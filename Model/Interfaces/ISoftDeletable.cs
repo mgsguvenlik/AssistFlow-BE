@@ -3,11 +3,11 @@
     /// <summary>
     /// This interface implemented Deletion Date and Is Deleted property for entity
     /// </summary>
-    public interface ISoftDeleteModel
+    public interface ISoftDeletable
     {
         /// <summary>
         /// Is Deleted
         /// </summary>
-        public bool IsDeleted { get; set; }
+        bool IsDeleted { get; set; }
     }
 }
