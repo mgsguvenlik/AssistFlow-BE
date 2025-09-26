@@ -17,8 +17,8 @@ namespace Model.Abstractions
         public DateTimeOffset? UpdatedDate { get; set; }
 
         // ASP.NET Identity defaultu string olduğu için string bıraktım (username veya userId tutabilirsiniz)
-        public string? CreatedUser { get; set; }
-        public string? UpdatedUser { get; set; }
+        public long CreatedUser { get; set; }
+        public long UpdatedUser { get; set; }
 
         public bool IsDeleted { get; set; }
     }

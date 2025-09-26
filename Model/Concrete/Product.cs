@@ -1,15 +1,12 @@
 ﻿using Model.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
     // Product (Ürün)
-    public class Product:AuditableWithUserEntity
+    public class Product : AuditableWithUserEntity
     {
+        [Key]
         public long Id { get; set; }
 
         public string? ProductCode { get; set; }          // Ürün Kodu

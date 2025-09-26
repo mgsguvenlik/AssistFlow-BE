@@ -9,7 +9,7 @@ namespace Model.Interfaces
     /// <summary>Oluşturan / güncelleyen kullanıcı alanları için arayüz.</summary>
     public interface IAuditedByUser
     {
-        string? CreatedUser { get; set; }
-        string? UpdatedUser { get; set; }
+        long CreatedUser { get; set; }
+        long UpdatedUser { get; set; }
     }
 }

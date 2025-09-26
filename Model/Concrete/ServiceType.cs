@@ -1,6 +1,7 @@
 ﻿using Model.Abstractions;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,8 +9,9 @@ using System.Threading.Tasks;
 namespace Model.Concrete
 {
     // Servis Türü
-    public class ServiceType:SoftDeleteEntity
+    public class ServiceType:BaseEntity
     {
+        [Key]
         public long Id { get; set; }
 
         /// <summary>Servis türü adı (örn: Kurulum, Keşif).</summary>

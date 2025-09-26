@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class Role : AuditableWithUserEntity
+    public class Role : TimestampedSoftDeleteEntity
     {
         /// <summary>Birincil anahtar (PK).</summary>
         [Key]

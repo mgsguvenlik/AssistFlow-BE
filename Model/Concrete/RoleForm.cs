@@ -1,23 +1,15 @@
-﻿using Model.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class RoleForm:SoftDeleteEntity
+    public class RoleForm : AbandonedMutexException
     {
+        [Key]
         public long Id { get; set; }
-
-       
-
         public bool IsVisible { get; set; }
         public bool Readonly { get; set; }
         public bool IsRequired { get; set; }
 
-        // Navigations
         /// <summary>İlgili form alanı.</summary>
         public long FormFieldId { get; set; }
         public FormField? FormField { get; set; }

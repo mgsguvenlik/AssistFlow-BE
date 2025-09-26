@@ -6,7 +6,7 @@ namespace Model.Concrete
     /// <summary>
     /// Hakediş yetkilisi
     /// </summary>
-    public class ProgressApprover : AuditableWithUserEntity
+    public class ProgressApprover : BaseEntity
     {
         /// <summary>
         /// Birincil anahtar (PK). Otomatik artan kimlik.

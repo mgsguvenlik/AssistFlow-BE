@@ -1,9 +1,11 @@
 ﻿using Model.Abstractions;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
     public class WorkFlowAnswer : AuditableWithUserEntity
     {
+        [Key]
         public long Id { get; set; }
         public string Value { get; set; } = null!;
 

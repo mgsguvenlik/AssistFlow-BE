@@ -1,9 +1,12 @@
 ﻿using Model.Abstractions;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class WorkFlowStatus:SoftDeleteEntity
+    public class WorkFlowStatus : SoftDeleteEntity
     {
+
+        [Key]
         public long Id { get; set; }
         public string Name { get; set; } = null!;
 

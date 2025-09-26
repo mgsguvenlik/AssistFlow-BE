@@ -1,14 +1,11 @@
 ﻿using Model.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class SystemType:SoftDeleteEntity
+    public class SystemType : BaseEntity
     {
+        [Key]
         public long Id { get; set; }
 
         /// <summary>Sistem tipi adı (örn: ARIZA, ŞUBE TADİLAT).</summary>

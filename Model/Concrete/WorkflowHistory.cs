@@ -1,9 +1,11 @@
 ﻿using Model.Abstractions;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
     public class WorkflowHistory:AuditableWithUserEntity
     {
+        [Key]
         public long Id { get; set; }
         public DateOnly Date { get; set; }
         public long StatusId { get; set; }
