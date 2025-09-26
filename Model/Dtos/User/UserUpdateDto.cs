@@ -3,12 +3,20 @@ namespace Model.Dtos.User
 {
     public class UserUpdateDto
     {
-        public Guid Id { get; set; }
-        public string UserName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string? FirstName { get; set; }
-        public string? LastName { get; set; }
-        public bool IsActive { get; set; } = true;
+        public long Id { get; set; }
+        public string TechnicianCode { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string? TechnicianCompany { get; set; }
+        public string? TechnicianAddress { get; set; }
+        public string? City { get; set; }
+        public string? District { get; set; }
+        public string TechnicianName { get; set; } = string.Empty;
+        public string? TechnicianPhone { get; set; }
+        public string? TechnicianEmail { get; set; }
+
+        // Şifre değiştirme opsiyonel
+        public string? NewPassword { get; set; }
+
+        public List<long>? RoleIds { get; set; }
     }
 }

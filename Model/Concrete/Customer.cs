@@ -91,7 +91,7 @@ namespace Model.Concrete
         /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
         /// </summary>
         [ForeignKey(nameof(CustomerType))]
-        public int? CustomerTypeId { get; set; }
+        public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
     }
 }

@@ -1,0 +1,26 @@
+﻿namespace Model.Dtos.Product
+{
+    public class ProductCreateDto
+    {
+        public string? ProductCode { get; set; }
+        public string? OracleProductCode { get; set; }
+        public string? SystemType { get; set; }
+
+        public long? BrandId { get; set; }
+        public long? ModelId { get; set; }
+
+        public string? Description { get; set; }
+        public string? PriceCurrency { get; set; }
+        public decimal? Price { get; set; }
+
+        public long? CurrencyTypeId { get; set; }
+
+        public DateTimeOffset? InstallationDate { get; set; }
+        public DateTimeOffset? ConnectionDate { get; set; }
+
+        public string? CorporateCustomerShortCode { get; set; }
+        public string? OracleCustomerCode { get; set; }
+
+        public long? ProductTypeId { get; set; }
+    }
+}
