@@ -26,7 +26,7 @@ namespace Business.Abstractions
             try
             {
                 if (await _unitOfWork.Repository.CompleteAsync() > 0)
-                    result = new ResponseModel<TEntity>(true, StatusCode.Success, entity);
+                    result = new ResponseModel<TEntity>(true, StatusCode.Ok, entity);
                 result.Message = "Save operation completed successfully.";
             }
             catch (Exception ex)
@@ -48,7 +48,7 @@ namespace Business.Abstractions
             {
                 if (await _unitOfWork.Repository.CompleteAsync() > 0)
                     result.IsSuccess = true;
-                result.StatusCode = StatusCode.Success;
+                result.StatusCode = StatusCode.Ok;
                 result.Message = "Save operation completed successfully.";
             }
             catch (Exception ex)

@@ -2,11 +2,13 @@
 {
     public enum StatusCode
     {
-        Success = 200,
-        Error = 400,
-        ServerError = 500,
+        Ok = 200,
+        Created = 201,
+        NoContent = 204,
+        BadRequest = 400,
         NotFound = 404,
-        ShowConfirm = 1000,
-        PrinterBusy = 1001,
+        Conflict = 409,
+        ValidationError = 422,
+        Error = 500
     }
 }

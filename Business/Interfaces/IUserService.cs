@@ -8,7 +8,6 @@ namespace Business.Interfaces
     {
         //ResponseModel<UserGetDto> GetById<TEntity>(object id, bool asNoTracking = false) where TEntity : class;
         //Task<ResponseModel<UserGetDto>> GetByIdAsync(object id, bool asNoTracking = false, CancellationToken cancellationToken = default);
-        //ResponseModel<List<UserGetDto>> GetAll(bool asNoTracking = false);
         //Task<ResponseModel<List<UserGetDto>>> GetAllAsync(bool asNoTracking = false, CancellationToken cancellationToken = default);
         //Task<ResponseModel<UserGetDto>> AddAsync(UserCreateDto entity);
         //Task<ResponseModel<UserGetDto>> UpdateAsync(UserUpdateDto entity);

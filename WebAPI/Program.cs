@@ -8,6 +8,8 @@ using Core.Utilities.IoC;
 using Data.Abstract;
 using Data.Concrete;
 using Data.Concrete.EfCore.Context;
+using Mapster;
+using MapsterMapper;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,10 +64,22 @@ builder.Services.AddDependencyResolvers(new ICoreModule[]
 {
     new AutofacBusinessModule()
 });
+
+#region Mapper
+
+var mapsterConfig = new TypeAdapterConfig();
+mapsterConfig.Scan(AppDomain.CurrentDomain.GetAssemblies()); // AppMappings bulunur
+mapsterConfig.Compile();
+
+builder.Services.AddSingleton(mapsterConfig);
+builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
+
 //builder.Services.AddAutoMapper(typeof(MapperProfile));
-MapsterConfig.Configure();
+//MapsterConfig.Configure();
 //builder.Services.AddDbContext<AppDataContext>(options =>
 //        options.UseSqlServer(appSettings.MSSQLConnectionString));
+#endregion
+
 
 builder.Services.AddDbContext<AppDataContext>(options =>
     options.UseSqlServer(

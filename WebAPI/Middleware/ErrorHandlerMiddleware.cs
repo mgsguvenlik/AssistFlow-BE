@@ -94,7 +94,7 @@ namespace WebAPI.Middleware
             var response = new ResponseModel
             {
                 Message = $"Internal Server Error. Please try again later. ERROR: {exception.Message}",
-                StatusCode = StatusCode.ServerError,
+                StatusCode = StatusCode.Error,
                 IsSuccess = false
             };
 
