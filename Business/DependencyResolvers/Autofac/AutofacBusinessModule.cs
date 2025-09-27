@@ -21,6 +21,7 @@ namespace Business.DependencyResolvers.Autofac
 
             services.AddScoped(typeof(IUserService), typeof(UserService));
             services.AddScoped(typeof(IRoleService), typeof(RoleService));
+            services.AddScoped(typeof(IAuthService), typeof(AuthService));
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();

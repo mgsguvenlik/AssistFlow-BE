@@ -29,6 +29,79 @@ public class UserService
     protected override Expression<Func<User, bool>> KeyPredicate(long id)
         => u => u.Id == id;
 
+    public override async Task<ResponseModel<UserGetDto>> CreateAsync(UserCreateDto dto)
+    {
+        try
+        {
+            // 1) DTO -> Entity
+            var entity = _mapper.Map<User>(dto);
+
+            // 2) Şifre zorunlu + hashle
+            if (string.IsNullOrWhiteSpace(dto.Password))
+                return ResponseModel<UserGetDto>.Fail("Şifre zorunludur.", StatusCode.BadRequest);
+
+            entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.Password);
+
+            // (Opsiyonel) Eğer base'inde SetCreateAuditIfExists varsa çağır:
+            // SetCreateAuditIfExists(entity);
+
+            // 3) Kullanıcıyı kaydet (Id üretilecek)
+            await _unitOfWork.Repository.AddAsync(entity);
+            await _unitOfWork.Repository.CompleteAsync();
+
+            // 4) Rol atamaları (varsa) -> önce doğrula sonra ekle
+            if (dto.RoleIds is not null && dto.RoleIds.Any())
+            {
+                var desired = dto.RoleIds.Distinct().ToList();
+
+                // Geçerli rol Id'lerini getir
+                var roles = await _unitOfWork.Repository.GetMultipleAsync<Role>(
+                    asNoTracking: true,
+                    r => desired.Contains(r.Id));
+
+                var existingIds = roles.Select(r => r.Id).ToHashSet();
+                var missing = desired.Where(id => !existingIds.Contains(id)).ToList();
+                if (missing.Any())
+                    return ResponseModel<UserGetDto>.Fail(
+                        $"Geçersiz rol id(leri): {string.Join(", ", missing)}",
+                        StatusCode.BadRequest);
+
+                // UserRole kayıtlarını ekle
+                var userRoles = existingIds.Select(rid => new UserRole
+                {
+                    UserId = entity.Id,
+                    RoleId = rid
+                }).ToList();
+
+                if (userRoles.Count > 0)
+                {
+                    await _unitOfWork.Repository.AddRangeAsync(userRoles);
+                    await _unitOfWork.Repository.CompleteAsync();
+                }
+            }
+
+            // 5) DTO'yu include'larla projekte et ve döndür
+            var query = _unitOfWork.Repository.GetQueryable<User>();
+            var inc = IncludeExpression();
+            if (inc is not null) query = inc(query);
+
+            var created = await query.AsNoTracking()
+                                     .Where(u => u.Id == entity.Id)
+                                     .ProjectToType<UserGetDto>(_config)
+                                     .FirstAsync();
+
+            return ResponseModel<UserGetDto>.Success(created, "Created", StatusCode.Created);
+        }
+        catch (DbUpdateException ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"DB error: {ex.Message}", StatusCode.Conflict);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"Beklenmeyen hata: {ex.Message}", StatusCode.Error);
+        }
+    }
+
     // Include'lar (roller)
     protected override Func<IQueryable<User>, IIncludableQueryable<User, object>>? IncludeExpression()
         => q => q.Include(u => u.UserRoles).ThenInclude(ur => ur.Role);

@@ -1,5 +1,6 @@
 ﻿using Business.Interfaces;
 using Core.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.User;
 
@@ -7,6 +8,7 @@ namespace WebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    //[Authorize(Roles = "Admin")]
     public class UsersController : CrudControllerBase<UserCreateDto, UserUpdateDto, UserGetDto, long>
     {
         private readonly IUserService _userService;

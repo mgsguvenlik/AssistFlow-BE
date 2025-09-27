@@ -37,7 +37,7 @@ namespace Business.Services.Base
 
 
         // Zaman & kullanıcı id okuyucu
-        protected virtual DateTimeOffset Now() => DateTimeOffset.UtcNow;
+        protected virtual DateTimeOffset Now() => DateTimeOffset.Now;
 
         protected virtual long GetCurrentUserIdOrDefault()
         {
@@ -215,7 +215,7 @@ namespace Business.Services.Base
         // ----------------------------------------------
         // CRUD
         // ----------------------------------------------
-        public  async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
+        public  virtual async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
         {
             try
             {
@@ -310,7 +310,6 @@ namespace Business.Services.Base
                 return ResponseModel<bool>.Fail($"Unexpected error: {ex.Message}", StatusCode.Error, false);
             }
         }
-
 
         public virtual async Task<ResponseModel<TGetDto>> GetByIdAsync(TKey id)
         {

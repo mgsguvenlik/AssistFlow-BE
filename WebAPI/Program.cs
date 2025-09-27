@@ -11,6 +11,7 @@ using Data.Concrete.EfCore.Context;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -52,7 +53,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy",
         policy => policy
-            .WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "http://localhost:8081") // React frontend URL'si
+            .WithOrigins(
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:5173",
+            "http://localhost:8081") // React frontend URL'si
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials() // Bunu kullanýyorsan WithOrigins zorunlu!
@@ -125,28 +130,35 @@ builder.Services.AddOpenApi(options =>
 
 
 #region jwt login
-builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
+// Session
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.Name = "app_session";
+    options.IdleTimeout = TimeSpan.FromHours(8);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
 
-            ValidIssuer = appSettings.Issuer,
-            ValidAudience = appSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(appSettings.Key!)
-            )
-        };
+// Cookie Auth
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "app_auth";
+        options.LoginPath = "/api/auth/login";
+        options.LogoutPath = "/api/auth/logout";
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+
+        // Cross-site SPA kullanýyorsan:
+        // options.Cookie.SameSite = SameSiteMode.None;
+        // options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     });
 
-builder.Services.AddAuthentication()
-    .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>("Basic", null);
-
 builder.Services.AddAuthorization();
+
+// HttpContext
+builder.Services.AddHttpContextAccessor();
 
 #endregion
 
@@ -179,8 +191,11 @@ app.UseRequestLocalization(options =>
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+// Sýra önemli:
+app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 await app.RunAsync();
