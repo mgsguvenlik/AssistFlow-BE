@@ -19,14 +19,6 @@ namespace Business.Mapper
 {
     public  class MapsterConfig : IRegister
     {
-        //public static void Configure()
-        //{
-        //    TypeAdapterConfig<User, UserCreateDto>.NewConfig();
-        //    TypeAdapterConfig<User, UserUpdateDto>.NewConfig();
-        //    TypeAdapterConfig<User, UserGetDto>.NewConfig();
-
-        //}
-
         public void Register(TypeAdapterConfig config)
         {
             // ---------------- Brand ----------------
@@ -162,8 +154,15 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles)
                   .Ignore(d => d.PasswordHash); // NewPassword serviste hash'lenir
-
-            config.NewConfig<User, UserGetDto>();
+            config.NewConfig<User, UserGetDto>()
+                  .Map(d => d.Roles,
+                       s => s.UserRoles.Select(ur => new RoleGetDto
+                       {
+                           Id = ur.RoleId,
+                           Name = ur.Role != null ? ur.Role.Name : null,
+                           Code = ur.Role != null ? ur.Role.Code : null
+                       }).ToList()
+                  );
 
             // ---------------- UserRole ----------------
             config.NewConfig<UserRoleCreateDto, UserRole>()

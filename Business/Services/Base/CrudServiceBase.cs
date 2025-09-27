@@ -5,9 +5,13 @@ using Core.Enums;
 using Data.Abstract;
 using Mapster;
 using MapsterMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
+using System.Reflection;
+using System.Security.Claims;
+using static System.Net.WebRequestMethods;
 
 namespace Business.Services.Base
 {
@@ -19,13 +23,135 @@ namespace Business.Services.Base
         protected readonly IRepository _repo;
         protected readonly IMapper _mapper;           // MapsterMapper.IMapper
         protected readonly TypeAdapterConfig _config; // Mapster config
+        // ... sınıf başı alanlar:
+        protected readonly IHttpContextAccessor? _http;
 
-        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config)
+        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor? http = null)
         {
             _unitOfWork = unitOfWork;
             _repo = unitOfWork.Repository;
             _mapper = mapper;
             _config = config;
+            _http = http;
+        }
+
+
+        // Zaman & kullanıcı id okuyucu
+        protected virtual DateTimeOffset Now() => DateTimeOffset.UtcNow;
+
+        protected virtual long GetCurrentUserIdOrDefault()
+        {
+            var user = _http?.HttpContext?.User;
+            if (user is null || !user.Identity?.IsAuthenticated == true) return 0;
+
+            // En yaygın claim'ler: NameIdentifier, sub, uid
+            var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier)
+                      ?? user.FindFirstValue("sub")
+                      ?? user.FindFirstValue("uid");
+
+            return long.TryParse(idStr, out var id) ? id : 0;
+        }
+
+        // -------------------- AUDIT HELPERS --------------------
+        protected virtual void SetCreateAuditIfExists(object? entity)
+        {
+            if (entity is null) return;
+            var now = Now();
+            var uid = GetCurrentUserIdOrDefault();
+
+            TrySetDate(entity, "CreatedDate", now, onlyIfDefault: true);
+            TrySetLong(entity, "CreatedUser", uid, onlyIfDefault: true);
+            TrySetBool(entity, "IsDeleted", false, onlyIfDefault: false);
+        }
+
+        protected virtual void SetUpdateAuditIfExists(object? entity)
+        {
+            if (entity is null) return;
+            var now = Now();
+            var uid = GetCurrentUserIdOrDefault();
+
+            TrySetDate(entity, "UpdatedDate", now, onlyIfDefault: false);
+            TrySetLong(entity, "UpdatedUser", uid, onlyIfDefault: false);
+        }
+
+        protected virtual bool TrySoftDeleteIfSupported(object entity)
+        {
+            // IsDeleted varsa soft delete uygula
+            var prop = FindProp(entity, "IsDeleted");
+            if (prop is null) return false;
+
+            TrySetBool(entity, "IsDeleted", true, onlyIfDefault: false);
+            SetUpdateAuditIfExists(entity);
+            return true;
+        }
+        private static void TrySetDate(object entity, string name, DateTimeOffset value, bool onlyIfDefault)
+        {
+            var p = FindProp(entity, name); if (p is null || !p.CanWrite) return;
+            var t = Underlying(p);
+            if (t == typeof(DateTimeOffset))
+            {
+                if (onlyIfDefault)
+                {
+                    var cur = p.GetValue(entity);
+                    if (cur == null || (cur is DateTimeOffset dto && dto == default))
+                        p.SetValue(entity, value);
+                }
+                else p.SetValue(entity, value);
+            }
+            else if (t == typeof(DateTime))
+            {
+                var val = value.UtcDateTime;
+                if (onlyIfDefault)
+                {
+                    var cur = p.GetValue(entity);
+                    if (cur == null || (cur is DateTime dt && dt == default))
+                        p.SetValue(entity, val);
+                }
+                else p.SetValue(entity, val);
+            }
+        }
+
+        private static void TrySetLong(object entity, string name, long value, bool onlyIfDefault)
+        {
+            var p = FindProp(entity, name); if (p is null || !p.CanWrite) return;
+            var t = Underlying(p);
+            if (t == typeof(long) || t == typeof(int))
+            {
+                if (onlyIfDefault)
+                {
+                    var cur = p.GetValue(entity);
+                    var isDefault = cur == null ||
+                                    (cur is long l && l == default) ||
+                                    (cur is int i && i == default);
+                    if (isDefault) p.SetValue(entity, t == typeof(long) ? value : (int)value);
+                }
+                else p.SetValue(entity, t == typeof(long) ? value : (int)value);
+            }
+        }
+
+        private static void TrySetBool(object entity, string name, bool value, bool onlyIfDefault)
+        {
+            var p = FindProp(entity, name); if (p is null || !p.CanWrite) return;
+            var t = Underlying(p);
+            if (t == typeof(bool))
+            {
+                if (onlyIfDefault)
+                {
+                    var cur = p.GetValue(entity);
+                    if (cur == null || (cur is bool b && EqualityComparer<bool>.Default.Equals(b, default)))
+                        p.SetValue(entity, value);
+                }
+                else p.SetValue(entity, value);
+            }
+        }
+        // -------------------- Reflection mini utils --------------------
+        private static PropertyInfo? FindProp(object entity, string name) =>
+            entity.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+        private static Type? Underlying(PropertyInfo p)
+        {
+            var t = p.PropertyType;
+            return Nullable.GetUnderlyingType(t) ?? t;
         }
 
         /// <summary> Entity'nin Id/Key'ini entity'den okuyup döndür. </summary>
@@ -89,26 +215,27 @@ namespace Business.Services.Base
         // ----------------------------------------------
         // CRUD
         // ----------------------------------------------
-        public virtual async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
+        public  async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
         {
             try
             {
                 var entity = _mapper.Map<TEntity>(dto);
+
+                // >>> created audit
+                SetCreateAuditIfExists(entity);
+
                 await _repo.AddAsync(entity);
                 await _repo.CompleteAsync();
 
                 var id = ReadKey(entity);
-
-                // Include gerekiyorsa IncludeExpression ile projekte et
-                var query = _repo.GetQueryable<TEntity>();
+                var q = _repo.GetQueryable<TEntity>();
                 var inc = IncludeExpression();
-                if (inc is not null) query = inc(query);
+                if (inc is not null) q = inc(q);
 
-                var created = await query
-                    .AsNoTracking()
-                    .Where(KeyPredicate(id))
-                    .ProjectToType<TGetDto>(_config)
-                    .FirstAsync();
+                var created = await q.AsNoTracking()
+                                     .Where(KeyPredicate(id))
+                                     .ProjectToType<TGetDto>(_config)
+                                     .FirstAsync();
 
                 return ResponseModel<TGetDto>.Success(created, "Created", StatusCode.Created);
             }
@@ -122,7 +249,7 @@ namespace Business.Services.Base
             }
         }
 
-        public virtual async Task<ResponseModel<TGetDto>> UpdateAsync(TUpdateDto dto)
+        public async Task<ResponseModel<TGetDto>> UpdateAsync(TUpdateDto dto)
         {
             try
             {
@@ -132,19 +259,20 @@ namespace Business.Services.Base
 
                 MapUpdate(dto, entity);
 
+                // >>> updated audit
+                SetUpdateAuditIfExists(entity);
+
                 await _repo.CompleteAsync();
 
-                // Güncelleneni include'larla tekrar çekmek istersen:
                 var id = ReadKey(entity);
-                var query = _repo.GetQueryable<TEntity>();
+                var q = _repo.GetQueryable<TEntity>();
                 var inc = IncludeExpression();
-                if (inc is not null) query = inc(query);
+                if (inc is not null) q = inc(q);
 
-                var updated = await query
-                    .AsNoTracking()
-                    .Where(KeyPredicate(id))
-                    .ProjectToType<TGetDto>(_config)
-                    .FirstAsync();
+                var updated = await q.AsNoTracking()
+                                     .Where(KeyPredicate(id))
+                                     .ProjectToType<TGetDto>(_config)
+                                     .FirstAsync();
 
                 return ResponseModel<TGetDto>.Success(updated, "Updated");
             }
@@ -158,18 +286,23 @@ namespace Business.Services.Base
             }
         }
 
-        public virtual async Task<ResponseModel<bool>> DeleteAsync(TKey id)
+
+        public async Task<ResponseModel<bool>> DeleteAsync(TKey id)
         {
             try
             {
-                // Varlık var mı?
-                var exists = await _repo.GetSingleAsync<TEntity>(asNoTracking: true, KeyPredicate(id));
-                if (exists is null)
+                var entity = await _repo.GetSingleAsync<TEntity>(asNoTracking: false, KeyPredicate(id));
+                if (entity is null)
                     return ResponseModel<bool>.Fail("Not found", StatusCode.NotFound, false);
 
+                if (TrySoftDeleteIfSupported(entity))
+                {
+                    await _repo.CompleteAsync();
+                    return ResponseModel<bool>.Success(true, "Deleted", StatusCode.NoContent);
+                }
+                // Soft destek yoksa hard delete
                 await _repo.HardDeleteAsync<TEntity>(id);
                 await _repo.CompleteAsync();
-
                 return ResponseModel<bool>.Success(true, "Deleted", StatusCode.NoContent);
             }
             catch (Exception ex)
@@ -177,6 +310,7 @@ namespace Business.Services.Base
                 return ResponseModel<bool>.Fail($"Unexpected error: {ex.Message}", StatusCode.Error, false);
             }
         }
+
 
         public virtual async Task<ResponseModel<TGetDto>> GetByIdAsync(TKey id)
         {
@@ -213,5 +347,6 @@ namespace Business.Services.Base
             return ResponseModel<PagedResult<TGetDto>>.Success(
                 new PagedResult<TGetDto>(items, total, q.Page, q.PageSize));
         }
+
     }
 }

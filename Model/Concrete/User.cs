@@ -13,10 +13,6 @@ namespace Model.Concrete
         [Required, MaxLength(50)]
         public string TechnicianCode { get; set; } = string.Empty;
 
-        /// <summary>Görevi / Rolü (örn. Saha Teknisyeni, Ekip Lideri).</summary>
-        [Required, MaxLength(100)]
-        public string Role { get; set; } = string.Empty;
-
         /// <summary>Bağlı olduğu firma/unvan.</summary>
         [MaxLength(200)]
         public string? TechnicianCompany { get; set; }

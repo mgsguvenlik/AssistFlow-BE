@@ -67,24 +67,58 @@ public class UserService
         }
     }
 
-    public override async Task<ResponseModel<UserGetDto>> CreateAsync(UserCreateDto dto)
+    // ---------- Çoklu Rol Atama (Id listesi) ----------
+    public async Task<ResponseModel<UserGetDto>> AssignRolesAsync(long userId, IEnumerable<long> roleIds)
     {
-        // Şifre hash serviste üret
-        var entity = _mapper.Map<User>(dto);
-        entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.Password);
-        await _unitOfWork.Repository.AddAsync(entity);
-        await _unitOfWork.Repository.CompleteAsync();
+        try
+        {
+            var desired = (roleIds ?? Enumerable.Empty<long>()).Distinct().ToHashSet();
 
-        var id = ReadKey(entity);
+            var user = await _unitOfWork.Repository.GetSingleAsync<User>(
+                asNoTracking: false,
+                u => u.Id == userId,
+                q => q.Include(u => u.UserRoles));
 
-        var query = _unitOfWork.Repository.GetQueryable<User>();
-        query = IncludeExpression()!(query);
+            if (user is null)
+                return ResponseModel<UserGetDto>.Fail("Kullanıcı bulunamadı.", StatusCode.NotFound);
 
-        var created = await query.AsNoTracking()
-            .Where(KeyPredicate(id))
-            .ProjectToType<UserGetDto>(_config)
-            .FirstAsync();
+            // Var olan role’leri doğrula (geçersiz id varsa bildir)
+            var existingRoles = await _unitOfWork.Repository.GetMultipleAsync<Role>(
+                asNoTracking: true,
+                r => desired.Contains(r.Id));
 
-        return ResponseModel<UserGetDto>.Success(created, "Created", StatusCode.Created);
+            var existingIds = existingRoles.Select(r => r.Id).ToHashSet();
+            var missing = desired.Except(existingIds).ToList();
+            if (missing.Any())
+                return ResponseModel<UserGetDto>.Fail($"Bilinmeyen rol id(s): {string.Join(", ", missing)}", StatusCode.BadRequest);
+
+            // Senkronize et
+            var current = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
+            var toAdd = existingIds.Except(current);
+            var toRemove = current.Except(existingIds);
+
+            if (toRemove.Any())
+                user.UserRoles = user.UserRoles.Where(ur => !toRemove.Contains(ur.RoleId)).ToList();
+
+            foreach (var rid in toAdd)
+                user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = rid });
+
+            await _unitOfWork.Repository.CompleteAsync();
+
+            // Güncel DTO’yu include ile getir
+            var query = _unitOfWork.Repository.GetQueryable<User>();
+            query = IncludeExpression()!(query);
+
+            var dto = await query.AsNoTracking()
+                                 .Where(u => u.Id == userId)
+                                 .ProjectToType<UserGetDto>(_config)
+                                 .FirstAsync();
+
+            return ResponseModel<UserGetDto>.Success(dto, "Roller Güncelendi.");
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"Beklenmedik hata: {ex.Message}", StatusCode.Error);
+        }
     }
 }

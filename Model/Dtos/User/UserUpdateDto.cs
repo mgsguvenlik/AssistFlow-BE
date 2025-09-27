@@ -5,7 +5,6 @@ namespace Model.Dtos.User
     {
         public long Id { get; set; }
         public string TechnicianCode { get; set; } = string.Empty;
-        public string Role { get; set; } = string.Empty;
         public string? TechnicianCompany { get; set; }
         public string? TechnicianAddress { get; set; }
         public string? City { get; set; }
