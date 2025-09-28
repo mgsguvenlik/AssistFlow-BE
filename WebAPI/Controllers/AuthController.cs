@@ -1,7 +1,6 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Auth;
 

@@ -1,6 +1,9 @@
-﻿namespace Business.Interfaces
+﻿using Model.Dtos.ProductType;
+using Model.Dtos.ProgressApprover;
+
+namespace Business.Interfaces
 {
-    public interface IProgressApproverService
+    public interface IProgressApproverService 
     {
     }
 }
