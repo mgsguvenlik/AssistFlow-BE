@@ -21,6 +21,9 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<ServiceType> ServiceTypes{ get; set; }
         public DbSet<SystemType>SystemTypes{ get; set; }
         public DbSet<UserRole> UserRoles{ get; set; }
+        public DbSet<City> Cities{ get; set; }
+        public DbSet<Region> Regions{ get; set; }
+        public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -158,6 +161,12 @@ namespace Data.Concrete.EfCore.Context
                 e.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 e.Property(x => x.ContractNumber).HasMaxLength(50);
             });
+
+
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<Data.Seeding.Infrastructure.SeedHistory>()
+                        .HasIndex(x => x.Key)
+                        .IsUnique();
         }
     }
 }

@@ -75,8 +75,8 @@ public class AuthService : IAuthService
             {
                 IsPersistent = dto.RememberMe,
                 ExpiresUtc = dto.RememberMe
-                    ? DateTimeOffset.UtcNow.AddDays(7)
-                    : DateTimeOffset.UtcNow.AddHours(8),
+                    ? DateTimeOffset.Now.AddDays(7)
+                    : DateTimeOffset.Now.AddHours(8),
                 AllowRefresh = true
             };
 

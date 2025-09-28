@@ -8,6 +8,8 @@ using Core.Utilities.IoC;
 using Data.Abstract;
 using Data.Concrete;
 using Data.Concrete.EfCore.Context;
+using Data.Seeding.Infrastructure;
+using Data.Seeding.Seeds;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication;
@@ -18,9 +20,11 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
+using System;
 using System.Text;
 using WebAPI.Extensions;
 using WebAPI.Middleware;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,6 +88,11 @@ builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
 //builder.Services.AddDbContext<AppDataContext>(options =>
 //        options.UseSqlServer(appSettings.MSSQLConnectionString));
 #endregion
+
+// Seed servislerini kaydet
+builder.Services.AddDataSeeding(
+    typeof(TurkeyCitiesSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
 
 
 builder.Services.AddDbContext<AppDataContext>(options =>
@@ -164,6 +173,7 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
+await app.UseDataSeedingAsync<AppDataContext>(); // Migration’dan önce/sonra çaðýrabilirsin
 
 /// Otomatik Migration iþlemi
 MigrationApplier.ApplyMigrations(app);

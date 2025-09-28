@@ -1,6 +1,7 @@
 ﻿using Mapster;
 using Model.Concrete;
 using Model.Dtos.Brand;
+using Model.Dtos.City;
 using Model.Dtos.CurrencyType;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
@@ -9,6 +10,7 @@ using Model.Dtos.Model;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
+using Model.Dtos.Region;
 using Model.Dtos.Role;
 using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
@@ -17,7 +19,7 @@ using Model.Dtos.UserRole;
 
 namespace Business.Mapper
 {
-    public  class MapsterConfig : IRegister
+    public class MapsterConfig : IRegister
     {
         public void Register(TypeAdapterConfig config)
         {
@@ -33,7 +35,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Products);
 
             config.NewConfig<Brand, BrandGetDto>();
-                  
+
 
             // ---------------- Model ----------------
             config.NewConfig<ModelCreateDto, Model.Concrete.Model>()
@@ -71,7 +73,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Products);
 
             config.NewConfig<CurrencyType, CurrencyTypeGetDto>();
-           
+
 
             // ---------------- CustomerType ----------------
             config.NewConfig<CustomerTypeCreateDto, CustomerType>()
@@ -81,7 +83,7 @@ namespace Business.Mapper
                   .IgnoreNullValues(true);
 
             config.NewConfig<CustomerType, CustomerTypeGetDto>();
-       
+
 
             // ---------------- CustomerGroup ----------------
             config.NewConfig<CustomerGroupCreateDto, CustomerGroup>()
@@ -113,7 +115,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Customer);
 
             config.NewConfig<ProgressApprover, ProgressApproverGetDto>();
-          
+
 
             // ---------------- Role ----------------
             config.NewConfig<RoleCreateDto, Role>()
@@ -196,6 +198,18 @@ namespace Business.Mapper
 
             // Küçük özet
             config.NewConfig<Product, ProductGetDto>();
+
+            config.NewConfig<City, CityGetDto>()
+                  .Map(d => d.Regions,
+                       s => s.Regions.Select(r => new RegionGetDto
+                       {
+                           Id = r.Id,
+                           Name = r.Name,
+                           Code = r.Code,
+                           CityId = r.CityId
+                       }).ToList());
+
+            config.NewConfig<Region, RegionGetDto>();
         }
     }
 }

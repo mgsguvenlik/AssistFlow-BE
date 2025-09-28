@@ -1,0 +1,1458 @@
+[
+  {
+    "name": "ADANA",
+    "code": "01",
+    "regions": [
+      "ALADAĞ",
+      "CEYHAN",
+      "ÇUKUROVA",
+      "FEKE",
+      "İMAMOĞLU",
+      "KARAİSALI",
+      "KARATAŞ",
+      "KOZAN",
+      "POZANTI",
+      "SAİMBEYLİ",
+      "SARIÇAM",
+      "SEYHAN",
+      "TUFANBEYLİ",
+      "YUMURTALIK",
+      "YÜREĞİR"
+    ]
+  },
+  {
+    "name": "ADIYAMAN",
+    "code": "02",
+    "regions": [
+      "BESNİ",
+      "ÇELİKHAN",
+      "GERGER",
+      "GÖLBAŞI",
+      "KAHTA",
+      "MERKEZ",
+      "SAMSAT",
+      "SİNCİK",
+      "TUT"
+    ]
+  },
+  {
+    "name": "AFYONKARAHİSAR",
+    "code": "03",
+    "regions": [
+      "BAŞMAKÇI",
+      "BAYAT",
+      "BOLVADİN",
+      "ÇAY",
+      "ÇOBANLAR",
+      "DAZKIRI",
+      "DİNAR",
+      "EMİRDAĞ",
+      "EVCİLER",
+      "HOCALAR",
+      "İHSANİYE",
+      "İSCEHİSAR",
+      "KIZILÖREN",
+      "MERKEZ",
+      "SANDIKLI",
+      "SİNANPAŞA",
+      "SULTANDAĞI",
+      "ŞUHUT"
+    ]
+  },
+  {
+    "name": "AĞRI",
+    "code": "04",
+    "regions": [
+      "DİYADİN",
+      "DOĞUBAYAZIT",
+      "ELEŞKİRT",
+      "HAMUR",
+      "MERKEZ",
+      "PATNOS",
+      "TAŞLIÇAY",
+      "TUTA"
+    ]
+  },
+  {
+    "name": "AKSARAY",
+    "code": "68",
+    "regions": [
+      "AĞAÇÖREN",
+      "ESKİL",
+      "GÜLAĞAÇ",
+      "GÜZELYURT",
+      "MERKEZ",
+      "ORTAKÖY",
+      "SARIYAHŞİ"
+    ]
+  },
+  {
+    "name": "AMASYA",
+    "code": "05",
+    "regions": [
+      "GÖYNÜCEK",
+      "GÜMÜŞHACIKÖY",
+      "HAMAMÖZÜ",
+      "MERKEZ",
+      "MERZİFON",
+      "SULUOVA",
+      "TAŞOVA"
+    ]
+  },
+  {
+    "name": "ANKARA",
+    "code": "06",
+    "regions": [
+      "AKYURT",
+      "ALTINDAĞ",
+      "AYAŞ",
+      "BALA",
+      "BEYPAZARI",
+      "ÇAMLIDERE",
+      "ÇANKAYA",
+      "ÇUBUK",
+      "ELMADAĞ",
+      "ETİMESGUT",
+      "EVREN",
+      "GÖLBAŞI",
+      "GÜDÜL",
+      "HAYMANA",
+      "KALECİK",
+      "KAZAN",
+      "KEÇİÖREN",
+      "KIZILCAHAMAM",
+      "MAMAK",
+      "NALLIHAN",
+      "POLATLI",
+      "PURSAKLAR",
+      "SİNCAN",
+      "ŞEREFLİKOÇHİSAR",
+      "YENİMAHALLE"
+    ]
+  },
+  {
+    "name": "ANTALYA",
+    "code": "07",
+    "regions": [
+      "AKSEKİ",
+      "AKSU",
+      "ALANYA",
+      "DEMRE",
+      "DÖŞEMEALTI",
+      "ELMALI",
+      "FİNİKE",
+      "GAZİPAŞA",
+      "GÜNDOĞMUŞ",
+      "İBRADI",
+      "KAŞ",
+      "KEMER",
+      "KEPEZ",
+      "KONYAALTI",
+      "KORKUTELİ",
+      "KUMLUCA",
+      "MANAVGAT",
+      "MURATPAŞA",
+      "SERİK"
+    ]
+  },
+  {
+    "name": "ARDAHAN",
+    "code": "75",
+    "regions": [
+      "ÇILDIR",
+      "DAMAL",
+      "GÖLE",
+      "HANAK",
+      "MERKEZ",
+      "POSOF"
+    ]
+  },
+  {
+    "name": "ARTVİN",
+    "code": "08",
+    "regions": [
+      "ARDANUÇ",
+      "ARHAVİ",
+      "BORÇKA",
+      "HOPA",
+      "MERKEZ",
+      "MURGUL",
+      "ŞAVŞAT",
+      "YUSUFELİ"
+    ]
+  },
+  {
+    "name": "AYDIN",
+    "code": "09",
+    "regions": [
+      "BOZDOĞAN",
+      "BUHARKENT",
+      "ÇİNE",
+      "DİDİM",
+      "EFELER",
+      "GERMENCİK",
+      "İNCİRLİOVA",
+      "KARACASU",
+      "KARPUZLU",
+      "KOÇARLI",
+      "KÖŞK",
+      "KUŞADASI",
+      "KUYUCAK",
+      "NAZİLLİ",
+      "SÖKE",
+      "SULTANHİSAR",
+      "YENİPAZAR"
+    ]
+  },
+  {
+    "name": "BALIKESİR",
+    "code": "10",
+    "regions": [
+      "ALTIEYLÜL",
+      "AYVALIK",
+      "BALYA",
+      "BANDIRMA",
+      "BİGADİÇ",
+      "BURHANİYE",
+      "DURSUNBEY",
+      "EDREMİT",
+      "ERDEK",
+      "GÖMEÇ",
+      "GÖNEN",
+      "HAVRAN",
+      "İVRİNDİ",
+      "KARESİ",
+      "KEPSUT",
+      "MANYAS",
+      "MARMARA",
+      "SAVAŞTEPE",
+      "SINDIRGI",
+      "SUSURLUK"
+    ]
+  },
+  {
+    "name": "BARTIN",
+    "code": "74",
+    "regions": [
+      "AMASRA",
+      "KURUCAŞİLE",
+      "MERKEZ",
+      "ULUS"
+    ]
+  },
+  {
+    "name": "BATMAN",
+    "code": "72",
+    "regions": [
+      "BEŞİRİ",
+      "GERCÜŞ",
+      "HASANKEYF",
+      "KOZLUK",
+      "MERKEZ",
+      "SASON"
+    ]
+  },
+  {
+    "name": "BAYBURT",
+    "code": "69",
+    "regions": [
+      "AYDINTEPE",
+      "DEMİRÖZÜ",
+      "MERKEZ"
+    ]
+  },
+  {
+    "name": "BİLECİK",
+    "code": "11",
+    "regions": [
+      "BOZÜYÜK",
+      "GÖLPAZARI",
+      "İNHİSAR",
+      "MERKEZ",
+      "OSMANELİ",
+      "PAZARYERİ",
+      "SÖĞÜT",
+      "YENİPAZAR"
+    ]
+  },
+  {
+    "name": "BİNGÖL",
+    "code": "12",
+    "regions": [
+      "ADAKLI",
+      "GENÇ",
+      "KARLIOVA",
+      "KİĞI",
+      "MERKEZ",
+      "SOLHAN",
+      "YAYLADERE",
+      "YEDİSU"
+    ]
+  },
+  {
+    "name": "BİTLİS",
+    "code": "13",
+    "regions": [
+      "ADİLCEVAZ",
+      "AHLAT",
+      "GÜROYMAK",
+      "HİZAN",
+      "MERKEZ",
+      "MUTKİ",
+      "TATVAN"
+    ]
+  },
+  {
+    "name": "BOLU",
+    "code": "14",
+    "regions": [
+      "DÖRTDİVAN",
+      "GEREDE",
+      "GÖYNÜK",
+      "KIBRISCIK",
+      "MENGEN",
+      "MERKEZ",
+      "MUDURNU",
+      "SEBEN",
+      "YENİÇAĞA"
+    ]
+  },
+  {
+    "name": "BURDUR",
+    "code": "15",
+    "regions": [
+      "AĞLASUN",
+      "ALTINYAYLA",
+      "BUCAK",
+      "ÇAVDIR",
+      "ÇELTİKÇİ",
+      "GÖLHİSAR",
+      "KARAMANLI",
+      "KEMER",
+      "MERKEZ",
+      "TEFENNİ",
+      "YEŞİLOVA"
+    ]
+  },
+  {
+    "name": "BURSA",
+    "code": "16",
+    "regions": [
+      "BÜYÜKORHAN",
+      "GEMLİK",
+      "GÜRSU",
+      "HARMANCIK",
+      "İNEGÖL",
+      "İZNİK",
+      "KARACABEY",
+      "KELES",
+      "KESTEL",
+      "MUDANYA",
+      "MUSTAFAKEMALPAŞA",
+      "NİLÜFER",
+      "ORHANELİ",
+      "ORHANGAZİ",
+      "OSMANGAZİ",
+      "YENİŞEHİR",
+      "YILDIRIM"
+    ]
+  },
+  {
+    "name": "ÇANAKKALE",
+    "code": "17",
+    "regions": [
+      "AYVACIK",
+      "BAYRAMİÇ",
+      "BİGA",
+      "BOZCAADA",
+      "ÇAN",
+      "ECEABAT",
+      "EZİNE",
+      "GELİBOLU",
+      "GÖKÇEADA",
+      "LAPSEKİ",
+      "MERKEZ",
+      "YENİCE"
+    ]
+  },
+  {
+    "name": "ÇANKIRI",
+    "code": "18",
+    "regions": [
+      "ATKARACALAR",
+      "BAYRAMÖREN",
+      "ÇERKEŞ",
+      "ELDİVAN",
+      "ILGAZ",
+      "KIZILIRMAK",
+      "KORGUN",
+      "KURŞUNLU",
+      "MERKEZ",
+      "ORTA",
+      "ŞABANÖZÜ",
+      "YAPRAKLI"
+    ]
+  },
+  {
+    "name": "ÇORUM",
+    "code": "19",
+    "regions": [
+      "ALACA",
+      "BAYAT",
+      "BOĞAZKALE",
+      "DODURGA",
+      "İSKİLİP",
+      "KARGI",
+      "LAÇİN",
+      "MECİTÖZÜ",
+      "MERKEZ",
+      "OĞUZLAR",
+      "ORTAKÖY",
+      "OSMANCIK",
+      "SUNGURLU",
+      "UĞURLUDAĞ"
+    ]
+  },
+  {
+    "name": "DENİZLİ",
+    "code": "20",
+    "regions": [
+      "ACIPAYAM",
+      "BABADAĞ",
+      "BAKLAN",
+      "BEKİLLİ",
+      "BEYAĞAÇ",
+      "BOZKURT",
+      "BULDAN",
+      "ÇAL",
+      "ÇAMELİ",
+      "ÇARDAK",
+      "ÇİVRİL",
+      "GÜNEY",
+      "HONAZ",
+      "KALE",
+      "MERKEZEFENDİ",
+      "PAMUKKALE",
+      "SARAYKÖY",
+      "SERİNHİSAR",
+      "TAVAS"
+    ]
+  },
+  {
+    "name": "DİYARBAKIR",
+    "code": "21",
+    "regions": [
+      "BAĞLAR",
+      "BİSMİL",
+      "ÇERMİK",
+      "ÇINAR",
+      "ÇÜNGÜŞ",
+      "DİCLE",
+      "EĞİL",
+      "ERGANİ",
+      "HANİ",
+      "HAZRO",
+      "KAYAPINAR",
+      "KOCAKÖY",
+      "KULP",
+      "LİCE",
+      "SİLVAN",
+      "SUR",
+      "YENİŞEHİR"
+    ]
+  },
+  {
+    "name": "DÜZCE",
+    "code": "81",
+    "regions": [
+      "AKÇAKOCA",
+      "CUMAYERİ",
+      "ÇİLİMLİ",
+      "GÖLYAKA",
+      "GÜMÜŞOVA",
+      "KAYNAŞLI",
+      "MERKEZ",
+      "YIĞILCA"
+    ]
+  },
+  {
+    "name": "EDİRNE",
+    "code": "22",
+    "regions": [
+      "ENEZ",
+      "HAVSA",
+      "İPSALA",
+      "KEŞAN",
+      "LALAPAŞA",
+      "MERİÇ",
+      "MERKEZ",
+      "SÜLOĞLU",
+      "UZUNKÖPRÜ"
+    ]
+  },
+  {
+    "name": "ELAZIĞ",
+    "code": "23",
+    "regions": [
+      "AĞIN",
+      "ALACAKAYA",
+      "ARICAK",
+      "BASKİL",
+      "KARAKOÇAN",
+      "KEBAN",
+      "KOVANCILAR",
+      "MADEN",
+      "MERKEZ",
+      "PALU",
+      "SİVRİCE"
+    ]
+  },
+  {
+    "name": "ERZİNCAN",
+    "code": "24",
+    "regions": [
+      "ÇAYIRLI",
+      "İLİÇ",
+      "KEMAH",
+      "KEMALİYE",
+      "MERKEZ",
+      "OTLUKBELİ",
+      "REFAHİYE",
+      "TERCAN",
+      "ÜZÜMLÜ"
+    ]
+  },
+  {
+    "name": "ERZURUM",
+    "code": "25",
+    "regions": [
+      "AŞKALE",
+      "AZİZİYE",
+      "ÇAT",
+      "HINIS",
+      "HORASAN",
+      "İSPİR",
+      "KARAÇOBAN",
+      "KARAYAZI",
+      "KÖPRÜKÖY",
+      "NARMAN",
+      "OLTU",
+      "OLUR",
+      "PALANDÖKEN",
+      "PASİNLER",
+      "PAZARYOLU",
+      "ŞENKAYA",
+      "TEKMAN",
+      "TORTUM",
+      "UZUNDERE",
+      "YAKUTİYE"
+    ]
+  },
+  {
+    "name": "ESKİŞEHİR",
+    "code": "26",
+    "regions": [
+      "ALPU",
+      "BEYLİKOVA",
+      "ÇİFTELER",
+      "GÜNYÜZÜ",
+      "HAN",
+      "İNÖNÜ",
+      "MAHMUDİYE",
+      "MİHALGAZİ",
+      "MİHALIÇÇIK",
+      "ODUNPAZARI",
+      "SARICAKAYA",
+      "SEYİTGAZİ",
+      "SİVRİHİSAR",
+      "TEPEBAŞI"
+    ]
+  },
+  {
+    "name": "GAZİANTEP",
+    "code": "27",
+    "regions": [
+      "ARABAN",
+      "İSLAHİYE",
+      "KARKAMIŞ",
+      "NİZİP",
+      "NURDAĞI",
+      "OĞUZELİ",
+      "ŞAHİNBEY",
+      "ŞEHİTKAMİL",
+      "YAVUZELİ"
+    ]
+  },
+  {
+    "name": "GİRESUN",
+    "code": "28",
+    "regions": [
+      "ALUCRA",
+      "BULANCAK",
+      "ÇAMOLUK",
+      "ÇANAKÇI",
+      "DERELİ",
+      "DOĞANKENT",
+      "ESPİYE",
+      "EYNESİL",
+      "GÖRELE",
+      "GÜCE",
+      "KEŞAP",
+      "MERKEZ",
+      "PİRAZİZ",
+      "ŞEBİNKARAHİSAR",
+      "TİREBOLU",
+      "YAĞLIDERE"
+    ]
+  },
+  {
+    "name": "GÜMÜŞHANE",
+    "code": "29",
+    "regions": [
+      "KELKİT",
+      "KÖSE",
+      "KÜRTÜN",
+      "MERKEZ",
+      "ŞİRAN",
+      "TORUL"
+    ]
+  },
+  {
+    "name": "HAKKARİ",
+    "code": "30",
+    "regions": [
+      "ÇUKURCA",
+      "MERKEZ",
+      "ŞEMDİNLİ",
+      "YÜKSEKOVA"
+    ]
+  },
+  {
+    "name": "HATAY",
+    "code": "31",
+    "regions": [
+      "ALTINÖZÜ",
+      "ANTAKYA",
+      "ARSUZ",
+      "BELEN",
+      "DEFNE",
+      "DÖRTYOL",
+      "ERZİN",
+      "HASSA",
+      "İSKENDERUN",
+      "KIRIKHAN",
+      "KUMLU",
+      "PAYAS",
+      "REYHANLI",
+      "SAMANDAĞ",
+      "YAYLADAĞI"
+    ]
+  },
+  {
+    "name": "IĞDIR",
+    "code": "76",
+    "regions": [
+      "ARALIK",
+      "KARAKOYUNLU",
+      "MERKEZ",
+      "TUZLUCA"
+    ]
+  },
+  {
+    "name": "ISPARTA",
+    "code": "32",
+    "regions": [
+      "AKSU",
+      "ATABEY",
+      "EĞİRDİR",
+      "GELENDOST",
+      "GÖNEN",
+      "KEÇİBORLU",
+      "MERKEZ",
+      "SENİRKENT",
+      "SÜTÇÜLER",
+      "ŞARKİKARAAĞAÇ",
+      "ULUBORLU",
+      "YALVAÇ",
+      "YENİŞARBADEMLİ"
+    ]
+  },
+  {
+    "name": "İSTANBUL",
+    "code": "34",
+    "regions": [
+      "ADALAR",
+      "ARNAVUTKÖY",
+      "ATAŞEHİR",
+      "AVCILAR",
+      "BAĞCILAR",
+      "BAHÇELİEVLER",
+      "BAKIRKÖY",
+      "BAŞAKŞEHİR",
+      "BAYRAMPAŞA",
+      "BEŞİKTAŞ",
+      "BEYKOZ",
+      "BEYLİKDÜZÜ",
+      "BEYOĞLU",
+      "BÜYÜKÇEKMECE",
+      "ÇATALCA",
+      "ÇEKMEKÖY",
+      "ESENLER",
+      "ESENYURT",
+      "EYÜP",
+      "FATİH",
+      "GAZİOSMANPAŞA",
+      "GÜNGÖREN",
+      "KADIKÖY",
+      "KAĞITHANE",
+      "KARTAL",
+      "KÜÇÜKÇEKMECE",
+      "MALTEPE",
+      "PENDİK",
+      "SANCAKTEPE",
+      "SARIYER",
+      "SİLİVRİ",
+      "SULTANBEYLİ",
+      "SULTANGAZİ",
+      "ŞİLE",
+      "ŞİŞLİ",
+      "TUZLA",
+      "ÜMRANİYE",
+      "ÜSKÜDAR",
+      "ZEYTİNBURNU"
+    ]
+  },
+  {
+    "name": "İZMİR",
+    "code": "35",
+    "regions": [
+      "ALİAĞA",
+      "BALÇOVA",
+      "BAYINDIR",
+      "BAYRAKLI",
+      "BERGAMA",
+      "BEYDAĞ",
+      "BORNOVA",
+      "BUCA",
+      "ÇEŞME",
+      "ÇİĞLİ",
+      "DİKİLİ",
+      "FOÇA",
+      "GAZİEMİR",
+      "GÜZELBAHÇE",
+      "KARABAĞLAR",
+      "KARABURUN",
+      "KARŞIYAKA",
+      "KEMALPAŞA",
+      "KINIK",
+      "KİRAZ",
+      "KONAK",
+      "MENDERES",
+      "MENEMEN",
+      "NARLIDERE",
+      "ÖDEMİŞ",
+      "SEFERİHİSAR",
+      "SELÇUK",
+      "TİRE",
+      "TORBALI",
+      "URLA"
+    ]
+  },
+  {
+    "name": "KAHRAMANMARAŞ",
+    "code": "46",
+    "regions": [
+      "AFŞİN",
+      "ANDIRIN",
+      "ÇAĞLAYANCERİT",
+      "DULKADİROĞLU",
+      "EKİNÖZÜ",
+      "ELBİSTAN",
+      "GÖKSUN",
+      "NURHAK",
+      "ONİKİŞUBAT",
+      "PAZARCIK",
+      "TÜRKOĞLU"
+    ]
+  },
+  {
+    "name": "KARABÜK",
+    "code": "78",
+    "regions": [
+      "EFLANİ",
+      "ESKİPAZAR",
+      "MERKEZ",
+      "OVACIK",
+      "SAFRANBOLU",
+      "YENİCE"
+    ]
+  },
+  {
+    "name": "KARAMAN",
+    "code": "70",
+    "regions": [
+      "AYRANCI",
+      "BAŞYAYLA",
+      "ERMENEK",
+      "KAZIMKARABEKİR",
+      "MERKEZ",
+      "SARIVELİLER"
+    ]
+  },
+  {
+    "name": "KARS",
+    "code": "36",
+    "regions": [
+      "AKYAKA",
+      "ARPAÇAY",
+      "DİGOR",
+      "KAĞIZMAN",
+      "MERKEZ",
+      "SARIKAMIŞ",
+      "SELİM",
+      "SUSUZ"
+    ]
+  },
+  {
+    "name": "KASTAMONU",
+    "code": "37",
+    "regions": [
+      "ABANA",
+      "AĞLI",
+      "ARAÇ",
+      "AZDAVAY",
+      "BOZKURT",
+      "CİDE",
+      "ÇATALZEYTİN",
+      "DADAY",
+      "DEVREKANİ",
+      "DOĞANYURT",
+      "HANÖNÜ",
+      "İHSANGAZİ",
+      "İNEBOLU",
+      "KÜRE",
+      "MERKEZ",
+      "PINARBAŞI",
+      "SEYDİLER",
+      "ŞENPAZAR",
+      "TAŞKÖPRÜ",
+      "TOSYA"
+    ]
+  },
+  {
+    "name": "KAYSERİ",
+    "code": "38",
+    "regions": [
+      "AKKIŞLA",
+      "BÜNYAN",
+      "DEVELİ",
+      "FELAHİYE",
+      "HACILAR",
+      "İNCESU",
+      "KOCASİNAN",
+      "MELİKGAZİ",
+      "ÖZVATAN",
+      "PINARBAŞI",
+      "SARIOĞLAN",
+      "SARIZ",
+      "TALAS",
+      "TOMARZA",
+      "YAHYALI",
+      "YEŞİLHİSAR"
+    ]
+  },
+  {
+    "name": "KIRIKKALE",
+    "code": "71",
+    "regions": [
+      "BAHŞİLİ",
+      "BALIŞEYH",
+      "ÇELEBİ",
+      "DELİCE",
+      "KARAKEÇİLİ",
+      "KESKİN",
+      "MERKEZ",
+      "SULAKYURT",
+      "YAHŞİHAN"
+    ]
+  },
+  {
+    "name": "KIRKLARELİ",
+    "code": "39",
+    "regions": [
+      "BABAESKİ",
+      "DEMİRKÖY",
+      "KOFÇAZ",
+      "LÜLEBURGAZ",
+      "MERKEZ",
+      "PEHLİVANKÖY",
+      "PINARHİSAR",
+      "VİZE"
+    ]
+  },
+  {
+    "name": "KIRŞEHİR",
+    "code": "40",
+    "regions": [
+      "AKÇAKENT",
+      "AKPINAR",
+      "BOZTEPE",
+      "ÇİÇEKDAĞI",
+      "KAMAN",
+      "MERKEZ",
+      "MUCUR"
+    ]
+  },
+  {
+    "name": "KİLİS",
+    "code": "79",
+    "regions": [
+      "ELBEYLİ",
+      "MERKEZ",
+      "MUSABEYLİ",
+      "POLATELİ"
+    ]
+  },
+  {
+    "name": "KOCAELİ",
+    "code": "41",
+    "regions": [
+      "BAŞİSKELE",
+      "ÇAYIROVA",
+      "DARICA",
+      "DERİNCE",
+      "DİLOVASI",
+      "GEBZE",
+      "GÖLCÜK",
+      "İZMİT",
+      "KANDIRA",
+      "KARAMÜRSEL",
+      "KARTEPE",
+      "KÖRFEZ"
+    ]
+  },
+  {
+    "name": "KONYA",
+    "code": "42",
+    "regions": [
+      "AHIRLI",
+      "AKÖREN",
+      "AKŞEHİR",
+      "ALTINEKİN",
+      "BEYŞEHİR",
+      "BOZKIR",
+      "CİHANBEYLİ",
+      "ÇELTİK",
+      "ÇUMRA",
+      "DERBENT",
+      "DEREBUCAK",
+      "DOĞANHİSAR",
+      "EMİRGAZİ",
+      "EREĞLİ",
+      "GÜNEYSINIR",
+      "HADİM",
+      "HALKAPINAR",
+      "HÜYÜK",
+      "ILGIN",
+      "KADINHANI",
+      "KARAPINAR",
+      "KARATAY",
+      "KULU",
+      "MERAM",
+      "SARAYÖNÜ",
+      "SELÇUKLU",
+      "SEYDİŞEHİR",
+      "TAŞKENT",
+      "TUZLUKÇU",
+      "YALIHÜYÜK",
+      "YUNAK"
+    ]
+  },
+  {
+    "name": "KÜTAHYA",
+    "code": "43",
+    "regions": [
+      "ALTINTAŞ",
+      "ASLANAPA",
+      "ÇAVDARHİSAR",
+      "DOMANİÇ",
+      "DUMLUPINAR",
+      "EMET",
+      "GEDİZ",
+      "HİSARCIK",
+      "MERKEZ",
+      "PAZARLAR",
+      "SİMAV",
+      "ŞAPHANE",
+      "TAVŞANLI"
+    ]
+  },
+  {
+    "name": "MALATYA",
+    "code": "44",
+    "regions": [
+      "AKÇADAĞ",
+      "ARAPGİR",
+      "ARGUVAN",
+      "BATTALGAZİ",
+      "DARENDE",
+      "DOĞANŞEHİR",
+      "DOĞANYOL",
+      "HEKİMHAN",
+      "KALE",
+      "KULUNCAK",
+      "PÜTÜRGE",
+      "YAZIHAN",
+      "YEŞİLYURT"
+    ]
+  },
+  {
+    "name": "MANİSA",
+    "code": "45",
+    "regions": [
+      "AHMETLİ",
+      "AKHİSAR",
+      "ALAŞEHİR",
+      "DEMİRCİ",
+      "GÖLMARMARA",
+      "GÖRDES",
+      "KIRKAĞAÇ",
+      "KÖPRÜBAŞI",
+      "KULA",
+      "SALİHLİ",
+      "SARIGÖL",
+      "SARUHANLI",
+      "SELENDİ",
+      "SOMA",
+      "ŞEHZADELER",
+      "TURGUTLU",
+      "YUNUSEMRE"
+    ]
+  },
+  {
+    "name": "MARDİN",
+    "code": "47",
+    "regions": [
+      "ARTUKLU",
+      "DARGEÇİT",
+      "DERİK",
+      "KIZILTEPE",
+      "MAZIDAĞI",
+      "MİDYAT",
+      "NUSAYBİN",
+      "ÖMERLİ",
+      "SAVUR",
+      "YEŞİLLİ"
+    ]
+  },
+  {
+    "name": "MERSİN",
+    "code": "33",
+    "regions": [
+      "AKDENİZ",
+      "ANAMUR",
+      "AYDINCIK",
+      "BOZYAZI",
+      "ÇAMLIYAYLA",
+      "ERDEMLİ",
+      "GÜLNAR",
+      "MEZİTLİ",
+      "MUT",
+      "SİLİFKE",
+      "TARSUS",
+      "TOROSLAR",
+      "YENİŞEHİR"
+    ]
+  },
+  {
+    "name": "MUĞLA",
+    "code": "48",
+    "regions": [
+      "BODRUM",
+      "DALAMAN",
+      "DATÇA",
+      "FETHİYE",
+      "KAVAKLIDERE",
+      "KÖYCEĞİZ",
+      "MARMARİS",
+      "MENTEŞE",
+      "MİLAS",
+      "ORTACA",
+      "SEYDİKEMER",
+      "ULA",
+      "YATAĞAN"
+    ]
+  },
+  {
+    "name": "MUŞ",
+    "code": "49",
+    "regions": [
+      "BULANIK",
+      "HASKÖY",
+      "KORKUT",
+      "MALAZGİRT",
+      "MERKEZ",
+      "VARTO"
+    ]
+  },
+  {
+    "name": "NEVŞEHİR",
+    "code": "50",
+    "regions": [
+      "ACIGÖL",
+      "AVANOS",
+      "DERİNKUYU",
+      "GÜLŞEHİR",
+      "HACIBEKTAŞ",
+      "KOZAKLI",
+      "MERKEZ",
+      "ÜRGÜP"
+    ]
+  },
+  {
+    "name": "NİĞDE",
+    "code": "51",
+    "regions": [
+      "ALTUNHİSAR",
+      "BOR",
+      "ÇAMARDI",
+      "ÇİFTLİK",
+      "MERKEZ",
+      "ULUKIŞLA"
+    ]
+  },
+  {
+    "name": "ORDU",
+    "code": "52",
+    "regions": [
+      "AKKUŞ",
+      "ALTINORDU",
+      "AYBASTI",
+      "ÇAMAŞ",
+      "ÇATALPINAR",
+      "ÇAYBAŞI",
+      "FATSA",
+      "GÖLKÖY",
+      "GÜLYALI",
+      "GÜRGENTEPE",
+      "İKİZCE",
+      "KABADÜZ",
+      "KABATAŞ",
+      "KORGAN",
+      "KUMRU",
+      "MESUDİYE",
+      "PERŞEMBE",
+      "ULUBEY",
+      "ÜNYE"
+    ]
+  },
+  {
+    "name": "OSMANİYE",
+    "code": "80",
+    "regions": [
+      "BAHÇE",
+      "DÜZİÇİ",
+      "HASANBEYLİ",
+      "KADİRLİ",
+      "MERKEZ",
+      "SUMBAS",
+      "TOPRAKKALE"
+    ]
+  },
+  {
+    "name": "RİZE",
+    "code": "53",
+    "regions": [
+      "ARDEŞEN",
+      "ÇAMLIHEMŞİN",
+      "ÇAYELİ",
+      "DEREPAZARI",
+      "FINDIKLI",
+      "GÜNEYSU",
+      "HEMŞİN",
+      "İKİZDERE",
+      "İYİDERE",
+      "KALKANDERE",
+      "MERKEZ",
+      "PAZAR"
+    ]
+  },
+  {
+    "name": "SAKARYA",
+    "code": "54",
+    "regions": [
+      "ADAPAZARI",
+      "AKYAZI",
+      "ARİFİYE",
+      "ERENLER",
+      "FERİZLİ",
+      "GEYVE",
+      "HENDEK",
+      "KARAPÜRÇEK",
+      "KARASU",
+      "KAYNARCA",
+      "KOCAALİ",
+      "PAMUKOVA",
+      "SAPANCA",
+      "SERDİVAN",
+      "SÖĞÜTLÜ",
+      "TARAKLI"
+    ]
+  },
+  {
+    "name": "SAMSUN",
+    "code": "55",
+    "regions": [
+      "ALAÇAM",
+      "ASARCIK",
+      "ATAKUM",
+      "AYVACIK",
+      "BAFRA",
+      "CANİK",
+      "ÇARŞAMBA",
+      "HAVZA",
+      "İLKADIM",
+      "KAVAK",
+      "LADİK",
+      "ONDOKUZMAYIS",
+      "SALIPAZARI",
+      "TEKKEKÖY",
+      "TERME",
+      "VEZİRKÖPRÜ",
+      "YAKAKENT"
+    ]
+  },
+  {
+    "name": "SİİRT",
+    "code": "56",
+    "regions": [
+      "AYDINLAR",
+      "BAYKAN",
+      "ERUH",
+      "KURTALAN",
+      "MERKEZ",
+      "PERVARİ",
+      "ŞİRVAN"
+    ]
+  },
+  {
+    "name": "SİNOP",
+    "code": "57",
+    "regions": [
+      "AYANCIK",
+      "BOYABAT",
+      "DİKMEN",
+      "DURAĞAN",
+      "ERFELEK",
+      "GERZE",
+      "MERKEZ",
+      "SARAYDÜZÜ",
+      "TÜRKELİ"
+    ]
+  },
+  {
+    "name": "SİVAS",
+    "code": "58",
+    "regions": [
+      "AKINCILAR",
+      "ALTINYAYLA",
+      "DİVRİĞİ",
+      "DOĞANŞAR",
+      "GEMEREK",
+      "GÖLOVA",
+      "GÜRÜN",
+      "HAFİK",
+      "İMRANLI",
+      "KANGAL",
+      "KOYULHİSAR",
+      "MERKEZ",
+      "SUŞEHRİ",
+      "ŞARKIŞLA",
+      "ULAŞ",
+      "YILDIZELİ",
+      "ZARA"
+    ]
+  },
+  {
+    "name": "ŞANLIURFA",
+    "code": "63",
+    "regions": [
+      "AKÇAKALE",
+      "BİRECİK",
+      "BOZOVA",
+      "CEYLANPINAR",
+      "EYYÜBİYE",
+      "HALFETİ",
+      "HALİLİYE",
+      "HARRAN",
+      "HİLVAN",
+      "KARAKÖPRÜ",
+      "SİVEREK",
+      "SURUÇ",
+      "VİRANŞEHİR"
+    ]
+  },
+  {
+    "name": "ŞIRNAK",
+    "code": "73",
+    "regions": [
+      "BEYTÜŞŞEBAP",
+      "CİZRE",
+      "GÜÇLÜKONAK",
+      "İDİL",
+      "MERKEZ",
+      "SİLOPİ",
+      "ULUDERE"
+    ]
+  },
+  {
+    "name": "TEKİRDAĞ",
+    "code": "59",
+    "regions": [
+      "ÇERKEZKÖY",
+      "ÇORLU",
+      "ERGENE",
+      "HAYRABOLU",
+      "KAPAKLI",
+      "MALKARA",
+      "MARMARAEREĞLİSİ",
+      "MURATLI",
+      "SARAY",
+      "SÜLEYMANPAŞA",
+      "ŞARKÖY"
+    ]
+  },
+  {
+    "name": "TOKAT",
+    "code": "60",
+    "regions": [
+      "ALMUS",
+      "ARTOVA",
+      "BAŞÇİFTLİK",
+      "ERBAA",
+      "MERKEZ",
+      "NİKSAR",
+      "PAZAR",
+      "REŞADİYE",
+      "SULUSARAY",
+      "TURHAL",
+      "YEŞİLYURT",
+      "ZİLE"
+    ]
+  },
+  {
+    "name": "TRABZON",
+    "code": "61",
+    "regions": [
+      "AKÇAABAT",
+      "ARAKLI",
+      "ARSİN",
+      "BEŞİKDÜZÜ",
+      "ÇARŞIBAŞI",
+      "ÇAYKARA",
+      "DERNEKPAZARI",
+      "DÜZKÖY",
+      "HAYRAT",
+      "KÖPRÜBAŞI",
+      "MAÇKA",
+      "OF",
+      "ORTAHİSAR",
+      "SÜRMENE",
+      "ŞALPAZARI",
+      "TONYA",
+      "VAKFIKEBİR",
+      "YOMRA"
+    ]
+  },
+  {
+    "name": "TUNCELİ",
+    "code": "62",
+    "regions": [
+      "ÇEMİŞGEZEK",
+      "HOZAT",
+      "MAZGİRT",
+      "MERKEZ",
+      "NAZIMİYE",
+      "OVACIK",
+      "PERTEK",
+      "PÜLÜMÜR"
+    ]
+  },
+  {
+    "name": "UŞAK",
+    "code": "64",
+    "regions": [
+      "BANAZ",
+      "EŞME",
+      "KARAHALLI",
+      "MERKEZ",
+      "SİVASLI",
+      "ULUBEY"
+    ]
+  },
+  {
+    "name": "VAN",
+    "code": "65",
+    "regions": [
+      "BAHÇESARAY",
+      "BAŞKALE",
+      "ÇALDIRAN",
+      "ÇATAK",
+      "EDREMİT",
+      "ERCİŞ",
+      "GEVAŞ",
+      "GÜRPINAR",
+      "İPEKYOLU",
+      "MURADİYE",
+      "ÖZALP",
+      "SARAY",
+      "TUŞBA"
+    ]
+  },
+  {
+    "name": "YALOVA",
+    "code": "77",
+    "regions": [
+      "ALTINOVA",
+      "ARMUTLU",
+      "ÇINARCIK",
+      "ÇİFTLİKKÖY",
+      "MERKEZ",
+      "TERMAL"
+    ]
+  },
+  {
+    "name": "YOZGAT",
+    "code": "66",
+    "regions": [
+      "AKDAĞMADENİ",
+      "AYDINCIK",
+      "BOĞAZLIYAN",
+      "ÇANDIR",
+      "ÇAYIRALAN",
+      "ÇEKEREK",
+      "KADIŞEHRİ",
+      "MERKEZ",
+      "SARAYKENT",
+      "SARIKAYA",
+      "SORGUN",
+      "ŞEFAATLİ",
+      "YENİFAKILI",
+      "YERKÖY"
+    ]
+  },
+  {
+    "name": "ZONGULDAK",
+    "code": "67",
+    "regions": [
+      "ALAPLI",
+      "ÇAYCUMA",
+      "DEVREK",
+      "EREĞLİ",
+      "GÖKÇEBEY",
+      "KİLİMLİ",
+      "KOZLU",
+      "MERKEZ"
+    ]
+  }
+]
