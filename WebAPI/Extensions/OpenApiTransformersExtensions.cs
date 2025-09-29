@@ -26,7 +26,7 @@ namespace WebAPI.Extensions
                 document.Components ??= new();
                 document.Components.SecuritySchemes.Add(JwtBearerDefaults.AuthenticationScheme, scheme);
                 return Task.CompletedTask;
-            });
+            }); 
 
             options.AddOperationTransformer((operation, context, ct) =>
             {
@@ -38,7 +38,6 @@ namespace WebAPI.Extensions
             });
 
             return options;
-
         }
     }
 }

@@ -1,6 +1,4 @@
 using Business.DependencyResolvers.Autofac;
-using Business.Interfaces;
-using Business.Mapper;
 using Business.UnitOfWork;
 using Core.Extensions;
 using Core.Settings.Concrete;
@@ -12,16 +10,10 @@ using Data.Seeding.Infrastructure;
 using Data.Seeding.Seeds;
 using Mapster;
 using MapsterMapper;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
-using System;
-using System.Text;
 using WebAPI.Extensions;
 using WebAPI.Middleware;
 

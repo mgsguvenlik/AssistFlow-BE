@@ -10,8 +10,6 @@ namespace Business.Interfaces
 {
     public interface IAuthService
     {
-        Task<ResponseModel<LoginResponseDto>> LoginAsync(LoginRequestDto dto);
-        Task<ResponseModel> LogoutAsync();
         Task<ResponseModel<CurrentUserDto>> MeAsync(); // opsiyonel
     }
 }

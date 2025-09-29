@@ -5,7 +5,6 @@ using Core.Common;
 using Core.Enums;
 using Mapster;
 using MapsterMapper;
-using Microsoft.AspNet.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -16,9 +15,9 @@ using System.Linq.Expressions;
 public class UserService
     : CrudServiceBase<User, long, UserCreateDto, UserUpdateDto, UserGetDto>,IUserService
 {
-    private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly Microsoft.AspNetCore.Identity.IPasswordHasher<User> _passwordHasher;
 
-    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IPasswordHasher<User> passwordHasher)
+    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher)
         : base(uow, mapper, config)
     {
         _passwordHasher = passwordHasher;
@@ -194,4 +193,40 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"Beklenmedik hata: {ex.Message}", StatusCode.Error);
         }
     }
+
+
+
+
+    //  Login (email + şifre ile)
+    public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
+    {
+        // Find user by email and include roles
+        var user = _unitOfWork.Repository.GetMultiple<User>(
+            asNoTracking: false,
+            whereExpression: u => u.TechnicianEmail == email,
+            q => q.Include(u => u.UserRoles).ThenInclude(x=>x.Role)
+        ).FirstOrDefault();
+
+        var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
+        if (vr == PasswordVerificationResult.Failed)
+        {
+            return new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.NotFound,
+                Message = "Invalid email or password."
+            };
+        }
+
+        var userDto = _mapper.Map<UserGetDto>(user);
+        return new ResponseModel<UserGetDto>
+        {
+            Data = userDto,
+            IsSuccess = true,
+            StatusCode = Core.Enums.StatusCode.Ok,
+            Message = "Sign in successful."
+        };
+    }
+
 }
