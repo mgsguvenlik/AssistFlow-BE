@@ -58,16 +58,12 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>PUT /api/[controller]/{id} -> Update</summary>
-        [HttpPost("{id}")]
+        [HttpPost("update")]
         //[ProducesResponseType(typeof(ResponseModel<TGetDto>), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(404)]
-        public virtual async Task<IActionResult> Update([FromRoute] TKey id, [FromBody] TUpdateDto dto)
+        public virtual async Task<IActionResult> Update([FromBody] TUpdateDto dto)
         {
-            // Body'de "Id" property varsa, route id ile eşitliğini doğrula
-            if (!RouteIdMatchesBodyId(id, dto, out var mismatch))
-                return mismatch!;
-
             var resp = await _service.UpdateAsync(dto);
             return ToActionResult(resp);
         }

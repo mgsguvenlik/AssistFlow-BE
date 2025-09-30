@@ -47,6 +47,11 @@ namespace Model.Concrete
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
+        /// <summary>
+        ///     
+        /// </summary>
+        public bool IsActive { get; set; } = true;
+
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
 }

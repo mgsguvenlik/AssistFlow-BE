@@ -104,15 +104,32 @@ public class UserService
     // Include'lar (roller)
     protected override Func<IQueryable<User>, IIncludableQueryable<User, object>>? IncludeExpression()
         => q => q.Include(u => u.UserRoles).ThenInclude(ur => ur.Role);
-
     protected override async Task<User?> ResolveEntityForUpdateAsync(UserUpdateDto dto)
     {
-        // tracked + include
-        return await _unitOfWork.Repository
-            .GetSingleAsync<User>(asNoTracking: false, u => u.Id == dto.Id,
-                q => q.Include(u => u.UserRoles));
-    }
+        if (dto.Id <= 0) return null;
 
+        // 1) PK meta-cast ile güvenli getirme (include + theninclude)
+        var user = await _unitOfWork.Repository.GetByIdAsync<User>(
+            asNoTracking: false,
+            id: dto.Id,
+            includeExpression: q => q
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+        );
+
+        if (user != null) return user;
+
+        // 2) DIAGNOSTIC: Eğer null geldiyse, global filtrelerin eliyor olma ihtimalini test et
+        //    Repo’yu bypass ederek IgnoreQueryFilters ile deneyin.
+        user = await _unitOfWork.Repository
+            .GetQueryable<User>()            // DbSet<User>()
+            .IgnoreQueryFilters()            // <- soft delete / tenant filtresi varsa geçici olarak atla
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == (int)dto.Id); // PK int ise açık cast yapın
+
+        return user;
+    }
     protected override void MapUpdate(UserUpdateDto dto, User entity)
     {
         // mapster partial update (IgnoreNullValues(true) konfig’de)

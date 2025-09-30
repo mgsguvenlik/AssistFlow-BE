@@ -14,6 +14,7 @@ namespace Model.Dtos.User
         public string? TechnicianPhone { get; set; }
         public string? TechnicianEmail { get; set; }
 
+        public bool IsActive { get; set; }
         public List<RoleGetDto> Roles { get; set; } = new();
 
     }

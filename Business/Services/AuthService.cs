@@ -32,11 +32,10 @@ public class AuthService : IAuthService
     {
         // Kullanıcı doğrulama
         var result = await _userService.SignInAsync(loginRequest.Identifier, loginRequest.Password);
-        if (!result.IsSuccess || result.Data == null)
+        if (!result.IsSuccess || result.Data == null || !result.Data.IsActive)
         {
             return ResponseModel<AuthResponseDto>.Fail("Unauthorized", Core.Enums.StatusCode.Unauthorized);
         }
-
         var user = result.Data;
 
         // App settings
