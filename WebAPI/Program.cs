@@ -11,9 +11,13 @@ using Data.Seeding.Seeds;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
+using System.Security.Claims;
+using System.Text;
 using WebAPI.Extensions;
 using WebAPI.Middleware;
 
@@ -75,10 +79,6 @@ mapsterConfig.Compile();
 builder.Services.AddSingleton(mapsterConfig);
 builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
 
-//builder.Services.AddAutoMapper(typeof(MapperProfile));
-//MapsterConfig.Configure();
-//builder.Services.AddDbContext<AppDataContext>(options =>
-//        options.UseSqlServer(appSettings.MSSQLConnectionString));
 #endregion
 
 // Seed servislerini kaydet
@@ -132,30 +132,33 @@ builder.Services.AddOpenApi(options =>
 
 #region jwt login
 // Session
-builder.Services.AddDistributedMemoryCache();
-builder.Services.AddSession(options =>
-{
-    options.Cookie.Name = "app_session";
-    options.IdleTimeout = TimeSpan.FromHours(8);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-});
+//builder.Services.AddDistributedMemoryCache();
+//builder.Services.AddSession(options =>
+//{
+//    options.Cookie.Name = "app_session";
+//    options.IdleTimeout = TimeSpan.FromHours(8);
+//    options.Cookie.HttpOnly = true;
+//    options.Cookie.IsEssential = true;
+//});
 
 // Cookie Auth
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        options.Cookie.Name = "app_auth";
-        options.LoginPath = "/api/auth/login";
-        options.LogoutPath = "/api/auth/logout";
-        options.SlidingExpiration = true;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-
-        // Cross-site SPA kullanýyorsan:
-        // options.Cookie.SameSite = SameSiteMode.None;
-        // options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = appSettings.Issuer,
+            ValidAudience = appSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Key)),
+            ClockSkew = TimeSpan.Zero, // Ýsteðe baðlý: expire anýnda düþsün
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
+        };
     });
-
 builder.Services.AddAuthorization();
 
 // HttpContext
@@ -171,8 +174,6 @@ await app.UseDataSeedingAsync<AppDataContext>(); // Migration’dan önce/sonra çað
 MigrationApplier.ApplyMigrations(app);
 
 
-app.UseCors("CorsPolicy");
-
 app.UseMiddleware<ErrorHandlerMiddleware>();
 
 // Configure the HTTP request pipeline.
@@ -181,6 +182,7 @@ app.UseMiddleware<ErrorHandlerMiddleware>();
 app.MapScalarApiReference(o =>
     o.WithTheme(ScalarTheme.BluePlanet)
 );
+
 app.MapOpenApi();
 
 
@@ -194,7 +196,11 @@ app.UseRequestLocalization(options =>
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 // Sýra önemli:
-app.UseSession();
+//app.UseSession();
+app.UseRouting();
+
+app.UseCors("CorsPolicy");
+
 app.UseAuthentication();
 app.UseAuthorization();
 

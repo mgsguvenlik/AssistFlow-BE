@@ -9,6 +9,7 @@
         NotFound = 404,
         Conflict = 409,
         ValidationError = 422,
-        Error = 500
+        Error = 500,
+        Unauthorized = 403
     }
 }

@@ -4,7 +4,7 @@ using Model.Dtos.User;
 
 namespace Business.Interfaces
 {
-    public interface IUserService
+    public interface IUserService : ICrudService<UserCreateDto, UserUpdateDto, UserGetDto, long>
     {
         Task<ResponseModel<UserGetDto>> AssignRolesAsync(long userId, IEnumerable<long> roleIds);
 

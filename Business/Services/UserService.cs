@@ -15,7 +15,7 @@ using System.Linq.Expressions;
 public class UserService
     : CrudServiceBase<User, long, UserCreateDto, UserUpdateDto, UserGetDto>,IUserService
 {
-    private readonly Microsoft.AspNetCore.Identity.IPasswordHasher<User> _passwordHasher;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
     public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher)
         : base(uow, mapper, config)
