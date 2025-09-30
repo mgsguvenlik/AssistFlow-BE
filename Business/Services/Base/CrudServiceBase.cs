@@ -255,7 +255,7 @@ namespace Business.Services.Base
             {
                 var entity = await ResolveEntityForUpdateAsync(dto);
                 if (entity is null)
-                    return ResponseModel<TGetDto>.Fail("Not found", StatusCode.NotFound);
+                    return ResponseModel<TGetDto>.Fail("Kayıt bulunamadı", StatusCode.NotFound);
 
                 MapUpdate(dto, entity);
 
