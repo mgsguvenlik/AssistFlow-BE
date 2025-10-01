@@ -312,7 +312,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "Failed to send reset password email."
+                Message = "Failed to send reset password email. Token: " + tokenString //MZK geçici test aşamasında çözüm için 
             };
         }
 
