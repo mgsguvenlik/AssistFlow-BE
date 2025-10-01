@@ -384,7 +384,7 @@ public class UserService
             });
         }
 
-        if (user.PasswordHash == newPassword)
+        if (user.PasswordHash  == _passwordHasher.HashPassword(user, newPassword))
         {
             return Task.FromResult(new ResponseModel<UserGetDto>
             {
@@ -395,7 +395,8 @@ public class UserService
             });
         }
 
-        user.PasswordHash = newPassword;
+       
+        user.PasswordHash = _passwordHasher.HashPassword(user, newPassword); ;
         _unitOfWork.Repository.Update(user);
         var result = SaveAsync<User>(user).Result;
 
