@@ -24,6 +24,9 @@ namespace Business.Mapper
     {
         public void Register(TypeAdapterConfig config)
         {
+
+            config.Default.MaxDepth(2);
+
             // ---------------- Brand ----------------
             config.NewConfig<BrandCreateDto, Brand>()
                   .Ignore(d => d.Id)
@@ -38,6 +41,7 @@ namespace Business.Mapper
             config.NewConfig<Brand, BrandGetDto>();
 
 
+
             // ---------------- Model ----------------
             config.NewConfig<ModelCreateDto, Model.Concrete.Model>()
                   .Ignore(d => d.Id)
@@ -49,9 +53,9 @@ namespace Business.Mapper
                   .Ignore(d => d.Brand)
                   .Ignore(d => d.Products);
 
+            config.NewConfig<Model.Concrete.Model, ModelGetDto>()
+                .Map(d => d.Brand,(ur => ur.Brand));
 
-            // Küçük özet
-            config.NewConfig<Model.Concrete.Model, ModelGetDto>();
 
             // ---------------- ProductType ----------------
             config.NewConfig<ProductTypeCreateDto, ProductType>()

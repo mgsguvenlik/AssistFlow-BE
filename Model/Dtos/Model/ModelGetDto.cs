@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Model.Dtos.Brand;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,5 +12,6 @@ namespace Model.Dtos.Model
         public long Id { get; set; }
         public string Name { get; set; } = null!;
         public string? Desc { get; set; }
+        public BrandGetDto? Brand { get; set; }
     }
 }
