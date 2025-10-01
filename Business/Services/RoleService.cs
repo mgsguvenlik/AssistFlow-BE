@@ -26,12 +26,12 @@ namespace Business.Services
             => r => r.Id == id;
 
         // Update işleminde takipli entity'yi getir (include gerekirse buraya ekleyebilirsin)
-        protected override Task<Role?> ResolveEntityForUpdateAsync(RoleUpdateDto dto)
-            => _unitOfWork.Repository.GetSingleAsync<Role>(asNoTracking: false, r => r.Id == dto.Id);
+        protected override async Task<Role?> ResolveEntityForUpdateAsync(RoleUpdateDto dto)
+            => await _unitOfWork.Repository.GetSingleAsync<Role>(asNoTracking: false, r => r.Id == dto.Id, includeExpression:r=>r.Include(u=>u.UserRoles).ThenInclude(u=>u.User));
 
         // İlişki include ihtiyacın yoksa base'in IncludeExpression()'ını kullanma; boş bırakmak yeterli
         // Eğer ileride Role -> UserRoles gibi include isterse:
         protected override Func<IQueryable<Role>, IIncludableQueryable<Role, object>>? IncludeExpression()
-            => q => q.Include(r => r.UserRoles);
+            => q => q.Include(r => r.UserRoles).ThenInclude(x=>x.User);
     }
 }

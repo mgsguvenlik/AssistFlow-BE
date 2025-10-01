@@ -127,7 +127,9 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles);
 
-            config.NewConfig<Role, RoleGetDto>();
+            config.NewConfig<Role, RoleGetDto>()
+                   .Map(d => d.Users,
+                    s => s.UserRoles.Select(ur => ur.User));
 
             // ---------------- ServiceType ----------------
             config.NewConfig<ServiceTypeCreateDto, ServiceType>()

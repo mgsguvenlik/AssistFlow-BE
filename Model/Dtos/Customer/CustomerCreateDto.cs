@@ -47,15 +47,10 @@ namespace Model.Dtos.Customer
         [StringLength(200, ErrorMessage = "E-posta en fazla 200 karakter olabilir.")]
         public string? Email1 { get; set; }
 
-        [StringLength(120, ErrorMessage = "2. Kişi adı en fazla 120 karakter olabilir.")]
-        [NotWhitespaceIfNotEmpty(ErrorMessage = "2. Kişi adı yalnızca boşluklardan oluşamaz.")]
         public string? ContactName2 { get; set; }
 
-        [RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = "Telefon 7-15 haneli olmalı ve sadece rakam (isteğe bağlı +) içermelidir.")]
         public string? Phone2 { get; set; }
 
-        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
-        [StringLength(200, ErrorMessage = "E-posta en fazla 200 karakter olabilir.")]
         public string? Email2 { get; set; }
 
         [StringLength(32, ErrorMessage = "Müşteri Kısa Kodu en fazla 32 karakter olabilir.")]
@@ -72,7 +67,6 @@ namespace Model.Dtos.Customer
     }
 
     /// ---- Yardımcı Attribute'lar ----
-
     /// Sınıf düzeyinde: belirtilen özelliklerden en az biri dolu olmalı.
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class RequireAnyAttribute : ValidationAttribute
