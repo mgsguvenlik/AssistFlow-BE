@@ -12,5 +12,6 @@ namespace Core.Settings.Concrete
         public required string OpenidConfiguration { get; set; }
         public required string DbProvider { get; set; }
         public  int AccessTokenMinutes { get; set; }
+        public  required string AppUrl { get; set; }
     }
 }

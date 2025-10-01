@@ -1,26 +1,39 @@
 ﻿using Business.Interfaces;
+using Business.Services;
 using Business.Services.Base;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Settings.Concrete;
+using Core.Utilities.IoC;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Model.Concrete;
 using Model.Dtos.User;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq.Expressions;
+using System.Security.Claims;
+using System.Text;
 
 public class UserService
-    : CrudServiceBase<User, long, UserCreateDto, UserUpdateDto, UserGetDto>,IUserService
+    : CrudServiceBase<User, long, UserCreateDto, UserUpdateDto, UserGetDto>, IUserService
 {
+
+    private readonly IMailService _mailService;
+
     private readonly IPasswordHasher<User> _passwordHasher;
 
-    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher)
+    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher, IMailService mailService)
         : base(uow, mapper, config)
     {
         _passwordHasher = passwordHasher;
+        _mailService = mailService;
     }
 
     protected override long ReadKey(User entity) => entity.Id;
@@ -213,7 +226,6 @@ public class UserService
 
 
 
-
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
@@ -221,7 +233,7 @@ public class UserService
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
             whereExpression: u => u.TechnicianEmail == email,
-            q => q.Include(u => u.UserRoles).ThenInclude(x=>x.Role)
+            q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
         ).FirstOrDefault();
 
         var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
@@ -245,5 +257,168 @@ public class UserService
             Message = "Sign in successful."
         };
     }
+
+
+    // Şifre Sıfırlama İsteği (email gönderimi)
+    public async Task<ResponseModel<UserGetDto>> ResetPasswordRequestAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+        var user = _unitOfWork.Repository.GetMultiple<User>(
+            asNoTracking: false,
+            whereExpression: u => u.TechnicianEmail == email
+        ).FirstOrDefault();
+
+        if (user == null)
+        {
+            return new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.NotFound,
+                Message = "Kullanıcı bulunamadı."
+            };
+        }
+
+        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.TechnicianEmail ?? string.Empty) };
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Value.Key));
+        var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: appSettings.Value.Issuer,
+            audience: appSettings.Value.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: creds
+        );
+
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+        var mailBody = $@"
+                Merhaba {user.TechnicianName},
+                <br/><br/>
+                Şifrenizi sıfırlamak için lütfen aşağıdaki bağlantıya tıklayın:<br/>
+                <a href='{appSettings.Value.AppUrl}/change-password/{tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
+                Eğer bu isteği siz yapmadıysanız, lütfen bu e-postayı dikkate almayın.<br/><br/>
+                Saygılarımızla,<br/>
+            ";
+
+        var mailResult = await _mailService.SendResetPassMailAsync(mailBody, user.TechnicianEmail);
+
+        if (!mailResult.IsSuccess)
+        {
+            return new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "Failed to send reset password email."
+            };
+        }
+
+        return new ResponseModel<UserGetDto>
+        {
+            Data = _mapper.Map<UserGetDto>(user),
+            IsSuccess = true,
+            StatusCode = Core.Enums.StatusCode.Ok,
+            Message = "Reset password request processed successfully. Please check your email."
+        };
+    }
+
+    public Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+
+
+        var userIdString = (jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
+        var userEmail = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrEmpty(userIdString) || string.IsNullOrEmpty(userEmail))
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "Invalid token."
+            });
+        }
+        long userId = long.Parse(userIdString);
+        var user = _unitOfWork.Repository.GetMultiple<User>(
+        asNoTracking: true,
+        whereExpression: u => u.Id == userId && u.TechnicianEmail == userEmail
+        ).FirstOrDefault();
+
+
+        if (user == null)
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.NotFound,
+                Message = "Invalid reset token."
+            });
+        }
+
+        if (jwtToken.ValidTo < DateTime.UtcNow)
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "Token expired."
+            });
+        }
+
+        if (string.IsNullOrEmpty(newPassword) || newPassword.Length < 6)
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "New password must be at least 6 characters long."
+            });
+        }
+
+        if (user.PasswordHash == newPassword)
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "New password cannot be the same as the old password."
+            });
+        }
+
+        user.PasswordHash = newPassword;
+        _unitOfWork.Repository.Update(user);
+        var result = SaveAsync<User>(user).Result;
+
+        if (!result.IsSuccess)
+        {
+            return Task.FromResult(new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.Error,
+                Message = "Failed to change password."
+            });
+        }
+
+
+        return Task.FromResult(new ResponseModel<UserGetDto>
+        {
+            Data = _mapper.Map<UserGetDto>(user),
+            IsSuccess = true,
+            StatusCode = Core.Enums.StatusCode.Ok,
+            Message = "Password changed successfully."
+        });
+    }
+
 
 }

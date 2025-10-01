@@ -286,7 +286,6 @@ namespace Business.Services.Base
             }
         }
 
-
         public async Task<ResponseModel<bool>> DeleteAsync(TKey id)
         {
             try

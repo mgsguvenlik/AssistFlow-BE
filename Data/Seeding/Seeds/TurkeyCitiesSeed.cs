@@ -89,12 +89,6 @@ namespace Data.Seeding.Seeds
             public string? Code { get; set; }    // "01"
             public List<string>? Regions { get; set; }
         }
-
-        // İsteğe bağlı: İsimleri Title Case yapmak için (TR dil kuralları)
-        private static string Normalize(string s)
-        {
-            var tr = new System.Globalization.CultureInfo("tr-TR");
-            return tr.TextInfo.ToTitleCase(s.ToLower(tr));
-        }
+               
     }
 }

@@ -1,11 +1,15 @@
 ﻿using Business.Interfaces;
+using Business.Services;
 using Core.Common;
 using Core.Settings.Concrete;
+using Core.Utilities.IoC;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Model.Concrete;
 using Model.Dtos.Auth;
 using Model.Dtos.Role;
+using Model.Dtos.User;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
@@ -15,7 +19,7 @@ public class AuthService : IAuthService
 {
     private readonly IHttpContextAccessor _http;
     private readonly IUserService _userService;
-    private readonly IOptionsSnapshot<AppSettings> _appSettings;
+    private readonly IOptionsSnapshot<AppSettings> _appSettings; 
 
     public AuthService(
         IHttpContextAccessor http,
@@ -24,7 +28,7 @@ public class AuthService : IAuthService
     )
     {
         _http = http;
-        _userService = userService;
+        _userService = userService; 
         _appSettings = appSettings;
     }
 
@@ -138,4 +142,5 @@ public class AuthService : IAuthService
 
         return ResponseModel<CurrentUserDto>.Success(dto);
     }
+
 }

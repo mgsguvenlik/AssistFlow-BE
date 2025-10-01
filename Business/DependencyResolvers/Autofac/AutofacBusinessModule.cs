@@ -32,6 +32,8 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IServiceTypeService), typeof(ServiceTypeService));
             services.AddScoped(typeof(ISystemTypeService), typeof(SystemTypeService));
             services.AddScoped(typeof(IUserService), typeof(UserService));
+            services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
+            services.AddScoped(typeof(IMailService), typeof(MailService));
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -146,6 +148,12 @@ namespace Business.DependencyResolvers.Autofac
                              Model.Dtos.User.UserUpdateDto,
                              Model.Dtos.User.UserGetDto,
                              long>, UserService>();
+
+            services.AddScoped<
+              ICrudService<Model.Dtos.Configuration.ConfigurationCreateDto,
+                           Model.Dtos.Configuration.ConfigurationUpdateDto,
+                           Model.Dtos.Configuration.ConfigurationGetDto,
+                           long>, ConfigurationService>();
         }
         protected override void Load(ContainerBuilder builder)
         {

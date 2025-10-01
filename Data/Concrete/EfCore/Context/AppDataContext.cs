@@ -23,6 +23,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<UserRole> UserRoles{ get; set; }
         public DbSet<City> Cities{ get; set; }
         public DbSet<Region> Regions{ get; set; }
+        public DbSet<Configuration> Configurations{ get; set; }
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
 
         /// <summary>

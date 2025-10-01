@@ -2,6 +2,7 @@
 using Model.Concrete;
 using Model.Dtos.Brand;
 using Model.Dtos.City;
+using Model.Dtos.Configuration;
 using Model.Dtos.CurrencyType;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
@@ -210,6 +211,15 @@ namespace Business.Mapper
                        }).ToList());
 
             config.NewConfig<Region, RegionGetDto>();
+
+
+            // ---------------- Config ----------------
+            config.NewConfig<ConfigurationCreateDto, ServiceType>();
+            config.NewConfig<ServiceType, ConfigurationCreateDto>();
+            config.NewConfig<ConfigurationUpdateDto, ServiceType>();
+            config.NewConfig<ServiceType, ConfigurationUpdateDto>();
+            config.NewConfig<ConfigurationGetDto, ServiceType>();
+            config.NewConfig<ServiceType, ConfigurationGetDto>();
         }
     }
 }
