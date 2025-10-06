@@ -9,7 +9,7 @@ using System.Linq.Expressions;
 
 namespace Business.Services
 {
-    public class ConfigurationService :CrudServiceBase<Configuration, long, ConfigurationCreateDto, ConfigurationUpdateDto, ConfigurationGetDto>,
+    public class ConfigurationService : CrudServiceBase<Configuration, long, ConfigurationCreateDto, ConfigurationUpdateDto, ConfigurationGetDto>,
         IConfigurationService
     {
         public ConfigurationService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)

@@ -1,8 +1,6 @@
 ﻿using Business.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Brand;
-using Model.Dtos.Model;
 
 namespace WebAPI.Controllers
 {

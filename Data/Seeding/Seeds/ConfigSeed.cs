@@ -1,12 +1,8 @@
-﻿using Data.Seeding.Abstractions;
+﻿using Core.Utilities.Constants;
+using Data.Seeding.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Data.Seeding.Seeds
 {
@@ -48,7 +44,7 @@ namespace Data.Seeding.Seeds
             await db.Set<Configuration>().AddRangeAsync(configs, ct);
             await db.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Configuration seed tamamlandı: {Count} Config,", configs.Count);
+            _logger.LogInformation(Messages.ConfigurationSeedCompleted, configs.Count);
         }
 
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)

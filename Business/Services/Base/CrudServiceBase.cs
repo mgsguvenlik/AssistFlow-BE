@@ -2,6 +2,7 @@
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Utilities.Constants;
 using Data.Abstract;
 using Mapster;
 using MapsterMapper;
@@ -11,7 +12,6 @@ using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
-using static System.Net.WebRequestMethods;
 
 namespace Business.Services.Base
 {
@@ -182,11 +182,11 @@ namespace Business.Services.Base
                 if (await _repo.CompleteAsync() > 0)
                 {
                     result = new ResponseModel<TEntity>(true, StatusCode.Ok, entity);
-                    result.Message = "Save operation completed successfully.";
+                    result.Message = Messages.DataSavedSuccessfully;
                     return result;
                 }
                 result.StatusCode = StatusCode.Ok;
-                result.Message = "No changes were persisted.";
+                result.Message = Messages.NoChangesSaved;
             }
             catch (Exception ex)
             {
@@ -203,7 +203,7 @@ namespace Business.Services.Base
                     result.IsSuccess = true;
 
                 result.StatusCode = StatusCode.Ok;
-                result.Message = "Save operation completed successfully.";
+                result.Message = Messages.DataSavedSuccessfully;
             }
             catch (Exception ex)
             {
@@ -215,7 +215,7 @@ namespace Business.Services.Base
         // ----------------------------------------------
         // CRUD
         // ----------------------------------------------
-        public  virtual async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
+        public virtual async Task<ResponseModel<TGetDto>> CreateAsync(TCreateDto dto)
         {
             try
             {
@@ -241,11 +241,11 @@ namespace Business.Services.Base
             }
             catch (DbUpdateException ex)
             {
-                return ResponseModel<TGetDto>.Fail($"DB error: {ex.Message}", StatusCode.Conflict);
+                return ResponseModel<TGetDto>.Fail($"{Messages.DatabaseError}: {ex.Message}", StatusCode.Conflict);
             }
             catch (Exception ex)
             {
-                return ResponseModel<TGetDto>.Fail($"Unexpected error: {ex.Message}", StatusCode.Error);
+                return ResponseModel<TGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
             }
         }
 
@@ -255,7 +255,7 @@ namespace Business.Services.Base
             {
                 var entity = await ResolveEntityForUpdateAsync(dto);
                 if (entity is null)
-                    return ResponseModel<TGetDto>.Fail("Kayıt bulunamadı", StatusCode.NotFound);
+                    return ResponseModel<TGetDto>.Fail(Messages.RecordNotFound, StatusCode.NotFound);
 
                 MapUpdate(dto, entity);
 
@@ -278,11 +278,11 @@ namespace Business.Services.Base
             }
             catch (DbUpdateConcurrencyException)
             {
-                return ResponseModel<TGetDto>.Fail("Concurrency conflict", StatusCode.Conflict);
+                return ResponseModel<TGetDto>.Fail(Messages.ConflictError, StatusCode.Conflict);
             }
             catch (Exception ex)
             {
-                return ResponseModel<TGetDto>.Fail($"Unexpected error: {ex.Message}", StatusCode.Error);
+                return ResponseModel<TGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
             }
         }
 
@@ -292,7 +292,7 @@ namespace Business.Services.Base
             {
                 var entity = await _repo.GetSingleAsync<TEntity>(asNoTracking: false, KeyPredicate(id));
                 if (entity is null)
-                    return ResponseModel<bool>.Fail("Not found", StatusCode.NotFound, false);
+                    return ResponseModel<bool>.Fail(Messages.RecordNotFound, StatusCode.NotFound, false);
 
                 if (TrySoftDeleteIfSupported(entity))
                 {
@@ -306,7 +306,7 @@ namespace Business.Services.Base
             }
             catch (Exception ex)
             {
-                return ResponseModel<bool>.Fail($"Unexpected error: {ex.Message}", StatusCode.Error, false);
+                return ResponseModel<bool>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error, false);
             }
         }
 
@@ -323,7 +323,7 @@ namespace Business.Services.Base
                 .FirstOrDefaultAsync();
 
             return dto is null
-                ? ResponseModel<TGetDto>.Fail("Not found", StatusCode.NotFound)
+                ? ResponseModel<TGetDto>.Fail(Messages.RecordNotFound, StatusCode.NotFound)
                 : ResponseModel<TGetDto>.Success(dto);
         }
 

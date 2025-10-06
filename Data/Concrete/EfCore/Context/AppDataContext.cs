@@ -9,21 +9,21 @@ namespace Data.Concrete.EfCore.Context
         {
         }
         public DbSet<User> Users { get; set; }
-        public DbSet<Brand> Brands{ get; set; }
-        public DbSet<Customer> Customers{ get; set; }
-        public DbSet<CustomerGroup> CustomerGroups{ get; set; }
-        public DbSet<CurrencyType> CurrencyTypes{ get; set; }
-        public DbSet<Model.Concrete.Model> Models{ get; set; }
-        public DbSet<Product> Products{ get; set; }
-        public DbSet<ProductType> ProductTypes{ get; set; }
-        public DbSet<ProgressApprover> ProgressApprovers{ get; set; }
-        public DbSet<Role> Roles{ get; set; }
-        public DbSet<ServiceType> ServiceTypes{ get; set; }
-        public DbSet<SystemType>SystemTypes{ get; set; }
-        public DbSet<UserRole> UserRoles{ get; set; }
-        public DbSet<City> Cities{ get; set; }
-        public DbSet<Region> Regions{ get; set; }
-        public DbSet<Configuration> Configurations{ get; set; }
+        public DbSet<Brand> Brands { get; set; }
+        public DbSet<Customer> Customers { get; set; }
+        public DbSet<CustomerGroup> CustomerGroups { get; set; }
+        public DbSet<CurrencyType> CurrencyTypes { get; set; }
+        public DbSet<Model.Concrete.Model> Models { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<ProductType> ProductTypes { get; set; }
+        public DbSet<ProgressApprover> ProgressApprovers { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<ServiceType> ServiceTypes { get; set; }
+        public DbSet<SystemType> SystemTypes { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<City> Cities { get; set; }
+        public DbSet<Region> Regions { get; set; }
+        public DbSet<Configuration> Configurations { get; set; }
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
 
         /// <summary>

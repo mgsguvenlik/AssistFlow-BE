@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class WorkflowHistory:AuditableWithUserEntity
+    public class WorkflowHistory : AuditableWithUserEntity
     {
         [Key]
         public long Id { get; set; }
@@ -12,7 +12,7 @@ namespace Model.Concrete
 
         // Navigations (öneri):
         public long WorkFlowId { get; set; }
-        public WorkFlow? WorkFlow { get; set; }          
+        public WorkFlow? WorkFlow { get; set; }
         public WorkFlowStatus? Status { get; set; }
         // Not: Eğer WfHistory, WorkFlow kaydına FK ile bağlansın istiyorsanız ayrıca WorkFlowId ekleyin.
     }

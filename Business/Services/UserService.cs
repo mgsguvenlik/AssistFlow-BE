@@ -1,10 +1,10 @@
 ﻿using Business.Interfaces;
-using Business.Services;
 using Business.Services.Base;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
+using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Mapster;
 using MapsterMapper;
@@ -50,7 +50,7 @@ public class UserService
 
             // 2) Şifre zorunlu + hashle
             if (string.IsNullOrWhiteSpace(dto.Password))
-                return ResponseModel<UserGetDto>.Fail("Şifre zorunludur.", StatusCode.BadRequest);
+                return ResponseModel<UserGetDto>.Fail(Messages.PasswordRequired, StatusCode.BadRequest);
 
             entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.Password);
 
@@ -75,7 +75,7 @@ public class UserService
                 var missing = desired.Where(id => !existingIds.Contains(id)).ToList();
                 if (missing.Any())
                     return ResponseModel<UserGetDto>.Fail(
-                        $"Geçersiz rol id(leri): {string.Join(", ", missing)}",
+                        $"{Messages.InvalidRoleIds}: {string.Join(", ", missing)}",
                         StatusCode.BadRequest);
 
                 // UserRole kayıtlarını ekle
@@ -106,11 +106,11 @@ public class UserService
         }
         catch (DbUpdateException ex)
         {
-            return ResponseModel<UserGetDto>.Fail($"DB error: {ex.Message}", StatusCode.Conflict);
+            return ResponseModel<UserGetDto>.Fail($"{Messages.DatabaseError}: {ex.Message}", StatusCode.Conflict);
         }
         catch (Exception ex)
         {
-            return ResponseModel<UserGetDto>.Fail($"Beklenmeyen hata: {ex.Message}", StatusCode.Error);
+            return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
         }
     }
 
@@ -182,7 +182,7 @@ public class UserService
                 q => q.Include(u => u.UserRoles));
 
             if (user is null)
-                return ResponseModel<UserGetDto>.Fail("Kullanıcı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<UserGetDto>.Fail(Messages.UserNotFound, StatusCode.NotFound);
 
             // Var olan role’leri doğrula (geçersiz id varsa bildir)
             var existingRoles = await _unitOfWork.Repository.GetMultipleAsync<Role>(
@@ -192,7 +192,7 @@ public class UserService
             var existingIds = existingRoles.Select(r => r.Id).ToHashSet();
             var missing = desired.Except(existingIds).ToList();
             if (missing.Any())
-                return ResponseModel<UserGetDto>.Fail($"Bilinmeyen rol id(s): {string.Join(", ", missing)}", StatusCode.BadRequest);
+                return ResponseModel<UserGetDto>.Fail($"{Messages.UnknownRoleIds}: {string.Join(", ", missing)}", StatusCode.BadRequest);
 
             // Senkronize et
             var current = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
@@ -216,11 +216,11 @@ public class UserService
                                  .ProjectToType<UserGetDto>(_config)
                                  .FirstAsync();
 
-            return ResponseModel<UserGetDto>.Success(dto, "Roller Güncelendi.");
+            return ResponseModel<UserGetDto>.Success(dto, Messages.RolesUpdated);
         }
         catch (Exception ex)
         {
-            return ResponseModel<UserGetDto>.Fail($"Beklenmedik hata: {ex.Message}", StatusCode.Error);
+            return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError} {ex.Message}", StatusCode.Error);
         }
     }
 
@@ -236,6 +236,18 @@ public class UserService
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
         ).FirstOrDefault();
 
+        if (user == null)
+        {
+            return new ResponseModel<UserGetDto>
+            {
+                Data = null,
+                IsSuccess = false,
+                StatusCode = Core.Enums.StatusCode.NotFound,
+                Message = Messages.InvalidEmailOrPassword
+            };
+        }
+
+
         var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (vr == PasswordVerificationResult.Failed)
         {
@@ -244,7 +256,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.NotFound,
-                Message = "Invalid email or password."
+                Message = Messages.InvalidEmailOrPassword
             };
         }
 
@@ -254,7 +266,7 @@ public class UserService
             Data = userDto,
             IsSuccess = true,
             StatusCode = Core.Enums.StatusCode.Ok,
-            Message = "Sign in successful."
+            Message = Messages.SignInSuccessful
         };
     }
 
@@ -275,7 +287,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.NotFound,
-                Message = "Kullanıcı bulunamadı."
+                Message = Messages.UserNotFound
             };
         }
 
@@ -312,7 +324,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "Failed to send reset password email. Token: " + tokenString //MZK geçici test aşamasında çözüm için 
+                Message = Messages.FailedToSendResetPasswordEmail + tokenString //MZK geçici test aşamasında çözüm için 
             };
         }
 
@@ -321,7 +333,7 @@ public class UserService
             Data = _mapper.Map<UserGetDto>(user),
             IsSuccess = true,
             StatusCode = Core.Enums.StatusCode.Ok,
-            Message = "Reset password request processed successfully. Please check your email."
+            Message = Messages.ResetPasswordRequestSuccess
         };
     }
 
@@ -341,7 +353,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "Invalid token."
+                Message = Messages.InvalidToken
             });
         }
         long userId = long.Parse(userIdString);
@@ -358,7 +370,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.NotFound,
-                Message = "Invalid reset token."
+                Message = Messages.InvalidResetToken
             });
         }
 
@@ -369,7 +381,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "Token expired."
+                Message = Messages.TokenExpired
             });
         }
 
@@ -380,22 +392,22 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "New password must be at least 6 characters long."
+                Message = Messages.NewPasswordTooShort
             });
         }
 
-        if (user.PasswordHash  == _passwordHasher.HashPassword(user, newPassword))
+        if (user.PasswordHash == _passwordHasher.HashPassword(user, newPassword))
         {
             return Task.FromResult(new ResponseModel<UserGetDto>
             {
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "New password cannot be the same as the old password."
+                Message = Messages.NewPasswordCannotBeSameAsOld
             });
         }
 
-       
+
         user.PasswordHash = _passwordHasher.HashPassword(user, newPassword); ;
         _unitOfWork.Repository.Update(user);
         var result = SaveAsync<User>(user).Result;
@@ -407,7 +419,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = "Failed to change password."
+                Message = Messages.FailedToChangePassword
             });
         }
 
@@ -417,7 +429,7 @@ public class UserService
             Data = _mapper.Map<UserGetDto>(user),
             IsSuccess = true,
             StatusCode = Core.Enums.StatusCode.Ok,
-            Message = "Password changed successfully."
+            Message = Messages.PasswordChangedSuccessfully
         });
     }
 

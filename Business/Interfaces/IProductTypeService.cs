@@ -1,8 +1,6 @@
-﻿using Model.Dtos.ProductType;
-
-namespace Business.Interfaces
+﻿namespace Business.Interfaces
 {
-    public interface IProductTypeService 
+    public interface IProductTypeService
     {
     }
 }

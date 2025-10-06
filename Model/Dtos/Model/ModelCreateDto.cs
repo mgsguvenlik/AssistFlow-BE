@@ -1,18 +1,19 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Model
 {
     public class ModelCreateDto
     {
-        [Required(ErrorMessage = "Model adı zorunludur.")]
-        [StringLength(120, MinimumLength = 2, ErrorMessage = "Model adı 2-120 karakter olmalıdır.")]
-        [NotWhitespace(ErrorMessage = "Model adı yalnızca boşluklardan oluşamaz.")]
+        [Required(ErrorMessage = Messages.ModelNameRequired)]
+        [StringLength(120, MinimumLength = 2, ErrorMessage = Messages.ModelNameLength)]
+        [NotWhitespace(ErrorMessage = Messages.ModelNameCannotBeWhitespace)]
         public string Name { get; set; } = string.Empty;
 
-        [StringLength(500, ErrorMessage = "Açıklama en fazla 500 karakter olabilir.")]
+        [StringLength(500, ErrorMessage = Messages.DescriptionMaxLength)]
         public string? Desc { get; set; }
 
-        [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir marka seçiniz.")]
+        [Range(1, long.MaxValue, ErrorMessage = Messages.SelectValidBrand)]
         public long BrandId { get; set; }
     }
 
@@ -24,7 +25,7 @@ namespace Model.Dtos.Model
         {
             if (value is null) return ValidationResult.Success; // Required ayrı kontrol edilir
             if (value is string s && !string.IsNullOrWhiteSpace(s)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 }

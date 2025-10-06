@@ -1,6 +1,4 @@
-﻿using Model.Dtos.Brand;
-
-namespace Business.Interfaces
+﻿namespace Business.Interfaces
 {
     public interface IBrandService
     {

@@ -1,12 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Configuration
 {
     public class ConfigurationCreateDto
     {
-        [Required(ErrorMessage = "Tanım Alnı zorunlu")]
+        [Required(ErrorMessage = Messages.DefinitionRequired)]
         public string Name { get; set; } = null!;
-        [Required(ErrorMessage = "Değer Alnı zorunlu")]
+        [Required(ErrorMessage = Messages.ValueFieldRequired)]
         public string Value { get; set; } = null!;
         public string? Description { get; set; }
     }

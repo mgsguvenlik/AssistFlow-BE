@@ -1,6 +1,7 @@
 ﻿using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Utilities.Constants;
 
 namespace Business.Abstractions
 {
@@ -27,7 +28,7 @@ namespace Business.Abstractions
             {
                 if (await _unitOfWork.Repository.CompleteAsync() > 0)
                     result = new ResponseModel<TEntity>(true, StatusCode.Ok, entity);
-                result.Message = "Save operation completed successfully.";
+                result.Message = Messages.DataSavedSuccessfully;
             }
             catch (Exception ex)
             {
@@ -49,7 +50,7 @@ namespace Business.Abstractions
                 if (await _unitOfWork.Repository.CompleteAsync() > 0)
                     result.IsSuccess = true;
                 result.StatusCode = StatusCode.Ok;
-                result.Message = "Save operation completed successfully.";
+                result.Message = Messages.DataSavedSuccessfully;
             }
             catch (Exception ex)
             {

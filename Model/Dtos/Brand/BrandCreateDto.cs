@@ -1,15 +1,16 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Brand
 {
     public class BrandCreateDto
     {
-        [Required(ErrorMessage = "Marka adı zorunludur.")]
-        [StringLength(120, MinimumLength = 2, ErrorMessage = "Marka adı 2-120 karakter olmalıdır.")]
-        [NotWhitespace(ErrorMessage = "Marka adı yalnızca boşluklardan oluşamaz.")]
+        [Required(ErrorMessage = Messages.BrandNameRequired)]
+        [StringLength(120, MinimumLength = 2, ErrorMessage = Messages.BrandNameLength)]
+        [NotWhitespace(ErrorMessage = Messages.BrandNameCannotBeWhitespace)]
         public string Name { get; set; } = string.Empty;
 
-        [StringLength(500, ErrorMessage = "Açıklama en fazla 500 karakter olabilir.")]
+        [StringLength(500, ErrorMessage = Messages.DescriptionMaxLength)]
         public string? Desc { get; set; }
     }
 
@@ -21,7 +22,7 @@ namespace Model.Dtos.Brand
         {
             if (value is null) return ValidationResult.Success; // Required ayrı kontrol edilir
             if (value is string s && !string.IsNullOrWhiteSpace(s)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 }

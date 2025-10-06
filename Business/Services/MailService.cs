@@ -2,6 +2,7 @@
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Utilities.Constants;
 using Model.Concrete;
 using System.Net;
 using System.Net.Mail;
@@ -29,14 +30,14 @@ namespace Business.Services
                 string user = configuration.FirstOrDefault(x => x.Name == "MailUser")?.Value ?? "";
                 string pass = configuration.FirstOrDefault(x => x.Name == "MailPassword")?.Value ?? "";
                 string from = configuration.FirstOrDefault(x => x.Name == "MailFrom")?.Value ?? "";
-                string subject = "Şifre Yenile";
+                string subject = Messages.CityNotFound;
 
                 SendMail(from, to, "", subject, bodyMesage, true, mailserver, mailserverport, useSSL, true, user, pass, "", "MGS Destek");
-                return new ResponseModel<bool>(true, true, "Mail gönderimi başarılı.", StatusCode.Ok);
+                return new ResponseModel<bool>(true, true, Messages.MailSentSuccessfully, StatusCode.Ok);
             }
             catch (Exception ex)
             {
-                return new ResponseModel<bool>(false, false, $"Mail gönderilemedi: {ex.Message}", StatusCode.Ok);
+                return new ResponseModel<bool>(false, false, $"{Messages.MailSendFailed} {ex.Message}", StatusCode.Ok);
             }
         }
 

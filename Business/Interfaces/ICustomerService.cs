@@ -1,7 +1,4 @@
-﻿using Model.Dtos.CurrencyType;
-using Model.Dtos.Customer;
-
-namespace Business.Interfaces
+﻿namespace Business.Interfaces
 {
     public interface ICustomerService
     {

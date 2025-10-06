@@ -1,6 +1,5 @@
 ﻿using Business.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Model.Dtos.CustomerGroup;
 
 namespace WebAPI.Controllers

@@ -1,7 +1,6 @@
 ﻿// WebAPI/Controllers/ModelsController.cs
 using Business.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Model.Dtos.Model;
 
 namespace WebAPI.Controllers

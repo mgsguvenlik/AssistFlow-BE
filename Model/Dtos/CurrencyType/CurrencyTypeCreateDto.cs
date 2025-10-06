@@ -1,16 +1,17 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.CurrencyType
 {
     public class CurrencyTypeCreateDto
     {
-        [Required(ErrorMessage = "Para birimi kodu zorunludur.")]
+        [Required(ErrorMessage = Messages.CurrencyCodeRequired)]
         [RegularExpression(@"^[A-Z]{3}$",
-            ErrorMessage = "Para birimi kodu ISO 4217 formatında 3 büyük harf olmalıdır (örn. TRY, USD, EUR).")]
+            ErrorMessage = Messages.CurrencyCodeFormat)]
         public string Code { get; set; } = string.Empty;
 
-        [StringLength(120, ErrorMessage = "Ad en fazla 120 karakter olabilir.")]
-        [NotWhitespace(ErrorMessage = "Ad yalnızca boşluklardan oluşamaz.")]
+        [StringLength(120, ErrorMessage = Messages.NameMaxLength)]
+        [NotWhitespace(ErrorMessage = Messages.NameCannotBeWhitespace)]
         public string? Name { get; set; }
     }
 
@@ -22,7 +23,7 @@ namespace Model.Dtos.CurrencyType
         {
             if (value is null) return ValidationResult.Success; // Required ayrı kontrol edilir
             if (value is string s && !string.IsNullOrWhiteSpace(s)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 }

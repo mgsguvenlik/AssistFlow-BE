@@ -1,17 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace Model.Dtos.ServiceType
 {
     public class ServiceTypeCreateDto
     {
-        [Required(ErrorMessage = "Servis tipi adı zorunludur.")]
-        [StringLength(120, MinimumLength = 2, ErrorMessage = "Ad 2-120 karakter olmalıdır.")]
-        [NotWhitespace(ErrorMessage = "Ad yalnızca boşluklardan oluşamaz.")]
+        [Required(ErrorMessage = Messages.ServiceTypeNameRequired)]
+        [StringLength(120, MinimumLength = 2, ErrorMessage = Messages.NameLength)]
+        [NotWhitespace(ErrorMessage = Messages.NameCannotBeWhitespace)]
         public string Name { get; set; } = string.Empty;
 
-        [StringLength(64, MinimumLength = 2, ErrorMessage = "Sözleşme numarası 2-64 karakter olmalıdır.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._/-]+$", ErrorMessage = "Sözleşme numarası yalnızca harf, rakam, '.', '_', '-', '/' içerebilir.")]
+        [StringLength(64, MinimumLength = 2, ErrorMessage = Messages.ContractNumberLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._/-]+$", ErrorMessage = Messages.ContractNumberInvalidChars)]
         public string? ContractNumber { get; set; }
     }
 
@@ -23,7 +24,7 @@ namespace Model.Dtos.ServiceType
         {
             if (value is null) return ValidationResult.Success; // Required ayrı kontrol edilir
             if (value is string s && !string.IsNullOrWhiteSpace(s)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 
@@ -40,7 +41,7 @@ namespace Model.Dtos.ServiceType
             if (value is null) return ValidationResult.Success;
             if (value is string s && s.Length == 0) return ValidationResult.Success;
             if (value is string s2 && _regex.IsMatch(s2)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Geçersiz biçim.");
+            return new ValidationResult(ErrorMessage ?? Messages.InvalidFormat);
         }
     }
 }

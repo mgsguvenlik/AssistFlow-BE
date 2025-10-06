@@ -1,14 +1,15 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace Model.Dtos.Auth
 {
     public class LoginRequestDto
     {
-        [Required(ErrorMessage = "Kullanıcı adı (e-posta veya teknisyen kodu) zorunludur.")]
+        [Required(ErrorMessage = Messages.UsernameRequired)]
         public string Identifier { get; set; } = string.Empty; // email veya TechnicianCode
 
-        [Required(ErrorMessage = "Şifre zorunludur.")]
+        [Required(ErrorMessage = Messages.PasswordRequired)]
         public string Password { get; set; } = string.Empty;
 
         // bool için extra validasyona gerek yok; default true.
@@ -31,7 +32,7 @@ namespace Model.Dtos.Auth
         {
             var s = (value as string)?.Trim();
             if (string.IsNullOrWhiteSpace(s))
-                return new ValidationResult(ErrorMessage ?? "Kullanıcı adı zorunludur.");
+                return new ValidationResult(ErrorMessage ?? Messages.UsernameRequired);
 
             if (s.Contains('@'))
             {
@@ -39,14 +40,14 @@ namespace Model.Dtos.Auth
                 if (emailAttr.IsValid(s))
                     return ValidationResult.Success;
 
-                return new ValidationResult(ErrorMessage ?? "Geçerli bir e-posta adresi girin.");
+                return new ValidationResult(ErrorMessage ?? Messages.EnterValidEmail);
             }
 
             if (s.Length < MinCodeLength || s.Length > MaxCodeLength)
-                return new ValidationResult(ErrorMessage ?? $"Teknisyen kodu {MinCodeLength}-{MaxCodeLength} karakter olmalıdır.");
+                return new ValidationResult(ErrorMessage ?? $"{Messages.TechnicianCodeLength}");
 
             if (!CodeRegex.IsMatch(s))
-                return new ValidationResult(ErrorMessage ?? "Teknisyen kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.");
+                return new ValidationResult(ErrorMessage ?? Messages.TechnicianCodeInvalidChars);
 
             return ValidationResult.Success;
         }

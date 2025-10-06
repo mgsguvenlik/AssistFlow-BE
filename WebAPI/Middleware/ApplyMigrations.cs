@@ -1,4 +1,5 @@
-﻿using Data.Concrete.EfCore.Context;
+﻿using Core.Utilities.Constants;
+using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace WebAPI.Middleware
@@ -16,13 +17,13 @@ namespace WebAPI.Middleware
                 var pendingMigrations = dbContext.Database.GetPendingMigrations().ToList(); // Ensure materialization
                 if (pendingMigrations.Any())
                 {
-                    logger.LogInformation("Applying pending migrations...");
+                    logger.LogInformation(Messages.ApplyingPendingMigrations);
                     dbContext.Database.Migrate();
-                    logger.LogInformation("Migrations applied successfully.");
+                    logger.LogInformation(Messages.MigrationsAppliedSuccessfully);
                 }
                 else
                 {
-                    logger.LogInformation("No pending migrations found.");
+                    logger.LogInformation(Messages.NoPendingMigrationsFound);
                 }
             }
         }

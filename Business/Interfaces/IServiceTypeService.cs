@@ -1,6 +1,4 @@
-﻿using Model.Dtos.ServiceType;
-
-namespace Business.Interfaces
+﻿namespace Business.Interfaces
 {
     public interface IServiceTypeService
     {

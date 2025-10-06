@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class User:AuditableWithUserEntity
+    public class User : AuditableWithUserEntity
     {
         /// <summary>Birincil anahtar (PK).</summary>
         [Key]

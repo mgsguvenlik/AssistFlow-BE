@@ -1,11 +1,7 @@
-﻿using Data.Seeding.Abstractions;
+﻿using Core.Utilities.Constants;
+using Data.Seeding.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Data.Seeding.Infrastructure
 {
@@ -29,18 +25,18 @@ namespace Data.Seeding.Infrastructure
                 var already = await db.Set<SeedHistory>().AnyAsync(x => x.Key == seed.Key, ct);
                 if (already)
                 {
-                    _logger.LogInformation("Seed {Key} zaten uygulanmış, atlandı.", seed.Key);
+                    _logger.LogInformation(Messages.SeedAlreadyApplied, seed.Key);
                     continue;
                 }
 
                 var should = await seed.ShouldRunAsync(db, ct);
                 if (!should)
                 {
-                    _logger.LogInformation("Seed {Key} koşul sağlamadı, atlandı.", seed.Key);
+                    _logger.LogInformation(Messages.SeedAlreadyApplied, seed.Key);
                     continue;
                 }
 
-                _logger.LogInformation("Seed {Key} başlıyor...", seed.Key);
+                _logger.LogInformation(Messages.SeedStarting, seed.Key);
                 using var tx = await db.Database.BeginTransactionAsync(ct);
                 try
                 {
@@ -50,12 +46,12 @@ namespace Data.Seeding.Infrastructure
                     await db.SaveChangesAsync(ct);
 
                     await tx.CommitAsync(ct);
-                    _logger.LogInformation("Seed {Key} tamamlandı.", seed.Key);
+                    _logger.LogInformation(Messages.SeedCompleted, seed.Key);
                 }
                 catch (Exception ex)
                 {
                     await tx.RollbackAsync(ct);
-                    _logger.LogError(ex, "Seed {Key} hata verdi.", seed.Key);
+                    _logger.LogError(ex, Messages.SeedFailed, seed.Key);
                     throw;
                 }
             }

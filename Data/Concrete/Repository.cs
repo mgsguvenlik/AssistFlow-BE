@@ -59,7 +59,7 @@ namespace Data.Concrete
 
         public IEnumerable<TEntity> AddRange<TEntity, TPrimaryKey>(IEnumerable<TEntity> entities) where TEntity : BaseEntity
         {
-            
+
             _context.Set<TEntity>().AddRange(entities);
             return entities;
         }
