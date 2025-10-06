@@ -1,12 +1,8 @@
-﻿using Data.Seeding.Abstractions;
+﻿using Core.Utilities.Constants;
+using Data.Seeding.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Data.Seeding.Infrastructure
 {
@@ -21,7 +17,7 @@ namespace Data.Seeding.Infrastructure
             foreach (var t in seedTypes)
             {
                 if (!typeof(IDataSeed).IsAssignableFrom(t))
-                    throw new InvalidOperationException($"{t.Name} IDataSeed değil.");
+                    throw new InvalidOperationException($"{t.Name} {Messages.NotIDataSeed}");
                 services.AddScoped(typeof(IDataSeed), t);
             }
             return services;

@@ -54,7 +54,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Products);
 
             config.NewConfig<Model.Concrete.Model, ModelGetDto>()
-                .Map(d => d.Brand,(ur => ur.Brand));
+                .Map(d => d.Brand, (ur => ur.Brand));
 
 
             // ---------------- ProductType ----------------

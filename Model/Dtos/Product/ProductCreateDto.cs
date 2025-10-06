@@ -1,59 +1,59 @@
-﻿using System;
+﻿using Core.Utilities.Constants;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace Model.Dtos.Product
 {
     [PriceNeedsCurrency(nameof(Price), nameof(PriceCurrency), nameof(CurrencyTypeId),
-        ErrorMessage = "Fiyat girildiyse para birimi kodu (PriceCurrency) veya CurrencyTypeId zorunludur.")]
+        ErrorMessage = Messages.CurrencyRequiredIfPriceEntered)]
     [DateOrder(nameof(InstallationDate), nameof(ConnectionDate),
-        ErrorMessage = "Bağlantı tarihi, kurulum tarihinden önce olamaz.")]
+        ErrorMessage = Messages.ConnectionDateBeforeInstallationDate)]
     [ModelNeedsBrand(nameof(ModelId), nameof(BrandId),
-        ErrorMessage = "Model seçildiyse Marka da seçilmelidir.")]
+        ErrorMessage = Messages.BrandRequiredIfModelSelected)]
     public class ProductCreateDto
     {
-        [StringLength(64, ErrorMessage = "Ürün kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Ürün kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.ProductCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.ProductCodeInvalidChars)]
         public string? ProductCode { get; set; }
 
-        [StringLength(64, ErrorMessage = "Oracle ürün kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Oracle ürün kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.OracleCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCodeInvalidChars)]
         public string? OracleProductCode { get; set; }
 
-        [StringLength(64, ErrorMessage = "Sistem tipi en fazla 64 karakter olabilir.")]
-        [NotWhitespaceIfNotEmpty(ErrorMessage = "Sistem tipi yalnızca boşluklardan oluşamaz.")]
+        [StringLength(64, ErrorMessage = Messages.SystemTypeMaxLength)]
+        [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.SystemTypeCannotBeWhitespace)]
         public string? SystemType { get; set; }
 
-        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = "Geçerli bir marka seçiniz.")]
+        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidBrand)]
         public long? BrandId { get; set; }
 
-        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = "Geçerli bir model seçiniz.")]
+        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidModel)]
         public long? ModelId { get; set; }
 
-        [StringLength(500, ErrorMessage = "Açıklama en fazla 500 karakter olabilir.")]
+        [StringLength(500, ErrorMessage = Messages.DescriptionMaxLength)]
         public string? Description { get; set; }
 
-        [RegularExpression(@"^[A-Z]{3}$", ErrorMessage = "Para birimi kodu ISO 4217 biçiminde 3 büyük harf olmalıdır (örn. TRY, USD, EUR).")]
+        [RegularExpression(@"^[A-Z]{3}$", ErrorMessage = Messages.CurrencyCodeFormat)]
         public string? PriceCurrency { get; set; }
 
-        [NonNegativeDecimalIfHasValue(ErrorMessage = "Fiyat negatif olamaz.")]
+        [NonNegativeDecimalIfHasValue(ErrorMessage = Messages.PriceCannotBeNegative)]
         public decimal? Price { get; set; }
 
-        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = "Geçerli bir para birimi seçiniz.")]
+        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidCurrency)]
         public long? CurrencyTypeId { get; set; }
 
         public DateTimeOffset? InstallationDate { get; set; }
         public DateTimeOffset? ConnectionDate { get; set; }
 
-        [StringLength(32, ErrorMessage = "Kurumsal kısa kod en fazla 32 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Kurumsal kısa kod yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(32, ErrorMessage = Messages.CorporateShortCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.CorporateShortCodeInvalidChars)]
         public string? CorporateCustomerShortCode { get; set; }
 
-        [StringLength(64, ErrorMessage = "Oracle müşteri kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Oracle müşteri kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.OracleCustomerCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCustomerCodeInvalidChars)]
         public string? OracleCustomerCode { get; set; }
 
-        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = "Geçerli bir ürün tipi seçiniz.")]
+        [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidProductType)]
         public long? ProductTypeId { get; set; }
     }
 
@@ -72,7 +72,7 @@ namespace Model.Dtos.Product
             if (value is null) return ValidationResult.Success;
             if (value is string s && s.Length == 0) return ValidationResult.Success;
             if (value is string s2 && _regex.IsMatch(s2)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Geçersiz biçim.");
+            return new ValidationResult(ErrorMessage ?? Messages.InvalidFormat);
         }
     }
 
@@ -85,7 +85,7 @@ namespace Model.Dtos.Product
             if (value is null) return ValidationResult.Success;
             if (value is string s && s.Length == 0) return ValidationResult.Success;
             if (value is string s2 && !string.IsNullOrWhiteSpace(s2)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 
@@ -101,7 +101,7 @@ namespace Model.Dtos.Product
         {
             if (value is null) return ValidationResult.Success;
             if (value is long lv && lv >= Min && lv <= Max) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? $"Değer {Min}-{Max} aralığında olmalıdır.");
+            return new ValidationResult(ErrorMessage ?? $"{Messages.ValueOutOfRange}");
         }
     }
 
@@ -113,7 +113,7 @@ namespace Model.Dtos.Product
         {
             if (value is null) return ValidationResult.Success;
             if (value is decimal d && d >= 0) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer negatif olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeNegative);
         }
     }
 
@@ -152,7 +152,7 @@ namespace Model.Dtos.Product
 
             if (hasCode || hasId) return ValidationResult.Success;
 
-            return new ValidationResult(ErrorMessage ?? "Para birimi bilgisi eksik.");
+            return new ValidationResult(ErrorMessage ?? Messages.CurrencyInfoMissing);
         }
     }
 
@@ -181,7 +181,7 @@ namespace Model.Dtos.Product
             var brandId = bProp.GetValue(value) as long?;
             if (brandId.HasValue && brandId.Value > 0) return ValidationResult.Success;
 
-            return new ValidationResult(ErrorMessage ?? "Model seçildiyse Marka da seçilmelidir.");
+            return new ValidationResult(ErrorMessage ?? Messages.BrandRequiredIfModelSelected);
         }
     }
 
@@ -201,7 +201,7 @@ namespace Model.Dtos.Product
             var f = ctx.ObjectType.GetProperty(FromProperty)?.GetValue(value) as DateTimeOffset?;
             var t = ctx.ObjectType.GetProperty(ToProperty)?.GetValue(value) as DateTimeOffset?;
             if (f.HasValue && t.HasValue && t.Value < f.Value)
-                return new ValidationResult(ErrorMessage ?? "Tarih sıralaması geçersiz.");
+                return new ValidationResult(ErrorMessage ?? Messages.InvalidDateOrder);
             return ValidationResult.Success;
         }
     }

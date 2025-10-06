@@ -1,4 +1,5 @@
 ﻿using Business.Interfaces;
+using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos;
@@ -40,7 +41,7 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrEmpty(resetPasswordRequest.Email))
         {
-            return BadRequest("Email is required.");
+            return BadRequest(Messages.EmailRequired);
         }
 
 
@@ -48,14 +49,14 @@ public class AuthController : ControllerBase
 
         if (!result.IsSuccess)
         {
-            return BadRequest(result.Message ?? "Failed to process reset password request.");
+            return BadRequest(result.Message ?? Messages.FailedToProcessResetPasswordRequest);
         }
 
         return Ok(
             new
             {
                 Status = result.StatusCode,
-                Message = result.Message ?? "Reset password request processed successfully."
+                Message = result.Message ?? Messages.ResetPasswordRequestSuccess
             }
         );
     }
@@ -66,26 +67,26 @@ public class AuthController : ControllerBase
         if (string.IsNullOrEmpty(changePasswordDto.RecoveryCode) ||
            string.IsNullOrEmpty(changePasswordDto.NewPasswordConfirm) || string.IsNullOrEmpty(changePasswordDto.NewPassword))
         {
-            return BadRequest("Recovery code, old password, and new password are required.");
+            return BadRequest(Messages.RecoveryCodeOldAndNewPasswordRequired);
         }
 
         if (changePasswordDto.NewPassword != changePasswordDto.NewPasswordConfirm)
         {
-            return BadRequest("New password and confirmation do not match.");
+            return BadRequest(Messages.NewPasswordMismatch);
         }
 
         var result = await _userService.ChangePasswordAsync(changePasswordDto.RecoveryCode, changePasswordDto.NewPassword, cancellationToken);
 
         if (!result.IsSuccess)
         {
-            return BadRequest(result.Message ?? "Failed to change password.");
+            return BadRequest(result.Message ?? Messages.FailedToChangePassword);
         }
 
         return Ok(
             new
             {
                 Status = result.StatusCode,
-                Message = result.Message ?? "Password changed successfully."
+                Message = result.Message ?? Messages.PasswordChangedSuccessfully
             }
         );
     }

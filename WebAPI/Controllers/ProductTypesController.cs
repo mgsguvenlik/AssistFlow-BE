@@ -1,7 +1,6 @@
 ﻿// WebAPI/Controllers/ProductTypesController.cs
 using Business.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Model.Dtos.ProductType;
 
 namespace WebAPI.Controllers

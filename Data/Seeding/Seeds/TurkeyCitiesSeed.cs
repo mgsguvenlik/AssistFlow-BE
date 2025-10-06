@@ -1,10 +1,10 @@
 ﻿// Data/Seeding/Seeds/TurkeyCitiesSeed.cs
-using System.Text.Json;
+using Core.Utilities.Constants;
 using Data.Seeding.Abstractions;
-using Data.Seeding.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
+using System.Text.Json;
 
 namespace Data.Seeding.Seeds
 {
@@ -44,7 +44,7 @@ namespace Data.Seeding.Seeds
 
             var path = candidates.FirstOrDefault(File.Exists);
             if (path is null)
-                throw new FileNotFoundException("turkey-cities.json bulunamadı. seed/ veya DataFiles/ altına koyup 'Copy to Output' verin.");
+                throw new FileNotFoundException(Messages.TurkeyCitiesJsonBulunamadi);
 
             // 2) JSON oku
             var json = await File.ReadAllTextAsync(path, ct);
@@ -55,7 +55,7 @@ namespace Data.Seeding.Seeds
 
             if (docs.Count == 0)
             {
-                _logger.LogWarning("turkey-cities.json boş görünüyor, seed atlandı.");
+                _logger.LogWarning(Messages.TurkeyCitiesJsonEmpty);
                 return;
             }
 
@@ -64,6 +64,7 @@ namespace Data.Seeding.Seeds
             var cities = docs.Select(d => new City
             {
                 Name = d.Name!.Trim(),               // veya Normalize(d.Name!)
+
                 Code = d.Code?.Trim(),
                 Regions = (d.Regions ?? new())
                          .Where(r => !string.IsNullOrWhiteSpace(r))
@@ -78,7 +79,7 @@ namespace Data.Seeding.Seeds
             await db.Set<City>().AddRangeAsync(cities, ct);
             await db.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Şehir/İlçe seed tamamlandı: {CityCount} il, {RegionCount} ilçe.",
+            _logger.LogInformation(Messages.CityRegionSeedCompleted,
                 cities.Count, cities.Sum(c => c.Regions.Count));
         }
 
@@ -89,6 +90,6 @@ namespace Data.Seeding.Seeds
             public string? Code { get; set; }    // "01"
             public List<string>? Regions { get; set; }
         }
-               
+
     }
 }

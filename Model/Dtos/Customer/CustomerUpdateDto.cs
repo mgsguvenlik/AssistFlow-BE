@@ -1,53 +1,49 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Core.Utilities.Constants;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Model.Dtos.Customer
 {
-    public class CustomerUpdateDto 
+    public class CustomerUpdateDto
     {
         public long Id { get; set; }
 
 
         // Kodlar: harf, rakam, ., _, - (opsiyonel)
-        [StringLength(64, ErrorMessage = "Abone Kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Abone Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.SubscriberCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.SubscriberCodeInvalidChars)]
         public string? SubscriberCode { get; set; }
 
-        [StringLength(200, ErrorMessage = "Abone Firma en fazla 200 karakter olabilir.")]
-        [NotWhitespaceIfNotEmpty(ErrorMessage = "Abone Firma yalnızca boşluklardan oluşamaz.")]
+        [StringLength(200, ErrorMessage = Messages.SubscriberCompanyMaxLength)]
+        [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.SubscriberCompanyCannotBeWhitespace)]
         public string? SubscriberCompany { get; set; }
 
-        [StringLength(120, ErrorMessage = "Müşteri Ana Grup Adı en fazla 120 karakter olabilir.")]
+        [StringLength(120, ErrorMessage = Messages.CustomerMainGroupNameMaxLength)]
         public string? CustomerMainGroupName { get; set; }
 
-        [StringLength(500, ErrorMessage = "Adres en fazla 500 karakter olabilir.")]
+        [StringLength(500, ErrorMessage = Messages.AddressMaxLength)]
         public string? SubscriberAddress { get; set; }
 
-        [StringLength(100, ErrorMessage = "İl en fazla 100 karakter olabilir.")]
+        [StringLength(100, ErrorMessage = Messages.CityMaxLength)]
         public string? City { get; set; }
 
-        [StringLength(64, ErrorMessage = "Lokasyon Kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Lokasyon Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.LocationCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.LocationCodeInvalidChars)]
         public string? LocationCode { get; set; }
 
-        [StringLength(64, ErrorMessage = "Oracle Kodu en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Oracle Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.OracleCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCodeInvalidChars)]
         public string? OracleCode { get; set; }
 
-        [StringLength(120, ErrorMessage = "1. Kişi adı en fazla 120 karakter olabilir.")]
-        [NotWhitespaceIfNotEmpty(ErrorMessage = "1. Kişi adı yalnızca boşluklardan oluşamaz.")]
+        [StringLength(120, ErrorMessage = Messages.FirstPersonNameMaxLength)]
+        [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.FirstPersonNameCannotBeWhitespace)]
         public string? ContactName1 { get; set; }
 
         // Telefon: +905551112233 veya 05551112233 gibi (7-15 rakam, isteğe bağlı +)
-        [RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = "Telefon 7-15 haneli olmalı ve sadece rakam (isteğe bağlı +) içermelidir.")]
+        [RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
         public string? Phone1 { get; set; }
 
-        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
-        [StringLength(200, ErrorMessage = "E-posta en fazla 200 karakter olabilir.")]
+        [EmailAddress(ErrorMessage = Messages.EnterValidEmail)]
+        [StringLength(200, ErrorMessage = Messages.EmailMaxLength)]
         public string? Email1 { get; set; }
 
         public string? ContactName2 { get; set; }
@@ -56,16 +52,16 @@ namespace Model.Dtos.Customer
 
         public string? Email2 { get; set; }
 
-        [StringLength(32, ErrorMessage = "Müşteri Kısa Kodu en fazla 32 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Müşteri Kısa Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(32, ErrorMessage = Messages.CustomerShortCodeMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.CustomerShortCodeInvalidChars)]
         public string? CustomerShortCode { get; set; }
 
-        [StringLength(64, ErrorMessage = "Kurumsal Lokasyon ID en fazla 64 karakter olabilir.")]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = "Kurumsal Lokasyon ID yalnızca harf, rakam, '.', '_' ve '-' içerebilir.")]
+        [StringLength(64, ErrorMessage = Messages.CorporateLocationIdMaxLength)]
+        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.CorporateLocationIdInvalidChars)]
         public string? CorporateLocationId { get; set; }
 
         // Nullable olduğu için boş geçilebilir; değer girilirse 1 ve üzeri olmalı
-        [Range(1, long.MaxValue, ErrorMessage = "Müşteri Tipi geçersiz.")]
+        [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
     }
 

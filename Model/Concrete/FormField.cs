@@ -1,10 +1,5 @@
 ﻿using Model.Abstractions;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Model.Concrete
 {
@@ -20,7 +15,7 @@ namespace Model.Concrete
         /// <summary>Alan tipi (örn: input, integer, textarea, radio).</summary>
         public string Type { get; set; } = null!;
 
-        List<object> List  { get; set; }
+        List<object> List { get; set; }
 
         // Navigations
         public ICollection<RoleForm> RoleForms { get; set; } = new List<RoleForm>();

@@ -1,7 +1,6 @@
 ﻿// WebAPI/Controllers/CurrencyTypesController.cs
 using Business.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Model.Dtos.CurrencyType;
 
 namespace WebAPI.Controllers

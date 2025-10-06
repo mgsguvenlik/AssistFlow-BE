@@ -6,6 +6,6 @@
         NoUserName = 2,
         NoBsNo = 3,
         HasBsNo = 4,
-        HasUserAndBsNo =5
+        HasUserAndBsNo = 5
     }
 }

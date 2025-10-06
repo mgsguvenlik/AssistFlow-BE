@@ -1,17 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.CustomerType
 {
     public class CustomerTypeCreateDto
     {
-        [Required(ErrorMessage = "Müşteri tipi adı zorunludur.")]
-        [StringLength(120, MinimumLength = 2, ErrorMessage = "Ad 2-120 karakter olmalıdır.")]
-        [NotWhitespace(ErrorMessage = "Ad yalnızca boşluklardan oluşamaz.")]
+        [Required(ErrorMessage = Messages.CustomerTypeNameRequired)]
+        [StringLength(120, MinimumLength = 2, ErrorMessage = Messages.NameLength)]
+        [NotWhitespace(ErrorMessage = Messages.NameCannotBeWhitespace)]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Kod zorunludur.")]
-        [StringLength(32, MinimumLength = 2, ErrorMessage = "Kod 2-32 karakter olmalıdır.")]
-        [RegularExpression(@"^[A-Z0-9._-]+$", ErrorMessage = "Kod yalnızca A-Z, 0-9, '.', '_' ve '-' içerebilir.")]
+        [Required(ErrorMessage = Messages.CodeRequired)]
+        [StringLength(32, MinimumLength = 2, ErrorMessage = Messages.CodeLength)]
+        [RegularExpression(@"^[A-Z0-9._-]+$", ErrorMessage = Messages.CodeInvalidChars)]
         public string Code { get; set; } = string.Empty;
     }
 
@@ -23,7 +24,7 @@ namespace Model.Dtos.CustomerType
         {
             if (value is null) return ValidationResult.Success; // Required ayrı kontrol edilir
             if (value is string s && !string.IsNullOrWhiteSpace(s)) return ValidationResult.Success;
-            return new ValidationResult(ErrorMessage ?? "Değer yalnızca boşluk olamaz.");
+            return new ValidationResult(ErrorMessage ?? Messages.ValueCannotBeWhitespace);
         }
     }
 }

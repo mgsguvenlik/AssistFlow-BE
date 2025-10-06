@@ -1,5 +1,4 @@
 ﻿using Core.Common;
-using Model.Dtos.Brand;
 using Model.Dtos.City;
 using Model.Dtos.Region;
 

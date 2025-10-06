@@ -1,5 +1,4 @@
-﻿using Model.Dtos.Role;
-using Model.Dtos.User;
+﻿using Model.Dtos.User;
 
 namespace Model.Dtos.Auth
 {

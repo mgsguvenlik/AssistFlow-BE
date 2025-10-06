@@ -2,6 +2,7 @@
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Utilities.Constants;
 using Mapster;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
@@ -32,7 +33,7 @@ public class CityService : ICityService
         }
         catch (Exception ex)
         {
-            return ResponseModel<List<CityGetDto>>.Fail($"Beklenmeyen hata: {ex.Message}", StatusCode.Error);
+            return ResponseModel<List<CityGetDto>>.Fail($"{Messages.UnexpectedError} : {ex.Message}", StatusCode.Error);
         }
     }
 
@@ -47,12 +48,12 @@ public class CityService : ICityService
             var dto = await query.ProjectToType<CityGetDto>(_config).FirstOrDefaultAsync();
 
             return dto is null
-                ? ResponseModel<CityGetDto>.Fail("City not found.", StatusCode.NotFound)
+                ? ResponseModel<CityGetDto>.Fail(Messages.CityNotFound, StatusCode.NotFound)
                 : ResponseModel<CityGetDto>.Success(dto);
         }
         catch (Exception ex)
         {
-            return ResponseModel<CityGetDto>.Fail($"Beklenmeyen hata: {ex.Message}", StatusCode.Error);
+            return ResponseModel<CityGetDto>.Fail($"{Messages.UnexpectedError} : {ex.Message}", StatusCode.Error);
         }
     }
 
@@ -71,7 +72,7 @@ public class CityService : ICityService
         }
         catch (Exception ex)
         {
-            return ResponseModel<List<RegionGetDto>>.Fail($"Beklenmeyen hata: {ex.Message}", StatusCode.Error);
+            return ResponseModel<List<RegionGetDto>>.Fail($"{Messages.UnexpectedError} : {ex.Message}", StatusCode.Error);
         }
     }
 }

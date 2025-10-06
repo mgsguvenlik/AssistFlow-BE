@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Core.Enums
+﻿namespace Core.Enums
 {
     public enum LogType
     {
-        Info=1,
-        Error=2,
+        Info = 1,
+        Error = 2,
     }
 }

@@ -13,7 +13,7 @@ using Model.Concrete;
 
 namespace Business.DependencyResolvers.Autofac
 {
-    public class AutofacBusinessModule: Module, ICoreModule
+    public class AutofacBusinessModule : Module, ICoreModule
     {
         public void Load(IServiceCollection services)
         {
@@ -100,7 +100,7 @@ namespace Business.DependencyResolvers.Autofac
                 ICrudService<Model.Dtos.ProductType.ProductTypeCreateDto,
                              Model.Dtos.ProductType.ProductTypeUpdateDto,
                              Model.Dtos.ProductType.ProductTypeGetDto,
-                             long>, ProductTypeService> ();
+                             long>, ProductTypeService>();
 
             // ProgressApprover
             services.AddScoped<

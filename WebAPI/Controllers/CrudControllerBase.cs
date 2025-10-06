@@ -1,5 +1,6 @@
 ﻿using Business.Interfaces;
 using Core.Common;
+using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
 
@@ -77,7 +78,7 @@ namespace WebAPI.Controllers
             var resp = await _service.DeleteAsync(id);
 
             // 204 için gövdesiz dön
-            if (resp.StatusCode ==Core.Enums.StatusCode.NoContent && resp.IsSuccess)
+            if (resp.StatusCode == Core.Enums.StatusCode.NoContent && resp.IsSuccess)
                 return NoContent();
 
             return ToActionResult(resp);
@@ -116,13 +117,13 @@ namespace WebAPI.Controllers
                 var bodyId = (TKey)Convert.ChangeType(value, typeof(TKey))!;
                 if (!EqualityComparer<TKey>.Default.Equals(routeId, bodyId))
                 {
-                    result = BadRequest(new ResponseModel(false, "Route id ve body Id eşleşmiyor.", Core.Enums.StatusCode.BadRequest));
+                    result = BadRequest(new ResponseModel(false, Messages.RouteIdBodyIdMismatch, Core.Enums.StatusCode.BadRequest));
                     return false;
                 }
             }
             catch
             {
-                result = BadRequest(new ResponseModel(false, "Body Id tipi geçersiz.", Core.Enums.StatusCode.BadRequest));
+                result = BadRequest(new ResponseModel(false, Messages.BodyIdTypeInvalid, Core.Enums.StatusCode.BadRequest));
                 return false;
             }
 

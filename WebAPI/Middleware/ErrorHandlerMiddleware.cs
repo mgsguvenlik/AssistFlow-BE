@@ -1,5 +1,6 @@
 ﻿using Core.Common;
 using Core.Enums;
+using Core.Utilities.Constants;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -27,14 +28,14 @@ namespace WebAPI.Middleware
             try
             {
                 var requestInfo = await GetRequestDetails(context.Request);
-                _logger.LogInformation("Received request: {RequestInfo}", requestInfo);
+                _logger.LogInformation(Messages.ReceivedRequest, requestInfo);
 
                 await _next(context); // Middleware zinciri çağrılır
 
                 // Başarılı durumda response loglanır ve geri yazılır
                 context.Response.Body.Seek(0, SeekOrigin.Begin);
                 var responseInfo = await GetResponseDetails(context);
-                _logger.LogInformation("Response: {ResponseInfo}", responseInfo);
+                _logger.LogInformation(Messages.ResponseInfo, responseInfo);
 
                 context.Response.Body.Seek(0, SeekOrigin.Begin);
                 await responseBody.CopyToAsync(originalBodyStream);
@@ -42,7 +43,7 @@ namespace WebAPI.Middleware
             catch (Exception ex)
             {
                 // Hata durumunda sadece logla ve hatayı yönet
-                _logger.LogError(ex, "An error occurred: {Message}", ex.Message);
+                _logger.LogError(ex, Messages.ErrorOccurred, ex.Message);
 
                 // Body restore edilmezse response’a yazılamaz
                 context.Response.Body = originalBodyStream;
@@ -93,7 +94,7 @@ namespace WebAPI.Middleware
 
             var response = new ResponseModel
             {
-                Message = $"Internal Server Error. Please try again later. ERROR: {exception.Message}",
+                Message = $"{Messages.InternalServerErrorDetailed} {exception.Message}",
                 StatusCode = StatusCode.Error,
                 IsSuccess = false
             };

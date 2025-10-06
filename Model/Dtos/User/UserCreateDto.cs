@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.User
 {
@@ -31,7 +32,7 @@ namespace Model.Dtos.User
         // Şifre: min 8, en az 1 büyük, 1 küçük harf ve 1 rakam
         [Required, MinLength(8)]
         [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$",
-            ErrorMessage = "Şifre en az 8 karakter olmalı ve büyük/küçük harf ile rakam içermelidir.")]
+            ErrorMessage = Messages.PasswordComplexity)]
         public string Password { get; set; } = string.Empty;
 
         // Opsiyonel; verilirse kurallara uysun
@@ -43,15 +44,15 @@ namespace Model.Dtos.User
             if (RoleIds != null)
             {
                 if (RoleIds.Count == 0)
-                    yield return new ValidationResult("En az bir rol seçiniz.", new[] { nameof(RoleIds) });
+                    yield return new ValidationResult(Messages.AtLeastOneRoleRequired, new[] { nameof(RoleIds) });
 
                 if (RoleIds.Any(id => id <= 0))
-                    yield return new ValidationResult("Rol Id'leri pozitif olmalıdır.", new[] { nameof(RoleIds) });
+                    yield return new ValidationResult(Messages.RoleIdsMustBePositive, new[] { nameof(RoleIds) });
 
                 var duplicates = RoleIds.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
                 if (duplicates.Count > 0)
                     yield return new ValidationResult(
-                        $"RoleIds içinde tekrar eden değer(ler): {string.Join(", ", duplicates)}",
+                        $"{Messages.DuplicateRoleIds} {string.Join(", ", duplicates)}",
                         new[] { nameof(RoleIds) });
             }
         }

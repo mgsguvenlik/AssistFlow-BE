@@ -11,6 +11,6 @@ namespace Model.Abstractions
     /// </typeparam>
     public abstract class BaseEntity : IModel
     {
-      
+
     }
 }

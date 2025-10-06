@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete
 {
-    public class CustomerGroup:BaseEntity
+    public class CustomerGroup : BaseEntity
     {
         /// <summary>Birincil anahtar (PK).</summary>
         [Key]

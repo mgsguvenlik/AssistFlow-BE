@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace Core.Common
+﻿namespace Core.Common
 {
     public static class CommonFunctions
     {
@@ -19,21 +17,7 @@ namespace Core.Common
             return text;
         }
 
-        ///MZK Not: Bu metot Common Function a çekilebilir.
-        public static string GetErrorMessage(string errorCode)
-        {
-            var errorMessages = new Dictionary<string, string>
-                {
-                    { "1", "Malzeme yok!" },
-                    { "2", "Ürün sipariş numarası yok!" },
-                    { "3", "Malzeme uygun formatta değil!" },
-                    { "5", "Malzeme bulunamadı!" },
-                    { "6", "Ürün sipariş numarası bulunamadı!" },
-                    { "7", "Ürün sipariş numarası bu malzemeye ait değil!" },
-                };
-            return errorMessages.TryGetValue(errorCode, out var message) ? message : "Bilinmeyen hata";
-        }
-        public static string  TrToEng(string sqlStr)
+        public static string TrToEng(string sqlStr)
         {
             string turkceKarakter = "ığüşöçĞÜŞİÖÇ";
             string karsiKarakter = "igusocGUSIOC";

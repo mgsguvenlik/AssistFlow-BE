@@ -1,17 +1,13 @@
 ﻿using Business.Interfaces;
-using Business.Services;
 using Core.Common;
 using Core.Settings.Concrete;
-using Core.Utilities.IoC;
+using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Model.Concrete;
 using Model.Dtos.Auth;
 using Model.Dtos.Role;
-using Model.Dtos.User;
 using System.IdentityModel.Tokens.Jwt;
-using System.Net;
 using System.Security.Claims;
 using System.Text;
 
@@ -19,7 +15,7 @@ public class AuthService : IAuthService
 {
     private readonly IHttpContextAccessor _http;
     private readonly IUserService _userService;
-    private readonly IOptionsSnapshot<AppSettings> _appSettings; 
+    private readonly IOptionsSnapshot<AppSettings> _appSettings;
 
     public AuthService(
         IHttpContextAccessor http,
@@ -28,7 +24,7 @@ public class AuthService : IAuthService
     )
     {
         _http = http;
-        _userService = userService; 
+        _userService = userService;
         _appSettings = appSettings;
     }
 
@@ -89,7 +85,7 @@ public class AuthService : IAuthService
         {
             Token = tokenString,
             Expires = expires,
-            User= user,
+            User = user,
             Status = 200
         };
 
@@ -109,15 +105,15 @@ public class AuthService : IAuthService
                  ?? p?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
 
         if (!long.TryParse(idStr, out var userId) || userId <= 0)
-            return ResponseModel<CurrentUserDto>.Fail("User id claim not found", Core.Enums.StatusCode.Unauthorized);
+            return ResponseModel<CurrentUserDto>.Fail(Messages.UserIdClaimNotFound, Core.Enums.StatusCode.Unauthorized);
 
         // 2) Back-end'den kullanıcıyı getir
         var userRes = await _userService.GetByIdAsync(userId);
         if (!userRes.IsSuccess || userRes.Data is null)
-            return ResponseModel<CurrentUserDto>.Fail("User not found", Core.Enums.StatusCode.NotFound);
+            return ResponseModel<CurrentUserDto>.Fail(Messages.UserNotFound, Core.Enums.StatusCode.NotFound);
 
-        var u = userRes.Data; 
-       
+        var u = userRes.Data;
+
         // 4) DTO’yu doldur
         var dto = new CurrentUserDto
         {

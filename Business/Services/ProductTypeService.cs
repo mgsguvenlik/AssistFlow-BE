@@ -1,5 +1,4 @@
-﻿using System.Linq.Expressions;
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
 using Mapster;
@@ -7,6 +6,7 @@ using MapsterMapper;
 using Microsoft.EntityFrameworkCore.Query;
 using Model.Concrete;
 using Model.Dtos.ProductType;
+using System.Linq.Expressions;
 
 namespace Business.Services
 {

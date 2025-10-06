@@ -1,7 +1,7 @@
 ﻿using Model.Dtos.Model;
 using Model.Dtos.Product;
 
-namespace Model.Dtos.Brand 
+namespace Model.Dtos.Brand
 {
     public class BrandGetDto : BrandUpdateDto
     {

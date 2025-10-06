@@ -1,8 +1,6 @@
-﻿using Model.Dtos.Role;
-
-namespace Business.Interfaces
+﻿namespace Business.Interfaces
 {
-    public interface IRoleService 
+    public interface IRoleService
     {
     }
 }
