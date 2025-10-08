@@ -1,4 +1,6 @@
-﻿namespace Core.Common
+﻿using Core.Utilities.Constants;
+
+namespace Core.Common
 {
     public static class CommonFunctions
     {
@@ -7,8 +9,8 @@
         {
             text = text.Trim();
 
-            string[] trkChars = { "Ç", "ç", "Ğ", "ğ", "ı", "İ", "Ö", "ö", "Ş", "ş", "Ü", "ü" };
-            string[] engChars = { "C", "c", "G", "g", "i", "I", "O", "o", "S", "s", "U", "u" };
+            string[] trkChars = CommonConstants.TrChars;
+            string[] engChars = CommonConstants.EngChars;
 
             for (int i = 0; i < trkChars.Length; i++)
             {
@@ -19,8 +21,8 @@
 
         public static string TrToEng(string sqlStr)
         {
-            string turkceKarakter = "ığüşöçĞÜŞİÖÇ";
-            string karsiKarakter = "igusocGUSIOC";
+            string turkceKarakter = CommonConstants.TurkishCharacters;
+            string karsiKarakter = CommonConstants.AsciiEquivalents;
             bool temp2 = false;
             string temp = string.Empty;
 

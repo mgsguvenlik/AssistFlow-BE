@@ -7,7 +7,7 @@
         public string? OracleProductCode { get; set; }
         public string? SystemType { get; set; }
         public long? BrandId { get; set; }
-        public long? ModelId{ get; set; }
+        public long? ModelId { get; set; }
         public string? Description { get; set; }
         public string? PriceCurrency { get; set; }
         public decimal? Price { get; set; }

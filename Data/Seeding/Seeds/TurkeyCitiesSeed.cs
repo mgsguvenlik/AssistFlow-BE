@@ -13,7 +13,7 @@ namespace Data.Seeding.Seeds
         private readonly ILogger<TurkeyCitiesSeed> _logger;
         public TurkeyCitiesSeed(ILogger<TurkeyCitiesSeed> logger) => _logger = logger;
 
-        public string Key => "seed.cities.regions.v1"; // SeedHistory için benzersiz anahtar
+        public string Key => CommonConstants.SeedCitiesRegions; // SeedHistory için benzersiz anahtar
         public int Order => 10; // sıralama
 
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)
@@ -28,18 +28,18 @@ namespace Data.Seeding.Seeds
             var candidates = new[]
                {
                    // Çıktı köküne kopyalanmış olabilir
-                   Path.Combine(AppContext.BaseDirectory, "turkey-cities.json"),
+                   Path.Combine(AppContext.BaseDirectory,CommonConstants.TurkeyCities),
                
                    // Çıktıya 'seed/turkey-cities.json' olarak linklenmiş olabilir
-                   Path.Combine(AppContext.BaseDirectory, "seed", "turkey-cities.json"),
+                   Path.Combine(AppContext.BaseDirectory, CommonConstants.seed, CommonConstants.TurkeyCities),
                
                    // Data projesindeki klasör yapısıyla kopyalanmış olabilir
-                   Path.Combine(AppContext.BaseDirectory, "Seeding", "DataFiles", "turkey-cities.json"),
-                   Path.Combine(AppContext.BaseDirectory, "Data", "Seeding", "DataFiles", "turkey-cities.json"),
+                   Path.Combine(AppContext.BaseDirectory, CommonConstants.Seeding, CommonConstants.DataFiles, CommonConstants.TurkeyCities),
+                   Path.Combine(AppContext.BaseDirectory,CommonConstants.Data,CommonConstants.Seeding,CommonConstants.DataFiles, CommonConstants.TurkeyCities),
                
                    // Geliştirme sırasında CurrentDirectory üzerinden de deneyelim
-                   Path.Combine(Directory.GetCurrentDirectory(), "Data", "Seeding", "DataFiles", "turkey-cities.json"),
-                   Path.Combine(Directory.GetCurrentDirectory(), "Seeding", "DataFiles", "turkey-cities.json"),
+                   Path.Combine(Directory.GetCurrentDirectory(), CommonConstants.Data, CommonConstants.Seeding, CommonConstants.DataFiles,  CommonConstants.TurkeyCities),
+                   Path.Combine(Directory.GetCurrentDirectory(), CommonConstants.Seeding, CommonConstants.DataFiles,  CommonConstants.TurkeyCities),
                };
 
             var path = candidates.FirstOrDefault(File.Exists);
@@ -70,7 +70,7 @@ namespace Data.Seeding.Seeds
                          .Where(r => !string.IsNullOrWhiteSpace(r))
                          .Select(r => r.Trim())
                          .Distinct(StringComparer.OrdinalIgnoreCase)
-                         .OrderBy(r => r, StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), true))
+                         .OrderBy(r => r, StringComparer.Create(new System.Globalization.CultureInfo(CommonConstants.TrTR), true))
                          .Select(r => new Region { Name = r /* veya Normalize(r) */ })
                          .ToList()
             }).ToList();

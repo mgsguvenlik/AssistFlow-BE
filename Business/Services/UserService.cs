@@ -102,7 +102,7 @@ public class UserService
                                      .ProjectToType<UserGetDto>(_config)
                                      .FirstAsync();
 
-            return ResponseModel<UserGetDto>.Success(created, "Created", StatusCode.Created);
+            return ResponseModel<UserGetDto>.Success(created, Messages.Created, StatusCode.Created);
         }
         catch (DbUpdateException ex)
         {

@@ -102,7 +102,7 @@
         public const string NameCannotBeWhitespace = "Ad yalnızca boşluklardan oluşamaz.";
         public const string PrimaryContactRequired = "Birincil iletişim için en az Telefon veya E-posta girilmelidir.";
         public const string CustomerNameRequired = "Müşteri adı için 'Abone Firma' veya '1. Kişi Adı' alanlarından en az biri dolu olmalıdır.";
-        public const string SubscriberCodeMaxLength = "Abone Kodu en fazla 64 karakter olabilir." ; 
+        public const string SubscriberCodeMaxLength = "Abone Kodu en fazla 64 karakter olabilir.";
         public const string SubscriberCodeInvalidChars = "Abone Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.";
         public const string SubscriberCompanyMaxLength = "Abone Firma en fazla 200 karakter olabilir.";
         public const string SubscriberCompanyCannotBeWhitespace = "Abone Firma yalnızca boşluklardan oluşamaz.";
@@ -186,6 +186,12 @@
         public const string ResponseInfo = "Yanıt: {ResponseInfo}";
         public const string ErrorOccurred = "Bir hata oluştu: {Message}";
         public const string InternalServerErrorDetailed = "Sunucu hatası. Lütfen daha sonra tekrar deneyin. HATA:";
+        public const string Created = "Oluşturuldu";
+        public const string Updated = "Güncellendi";
+        public const string Deleted = "Silindi";
+        public const string Unauthorized = "Yetkisiz erişim";
+        public const string MGSHelpDesk = "MGS Destek";
+        public const string Success = "Başarılı";
 
 
     }

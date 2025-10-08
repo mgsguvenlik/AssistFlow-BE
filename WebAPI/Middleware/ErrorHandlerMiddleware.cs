@@ -89,7 +89,7 @@ namespace WebAPI.Middleware
 
         private static Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
-            context.Response.ContentType = "application/json";
+            context.Response.ContentType = CommonConstants.ApplicationJson;
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
             var response = new ResponseModel
