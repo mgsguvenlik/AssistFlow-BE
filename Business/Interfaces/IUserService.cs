@@ -9,5 +9,13 @@ namespace Business.Interfaces
         Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password);
         Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default);
         Task<ResponseModel<UserGetDto>> ResetPasswordRequestAsync(string email, CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<UserGetDto>> ChangePasswordWithOldAsync(
+                long userId,
+                string oldPassword,
+                string newPassword,
+                string newPasswordConfirm,
+                CancellationToken cancellationToken = default
+        );
     }
 }
