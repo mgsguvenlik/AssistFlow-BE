@@ -106,7 +106,7 @@ namespace WebAPI.Controllers
         protected bool RouteIdMatchesBodyId<TDto>(TKey routeId, TDto dto, out IActionResult? result)
         {
             result = null;
-            var prop = typeof(TDto).GetProperty("Id", BindingFlags.Public | BindingFlags.Instance);
+            var prop = typeof(TDto).GetProperty(CommonConstants.Id, BindingFlags.Public | BindingFlags.Instance);
             if (prop == null) return true; // Id yoksa kontrol etmeyelim
 
             var value = prop.GetValue(dto);
@@ -136,7 +136,7 @@ namespace WebAPI.Controllers
             id = null;
             if (obj == null) return false;
 
-            var prop = typeof(T).GetProperty("Id", BindingFlags.Public | BindingFlags.Instance);
+            var prop = typeof(T).GetProperty(CommonConstants.Id, BindingFlags.Public | BindingFlags.Instance);
             if (prop == null) return false;
 
             id = prop.GetValue(obj);

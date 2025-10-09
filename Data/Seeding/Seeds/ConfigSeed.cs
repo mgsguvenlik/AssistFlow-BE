@@ -15,7 +15,7 @@ namespace Data.Seeding.Seeds
             _logger = logger;
         }
 
-        public string Key => "seed.configuration.v1"; // SeedHistory için benzersiz anahtar
+        public string Key => CommonConstants.SeedConfiguration; // SeedHistory için benzersiz anahtar
         public int Order => 10; // sıralama
         public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
         {

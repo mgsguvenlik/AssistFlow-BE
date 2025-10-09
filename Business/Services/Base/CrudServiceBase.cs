@@ -46,8 +46,8 @@ namespace Business.Services.Base
 
             // En yaygın claim'ler: NameIdentifier, sub, uid
             var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier)
-                      ?? user.FindFirstValue("sub")
-                      ?? user.FindFirstValue("uid");
+                      ?? user.FindFirstValue(CommonConstants.sub)
+                      ?? user.FindFirstValue(CommonConstants.uid);
 
             return long.TryParse(idStr, out var id) ? id : 0;
         }
@@ -59,9 +59,9 @@ namespace Business.Services.Base
             var now = Now();
             var uid = GetCurrentUserIdOrDefault();
 
-            TrySetDate(entity, "CreatedDate", now, onlyIfDefault: true);
-            TrySetLong(entity, "CreatedUser", uid, onlyIfDefault: true);
-            TrySetBool(entity, "IsDeleted", false, onlyIfDefault: false);
+            TrySetDate(entity, CommonConstants.CreatedDate, now, onlyIfDefault: true);
+            TrySetLong(entity, CommonConstants.CreatedUser, uid, onlyIfDefault: true);
+            TrySetBool(entity, CommonConstants.IsDeleted, false, onlyIfDefault: false);
         }
 
         protected virtual void SetUpdateAuditIfExists(object? entity)
@@ -70,17 +70,17 @@ namespace Business.Services.Base
             var now = Now();
             var uid = GetCurrentUserIdOrDefault();
 
-            TrySetDate(entity, "UpdatedDate", now, onlyIfDefault: false);
-            TrySetLong(entity, "UpdatedUser", uid, onlyIfDefault: false);
+            TrySetDate(entity, CommonConstants.UpdatedDate, now, onlyIfDefault: false);
+            TrySetLong(entity, CommonConstants.UpdatedUser, uid, onlyIfDefault: false);
         }
 
         protected virtual bool TrySoftDeleteIfSupported(object entity)
         {
             // IsDeleted varsa soft delete uygula
-            var prop = FindProp(entity, "IsDeleted");
+            var prop = FindProp(entity, CommonConstants.IsDeleted);
             if (prop is null) return false;
 
-            TrySetBool(entity, "IsDeleted", true, onlyIfDefault: false);
+            TrySetBool(entity, CommonConstants.IsDeleted, true, onlyIfDefault: false);
             SetUpdateAuditIfExists(entity);
             return true;
         }
@@ -237,7 +237,7 @@ namespace Business.Services.Base
                                      .ProjectToType<TGetDto>(_config)
                                      .FirstAsync();
 
-                return ResponseModel<TGetDto>.Success(created, "Created", StatusCode.Created);
+                return ResponseModel<TGetDto>.Success(created, Messages.Created, StatusCode.Created);
             }
             catch (DbUpdateException ex)
             {
@@ -274,7 +274,7 @@ namespace Business.Services.Base
                                      .ProjectToType<TGetDto>(_config)
                                      .FirstAsync();
 
-                return ResponseModel<TGetDto>.Success(updated, "Updated");
+                return ResponseModel<TGetDto>.Success(updated, Messages.Updated);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -297,12 +297,12 @@ namespace Business.Services.Base
                 if (TrySoftDeleteIfSupported(entity))
                 {
                     await _repo.CompleteAsync();
-                    return ResponseModel<bool>.Success(true, "Deleted", StatusCode.NoContent);
+                    return ResponseModel<bool>.Success(true, Messages.Deleted, StatusCode.NoContent);
                 }
                 // Soft destek yoksa hard delete
                 await _repo.HardDeleteAsync<TEntity>(id);
                 await _repo.CompleteAsync();
-                return ResponseModel<bool>.Success(true, "Deleted", StatusCode.NoContent);
+                return ResponseModel<bool>.Success(true, Messages.Deleted, StatusCode.NoContent);
             }
             catch (Exception ex)
             {

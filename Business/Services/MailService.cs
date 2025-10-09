@@ -23,16 +23,16 @@ namespace Business.Services
             try
             {
                 var configuration = await _uow.Repository.GetMultipleAsync<Configuration>(true);
-                string mailserver = configuration.FirstOrDefault(x => x.Name == "MailServer")?.Value ?? "";
-                string mailserverportValue = configuration.FirstOrDefault(x => x.Name == "MailServerPort")?.Value ?? "";
+                string mailserver = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailServer)?.Value ?? "";
+                string mailserverportValue = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailServerPort)?.Value ?? "";
                 int mailserverport = !string.IsNullOrEmpty(mailserverportValue) ? int.Parse(mailserverportValue) : 0;
-                bool useSSL = configuration.FirstOrDefault(x => x.Name == "MailUseSSL")?.Value?.ToLower() == "1";
-                string user = configuration.FirstOrDefault(x => x.Name == "MailUser")?.Value ?? "";
-                string pass = configuration.FirstOrDefault(x => x.Name == "MailPassword")?.Value ?? "";
-                string from = configuration.FirstOrDefault(x => x.Name == "MailFrom")?.Value ?? "";
+                bool useSSL = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailUseSSL)?.Value?.ToLower() == "1";
+                string user = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailUser)?.Value ?? "";
+                string pass = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailPassword)?.Value ?? "";
+                string from = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFrom)?.Value ?? "";
                 string subject = Messages.CityNotFound;
 
-                SendMail(from, to, "", subject, bodyMesage, true, mailserver, mailserverport, useSSL, true, user, pass, "", "MGS Destek");
+                SendMail(from, to, "", subject, bodyMesage, true, mailserver, mailserverport, useSSL, true, user, pass, "", Messages.MGSHelpDesk);
                 return new ResponseModel<bool>(true, true, Messages.MailSentSuccessfully, StatusCode.Ok);
             }
             catch (Exception ex)

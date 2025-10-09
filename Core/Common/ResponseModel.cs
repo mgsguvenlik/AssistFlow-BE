@@ -1,5 +1,6 @@
 ﻿using Core.Abstractions;
 using Core.Enums;
+using Core.Utilities.Constants;
 
 namespace Core.Common
 {
@@ -15,7 +16,7 @@ namespace Core.Common
 
         // Helper'lar (isteğe bağlı)
         public static ResponseModel Success(string? message = null, StatusCode status = StatusCode.Ok)
-            => new ResponseModel(true, message ?? "Success", status);
+            => new ResponseModel(true, message ?? Messages.Success, status);
 
         public static ResponseModel Fail(string message, StatusCode status = StatusCode.BadRequest,
                                          Dictionary<string, string[]>? validation = null)
@@ -41,7 +42,7 @@ namespace Core.Common
 
         // Helper'lar (kullanışlı)
         public static ResponseModel<T> Success(T data, string? message = null, StatusCode status = StatusCode.Ok)
-            => new ResponseModel<T>(true, data, message ?? "Success", status);
+            => new ResponseModel<T>(true, data, message ?? Messages.Success, status);
 
         public static ResponseModel<T> Fail(string message, StatusCode status = StatusCode.BadRequest,
                                             T? data = default,
