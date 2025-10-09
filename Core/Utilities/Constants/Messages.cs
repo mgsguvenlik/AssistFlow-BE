@@ -186,6 +186,10 @@
         public const string ResponseInfo = "Yanıt: {ResponseInfo}";
         public const string ErrorOccurred = "Bir hata oluştu: {Message}";
         public const string InternalServerErrorDetailed = "Sunucu hatası. Lütfen daha sonra tekrar deneyin. HATA:";
+        public const string NewPasswordAndConfirmationDoNotMatch = "Yeni şifre ile şifre tekrarı eşleşmiyor.";
+        public const string RecoveryOldNewRequired = "Eski şifre, yeni şifre ve şifre tekrarı alanları zorunludur.";
+
+
 
 
     }

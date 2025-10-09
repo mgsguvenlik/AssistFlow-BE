@@ -225,7 +225,6 @@ public class UserService
     }
 
 
-
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
@@ -432,6 +431,95 @@ public class UserService
             Message = Messages.PasswordChangedSuccessfully
         });
     }
+
+
+    public async Task<ResponseModel<UserGetDto>> ChangePasswordWithOldAsync(
+    long userId,
+    string oldPassword,
+    string newPassword,
+    string newPasswordConfirm,
+    CancellationToken cancellationToken = default)
+    {
+        // 0) Temel kontroller
+        if (string.IsNullOrWhiteSpace(oldPassword) ||
+            string.IsNullOrWhiteSpace(newPassword) ||
+            string.IsNullOrWhiteSpace(newPasswordConfirm))
+        {
+            return ResponseModel<UserGetDto>.Fail(Messages.RecoveryOldNewRequired, StatusCode.BadRequest);
+            // Örn: "Recovery code, old password, and new password are required." mesajını bu senaryoya uyarlayabilirsin
+        }
+
+        if (newPassword != newPasswordConfirm)
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordAndConfirmationDoNotMatch, StatusCode.BadRequest);
+
+        // (Opsiyonel) Minimum uzunluk vb. politikalar
+        var pwdPolicyError = ValidatePasswordStrength(newPassword);
+        if (!string.IsNullOrEmpty(pwdPolicyError))
+            return ResponseModel<UserGetDto>.Fail(pwdPolicyError, StatusCode.BadRequest);
+
+        // 1) Kullanıcıyı tracking açık çek
+        var user = await _unitOfWork.Repository.GetSingleAsync<User>(
+            asNoTracking: false,
+            whereExpression: u => u.Id == userId);
+
+        if (user is null)
+            return ResponseModel<UserGetDto>.Fail(Messages.UserNotFound, StatusCode.NotFound);
+
+        // 2) Eski şifreyi doğrula
+        var verifyOld = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, oldPassword);
+        if (verifyOld == PasswordVerificationResult.Failed)
+            return ResponseModel<UserGetDto>.Fail(Messages.InvalidEmailOrPassword, StatusCode.BadRequest);
+        // İstersen "Eski şifre hatalı" gibi ayrı bir sabit kullan
+
+        // 3) Yeni şifre eskisi ile aynı mı? (Doğrulamanın doğru yolu)
+        var newEqualsOld = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, newPassword);
+        if (newEqualsOld != PasswordVerificationResult.Failed)
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordCannotBeSameAsOld, StatusCode.BadRequest);
+
+        try
+        {
+            // 4) Hashle ve kaydet
+            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+
+            _unitOfWork.Repository.Update(user);
+            await _unitOfWork.Repository.CompleteAsync();
+
+            // 5) Güncel DTO'yu include'larla projekte ederek döndür
+            var query = _unitOfWork.Repository.GetQueryable<User>();
+            var inc = IncludeExpression();
+            if (inc is not null) query = inc(query);
+
+            var dto = await query.AsNoTracking()
+                                 .Where(u => u.Id == user.Id)
+                                 .ProjectToType<UserGetDto>(_config)
+                                 .FirstAsync(cancellationToken);
+
+            return ResponseModel<UserGetDto>.Success(dto, Messages.PasswordChangedSuccessfully, StatusCode.Ok);
+        }
+        catch (DbUpdateException ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.DatabaseError}: {ex.Message}", StatusCode.Conflict);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.FailedToChangePassword}: {ex.Message}", StatusCode.Error);
+        }
+    }
+
+    /// <summary>
+    /// Opsiyonel: Basit parola politikası (uzunluk, rakam, harf vb.)
+    /// İstersen kaldırabilir ya da şirket politikasına göre geliştirebilirsin.
+    /// </summary>
+    private static string? ValidatePasswordStrength(string password)
+    {
+        if (password.Length < 8) return "Şifre en az 8 karakter olmalıdır.";
+        if (!password.Any(char.IsDigit)) return "Şifre en az bir rakam içermelidir.";
+        if (!password.Any(char.IsLower)) return "Şifre en az bir küçük harf içermelidir.";
+        if (!password.Any(char.IsUpper)) return "Şifre en az bir büyük harf içermelidir.";
+        // if (!password.Any(ch => !char.IsLetterOrDigit(ch))) return "Şifre en az bir özel karakter içermelidir.";
+        return null;
+    }
+
 
 
 }
