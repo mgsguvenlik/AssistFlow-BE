@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
+using Core.Common;
 using Mapster;
 using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
@@ -27,5 +28,14 @@ namespace Business.Services
         protected override Task<ProgressApprover?> ResolveEntityForUpdateAsync(ProgressApproverUpdateDto dto)
             => _unitOfWork.Repository.GetSingleAsync<ProgressApprover>(false, x => x.Id == dto.Id,
                    q => q.Include(p => p.Customer));
+
+        public async Task<ResponseModel<List<ProgressApproverGetDto>>> GetByCustomerIdAsync(long customerId, CancellationToken cancellationToken)
+        {
+            var entities = await _unitOfWork.Repository.GetMultipleAsync<ProgressApprover>(false,
+                x => x.CustomerId == customerId,             
+                cancellationToken);
+            var dtos = entities.Adapt<List<ProgressApproverGetDto>>(_config);
+            return ResponseModel<List<ProgressApproverGetDto>>.Success(dtos);
+        }
     }
 }
