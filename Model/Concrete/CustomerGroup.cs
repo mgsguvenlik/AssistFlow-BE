@@ -16,5 +16,8 @@ namespace Model.Concrete
         /// <summary>Gruba ait kısa kod (örn. CORP, DIST, VIP).</summary>
         [Required, MaxLength(50)]
         public string Code { get; set; } = string.Empty;
+
+        // Navigations (grup fiyatları)
+        public ICollection<CustomerGroupProductPrice> GroupProductPrices { get; set; } = new List<CustomerGroupProductPrice>();
     }
 }

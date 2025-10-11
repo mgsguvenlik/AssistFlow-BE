@@ -35,14 +35,14 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
             services.AddScoped(typeof(IMailService), typeof(MailService));
             services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
+            services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
+            services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
             // Eğer kendi sarmalayıcını (IPasswordHasherService) da kullanacaksan:
             services.AddScoped(typeof(IPasswordHasherService), typeof(IdentityPasswordHasherService));
-
-
 
 
             // ---- CRUD generic kayıtlar ----

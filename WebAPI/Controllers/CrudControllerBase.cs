@@ -13,6 +13,7 @@ namespace WebAPI.Controllers
     {
         protected readonly ICrudService<TCreateDto, TUpdateDto, TGetDto, TKey> _service;
         protected readonly ILogger _logger;
+        private ICustomerProductPriceService service;
 
         protected CrudControllerBase(
             ICrudService<TCreateDto, TUpdateDto, TGetDto, TKey> service,

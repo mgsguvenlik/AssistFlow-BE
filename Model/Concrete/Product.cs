@@ -34,5 +34,9 @@ namespace Model.Concrete
 
         public long? ProductTypeId { get; set; }            // Ürün Tipi Id
         public ProductType? ProductType { get; set; }
+
+        // Navigations (fiyatlar)
+        public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
+        public ICollection<CustomerGroupProductPrice> GroupProductPrices { get; set; } = new List<CustomerGroupProductPrice>();
     }
 }

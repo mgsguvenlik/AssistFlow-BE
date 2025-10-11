@@ -30,8 +30,10 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlow> WorkFlows { get; set; }
         public DbSet<WorkFlowStatus> WorkFlowStatuses { get; set; }
         public DbSet<ServicesRequest>  ServicesRequests { get; set; }
-        public DbSet<PriceGroup> PriceGroups { get; set; }
+
         public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
+        public DbSet<CustomerProductPrice> CustomerProductPrices { get; set; }
+        public DbSet<CustomerGroupProductPrice> CustomerGroupProductPrices { get; set; }
 
 
         /// <summary>
@@ -202,6 +204,44 @@ namespace Data.Concrete.EfCore.Context
                 .WithMany() // ters navigation yoksa
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+
+
+
+            // CustomerProductPrice: Customer + Product tekil olsun
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasIndex(x => new { x.CustomerId, x.ProductId })
+                .IsUnique();
+
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasOne(x => x.Customer)
+                .WithMany(c => c.CustomerProductPrices)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasOne(x => x.Product)
+                .WithMany(p => p.CustomerProductPrices)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // CustomerGroupProductPrice: Group + Product tekil olsun
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasIndex(x => new { x.CustomerGroupId, x.ProductId })
+                .IsUnique();
+
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasOne(x => x.CustomerGroup)
+                .WithMany(g => g.GroupProductPrices)
+                .HasForeignKey(x => x.CustomerGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasOne(x => x.Product)
+                .WithMany(p => p.GroupProductPrices)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
         }
     }
 }

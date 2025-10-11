@@ -90,11 +90,20 @@ namespace Model.Concrete
         /// <summary>
         /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
         /// </summary>
+        /// 
+        [ForeignKey(nameof(CustomerGroup))]
+        public long? CustomerGroupId { get; set; }
+        public CustomerGroup? CustomerGroup { get; set; }
+
+
         [ForeignKey(nameof(CustomerType))]
         public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
-        public PriceGroup? PriceGroup { get; set; }
-        public long? PriceGroupId { get; set; }
+
+
+        // Navigations (fiyatlar)
+        public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
+
 
         public ICollection<ProgressApprover> ProgressApprovers { get; set; } = new List<ProgressApprover>();
     }

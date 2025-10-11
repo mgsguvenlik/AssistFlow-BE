@@ -7,9 +7,11 @@ using Model.Dtos.Configuration;
 using Model.Dtos.CurrencyType;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
+using Model.Dtos.CustomerGroupProductPrice;
+using Model.Dtos.CustomerProductPrice;
 using Model.Dtos.CustomerType;
 using Model.Dtos.Model;
-using Model.Dtos.PriceGroup;
+
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
@@ -287,16 +289,40 @@ namespace Business.Mapper
 
 
 
-            // ---------------- PriceGroup ----------------
-            config.NewConfig<PriceGroupCreateDto, Model.Concrete.PriceGroup>()
+            // ---------------- Pricing: CustomerGroupProductPrice ----------------
+            config.NewConfig<CustomerGroupProductPriceCreateDto, CustomerGroupProductPrice>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.Customers);
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.Product);
 
-            config.NewConfig<PriceGroupUpdateDto, Model.Concrete.PriceGroup>()
+            config.NewConfig<CustomerGroupProductPriceUpdateDto, CustomerGroupProductPrice>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.Customers);
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.Product);
 
-            config.NewConfig<Model.Concrete.PriceGroup, PriceGroupGetDto>();
+            config.NewConfig<CustomerGroupProductPrice, CustomerGroupProductPriceGetDto>()
+                  .Map(d => d.CustomerGroupName, s => s.CustomerGroup != null ? s.CustomerGroup.GroupName : null)
+                  .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
+                  .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
+
+            // ---------------- Pricing: CustomerProductPrice ----------------
+            config.NewConfig<CustomerProductPriceCreateDto, CustomerProductPrice>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerProductPriceUpdateDto, CustomerProductPrice>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerProductPrice, CustomerProductPriceGetDto>()
+                  .Map(d => d.CustomerName,
+                       s => s.Customer != null
+                            ? (s.Customer.SubscriberCompany ?? s.Customer.ContactName1)
+                            : null)
+                  .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
+                  .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
 
         }
     }
