@@ -178,11 +178,12 @@ app.UseMiddleware<ErrorHandlerMiddleware>();
 // Configure the HTTP request pipeline.
 
 #region OpenAPI
-app.MapScalarApiReference(o =>
-    o.WithTheme(ScalarTheme.BluePlanet)
-);
-
 app.MapOpenApi();
+app.MapScalarApiReference(o =>
+{
+    o.WithOpenApiRoutePattern("/openapi/{documentName}.json");
+    o.WithTheme(ScalarTheme.BluePlanet);
+});
 
 
 #endregion

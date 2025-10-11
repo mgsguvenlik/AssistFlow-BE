@@ -1,5 +1,6 @@
 ﻿using Mapster;
 using Model.Concrete;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.Brand;
 using Model.Dtos.City;
 using Model.Dtos.Configuration;
@@ -8,6 +9,7 @@ using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerType;
 using Model.Dtos.Model;
+using Model.Dtos.PriceGroup;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
@@ -17,6 +19,9 @@ using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
+using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
 namespace Business.Mapper
 {
@@ -119,7 +124,9 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.Customer);
 
-            config.NewConfig<ProgressApprover, ProgressApproverGetDto>();
+            config.NewConfig<ProgressApprover, ProgressApproverGetDto>()
+                   .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.SubscriberCompany : null)
+                   .Map(d => d.CustomerCode, s => s.Customer != null ? s.Customer.SubscriberCode : null);
 
 
             // ---------------- Role ----------------
@@ -226,6 +233,71 @@ namespace Business.Mapper
             config.NewConfig<ServiceType, ConfigurationUpdateDto>();
             config.NewConfig<ConfigurationGetDto, ServiceType>();
             config.NewConfig<ServiceType, ConfigurationGetDto>();
+
+
+            //-------------  WorkFlowStatus  ----------------
+            config.NewConfig<WorkFlowStatusCreateDto, WorkFlowStatus>()
+                    .Ignore(d => d.Id);
+
+            config.NewConfig<WorkFlowStatusUpdateDto, WorkFlowStatus>()
+                  .IgnoreNullValues(true); // partial update
+
+            config.NewConfig<WorkFlowStatus, WorkFlowStatusGetDto>();
+
+
+            //-------------  WorkFlow  ----------------
+            config.NewConfig<WorkFlowCreateDto, WorkFlow>()
+            .Ignore(d => d.Id)
+            .Map(d => d.CreatedDate, _ => DateTimeOffset.UtcNow)
+            .Ignore(d => d.Status); // FK set edilecek
+
+            config.NewConfig<WorkFlowUpdateDto, WorkFlow>()
+                  .IgnoreNullValues(true)
+                  .Map(d => d.UpdatedDate, _ => DateTimeOffset.UtcNow);
+
+            config.NewConfig<WorkFlow, WorkFlowGetDto>();
+
+
+            //-------------  ServicesRequest  ----------------
+            // --- ServicesRequest: CREATE -> ENTITY ---
+            config.NewConfig<ServicesRequestCreateDto, ServicesRequest>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customer)          // nav
+                  .Ignore(d => d.CustomerApprover)  // nav
+                  .Ignore(d => d.ServiceType)       // nav
+                  .Ignore(d => d.WorkFlowStatus);   // nav
+
+            // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
+            config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Customer)          // nav
+                  .Ignore(d => d.CustomerApprover)  // nav
+                  .Ignore(d => d.ServiceType)       // nav
+                  .Ignore(d => d.WorkFlowStatus);   // nav
+
+            // --- ServicesRequest: ENTITY -> GET DTO ---
+            config.NewConfig<ServicesRequest, ServicesRequestGetDto>()
+                  // düz alanlar otomatik eşleşir
+                  .Map(d => d.ServicesCostStatusText, s => s.ServicesCostStatus.ToString())
+                  .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.ContactName1 : null)
+                  .Map(d => d.CustomerApproverName, s => s.CustomerApprover != null ? s.CustomerApprover.FullName : null)
+                  .Map(d => d.ServiceTypeName, s => s.ServiceType != null ? s.ServiceType.Name : null)
+                  .Map(d => d.WorkFlowStatusId, s => s.SendedStatusId) // DTO’daki alias
+                  .Map(d => d.WorkFlowStatusName, s => s.WorkFlowStatus != null ? s.WorkFlowStatus.Name : null);
+
+
+
+            // ---------------- PriceGroup ----------------
+            config.NewConfig<PriceGroupCreateDto, Model.Concrete.PriceGroup>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customers);
+
+            config.NewConfig<PriceGroupUpdateDto, Model.Concrete.PriceGroup>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Customers);
+
+            config.NewConfig<Model.Concrete.PriceGroup, PriceGroupGetDto>();
+
         }
     }
 }

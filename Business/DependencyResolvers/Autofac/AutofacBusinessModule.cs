@@ -34,6 +34,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IUserService), typeof(UserService));
             services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
             services.AddScoped(typeof(IMailService), typeof(MailService));
+            services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();

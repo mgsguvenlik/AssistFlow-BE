@@ -1,4 +1,5 @@
 ﻿using Core.Utilities.Constants;
+using Model.Dtos.ProgressApprover;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Customer
@@ -63,9 +64,10 @@ namespace Model.Dtos.Customer
         // Nullable olduğu için boş geçilebilir; değer girilirse 1 ve üzeri olmalı
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
+
+        [Range(1, long.MaxValue)]
+        public long? PriceGroupId { get; set; }   // opsiyonel
+
     }
-
-
-
 
 }

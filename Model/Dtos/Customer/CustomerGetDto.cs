@@ -1,4 +1,7 @@
-﻿namespace Model.Dtos.Customer
+﻿using Model.Dtos.PriceGroup;
+using Model.Dtos.ProgressApprover;
+
+namespace Model.Dtos.Customer
 {
     public class CustomerGetDto
     {
@@ -19,5 +22,7 @@
         public string? CustomerShortCode { get; set; }
         public string? CorporateLocationId { get; set; }
         public long? CustomerTypeId { get; set; }
+        public PriceGroupGetDto? PriceGroup { get; set; }
+        public List<ProgressApproverGetDto> ProgressApprovers { get; set; } = new();
     }
 }

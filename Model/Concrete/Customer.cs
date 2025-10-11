@@ -93,5 +93,9 @@ namespace Model.Concrete
         [ForeignKey(nameof(CustomerType))]
         public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
+        public PriceGroup? PriceGroup { get; set; }
+        public long? PriceGroupId { get; set; }
+
+        public ICollection<ProgressApprover> ProgressApprovers { get; set; } = new List<ProgressApprover>();
     }
 }

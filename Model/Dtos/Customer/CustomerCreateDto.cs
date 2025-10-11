@@ -1,4 +1,5 @@
 ﻿using Core.Utilities.Constants;
+using Model.Dtos.ProgressApprover;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
@@ -65,6 +66,10 @@ namespace Model.Dtos.Customer
         // Nullable olduğu için boş geçilebilir; değer girilirse 1 ve üzeri olmalı
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
+
+        public long? PriceGroupId { get; set; }   // opsiyonel
+
+        public List<ProgressApproverCreateDto>? ProgressApprovers { get; set; }
     }
 
     /// ---- Yardımcı Attribute'lar ----

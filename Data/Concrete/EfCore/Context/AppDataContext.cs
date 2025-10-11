@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
+using Model.Concrete.WorkFlows;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -25,6 +26,13 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Region> Regions { get; set; }
         public DbSet<Configuration> Configurations { get; set; }
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
+
+        public DbSet<WorkFlow> WorkFlows { get; set; }
+        public DbSet<WorkFlowStatus> WorkFlowStatuses { get; set; }
+        public DbSet<ServicesRequest>  ServicesRequests { get; set; }
+        public DbSet<PriceGroup> PriceGroups { get; set; }
+        public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
+
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -168,6 +176,32 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<Data.Seeding.Infrastructure.SeedHistory>()
                         .HasIndex(x => x.Key)
                         .IsUnique();
+
+            ///WorkFlow Entity Configuration 
+             modelBuilder.Entity<WorkFlow>(b =>
+            {
+                b.Property(x => x.RequestNo).IsRequired().HasMaxLength(100);
+                b.HasIndex(x => x.RequestNo).IsUnique();
+            });
+
+
+
+            //ServicesRequestProduct Entity Configuration
+
+            modelBuilder.Entity<ServicesRequestProduct>()
+                .HasKey(x => new { x.ServicesRequestId, x.ProductId });
+
+            modelBuilder.Entity<ServicesRequestProduct>()
+                .HasOne(x => x.ServicesRequest)
+                .WithMany(r => r.ServicesRequestProducts)
+                .HasForeignKey(x => x.ServicesRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ServicesRequestProduct>()
+                .HasOne(x => x.Product)
+                .WithMany() // ters navigation yoksa
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
