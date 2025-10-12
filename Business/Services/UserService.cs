@@ -228,6 +228,7 @@ public class UserService
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
+
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
@@ -245,7 +246,6 @@ public class UserService
                 Message = Messages.InvalidEmailOrPassword
             };
         }
-
 
         var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (vr == PasswordVerificationResult.Failed)

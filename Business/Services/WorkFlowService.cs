@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 using System.Security.Cryptography;
@@ -28,8 +29,8 @@ namespace Business.Services
             _authService = authService;
         }
 
-
         // -------------------- ServicesRequest --------------------
+        //1 Servis Talebi oluşturma akışı:
         public async Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto)
         {
             try
@@ -48,7 +49,7 @@ namespace Business.Services
                                          .AnyAsync(x => x.RequestNo == dto.RequestNo);
 
                 if (exists)
-                    return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict); 
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
 
                 // 2) ServicesRequest map + ürün bağları (N-N join)
@@ -75,6 +76,10 @@ namespace Business.Services
                     StatuId = dto.StatuId,
                     CreatedDate = DateTimeOffset.UtcNow,
                     CreatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0,
+                    IsCancelled = false,
+                    IsComplated = false,
+                    ReconciliationStatus = WorkFlowReconciliationStatus.Pending,
+
                 };
 
                 await _uow.Repository.AddAsync(wf);
@@ -89,6 +94,82 @@ namespace Business.Services
                 return ResponseModel<ServicesRequestGetDto>.Fail($"Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
+        //-----------------------------
+
+
+        //Depoya Gönderim
+        public async Task<ResponseModel<ServicesRequestGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
+        {
+            // 1) Talep getir
+            var request = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.ServicesRequestProducts)
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+            if (request.IsSended)
+                return ResponseModel<ServicesRequestGetDto>.Fail("Bu talep zaten depoya gönderilmiş.", StatusCode.Conflict);
+
+            // 2) İlgili WorkFlow’u RequestNo üzerinden getir
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo);
+
+            if (wf is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("İlgili WorkFlow kaydı bulunamadı.", StatusCode.NotFound);
+
+            // 3) “Depoda” durumunu bul (Code veya Name ile esnek arama)
+            var depoda = await _uow.Repository
+                .GetQueryable<WorkFlowStatus>()
+                .Where(x =>x.Code != null && (x.Code == "INHOUSE" || x.Code == "DEPODA"))
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync();
+
+            if (depoda is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("WorkFlowStatus içinde 'Depoda' statüsü tanımlı değil.", StatusCode.BadRequest);
+
+            // 4) Warehouse kaydını oluştur
+            var productIds = (dto.ProductIds is { Count: > 0 })
+                ? dto.ProductIds.Distinct().ToList()
+                : request.ServicesRequestProducts?.Select(p => p.ProductId).Distinct().ToList() ?? new List<long>();
+
+            var warehouse = new Warehouse
+            {
+                RequestNo = request.RequestNo,
+                DeliveryDate = dto.DeliveryDate,
+                ApproverTechnicianId = dto.ApproverTechnicianId,
+                Description = dto.Description,
+                IsSended = true,
+                WarehouseProducts = new List<ServicesRequestProduct>()
+            };
+
+            foreach (var pid in productIds)
+                warehouse.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
+
+            await _uow.Repository.AddAsync(warehouse);
+
+            // 5) ServicesRequest’i güncelle
+            request.IsSended = true;
+            request.SendedStatusId = depoda.Id;              // FK lookup
+            request.WorkFlowStatus = null;                   // (opsiyonel) sadece FK ile güncelleyecekseniz nav’ı null bırakabilirsiniz
+
+            // 6) WorkFlow’u güncelle
+            wf.StatuId = depoda.Id;
+            wf.IsCancelled = false;
+            wf.IsComplated = false;
+            wf.UpdatedDate = DateTimeOffset.UtcNow;
+            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+
+            // 7) Commit
+            await _uow.Repository.CompleteAsync();
+
+            // 8) Güncel talebi döndür
+            return await GetRequestByIdAsync(request.Id);
+        }
+        //-----------------------------
+
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
             => q => q
                 .Include(x => x.Customer)
@@ -212,7 +293,6 @@ namespace Business.Services
         }
 
         // -------------------- WorkFlowStatus --------------------
-
         public async Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q)
         {
             var query = _uow.Repository.GetQueryable<WorkFlowStatus>();

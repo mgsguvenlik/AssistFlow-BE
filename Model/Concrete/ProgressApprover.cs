@@ -26,6 +26,9 @@ namespace Model.Concrete
         [Required, MaxLength(254), EmailAddress]
         public string Email { get; set; } = string.Empty;
 
+        [Required] 
+        public string Phone { get; set; } = string.Empty;
+
         /// <summary>
         /// Bağlı olduğu müşteri kaydının kimliği (Customer.Id).
         /// </summary>

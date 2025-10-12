@@ -12,9 +12,7 @@ namespace Model.Dtos.User
         public string TechnicianName { get; set; } = string.Empty;
         public string? TechnicianPhone { get; set; }
         public string? TechnicianEmail { get; set; }
-
         public bool IsActive { get; set; }
-
         // Şifre değiştirme opsiyonel
         public string? NewPassword { get; set; }
 

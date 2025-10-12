@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
 namespace WebAPI.Controllers
@@ -26,6 +27,30 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> CreateRequest([FromBody] Model.Dtos.WorkFlowDtos.ServicesRequest.ServicesRequestCreateDto dto)
         {
             var result = await _workFlowService.CreateRequestAsync(dto);
+            return Ok(result);
+        }
+
+
+        [HttpPost("send-warehouse")]
+        public async Task<IActionResult> SendWarehouse([FromBody] SendWarehouseDto dto)
+        {
+            var result = await _workFlowService.SendWarehouseAsync(dto);
+            return Ok(result);
+        }
+
+
+        [HttpGet("get-workflow-list")]
+        public async Task<IActionResult> GetWorkFlowList([FromQuery] QueryParams p)
+        {
+            var result = await _workFlowService.GetWorkFlowsAsync(p);
+            return Ok(result);
+        }
+
+
+        [HttpGet("get-servicesrequest-list")]
+        public async Task<IActionResult> GetServicesRequestList([FromQuery] QueryParams p)
+        {
+            var result = await _workFlowService.GetRequestsAsync(p);
             return Ok(result);
         }
 

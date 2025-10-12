@@ -22,6 +22,7 @@ using Model.Dtos.SystemType;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
@@ -324,6 +325,47 @@ namespace Business.Mapper
                   .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
                   .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
 
+
+
+            // Warehosue Entity -> GetDto
+            config.NewConfig<Warehouse, WarehouseGetDto>()
+                  .Map(d => d.ProductIds,
+                       s => s.WarehouseProducts.Select(p => p.ProductId).ToList())
+                  .Map(d => d.ApproverTechnicianName,
+                       s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianName : null)
+                  .Map(d => d.ApproverTechnicianEmail,
+                       s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianEmail : null);
+
+            // Warehosue CreateDto -> Entity
+            config.NewConfig<WarehouseCreateDto, Warehouse>()
+                  .Map(d => d.WarehouseProducts, _ => new List<ServicesRequestProduct>()) // koleksiyon başlat
+                  .AfterMapping((src, dest) =>
+                  {
+                      dest.WarehouseProducts ??= new List<ServicesRequestProduct>();
+                      dest.WarehouseProducts.Clear();
+
+                      if (src.ProductIds is { Count: > 0 })
+                      {
+                          foreach (var pid in src.ProductIds.Distinct())
+                              dest.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
+                      }
+                  });
+
+            // Warehosue UpdateDto -> Entity
+            config.NewConfig<WarehouseUpdateDto, Warehouse>()
+                  .Ignore(dest => dest.WarehouseProducts) // koleksiyon güncellemesini servis katmanında yapacağız
+                  .AfterMapping((src, dest) =>
+                  {
+                      // İstersen koleksiyonu burada da senkronize edebilirsin:
+                      if (src.ProductIds is null) return;
+
+                      dest.WarehouseProducts ??= new List<ServicesRequestProduct>();
+
+                      // mevcut listeyi yeni gelen Id'lere göre yeniden kur
+                      dest.WarehouseProducts.Clear();
+                      foreach (var pid in src.ProductIds.Distinct())
+                          dest.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
+                  });
         }
     }
 }

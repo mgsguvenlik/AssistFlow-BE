@@ -1,4 +1,6 @@
-﻿namespace Model.Dtos.ProgressApprover
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Model.Dtos.ProgressApprover
 {
     public class ProgressApproverGetDto
     {
@@ -10,5 +12,7 @@
         // Görsellik/kolaylık //MZK:  Mapping ile doldurulacak
         public string? CustomerName { get; set; }   // örn: SubscriberCompany
         public string? CustomerCode { get; set; }   // örn: SubscriberCode
+
+        public string Phone { get; set; } = string.Empty;
     }
 }

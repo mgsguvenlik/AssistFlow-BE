@@ -29,11 +29,12 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<WorkFlow> WorkFlows { get; set; }
         public DbSet<WorkFlowStatus> WorkFlowStatuses { get; set; }
-        public DbSet<ServicesRequest>  ServicesRequests { get; set; }
+        public DbSet<ServicesRequest> ServicesRequests { get; set; }
 
         public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
         public DbSet<CustomerProductPrice> CustomerProductPrices { get; set; }
         public DbSet<CustomerGroupProductPrice> CustomerGroupProductPrices { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
 
 
         /// <summary>
@@ -180,11 +181,11 @@ namespace Data.Concrete.EfCore.Context
                         .IsUnique();
 
             ///WorkFlow Entity Configuration 
-             modelBuilder.Entity<WorkFlow>(b =>
-            {
-                b.Property(x => x.RequestNo).IsRequired().HasMaxLength(100);
-                b.HasIndex(x => x.RequestNo).IsUnique();
-            });
+            modelBuilder.Entity<WorkFlow>(b =>
+           {
+               b.Property(x => x.RequestNo).IsRequired().HasMaxLength(100);
+               b.HasIndex(x => x.RequestNo).IsUnique();
+           });
 
 
 

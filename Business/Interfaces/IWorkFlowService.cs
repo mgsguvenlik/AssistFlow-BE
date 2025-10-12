@@ -1,5 +1,6 @@
 ﻿using Core.Common;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
@@ -32,5 +33,9 @@ namespace Business.Interfaces
         Task<ResponseModel<WorkFlowGetDto>> CreateWorkFlowAsync(WorkFlowCreateDto dto);
         Task<ResponseModel<WorkFlowGetDto>> UpdateWorkFlowAsync(WorkFlowUpdateDto dto);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
+
+
+        // Warehouse (depo) ile ilgili işlemler 
+        Task<ResponseModel<ServicesRequestGetDto>> SendWarehouseAsync(SendWarehouseDto dto);
     }
 }

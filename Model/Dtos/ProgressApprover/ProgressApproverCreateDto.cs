@@ -17,6 +17,9 @@ namespace Model.Dtos.ProgressApprover
 
         [Range(1, long.MaxValue, ErrorMessage = Messages.SelectValidCustomer)]
         public long CustomerId { get; set; }
+
+        [Required]
+        public string Phone { get; set; } = string.Empty;
     }
 
     /// <summary>Metin yalnızca boşluklardan oluşamaz.</summary>
