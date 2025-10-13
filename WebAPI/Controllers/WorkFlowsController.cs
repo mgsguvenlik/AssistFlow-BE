@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
@@ -66,6 +67,16 @@ namespace WebAPI.Controllers
         {
             var result = await _workFlowService.GetRequestByNoAsync(requestNo);
             return Ok(result);
+        }
+
+        [HttpPost("update-services-request/{id:long}")]
+        public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] ServicesRequestUpdateDto dto)
+        {
+            if (dto.Id != id)
+                return BadRequest(new ResponseModel(false, "Route id ile body id eşleşmiyor.", Core.Enums.StatusCode.BadRequest));
+
+            var resp = await _workFlowService.UpdateRequestAsync(dto);
+            return ToActionResult(resp);
         }
 
 
