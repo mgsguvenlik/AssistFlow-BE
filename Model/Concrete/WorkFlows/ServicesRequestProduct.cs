@@ -10,6 +10,9 @@ namespace Model.Concrete.WorkFlows
 
         public long ProductId { get; set; }
         public Product Product { get; set; } = default!;
+
+        public Warehouse Warehouse { get; set; } = default!; // Depo (opsiyonel)
+        public long? WarehouseId { get; set; }
     }
 
 }

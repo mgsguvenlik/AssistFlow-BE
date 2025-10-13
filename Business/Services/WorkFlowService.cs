@@ -6,6 +6,7 @@ using Mapster;
 using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.Warehouse;
@@ -44,12 +45,25 @@ namespace Business.Services
                     dto.RequestNo = rn.Data!;
                 }
 
-                var query = _uow.Repository.GetQueryable<WorkFlow>();
-                bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == dto.RequestNo);
-
+                bool exists =await  _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo);
                 if (exists)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
+
+                var serviceTypeExist =await _uow.Repository.GetQueryable<ServiceType>().AsNoTracking().AnyAsync(s => s.Id == dto.ServiceTypeId);
+                if (serviceTypeExist )
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Service tipi bulunamadı.", StatusCode.Conflict);
+
+                var customerExist = await _uow.Repository.GetQueryable<Customer>().AsNoTracking().AnyAsync(c => c.Id == dto.CustomerId);
+                if (customerExist)
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Müşteri bulunamadı.", StatusCode.Conflict);
+
+                var customerApproverExist = dto.CustomerApproverId.HasValue ? await _uow.Repository.GetQueryable<ProgressApprover>().AsNoTracking().AnyAsync(ca => ca.Id == dto.CustomerApproverId.Value) : true;
+                if (!customerApproverExist)
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
+
+                var statuExist = await _uow.Repository.GetQueryable<WorkFlowStatus>().AsNoTracking().AnyAsync(s => s.Id == dto.StatuId);
+                if (!statuExist)
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Durum (Statu) bulunamadı.", StatusCode.Conflict);
 
 
                 // 2) ServicesRequest map + ürün bağları (N-N join)
@@ -65,8 +79,6 @@ namespace Business.Services
                 }
 
                 var res = await _uow.Repository.AddAsync(request);
-                await _uow.Repository.CompleteAsync(); // Id üretildi
-
                 // 3) WorkFlow oluştur (aynı RequestNo ile)
                 var wf = new WorkFlow
                 {
@@ -207,6 +219,23 @@ namespace Business.Services
             var dto = await query
                 .AsNoTracking()
                 .Where(x => x.Id == id)
+                .ProjectToType<ServicesRequestGetDto>(_config)
+                .FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<ServicesRequestGetDto>.Success(dto);
+        }
+
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetRequestByNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<ServicesRequest>();
+            query = RequestIncludes()!(query);
+
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
                 .ProjectToType<ServicesRequestGetDto>(_config)
                 .FirstOrDefaultAsync();
 

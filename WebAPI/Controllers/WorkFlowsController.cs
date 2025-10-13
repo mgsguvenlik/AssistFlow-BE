@@ -46,11 +46,25 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("get-servicesrequest-getbyid/{id:long}")]
+        public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
+        {
+            var result = await _workFlowService.GetRequestByIdAsync(id);
+            return Ok(result);
+        }
 
         [HttpGet("get-servicesrequest-list")]
         public async Task<IActionResult> GetServicesRequestList([FromQuery] QueryParams p)
         {
             var result = await _workFlowService.GetRequestsAsync(p);
+            return Ok(result);
+        }
+
+
+        [HttpGet("get-servicesrequest-byrequestno")]
+        public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetRequestByNoAsync(requestNo);
             return Ok(result);
         }
 

@@ -56,6 +56,9 @@ builder.Services.AddCors(options =>
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:5173",
+            "http://localhost:8084",
+            "http://192.168.1.46:300",
+            "http://192.168.1.46:5173",
             "http://localhost:8081") // React frontend URL'si
             .AllowAnyMethod()
             .AllowAnyHeader()
