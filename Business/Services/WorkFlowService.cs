@@ -191,6 +191,7 @@ namespace Business.Services
                 .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Product)
                 .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
                 .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Customer).ThenInclude(x => x.CustomerProductPrices);
+
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
@@ -307,7 +308,6 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return await GetRequestByIdAsync(entity.Id);
         }
-
 
 
         public async Task<ResponseModel> DeleteRequestAsync(long id)

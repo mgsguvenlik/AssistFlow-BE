@@ -378,6 +378,7 @@ namespace Business.Mapper
     .              Map(dest => dest.ProductId, src => src.ProductId)
     .              Map(dest => dest.WarehouseId, src => src.WarehouseId)
     .              Map(dest => dest.Quantity, src => src.Quantity)
+    .              Map(dest => dest.PriceCurrency, src => src.Product.PriceCurrency)
     .              Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())
     .              Map(dest => dest.ProductPrice, src => src.Product != null ? src.Product.Price : 0m)
     .              Map(dest => dest.ProductName, src => src.Product != null ? src.Product.Description : null)

@@ -10,6 +10,7 @@
         public string? ProductCode { get; set; }
         public long? WarehouseId { get; set; }
         public int Quantity { get; set; }
+        public string? PriceCurrency { get; set; }
         // Toplam Fiyat (Quantity * Product.Price)
         public decimal TotalPrice { get; set; }
     }
