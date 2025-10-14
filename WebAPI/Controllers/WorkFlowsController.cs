@@ -25,7 +25,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("create-services-request")]
-        public async Task<IActionResult> CreateRequest([FromBody] Model.Dtos.WorkFlowDtos.ServicesRequest.ServicesRequestCreateDto dto)
+        public async Task<IActionResult> CreateRequest([FromBody] ServicesRequestCreateDto dto)
         {
             var result = await _workFlowService.CreateRequestAsync(dto);
             return Ok(result);

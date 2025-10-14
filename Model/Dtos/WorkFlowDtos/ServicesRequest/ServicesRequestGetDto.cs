@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 {
@@ -42,6 +43,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long CreatedUser { get; set; }
         public long? UpdatedUser { get; set; }
         public bool IsDeleted { get; set; }
-        public List<long> ProductIds { get; set; } = new();
+        public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
     }
 }

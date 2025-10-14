@@ -22,6 +22,7 @@ using Model.Dtos.SystemType;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -366,6 +367,25 @@ namespace Business.Mapper
                       foreach (var pid in src.ProductIds.Distinct())
                           dest.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
                   });
+
+            //ServicesRequestProduct Dto <-> Entity
+            config.NewConfig<ServicesRequestProductCreateDto, ServicesRequestProduct>()
+                  .Ignore(d => d.ServicesRequest) // nav
+                  .Ignore(d => d.Product);         // nav
+
+            config.NewConfig<ServicesRequestProduct, ServicesRequestProductGetDto>()
+    .              Map(dest => dest.ServicesRequestId, src => src.ServicesRequestId)
+    .              Map(dest => dest.ProductId, src => src.ProductId)
+    .              Map(dest => dest.WarehouseId, src => src.WarehouseId)
+    .              Map(dest => dest.Quantity, src => src.Quantity)
+    .              Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())
+    .              Map(dest => dest.ProductPrice, src => src.Product != null ? src.Product.Price : 0m)
+    .              Map(dest => dest.ProductName, src => src.Product != null ? src.Product.Description : null)
+    .              Map(dest => dest.ProductCode, src => src.Product != null ? src.Product.ProductCode : null)
+    .              Map(dest => dest.TotalPrice, src => src.GetTotalEffectivePrice());
+
+            config.NewConfig<ServicesRequestProductUpdateDto, ServicesRequestProduct>();
+
         }
     }
 }

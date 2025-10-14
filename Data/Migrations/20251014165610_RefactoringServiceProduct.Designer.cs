@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251014165610_RefactoringServiceProduct")]
+    partial class RefactoringServiceProduct
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -843,9 +846,6 @@ namespace Data.Migrations
                     b.Property<long>("ProductId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("CustomerId")
-                        .HasColumnType("bigint");
-
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
@@ -853,8 +853,6 @@ namespace Data.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("ServicesRequestId", "ProductId");
-
-                    b.HasIndex("CustomerId");
 
                     b.HasIndex("ProductId");
 
@@ -1163,10 +1161,6 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequestProduct", b =>
                 {
-                    b.HasOne("Model.Concrete.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId");
-
                     b.HasOne("Model.Concrete.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
@@ -1182,8 +1176,6 @@ namespace Data.Migrations
                     b.HasOne("Model.Concrete.WorkFlows.Warehouse", "Warehouse")
                         .WithMany("WarehouseProducts")
                         .HasForeignKey("WarehouseId");
-
-                    b.Navigation("Customer");
 
                     b.Navigation("Product");
 
