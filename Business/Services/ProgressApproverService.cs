@@ -23,16 +23,16 @@ namespace Business.Services
         protected override Expression<Func<ProgressApprover, bool>> KeyPredicate(long id) => x => x.Id == id;
 
         protected override Func<IQueryable<ProgressApprover>, IIncludableQueryable<ProgressApprover, object>>? IncludeExpression()
-            => q => q.Include(p => p.Customer);
+            => q => q.Include(p => p.CustomerGroup);
 
         protected override Task<ProgressApprover?> ResolveEntityForUpdateAsync(ProgressApproverUpdateDto dto)
             => _unitOfWork.Repository.GetSingleAsync<ProgressApprover>(false, x => x.Id == dto.Id,
-                   q => q.Include(p => p.Customer));
+                   q => q.Include(p => p.CustomerGroup));
 
-        public async Task<ResponseModel<List<ProgressApproverGetDto>>> GetByCustomerIdAsync(long customerId, CancellationToken cancellationToken)
+        public async Task<ResponseModel<List<ProgressApproverGetDto>>> GetByCustomerIdAsync(long customerGroupId, CancellationToken cancellationToken)
         {
             var entities = await _unitOfWork.Repository.GetMultipleAsync<ProgressApprover>(false,
-                x => x.CustomerId == customerId,             
+                x => x.CustomerGroupId == customerGroupId,             
                 cancellationToken);
             var dtos = entities.Adapt<List<ProgressApproverGetDto>>(_config);
             return ResponseModel<List<ProgressApproverGetDto>>.Success(dtos);

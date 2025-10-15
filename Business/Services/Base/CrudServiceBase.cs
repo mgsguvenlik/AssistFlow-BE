@@ -249,7 +249,7 @@ namespace Business.Services.Base
             }
         }
 
-        public async Task<ResponseModel<TGetDto>> UpdateAsync(TUpdateDto dto)
+        public virtual async Task<ResponseModel<TGetDto>> UpdateAsync(TUpdateDto dto)
         {
             try
             {

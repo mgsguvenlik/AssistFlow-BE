@@ -105,6 +105,6 @@ namespace Model.Concrete
         public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
 
 
-        public ICollection<ProgressApprover> ProgressApprovers { get; set; } = new List<ProgressApprover>();
+ 
     }
 }

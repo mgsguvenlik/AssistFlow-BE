@@ -15,8 +15,6 @@ namespace Model.Dtos.CustomerGroupProductPrice
         [Required, Range(1, long.MaxValue, ErrorMessage = "Geçerli bir ürün seçiniz.")]
         public long ProductId { get; set; }
 
-        [Required, Range(typeof(decimal), "0.0", "79228162514264337593543950335",
-            ErrorMessage = "Fiyat 0 veya pozitif olmalıdır.")]
         public decimal Price { get; set; }
 
         [MaxLength(10)]

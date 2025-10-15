@@ -33,11 +33,11 @@ namespace Model.Concrete
         /// Bağlı olduğu müşteri kaydının kimliği (Customer.Id).
         /// </summary>
         [Required]
-        public long CustomerId { get; set; }
+        public long CustomerGroupId { get; set; }
 
         /// <summary>
         /// İlişkisel navigasyon: Yetkilinin bağlı olduğu müşteri.
         /// </summary>
-        public Customer? Customer { get; set; }
+        public CustomerGroup? CustomerGroup { get; set; }
     }
 }

@@ -122,15 +122,14 @@ namespace Business.Mapper
             // ---------------- ProgressApprover ----------------
             config.NewConfig<ProgressApproverCreateDto, ProgressApprover>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.Customer);
+                  .Ignore(d => d.CustomerGroup);
 
             config.NewConfig<ProgressApproverUpdateDto, ProgressApprover>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.Customer);
+                  .Ignore(d => d.CustomerGroup);
 
             config.NewConfig<ProgressApprover, ProgressApproverGetDto>()
-                   .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.SubscriberCompany : null)
-                   .Map(d => d.CustomerCode, s => s.Customer != null ? s.Customer.SubscriberCode : null);
+                   .Map(d => d.CustomerGroupName, s => s.CustomerGroup != null ? s.CustomerGroup.GroupName : null);
 
 
             // ---------------- Role ----------------
@@ -290,7 +289,6 @@ namespace Business.Mapper
                   .Map(d => d.WorkFlowStatusName, s => s.WorkFlowStatus != null ? s.WorkFlowStatus.Name : null);
 
 
-
             // ---------------- Pricing: CustomerGroupProductPrice ----------------
             config.NewConfig<CustomerGroupProductPriceCreateDto, CustomerGroupProductPrice>()
                   .Ignore(d => d.Id)
@@ -374,19 +372,25 @@ namespace Business.Mapper
                   .Ignore(d => d.Product);         // nav
 
             config.NewConfig<ServicesRequestProduct, ServicesRequestProductGetDto>()
-    .              Map(dest => dest.ServicesRequestId, src => src.ServicesRequestId)
-    .              Map(dest => dest.ProductId, src => src.ProductId)
-    .              Map(dest => dest.WarehouseId, src => src.WarehouseId)
-    .              Map(dest => dest.Quantity, src => src.Quantity)
-    .              Map(dest => dest.PriceCurrency, src => src.Product.PriceCurrency)
-    .              Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())
-    .              Map(dest => dest.ProductPrice, src => src.Product != null ? src.Product.Price : 0m)
-    .              Map(dest => dest.ProductName, src => src.Product != null ? src.Product.Description : null)
-    .              Map(dest => dest.ProductCode, src => src.Product != null ? src.Product.ProductCode : null)
-    .              Map(dest => dest.TotalPrice, src => src.GetTotalEffectivePrice());
+                .Map(dest => dest.ServicesRequestId, src => src.ServicesRequestId)
+                .Map(dest => dest.ProductId, src => src.ProductId)
+                .Map(dest => dest.WarehouseId, src => src.WarehouseId)
+                .Map(dest => dest.Quantity, src => src.Quantity)
+                .Map(dest => dest.PriceCurrency, src => src.Product.PriceCurrency)
+                .Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())
+                .Map(dest => dest.ProductPrice, src => src.Product != null ? src.Product.Price : 0m)
+                .Map(dest => dest.ProductName, src => src.Product != null ? src.Product.Description : null)
+                .Map(dest => dest.ProductCode, src => src.Product != null ? src.Product.ProductCode : null)
+                .Map(dest => dest.TotalPrice, src => src.GetTotalEffectivePrice());
 
             config.NewConfig<ServicesRequestProductUpdateDto, ServicesRequestProduct>();
 
+            // Customer Group 
+            TypeAdapterConfig<CustomerGroup, CustomerGroupGetDto>.NewConfig()
+                .Map(dest => dest.ParentGroupName, src => src.ParentGroup != null ? src.ParentGroup.GroupName : null)
+                .Map(dest => dest.SubGroups, src => src.SubGroups.Adapt<List<CustomerGroupChildDto>>())
+                .Map(dest => dest.GroupProductPrices, src => src.GroupProductPrices.Adapt<List<CustomerGroupProductPriceGetDto>>())
+                .Map(dest => dest.ProgressApprovers, src => src.ProgressApprovers.Adapt<List<ProgressApproverGetDto>>());
         }
     }
 }

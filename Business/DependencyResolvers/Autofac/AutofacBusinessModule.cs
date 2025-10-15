@@ -155,6 +155,13 @@ namespace Business.DependencyResolvers.Autofac
                            Model.Dtos.Configuration.ConfigurationUpdateDto,
                            Model.Dtos.Configuration.ConfigurationGetDto,
                            long>, ConfigurationService>();
+
+
+            services.AddScoped<
+              ICrudService<Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceCreateDto,
+                           Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceUpdateDto,
+                           Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceGetDto,
+                           long>, CustomerGroupProductPriceService>();
         }
         protected override void Load(ContainerBuilder builder)
         {

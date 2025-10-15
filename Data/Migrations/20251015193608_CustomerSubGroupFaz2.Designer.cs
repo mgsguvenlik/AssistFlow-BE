@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251015193608_CustomerSubGroupFaz2")]
+    partial class CustomerSubGroupFaz2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -525,10 +528,10 @@ namespace Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("CustomerGroupId")
+                    b.Property<long?>("CustomerGroupId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("CustomerGroupId1")
+                    b.Property<long>("CustomerId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Email")
@@ -549,9 +552,9 @@ namespace Data.Migrations
 
                     b.HasIndex("CustomerGroupId");
 
-                    b.HasIndex("CustomerGroupId1");
+                    b.HasIndex("CustomerId");
 
-                    b.HasIndex("CustomerGroupId", "Email")
+                    b.HasIndex("CustomerId", "Email")
                         .IsUnique();
 
                     b.ToTable("ProgressApprovers");
@@ -1101,17 +1104,17 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.ProgressApprover", b =>
                 {
-                    b.HasOne("Model.Concrete.CustomerGroup", "CustomerGroup")
+                    b.HasOne("Model.Concrete.CustomerGroup", null)
+                        .WithMany("ProgressApprovers")
+                        .HasForeignKey("CustomerGroupId");
+
+                    b.HasOne("Model.Concrete.Customer", "Customer")
                         .WithMany()
-                        .HasForeignKey("CustomerGroupId")
+                        .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Model.Concrete.CustomerGroup", null)
-                        .WithMany("ProgressApprovers")
-                        .HasForeignKey("CustomerGroupId1");
-
-                    b.Navigation("CustomerGroup");
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("Model.Concrete.Region", b =>

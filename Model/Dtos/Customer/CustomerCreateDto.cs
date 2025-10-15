@@ -67,9 +67,7 @@ namespace Model.Dtos.Customer
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
 
-        public long? PriceGroupId { get; set; }   // opsiyonel
 
-        public List<ProgressApproverCreateDto>? ProgressApprovers { get; set; }
     }
 
     /// ---- Yardımcı Attribute'lar ----
