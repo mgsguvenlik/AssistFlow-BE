@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.CustomerProductPrice
 {
@@ -15,8 +10,7 @@ namespace Model.Dtos.CustomerProductPrice
         [Required, Range(1, long.MaxValue, ErrorMessage = "Geçerli bir ürün seçiniz.")]
         public long ProductId { get; set; }
 
-        [Required, Range(typeof(decimal), "0.0", "79228162514264337593543950335",
-            ErrorMessage = "Fiyat 0 veya pozitif olmalıdır.")]
+        [Required]
         public decimal Price { get; set; }
 
         [MaxLength(10)]

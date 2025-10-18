@@ -11,7 +11,6 @@ using Model.Dtos.CustomerGroupProductPrice;
 using Model.Dtos.CustomerProductPrice;
 using Model.Dtos.CustomerType;
 using Model.Dtos.Model;
-
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;

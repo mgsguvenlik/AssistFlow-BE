@@ -38,5 +38,18 @@ namespace Business.Services
                      q => q.Include(x => x.CustomerGroup)
                                    .Include(x => x.Product)
                );
+
+
+        public async Task<List<CustomerGroupProductPriceGetDto>> GetByProductAndCustomerGroupAsync(long productId, long customerGroupId)
+        {
+            var entities = await _unitOfWork.Repository
+                .GetQueryable<CustomerGroupProductPrice>()
+                .Include(x => x.Product)
+                .Include(x => x.CustomerGroup)
+                .Where(x => x.ProductId == productId && x.CustomerGroupId == customerGroupId)
+                .ToListAsync();
+
+            return entities.Adapt<List<CustomerGroupProductPriceGetDto>>(_config);
+        }
     }
 }
