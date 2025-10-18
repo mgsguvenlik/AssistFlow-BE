@@ -7,9 +7,6 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
     {
         [Required]
         public required string RequestNo { get; set; }
-
-        [Required]
-        public long ApproverTechnicianId { get; set; }
         public DateTime DeliveryDate { get; set; } = DateTime.Now;
         public string Description { get; set; } = string.Empty;
         public List<ServicesRequestProductCreateDto> DeliveredProducts { get; set; } = new();

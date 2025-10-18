@@ -1,9 +1,11 @@
 ﻿using Core.Enums;
 using Model.Abstractions;
 using Model.Concrete.WorkFlows;
+using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -33,5 +35,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         public long CreatedUser { get; set; }
         public long? UpdatedUser { get; set; }
         public bool IsDeleted { get; set; }
+        public long? ApproverTechnicianId { get; set; }
+        public UserGetDto? ApproverTechnician { get; set; }
     }
 }

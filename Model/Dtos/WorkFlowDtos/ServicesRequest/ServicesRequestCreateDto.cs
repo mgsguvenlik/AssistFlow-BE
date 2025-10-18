@@ -35,7 +35,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public bool IsLocationValid { get; set; }
 
 
-
         /// <summary>Müşteri tarafı onaylayan (opsiyonel)</summary>
         public long? CustomerApproverId { get; set; }
 
@@ -47,5 +46,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
 
         public  long StatuId { get; set; } //Akış taleplerin id si. Ekranda seçilecek.
+
+        public long? ApproverTechnicianId { get; set; }
     }
 }

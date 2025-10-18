@@ -7,11 +7,6 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public long Id { get; set; }
         public string RequestNo { get; set; } = string.Empty;
         public DateTimeOffset DeliveryDate { get; set; }
-
-        public long? ApproverTechnicianId { get; set; }
-        public string? ApproverTechnicianName { get; set; }   // opsiyonel gösterim alanı
-        public string? ApproverTechnicianEmail { get; set; }  // opsiyonel gösterim alanı
-
         public string? Description { get; set; }
         public bool IsSended { get; set; }
 

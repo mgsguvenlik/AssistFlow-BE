@@ -3,6 +3,7 @@ using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 
@@ -109,6 +110,13 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+        [HttpPost("send-technical-service")]
+        public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] SendTechnicalServiceDto dto)
+        {
+            var result = await _workFlowService.SendTechnicalServiceAsync(dto);
             return Ok(result);
         }
 

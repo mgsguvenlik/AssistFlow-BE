@@ -31,5 +31,10 @@ namespace Model.Concrete.WorkFlows
 
         // Mutabakat durumu
         public WorkFlowReconciliationStatus ReconciliationStatus { get; set; } = WorkFlowReconciliationStatus.Pending;
+
+        /// <summary>Onaylayan teknisyen (opsiyonel)</summary>
+        [ForeignKey(nameof(ApproverTechnician))]
+        public long? ApproverTechnicianId { get; set; }
+        public User? ApproverTechnician { get; set; }
     }
 }

@@ -1,11 +1,5 @@
 ﻿using Core.Enums;
-using Model.Concrete.WorkFlows;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Model.Dtos.WorkFlowDtos.WorkFlow
 {
@@ -25,5 +19,8 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
 
         public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
             = WorkFlowReconciliationStatus.Pending;
+
+
+        public long? ApproverTechnicianId { get; set; }
     }
 }

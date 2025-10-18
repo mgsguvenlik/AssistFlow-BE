@@ -41,6 +41,8 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         /// <summary>Müşteri tarafı onaylayan (opsiyonel)</summary>
         public long? CustomerApproverId { get; set; }
 
+        public long? ApproverTechnicianId { get; set; }
+
         /// <summary>Zorunlu ilişkiler</summary>
         [Required] public long CustomerId { get; set; }
         [Required] public long ServiceTypeId { get; set; }

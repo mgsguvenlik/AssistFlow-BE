@@ -15,7 +15,6 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         [Required]
         public DateTimeOffset DeliveryDate { get; set; }
 
-        public long? ApproverTechnicianId { get; set; }
         public string? Description { get; set; }
         public bool IsSended { get; set; }
 

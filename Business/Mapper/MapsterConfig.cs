@@ -330,11 +330,7 @@ namespace Business.Mapper
 
 
             // Warehosue Entity -> GetDto
-            config.NewConfig<Warehouse, WarehouseGetDto>()
-                  .Map(d => d.ApproverTechnicianName,
-                       s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianName : null)
-                  .Map(d => d.ApproverTechnicianEmail,
-                       s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianEmail : null);
+            config.NewConfig<Warehouse, WarehouseGetDto>();
 
             // Warehosue CreateDto -> Entity
             config.NewConfig<WarehouseCreateDto, Warehouse>(); // koleksiyon başlat

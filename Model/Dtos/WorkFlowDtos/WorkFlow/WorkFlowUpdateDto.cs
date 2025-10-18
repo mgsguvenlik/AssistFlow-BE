@@ -13,5 +13,6 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         public bool? IsComplated { get; set; }
         public bool IsLocationValid { get; set; } = true;
         public WorkFlowReconciliationStatus? ReconciliationStatus { get; set; }
+        public long? ApproverTechnicianId { get; set; }
     }
 }

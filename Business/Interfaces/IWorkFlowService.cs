@@ -18,8 +18,10 @@ namespace Business.Interfaces
         Task<ResponseModel<ServicesRequestGetDto>> UpdateRequestAsync(ServicesRequestUpdateDto dto);
         Task<ResponseModel> DeleteRequestAsync(long id);
 
+        Task<ResponseModel<TechnicalServiceGetDto>> SendTechnicalServiceAsync(SendTechnicalServiceDto dto);
+
         // ServicesRequest - ürün yönetimi
-       
+
 
         // WorkFlowStatus
         Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q);

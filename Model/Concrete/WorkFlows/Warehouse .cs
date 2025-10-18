@@ -17,16 +17,11 @@ namespace Model.Concrete.WorkFlows
         [Required]
         public DateTimeOffset DeliveryDate { get; set; }
 
-        /// <summary>Onaylayan teknisyen (opsiyonel)</summary>
-        [ForeignKey(nameof(ApproverTechnician))]
-        public long? ApproverTechnicianId { get; set; }
-        public User? ApproverTechnician { get; set; }
-
+      
         /// <summary>Açıklama (opsiyonel)</summary>
         public string? Description { get; set; }
 
         /// <summary>Depodan sevk edildi mi?</summary>
         public bool IsSended { get; set; }
-        //public ICollection<ServicesRequestProduct> WarehouseProducts { get; set; } = new List<ServicesRequestProduct>();
     }
 }
