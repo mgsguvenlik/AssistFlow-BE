@@ -1,5 +1,6 @@
 ﻿using Core.Common;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -41,6 +42,9 @@ namespace Business.Interfaces
         Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id);
         Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo);
         Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync(CompleteDeliveryDto dto);
+
+        //Teknik Servis ile ilgili işlemler eklenecek
+        Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
 
     }
 }

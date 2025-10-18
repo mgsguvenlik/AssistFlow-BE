@@ -105,9 +105,12 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-
-
-
+        [HttpGet("technicalservice-by-requestno")]
+        public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
 
         // ---------- WorkFlowStatus CRUD ----------
         // GET: /api/workflows/statuses

@@ -11,6 +11,7 @@ using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -208,80 +209,7 @@ namespace Business.Services
             return await GetWarehouseByRequestNoAsync(request.RequestNo);
         }
 
-        //3 Depo Teslimatı ve Teknik servise Gönderim
-        public async Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync_(CompleteDeliveryDto dto)
-        {
-            var wf = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-
-            if (wf is null)
-                return ResponseModel<WarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
-
-            bool exists = await _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo);
-            if (exists)
-                return ResponseModel<WarehouseGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
-
-            var request = await _uow.Repository
-             .GetQueryable<ServicesRequest>()
-             .Include(x => x.Customer)
-             .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-
-            if (request is null)
-                return ResponseModel<WarehouseGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
-            var warehouse = await _uow.Repository
-                .GetQueryable<Warehouse>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-
-            if (warehouse is null)
-                return ResponseModel<WarehouseGetDto>.Fail("Depo kaydı bulunamadı.", StatusCode.NotFound);
-
-            var technicalService = new TechnicalService
-            {
-                RequestNo = dto.RequestNo,
-                ServiceTypeId = request.ServiceTypeId,
-                StartTime = null,
-                EndTime = null,
-                ProblemDescription = string.Empty,
-                ResolutionAndActions = string.Empty,
-                Latitude = request.Customer.Latitude,
-                Longitude = request.Customer.Longitude,
-                ServicesStatus = TechnicalServiceStatus.Pending,
-                ServicesCostStatus = request.ServicesCostStatus,
-            };
-            _uow.Repository.Add(technicalService);
-
-            warehouse!.IsSended = true;
-            warehouse.ApproverTechnicianId = dto.ApproverTechnicianId;
-            warehouse.DeliveryDate = dto.DeliveryDate;
-            warehouse.Description = dto.Description;
-            _uow.Repository.Update(warehouse!);
-
-
-            var statu = await _uow.Repository
-            .GetQueryable<WorkFlowStatus>()
-            .AsNoTracking()
-            .Where(x => x.Code != null && (x.Code == "TECNICALSERVICE"))
-            .Select(x => new { x.Id })
-            .FirstOrDefaultAsync();
-
-            if (statu is null)
-                return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStatus içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
-
-            wf.StatuId = statu.Id;
-            wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
-            _uow.Repository.Update(wf);
-
-            await _uow.Repository.CompleteAsync();
-
-            return await GetWarehouseByIdAsync(warehouse.Id);
-        }
-
+        //3 Depo Teslimatı ve Teknik servise Gönderim 
         public async Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync(CompleteDeliveryDto dto)
         {
             var wf = await _uow.Repository
@@ -407,7 +335,11 @@ namespace Business.Services
             return await GetWarehouseByIdAsync(warehouse.Id);
         }
 
+
+   
         //-----------------------------
+
+
 
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
             => q => q
@@ -607,6 +539,34 @@ namespace Business.Services
 
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
+        }
+
+        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<TechnicalService>();
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .Include(x=>x.UsedMaterials)
+                .Include(x=>x.ServiceRequestFormImages)
+                .Include(x=>x.ServicesImages)
+                .Include(x=>x.ServiceType)
+                .ProjectToType<TechnicalServiceGetDto>(_config)
+                .FirstOrDefaultAsync();
+            if (dto is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var products = await _uow.Repository
+               .GetQueryable<ServicesRequestProduct>()
+               .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+               .AsNoTracking()
+               .Where(p => p.RequestNo == dto.RequestNo)
+               .ProjectToType<ServicesRequestProductGetDto>(_config)
+               .ToListAsync();
+            dto.Products = products; // DTO’da ürün listesi property’si olmalı
+            return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
         // -------------------- Warehouse --------------------

@@ -375,18 +375,18 @@ namespace Business.Mapper
             config.NewConfig<TechnicalService, TechnicalServiceGetDto>()
                 .Map(dest => dest.ServicesImages, src => src.ServicesImages)
                 .Map(dest => dest.ServiceRequestFormImages, src => src.ServiceRequestFormImages)
-                .Map(dest => dest.UsedMaterials, src => src.UsedMaterialS);
+                .Map(dest => dest.UsedMaterials, src => src.UsedMaterials);
 
             config.NewConfig<TechnicalServiceCreateDto, TechnicalService>()
                 .Ignore(dest => dest.Id)
                 .Ignore(dest => dest.ServicesImages)
                 .Ignore(dest => dest.ServiceRequestFormImages)
-                .Ignore(dest => dest.UsedMaterialS);
+                .Ignore(dest => dest.UsedMaterials);
 
             config.NewConfig<TechnicalServiceUpdateDto, TechnicalService>()
                 .Ignore(dest => dest.ServicesImages)
                 .Ignore(dest => dest.ServiceRequestFormImages)
-                .Ignore(dest => dest.UsedMaterialS);
+                .Ignore(dest => dest.UsedMaterials);
 
             // ================================
             // TECHNICAL SERVICE IMAGE

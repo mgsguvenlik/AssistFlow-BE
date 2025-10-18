@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Core.Enums
+﻿namespace Core.Enums
 {
     public enum TechnicalServiceStatus
     {
         Pending = 1,   // Beklemede
-        Completed = 2  // Tamamlandı
+        Started = 2, // Başlandı
+        Finished = 3  // Tamamlandı
     }
 }

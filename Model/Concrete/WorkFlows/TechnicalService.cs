@@ -33,6 +33,6 @@ namespace Model.Concrete.WorkFlows
         // Görseller
         public ICollection<TechnicalServiceImage> ServicesImages { get; set; } = new List<TechnicalServiceImage>();
         public ICollection<TechnicalServiceFormImage> ServiceRequestFormImages { get; set; } = new List<TechnicalServiceFormImage>();
-        public ICollection<UsedMaterial> UsedMaterialS { get; set; } = new List<UsedMaterial>();
+        public ICollection<UsedMaterial> UsedMaterials { get; set; } = new List<UsedMaterial>();
     }
 }
