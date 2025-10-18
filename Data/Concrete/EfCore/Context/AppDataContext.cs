@@ -189,25 +189,6 @@ namespace Data.Concrete.EfCore.Context
 
 
 
-            //ServicesRequestProduct Entity Configuration
-
-            modelBuilder.Entity<ServicesRequestProduct>()
-                .HasKey(x => new { x.ServicesRequestId, x.ProductId });
-
-            modelBuilder.Entity<ServicesRequestProduct>()
-                .HasOne(x => x.ServicesRequest)
-                .WithMany(r => r.ServicesRequestProducts)
-                .HasForeignKey(x => x.ServicesRequestId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<ServicesRequestProduct>()
-                .HasOne(x => x.Product)
-                .WithMany() // ters navigation yoksa
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-
-
 
             // CustomerProductPrice: Customer + Product tekil olsun
             modelBuilder.Entity<CustomerProductPrice>()

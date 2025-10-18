@@ -64,7 +64,8 @@ namespace Model.Dtos.Customer
         // Nullable olduğu için boş geçilebilir; değer girilirse 1 ve üzeri olmalı
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
-
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
     }
 
 }

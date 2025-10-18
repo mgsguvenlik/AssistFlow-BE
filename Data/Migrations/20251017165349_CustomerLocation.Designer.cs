@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251017165349_CustomerLocation")]
+    partial class CustomerLocation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -804,9 +807,6 @@ namespace Data.Migrations
                     b.Property<DateTimeOffset?>("PlannedCompletionDate")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<int>("Priority")
-                        .HasColumnType("int");
-
                     b.Property<string>("RequestNo")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -851,30 +851,28 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequestProduct", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("CustomerId")
+                    b.Property<long>("ServicesRequestId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("ProductId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
-                    b.Property<string>("RequestNo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<long?>("WarehouseId")
+                        .HasColumnType("bigint");
 
-                    b.HasKey("Id");
+                    b.HasKey("ServicesRequestId", "ProductId");
 
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.ToTable("ServicesRequestProducts");
                 });
@@ -1190,19 +1188,31 @@ namespace Data.Migrations
                 {
                     b.HasOne("Model.Concrete.Customer", "Customer")
                         .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CustomerId");
 
                     b.HasOne("Model.Concrete.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkFlows.ServicesRequest", "ServicesRequest")
+                        .WithMany("ServicesRequestProducts")
+                        .HasForeignKey("ServicesRequestId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkFlows.Warehouse", "Warehouse")
+                        .WithMany("WarehouseProducts")
+                        .HasForeignKey("WarehouseId");
 
                     b.Navigation("Customer");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ServicesRequest");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.Warehouse", b =>
@@ -1281,6 +1291,16 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.User", b =>
                 {
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequest", b =>
+                {
+                    b.Navigation("ServicesRequestProducts");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.Warehouse", b =>
+                {
+                    b.Navigation("WarehouseProducts");
                 });
 #pragma warning restore 612, 618
         }

@@ -39,6 +39,20 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("get-warehouse-getbyid")]
+        public async Task<IActionResult> GetWarehouseById([FromBody] long id)
+        {
+            var result = await _workFlowService.GetWarehouseByIdAsync(id);
+            return Ok(result);
+        }
+        [HttpGet("get-warehouse-byrequestno")]
+        public async Task<IActionResult> GetWarehouseByRequestNo([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetWarehouseByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+
 
         [HttpGet("get-workflow-list")]
         public async Task<IActionResult> GetWorkFlowList([FromQuery] QueryParams p)

@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Azure.Core;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -9,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Query;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -70,13 +72,23 @@ namespace Business.Services
                 // 2) ServicesRequest map + ürün bağları (N-N join)
                 var request = dto.Adapt<ServicesRequest>(_config);
 
-                if (request.ServicesRequestProducts is null)
-                    request.ServicesRequestProducts = new List<ServicesRequestProduct>();
+                request.CreatedDate = DateTime.Now;
+                request.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
 
                 if (dto.Products is not null)
                 {
                     foreach (var p in dto.Products)
-                        request.ServicesRequestProducts.Add(new ServicesRequestProduct { ProductId = p.ProductId, Quantity = p.Quantity, CustomerId = request.CustomerId });
+                    {
+                        await _uow.Repository.AddAsync(new ServicesRequestProduct
+                        {
+                            RequestNo = request.RequestNo,
+                            ProductId = p.ProductId,
+                            Quantity = p.Quantity,
+                            CustomerId = request.CustomerId
+                        });
+                    }
+                    //request.ServicesRequestProducts.Add(new ServicesRequestProduct { ProductId = p.ProductId, Quantity = p.Quantity, CustomerId = request.CustomerId });
+
                 }
 
                 var res = await _uow.Repository.AddAsync(request);
@@ -87,7 +99,7 @@ namespace Business.Services
                     RequestTitle = "Servis Talebi",
                     Priority = dto.Priority,
                     StatuId = dto.StatuId,
-                    CreatedDate = DateTimeOffset.UtcNow,
+                    CreatedDate = DateTime.Now,
                     CreatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0,
                     IsCancelled = false,
                     IsComplated = false,
@@ -108,77 +120,102 @@ namespace Business.Services
         }
         //-----------------------------
 
-        //2 Depoya Gönderim
-        public async Task<ResponseModel<ServicesRequestGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
+        //2 Depoya Gönderim  
+        public async Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
         {
-            // 1) Talep getir
+            // 1️⃣ Talep getir (tracking kapalı)
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
-                .Include(x => x.ServicesRequestProducts)
+                //.Include(x => x.ServicesRequestProducts)
+                //.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             if (request is null)
-                return ResponseModel<ServicesRequestGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<WarehouseGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
             if (request.IsSended)
-                return ResponseModel<ServicesRequestGetDto>.Fail("Bu talep zaten depoya gönderilmiş.", StatusCode.Conflict);
+                return ResponseModel<WarehouseGetDto>.Fail("Bu talep zaten depoya gönderilmiş.", StatusCode.Conflict);
 
-            // 2) İlgili WorkFlow’u RequestNo üzerinden getir
+
+            // 2️⃣ WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
+                .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo);
 
             if (wf is null)
-                return ResponseModel<ServicesRequestGetDto>.Fail("İlgili WorkFlow kaydı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<WarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-            // 3) “Depoda” durumunu bul (Code veya Name ile esnek arama)
+            if (wf.IsCancelled)
+                return ResponseModel<WarehouseGetDto>.Fail("İlgili akış iptal edilmiştir.", StatusCode.NotFound);
+
+            // 3️⃣ “Depoda” statüsünü bul
             var depoda = await _uow.Repository
                 .GetQueryable<WorkFlowStatus>()
+                .AsNoTracking()
                 .Where(x => x.Code != null && (x.Code == "INHOUSE" || x.Code == "DEPODA"))
                 .Select(x => new { x.Id })
                 .FirstOrDefaultAsync();
 
             if (depoda is null)
-                return ResponseModel<ServicesRequestGetDto>.Fail("WorkFlowStatus içinde 'Depoda' statüsü tanımlı değil.", StatusCode.BadRequest);
+                return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStatus içinde 'Depoda' statüsü tanımlı değil.", StatusCode.BadRequest);
 
-            // 4) Warehouse kaydını oluştur
-            var productIds = (dto.ProductIds is { Count: > 0 })
-                ? dto.ProductIds.Distinct().ToList()
-                : request.ServicesRequestProducts?.Select(p => p.ProductId).Distinct().ToList() ?? new List<long>();
+            // 4️⃣ Warehouse kaydını getir (varsa)
+            var warehouse = await _uow.Repository
+                .GetQueryable<Warehouse>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
-            var warehouse = new Warehouse
+            // 5️⃣ Yoksa oluştur
+            if (warehouse == null)
             {
-                RequestNo = request.RequestNo,
-                DeliveryDate = dto.DeliveryDate,
-                ApproverTechnicianId = dto.ApproverTechnicianId,
-                Description = dto.Description,
-                IsSended = true,
-                WarehouseProducts = new List<ServicesRequestProduct>()
-            };
+                warehouse = new Warehouse
+                {
+                    RequestNo = request.RequestNo,
+                    DeliveryDate = dto.DeliveryDate,
+                    ApproverTechnicianId = dto.ApproverTechnicianId,
+                    Description = dto.Description,
+                    IsSended = false,
+                };
+                warehouse.CreatedDate = DateTime.Now;
+                warehouse.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
 
-            foreach (var pid in productIds)
-                warehouse.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
+                warehouse = await _uow.Repository.AddAsync(warehouse);
+            }
+            else
+            {
+                return ResponseModel<WarehouseGetDto>.Fail("Bu talep zaten depoya gönderilmiş.", StatusCode.Conflict);
+            }
 
-            await _uow.Repository.AddAsync(warehouse);
-
-            // 5) ServicesRequest’i güncelle
             request.IsSended = true;
-            request.SendedStatusId = depoda.Id;              // FK lookup
-            request.WorkFlowStatus = null;                   // (opsiyonel) sadece FK ile güncelleyecekseniz nav’ı null bırakabilirsiniz
+            request.SendedStatusId = depoda.Id;
+            request.WorkFlowStatus = null; // opsiyonel, FK resetlenebilir
+            request.UpdatedDate = DateTime.Now;
+            request.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            _uow.Repository.Update(request);
 
-            // 6) WorkFlow’u güncelle
+
+            // 8️⃣ WorkFlow güncelle
             wf.StatuId = depoda.Id;
             wf.IsCancelled = false;
             wf.IsComplated = false;
-            wf.UpdatedDate = DateTimeOffset.UtcNow;
+            wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(wf);
 
-            // 7) Commit
+            // 9️⃣ Commit
             await _uow.Repository.CompleteAsync();
 
-            // 8) Güncel talebi döndür
-            return await GetRequestByIdAsync(request.Id);
+            // 🔟 Güncel talebi döndür
+            return await GetWarehouseByRequestNoAsync(request.RequestNo);
         }
+
+        //3 Depo Teslimatı ve Teknik servise Gönderim
+        public async Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync(CompleteDeliveryDto dto)
+        {
+            return null;
+        }
+
         //-----------------------------
 
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
@@ -187,10 +224,7 @@ namespace Business.Services
                 .Include(x => x.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
                 .Include(x => x.ServiceType)
                 .Include(x => x.CustomerApprover)
-                .Include(x => x.WorkFlowStatus)
-                .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Product)
-                .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.ServicesRequestProducts).ThenInclude(sr => sr.Customer).ThenInclude(x => x.CustomerProductPrices);
+                .Include(x => x.WorkFlowStatus);
 
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
@@ -227,6 +261,17 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            var products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .ToListAsync();
+
+            dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
@@ -244,14 +289,25 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            var products = await _uow.Repository
+               .GetQueryable<ServicesRequestProduct>()
+               .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+               .AsNoTracking()
+               .Where(p => p.RequestNo == requestNo)
+               .ProjectToType<ServicesRequestProductGetDto>(_config)
+               .ToListAsync();
+
+            dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
-      
+
         public async Task<ResponseModel<ServicesRequestGetDto>> UpdateRequestAsync(ServicesRequestUpdateDto dto)
         {
             var entity = await _uow.Repository.GetSingleAsync<ServicesRequest>(
                 false,
-                x => x.Id == dto.Id,
+                x => x.RequestNo == dto.RequestNo,
                 includeExpression: RequestIncludes());
 
             if (entity is null)
@@ -260,56 +316,86 @@ namespace Business.Services
             // Ana talep bilgilerini güncelle
             dto.Adapt(entity, _config);
 
+            // Mevcut ürünleri çek (RequestNo bazlı)
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<ServicesRequestProduct>(
+                    asNoTracking: false, // track etsin ki güncelleme/silmede kullanılabilsin
+                    whereExpression: x => x.RequestNo == dto.RequestNo);
             // Ürün listesi değişmişse:
             if (dto.Products is not null)
             {
-                // Yeni ürün setini dictionary olarak hazırla
+                // Yeni ürün setini dictionary olarak hazırla (ProductId bazlı)
                 var updatedProducts = dto.Products
                     .GroupBy(p => p.ProductId)
                     .Select(g => g.First()) // Aynı ürün tekrar varsa tek al
                     .ToDictionary(p => p.ProductId, p => p);
 
-                var existingProducts = entity.ServicesRequestProducts.ToDictionary(p => p.ProductId, p => p);
 
-                // Silinecek ürünler
-                var toRemove = existingProducts.Keys.Except(updatedProducts.Keys).ToList();
-                // Eklenecek ürünler
-                var toAdd = updatedProducts.Keys.Except(existingProducts.Keys).ToList();
-                // Güncellenecek ürünler (var olan ama miktar/depo değişmiş olabilir)
-                var toUpdate = updatedProducts.Keys.Intersect(existingProducts.Keys).ToList();
+
+                // Koleksiyonlar null olabilir, önlem al
+                existingProducts ??= new List<ServicesRequestProduct>();
+
+                // Silinecek ürünler (DB'de var ama DTO'da yok)
+                var toRemove = existingProducts
+                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // Eklenecek ürünler (DTO'da var ama DB'de yok)
+                var toAdd = updatedProducts
+                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
+                    .Select(p => p.Value)
+                    .ToList();
+
+                // Güncellenecek ürünler (hem var hem değişmiş)
+                var toUpdate = existingProducts
+                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
 
                 // ❌ Sil
-                if (toRemove.Any())
-                    entity.ServicesRequestProducts = entity.ServicesRequestProducts.Where(p => !toRemove.Contains(p.ProductId)).ToList();
+                foreach (var prod in toRemove)
+                    await _uow.Repository.HardDeleteAsync(prod);
 
                 // ➕ Ekle
-                foreach (var pid in toAdd)
+                foreach (var prod in toAdd)
                 {
-                    var newProd = updatedProducts[pid];
-                    entity.ServicesRequestProducts.Add(new ServicesRequestProduct
+                    var entityProd = new ServicesRequestProduct
                     {
-                        ProductId = pid,
-                        ServicesRequestId = entity.Id,
-                        WarehouseId = newProd.WarehouseId,
-                        Quantity = newProd.Quantity
-                    });
+                        RequestNo = dto.RequestNo,
+                        ProductId = prod.ProductId,
+                        Quantity = prod.Quantity,
+                        CustomerId = dto.CustomerId,
+                    };
+                    await _uow.Repository.AddAsync(entityProd);
                 }
 
                 // 🔁 Güncelle
-                foreach (var pid in toUpdate)
+                foreach (var prod in toUpdate)
                 {
-                    var upd = updatedProducts[pid];
-                    var existing = existingProducts[pid];
-                    existing.WarehouseId = upd.WarehouseId;
-                    existing.Quantity = upd.Quantity;
+                    var dtoProd = updatedProducts[prod.ProductId];
+                    prod.Quantity = dtoProd.Quantity;
+                    prod.CustomerId = dto.CustomerId;
+                    prod.RequestNo = dto.RequestNo;
+                    prod.ProductId = dtoProd.ProductId;
+                    _uow.Repository.Update(prod);
+
+
+                }
+
+
+
+            }
+            else
+            {
+                foreach (var item in existingProducts)
+                {
+                    await _uow.Repository.HardDeleteAsync(item);
+
                 }
             }
-
+            await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
             return await GetRequestByIdAsync(entity.Id);
         }
-
-
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
 
@@ -323,7 +409,7 @@ namespace Business.Services
 
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.IsDeleted = true;                // varsa
-            entity.UpdatedDate = DateTimeOffset.UtcNow; // varsa
+            entity.UpdatedDate = DateTime.Now; // varsa
 
             // 3) SoftDelete çağrısı -> 2 tip argümanı verin ve entity gönderin
             await _uow.Repository.SoftDeleteAsync<Model.Concrete.WorkFlows.ServicesRequest, long>(entity);
@@ -332,25 +418,58 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> ReplaceRequestProductsAsync(long requestId, IEnumerable<long> productIds)
+        // -------------------- Warehouse --------------------
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
         {
-            var entity = await _uow.Repository.GetSingleAsync<ServicesRequest>(
-                false,
-                x => x.Id == requestId,
-                q => q.Include(x => x.ServicesRequestProducts));
+            var query = _uow.Repository.GetQueryable<Warehouse>();
 
-            if (entity is null)
-                return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .ProjectToType<WarehouseGetDto>(_config)
+                .FirstOrDefaultAsync();
 
-            var desired = (productIds ?? Enumerable.Empty<long>()).Distinct().ToList();
+            if (dto is null)
+                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            entity.ServicesRequestProducts.Clear();
-            foreach (var pid in desired)
-                entity.ServicesRequestProducts.Add(new ServicesRequestProduct { ServicesRequestId = entity.Id, ProductId = pid });
+            var products = await _uow.Repository
+                 .GetQueryable<ServicesRequestProduct>()
+                 .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                 .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                 .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                 .AsNoTracking()
+                 .Where(p => p.RequestNo == dto.RequestNo)
+                 .ProjectToType<ServicesRequestProductGetDto>(_config)
+                 .ToListAsync();
+            dto.WarehouseProducts = products; // DTO’da ürün listesi property’si olmalı
 
-            await _uow.Repository.CompleteAsync();
-            return await GetRequestByIdAsync(entity.Id);
+            return ResponseModel<WarehouseGetDto>.Success(dto);
         }
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<Warehouse>();
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ProjectToType<WarehouseGetDto>(_config)
+                .FirstOrDefaultAsync();
+            if (dto is null)
+                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var products = await _uow.Repository
+               .GetQueryable<ServicesRequestProduct>()
+               .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+               .AsNoTracking()
+               .Where(p => p.RequestNo == dto.RequestNo)
+               .ProjectToType<ServicesRequestProductGetDto>(_config)
+               .ToListAsync();
+            dto.WarehouseProducts = products; // DTO’da ürün listesi property’si olmalı
+            return ResponseModel<WarehouseGetDto>.Success(dto);
+
+        }
+
 
         // -------------------- WorkFlowStatus --------------------
         public async Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q)
@@ -510,7 +629,7 @@ namespace Business.Services
 
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.IsDeleted = true;                // varsa
-            entity.UpdatedDate = DateTimeOffset.UtcNow; // varsa
+            entity.UpdatedDate = DateTime.Now; // varsa
                                                         // entity.DeletedByUserId = currentUserId;   // varsa
 
             // 3) SoftDelete çağrısı -> 2 tip argümanı verin ve entity gönderin

@@ -27,6 +27,6 @@ namespace Model.Concrete.WorkFlows
 
         /// <summary>Depodan sevk edildi mi?</summary>
         public bool IsSended { get; set; }
-        public ICollection<ServicesRequestProduct> WarehouseProducts { get; set; } = new List<ServicesRequestProduct>();
+        //public ICollection<ServicesRequestProduct> WarehouseProducts { get; set; } = new List<ServicesRequestProduct>();
     }
 }

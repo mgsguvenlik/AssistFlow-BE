@@ -21,6 +21,9 @@ namespace Model.Dtos.Customer
         public string? CustomerShortCode { get; set; }
         public string? CorporateLocationId { get; set; }
         public long? CustomerTypeId { get; set; }
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+
 
     }
 }

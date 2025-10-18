@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.Warehouse
 {
@@ -20,7 +16,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public bool IsSended { get; set; }
 
         // Ekranlar için yalnızca ürün Id listesi
-        public List<long> ProductIds { get; set; } = new();
+        public List<ServicesRequestProductGetDto> WarehouseProducts { get; set; } = new();
     }
 
 }

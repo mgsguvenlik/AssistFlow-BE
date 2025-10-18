@@ -273,6 +273,7 @@ namespace Business.Mapper
             // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
             config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
                   .IgnoreNullValues(true)
+                  .Ignore(dest => dest.Id)
                   .Ignore(d => d.Customer)          // nav
                   .Ignore(d => d.CustomerApprover)  // nav
                   .Ignore(d => d.ServiceType)       // nav
@@ -328,53 +329,25 @@ namespace Business.Mapper
 
             // Warehosue Entity -> GetDto
             config.NewConfig<Warehouse, WarehouseGetDto>()
-                  .Map(d => d.ProductIds,
-                       s => s.WarehouseProducts.Select(p => p.ProductId).ToList())
                   .Map(d => d.ApproverTechnicianName,
                        s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianName : null)
                   .Map(d => d.ApproverTechnicianEmail,
                        s => s.ApproverTechnician != null ? s.ApproverTechnician.TechnicianEmail : null);
 
             // Warehosue CreateDto -> Entity
-            config.NewConfig<WarehouseCreateDto, Warehouse>()
-                  .Map(d => d.WarehouseProducts, _ => new List<ServicesRequestProduct>()) // koleksiyon başlat
-                  .AfterMapping((src, dest) =>
-                  {
-                      dest.WarehouseProducts ??= new List<ServicesRequestProduct>();
-                      dest.WarehouseProducts.Clear();
+            config.NewConfig<WarehouseCreateDto, Warehouse>(); // koleksiyon başlat
 
-                      if (src.ProductIds is { Count: > 0 })
-                      {
-                          foreach (var pid in src.ProductIds.Distinct())
-                              dest.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
-                      }
-                  });
 
             // Warehosue UpdateDto -> Entity
-            config.NewConfig<WarehouseUpdateDto, Warehouse>()
-                  .Ignore(dest => dest.WarehouseProducts) // koleksiyon güncellemesini servis katmanında yapacağız
-                  .AfterMapping((src, dest) =>
-                  {
-                      // İstersen koleksiyonu burada da senkronize edebilirsin:
-                      if (src.ProductIds is null) return;
-
-                      dest.WarehouseProducts ??= new List<ServicesRequestProduct>();
-
-                      // mevcut listeyi yeni gelen Id'lere göre yeniden kur
-                      dest.WarehouseProducts.Clear();
-                      foreach (var pid in src.ProductIds.Distinct())
-                          dest.WarehouseProducts.Add(new ServicesRequestProduct { ProductId = pid });
-                  });
+            config.NewConfig<WarehouseUpdateDto, Warehouse>(); // koleksiyon güncellemesini servis katmanında yapacağız
+                  
 
             //ServicesRequestProduct Dto <-> Entity
             config.NewConfig<ServicesRequestProductCreateDto, ServicesRequestProduct>()
-                  .Ignore(d => d.ServicesRequest) // nav
                   .Ignore(d => d.Product);         // nav
 
             config.NewConfig<ServicesRequestProduct, ServicesRequestProductGetDto>()
-                .Map(dest => dest.ServicesRequestId, src => src.ServicesRequestId)
                 .Map(dest => dest.ProductId, src => src.ProductId)
-                .Map(dest => dest.WarehouseId, src => src.WarehouseId)
                 .Map(dest => dest.Quantity, src => src.Quantity)
                 .Map(dest => dest.PriceCurrency, src => src.Product.PriceCurrency)
                 .Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())

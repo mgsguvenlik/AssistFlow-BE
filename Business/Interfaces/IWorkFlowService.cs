@@ -11,13 +11,14 @@ namespace Business.Interfaces
         // ServicesRequest
         Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<ServicesRequestGetDto>> GetRequestByNoAsync(string requestNo);
+      
         Task<ResponseModel<ServicesRequestGetDto>> GetRequestByIdAsync(long id);
         Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto);
         Task<ResponseModel<ServicesRequestGetDto>> UpdateRequestAsync(ServicesRequestUpdateDto dto);
         Task<ResponseModel> DeleteRequestAsync(long id);
 
         // ServicesRequest - ürün yönetimi
-        Task<ResponseModel<ServicesRequestGetDto>> ReplaceRequestProductsAsync(long requestId, IEnumerable<long> productIds);
+       
 
         // WorkFlowStatus
         Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q);
@@ -37,6 +38,9 @@ namespace Business.Interfaces
 
 
         // Warehouse (depo) ile ilgili işlemler 
-        Task<ResponseModel<ServicesRequestGetDto>> SendWarehouseAsync(SendWarehouseDto dto);
+        Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto);
+
+        Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id);
+        Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo);
     }
 }

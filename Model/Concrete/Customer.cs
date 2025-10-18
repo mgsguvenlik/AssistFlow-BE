@@ -94,6 +94,8 @@ namespace Model.Concrete
         [ForeignKey(nameof(CustomerGroup))]
         public long? CustomerGroupId { get; set; }
         public CustomerGroup? CustomerGroup { get; set; }
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
 
 
         [ForeignKey(nameof(CustomerType))]

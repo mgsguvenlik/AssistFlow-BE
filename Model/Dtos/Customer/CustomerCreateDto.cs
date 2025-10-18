@@ -67,6 +67,9 @@ namespace Model.Dtos.Customer
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
 
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+
 
     }
 

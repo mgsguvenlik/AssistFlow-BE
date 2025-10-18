@@ -1,9 +1,10 @@
 ﻿using Core.Enums;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 {
-    public class ServicesRequestGetDto
+    public class  ServicesRequestGetDto
     {
         public long Id { get; set; }
 
@@ -43,6 +44,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long CreatedUser { get; set; }
         public long? UpdatedUser { get; set; }
         public bool IsDeleted { get; set; }
+        public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
         public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
     }
 }

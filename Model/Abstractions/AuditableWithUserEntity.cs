@@ -10,8 +10,6 @@ namespace Model.Abstractions
     {
         public DateTimeOffset CreatedDate { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }
-
-        // ASP.NET Identity defaultu string olduğu için string bıraktım (username veya userId tutabilirsiniz)
         public long CreatedUser { get; set; }
         public long? UpdatedUser { get; set; }
 

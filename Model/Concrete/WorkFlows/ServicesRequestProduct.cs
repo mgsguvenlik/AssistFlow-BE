@@ -1,18 +1,18 @@
 ﻿using Model.Abstractions;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Concrete.WorkFlows
 {
     // Ara tablo: N-N (ServicesRequest <-> Product)
     public class ServicesRequestProduct : BaseEntity
     {
-        public long ServicesRequestId { get; set; }
-        public ServicesRequest ServicesRequest { get; set; } = default!;
-        public long ProductId { get; set; }
+        [Key]
+        public long Id { get; set; }
+        public required string RequestNo { get; set; }
+        public required long ProductId { get; set; }
         public Product Product { get; set; } = default!;
-        public Warehouse? Warehouse { get; set; } = default!;
-        public long? WarehouseId { get; set; }
         public Customer? Customer { get; set; } = default!;  ///Müşteriye göre fiyat hesaplamak için eklendi
-        public long? CustomerId { get; set; }
+        public required long CustomerId { get; set; }
         public int Quantity { get; set; }
 
         // Toplam Fiyat (Quantity * Product.Price)
@@ -37,12 +37,12 @@ namespace Model.Concrete.WorkFlows
         {
             if (Customer?.CustomerGroup?.GroupProductPrices
                 .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
-                return Quantity*groupPrice.Price;
+                return Quantity * groupPrice.Price;
 
             if (Customer?.CustomerProductPrices
                 .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
                 return customerPrice.Price;
-            return Quantity*Product?.Price ?? 0m;
+            return Quantity * Product?.Price ?? 0m;
         }
 
     }

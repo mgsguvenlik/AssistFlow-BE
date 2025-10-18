@@ -44,7 +44,8 @@ namespace Model.Concrete.WorkFlows
         public ServiceType ServiceType { get; set; } = default!;
         public long ServiceTypeId { get; set; }       // ServiceType FK
 
-        // *** Ürün ilişkisi ***
-        public ICollection<ServicesRequestProduct> ServicesRequestProducts { get; set; } = new List<ServicesRequestProduct>();
+        public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
+
+
     }
 }

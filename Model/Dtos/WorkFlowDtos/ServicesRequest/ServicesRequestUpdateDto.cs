@@ -12,7 +12,8 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         /// <summary>Unique olmak zorunda. Boş gönderirsen servis tarafında üretmeyi tercih edebilirsin.</summary>
         [MaxLength(100)]
-        public string? RequestNo { get; set; }
+        [Required]
+        public required string RequestNo { get; set; }
 
         [MaxLength(100)]
         public string? OracleNo { get; set; }
