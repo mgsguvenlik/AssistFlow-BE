@@ -61,9 +61,7 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.CompleteDeliveryAsync(dto);
 
             if (!result.IsSuccess)
-            {
                 return StatusCode((int)result.StatusCode, result);
-            }
 
             return Ok(result);
         }
