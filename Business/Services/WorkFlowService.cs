@@ -126,8 +126,6 @@ namespace Business.Services
             // 1️⃣ Talep getir (tracking kapalı)
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
-                //.Include(x => x.ServicesRequestProducts)
-                //.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             if (request is null)
