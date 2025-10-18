@@ -1,9 +1,4 @@
-﻿using Model.Concrete.WorkFlows;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Core.Enums;
 
 namespace Model.Dtos.WorkFlowDtos.WorkFlow
 {
@@ -16,6 +11,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         public WorkFlowPriority? Priority { get; set; }
         public bool? IsCancelled { get; set; }
         public bool? IsComplated { get; set; }
+        public bool IsLocationValid { get; set; } = true;
         public WorkFlowReconciliationStatus? ReconciliationStatus { get; set; }
     }
 }

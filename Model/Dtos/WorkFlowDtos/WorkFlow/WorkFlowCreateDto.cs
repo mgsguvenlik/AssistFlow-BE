@@ -1,4 +1,5 @@
-﻿using Model.Concrete.WorkFlows;
+﻿using Core.Enums;
+using Model.Concrete.WorkFlows;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -20,6 +21,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
 
         public bool IsCancelled { get; set; } = false;
         public bool IsComplated { get; set; } = false;
+        public bool IsLocationValid { get; set; } = true;
 
         public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
             = WorkFlowReconciliationStatus.Pending;

@@ -1,4 +1,5 @@
-﻿using Model.Abstractions;
+﻿using Core.Enums;
+using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -26,26 +27,9 @@ namespace Model.Concrete.WorkFlows
         // Bayraklar
         public bool IsCancelled { get; set; } = false;// iptal edildi mi?
         public bool IsComplated { get; set; } = false; // diyagramdaki yazımı korudum
+        public bool IsLocationValid { get; set; } = true;
 
         // Mutabakat durumu
-        public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
-            = WorkFlowReconciliationStatus.Pending;
-    }
-
-    // Önerilen enum'lar
-    public enum WorkFlowPriority
-    {
-        Low = 0,
-        Normal = 1,
-        High = 2,
-        Urgent = 3
-    }
-
-    public enum WorkFlowReconciliationStatus
-    {
-        Pending = 0,     // Mutabakat Beklemede
-        Completed = 1,   // Mutabakat Tamam
-        Rejected = 2,   //Mutabakat Reddedildi
-
+        public WorkFlowReconciliationStatus ReconciliationStatus { get; set; } = WorkFlowReconciliationStatus.Pending;
     }
 }

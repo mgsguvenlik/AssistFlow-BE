@@ -105,6 +105,7 @@ namespace Business.Services
                     IsCancelled = false,
                     IsComplated = false,
                     ReconciliationStatus = WorkFlowReconciliationStatus.Pending,
+                    IsLocationValid= dto.IsLocationValid
                 };
 
                 await _uow.Repository.AddAsync(wf);
@@ -124,7 +125,7 @@ namespace Business.Services
         //2 Depoya Gönderim  
         public async Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
         {
-            // 1️⃣ Talep getir (tracking kapalı)
+            // 1️ Talep getir (tracking kapalı)
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
@@ -136,7 +137,7 @@ namespace Business.Services
                 return ResponseModel<WarehouseGetDto>.Fail("Bu talep zaten depoya gönderilmiş.", StatusCode.Conflict);
 
 
-            // 2️⃣ WorkFlow getir
+            // 2️ WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
@@ -148,7 +149,7 @@ namespace Business.Services
             if (wf.IsCancelled)
                 return ResponseModel<WarehouseGetDto>.Fail("İlgili akış iptal edilmiştir.", StatusCode.NotFound);
 
-            // 3️⃣ “Depoda” statüsünü bul
+            // 3️ “Depoda” statüsünü bul
             var depoda = await _uow.Repository
                 .GetQueryable<WorkFlowStatus>()
                 .AsNoTracking()
@@ -159,13 +160,13 @@ namespace Business.Services
             if (depoda is null)
                 return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStatus içinde 'Depoda' statüsü tanımlı değil.", StatusCode.BadRequest);
 
-            // 4️⃣ Warehouse kaydını getir (varsa)
+            // 4️ Warehouse kaydını getir (varsa)
             var warehouse = await _uow.Repository
                 .GetQueryable<Warehouse>()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
-            // 5️⃣ Yoksa oluştur
+            // 5️ Yoksa oluştur
             if (warehouse == null)
             {
                 warehouse = new Warehouse
@@ -194,7 +195,7 @@ namespace Business.Services
             _uow.Repository.Update(request);
 
 
-            // 8️⃣ WorkFlow güncelle
+            //6 WorkFlow güncelle
             wf.StatuId = depoda.Id;
             wf.IsCancelled = false;
             wf.IsComplated = false;
@@ -202,10 +203,10 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
 
-            // 9️⃣ Commit
+            //7 Commit
             await _uow.Repository.CompleteAsync();
 
-            // 🔟 Güncel talebi döndür
+            //8 Güncel talebi döndür
             return await GetWarehouseByRequestNoAsync(request.RequestNo);
         }
 
@@ -254,6 +255,8 @@ namespace Business.Services
                 ServiceTypeId = request.ServiceTypeId,
                 StartTime = null,
                 EndTime = null,
+                StartLocation = string.Empty,
+                EndLocation = string.Empty,
                 ProblemDescription = string.Empty,
                 ResolutionAndActions = string.Empty,
                 Latitude = request.Customer.Latitude,
@@ -334,7 +337,6 @@ namespace Business.Services
             // 🔹 Son durumu döndür
             return await GetWarehouseByIdAsync(warehouse.Id);
         }
-
 
    
         //-----------------------------
@@ -436,7 +438,21 @@ namespace Business.Services
             if (entity is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            var wf = await _uow.Repository
+            .GetQueryable<WorkFlow>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (wf is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
             // Ana talep bilgilerini güncelle
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.IsLocationValid= dto.IsLocationValid;
+            _uow.Repository.Update(wf);
+
+
+
             dto.Adapt(entity, _config);
 
             // Mevcut ürünleri çek (RequestNo bazlı)

@@ -25,6 +25,8 @@ namespace Model.Concrete.WorkFlows
         public string? ResolutionAndActions { get; set; }//Alınan Aksiyonlar ve Çözüm
         public string? Latitude { get; set; }
         public string? Longitude { get; set; }
+        public string? StartLocation { get; set; }//Örn: "41.01224, 28.976018"
+        public string? EndLocation { get; set; }//Örn: "41.01224, 28.976018"
 
         // Durumlar
         public TechnicalServiceStatus ServicesStatus { get; set; } = TechnicalServiceStatus.Pending;

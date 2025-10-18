@@ -1,4 +1,5 @@
-﻿using Model.Abstractions;
+﻿using Core.Enums;
+using Model.Abstractions;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
 using System;
@@ -22,6 +23,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         public WorkFlowPriority Priority { get; set; }
         public bool IsCancelled { get; set; }
         public bool IsComplated { get; set; }
+        public bool IsLocationValid { get; set; } = true;
         public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
 
         public DateTimeOffset CreatedDate { get; set; }

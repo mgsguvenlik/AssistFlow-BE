@@ -36,6 +36,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         public bool IsReview { get; set; }
         public bool IsMailSended { get; set; }
+        public bool IsLocationValid { get; set; }
 
         /// <summary>Müşteri tarafı onaylayan (opsiyonel)</summary>
         public long? CustomerApproverId { get; set; }

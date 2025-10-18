@@ -20,6 +20,8 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         public string? ResolutionAndActions { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
+        public string? StartLocation { get; set; }//Örn: "41.01224, 28.976018"
+        public string? EndLocation { get; set; }//Örn: "41.01224, 28.976018"
 
         public TechnicalServiceStatus ServicesStatus { get; set; }
         public ServicesCostStatus ServicesCostStatus { get; set; }

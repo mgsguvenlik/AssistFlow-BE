@@ -26,7 +26,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long? SendedStatusId { get; set; }
         public bool IsReview { get; set; }
         public bool IsMailSended { get; set; }
-
+        public bool IsLocationValid { get; set; }
         public long? CustomerApproverId { get; set; }
         public string? CustomerApproverName { get; set; }
 
