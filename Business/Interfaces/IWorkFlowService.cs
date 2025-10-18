@@ -36,11 +36,11 @@ namespace Business.Interfaces
         Task<ResponseModel<WorkFlowGetDto>> UpdateWorkFlowAsync(WorkFlowUpdateDto dto);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
 
-
         // Warehouse (depo) ile ilgili işlemler 
         Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto);
-
         Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id);
         Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo);
+        Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync(CompleteDeliveryDto dto);
+
     }
 }

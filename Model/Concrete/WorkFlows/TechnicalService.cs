@@ -16,10 +16,6 @@ namespace Model.Concrete.WorkFlows
         public long? ServiceTypeId { get; set; }
         public ServiceType? ServiceType { get; set; }
 
-        // Planlanan saat aralıkları (sadece saat/dakika tutulacaksa TimeSpan idealdir)
-        public TimeSpan? StartHour { get; set; }
-        public TimeSpan? EndHour { get; set; }
-
         // Gerçekleşen zaman damgaları
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }
@@ -27,8 +23,8 @@ namespace Model.Concrete.WorkFlows
         // Teknik alanlar
         public string? ProblemDescription { get; set; } //Problem Tanımı
         public string? ResolutionAndActions { get; set; }//Alınan Aksiyonlar ve Çözüm
-        public double? Latitude { get; set; }
-        public double? Longitude { get; set; }
+        public string? Latitude { get; set; }
+        public string? Longitude { get; set; }
 
         // Durumlar
         public TechnicalServiceStatus ServicesStatus { get; set; } = TechnicalServiceStatus.Pending;

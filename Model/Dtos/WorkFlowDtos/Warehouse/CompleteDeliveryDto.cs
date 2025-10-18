@@ -1,13 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.WorkFlowDtos.Warehouse
 {
     public class CompleteDeliveryDto
     {
+        [Required]
+        public required string RequestNo { get; set; }
 
+        [Required]
+        public long ApproverTechnicianId { get; set; }
+        public DateTime DeliveryDate { get; set; } = DateTime.Now;
+        public string Description { get; set; } = string.Empty;
+        public List<ServicesRequestProductCreateDto> DeliveredProducts { get; set; } = new();
     }
 }
+ 

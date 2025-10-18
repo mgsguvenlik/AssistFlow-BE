@@ -11,9 +11,6 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
 
         public long? ServiceTypeId { get; set; }
 
-        public TimeSpan? StartHour { get; set; }
-        public TimeSpan? EndHour { get; set; }
-
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }
 

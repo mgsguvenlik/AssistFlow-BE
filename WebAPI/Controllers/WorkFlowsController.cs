@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Autofac.Core;
+using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
@@ -52,7 +53,20 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("complete-delivery")]
+        public async Task<IActionResult> CompleteDelivery([FromBody] CompleteDeliveryDto dto)
+        {
+            if (dto == null)
+                return BadRequest(new { message = "Geçersiz veri gönderildi." });
+            var result = await _workFlowService.CompleteDeliveryAsync(dto);
 
+            if (!result.IsSuccess)
+            {
+                return StatusCode((int)result.StatusCode, result);
+            }
+
+            return Ok(result);
+        }
 
         [HttpGet("get-workflow-list")]
         public async Task<IActionResult> GetWorkFlowList([FromQuery] QueryParams p)
@@ -92,6 +106,9 @@ namespace WebAPI.Controllers
             var resp = await _workFlowService.UpdateRequestAsync(dto);
             return ToActionResult(resp);
         }
+
+
+
 
 
         // ---------- WorkFlowStatus CRUD ----------

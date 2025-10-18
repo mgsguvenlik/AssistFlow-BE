@@ -22,6 +22,9 @@ using Model.Dtos.User;
 using Model.Dtos.UserRole;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.TechnicalService;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Model.Dtos.WorkFlowDtos.UsedMaterial;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -363,6 +366,45 @@ namespace Business.Mapper
                 .Map(dest => dest.SubGroups, src => src.SubGroups.Adapt<List<CustomerGroupChildDto>>())
                 .Map(dest => dest.GroupProductPrices, src => src.GroupProductPrices.Adapt<List<CustomerGroupProductPriceGetDto>>())
                 .Map(dest => dest.ProgressApprovers, src => src.ProgressApprovers.Adapt<List<ProgressApproverGetDto>>());
+
+
+
+            // ================================
+            // TECHNICAL SERVICE
+            // ================================
+            config.NewConfig<TechnicalService, TechnicalServiceGetDto>()
+                .Map(dest => dest.ServicesImages, src => src.ServicesImages)
+                .Map(dest => dest.ServiceRequestFormImages, src => src.ServiceRequestFormImages)
+                .Map(dest => dest.UsedMaterials, src => src.UsedMaterialS);
+
+            config.NewConfig<TechnicalServiceCreateDto, TechnicalService>()
+                .Ignore(dest => dest.Id)
+                .Ignore(dest => dest.ServicesImages)
+                .Ignore(dest => dest.ServiceRequestFormImages)
+                .Ignore(dest => dest.UsedMaterialS);
+
+            config.NewConfig<TechnicalServiceUpdateDto, TechnicalService>()
+                .Ignore(dest => dest.ServicesImages)
+                .Ignore(dest => dest.ServiceRequestFormImages)
+                .Ignore(dest => dest.UsedMaterialS);
+
+            // ================================
+            // TECHNICAL SERVICE IMAGE
+            // ================================
+            config.NewConfig<TechnicalServiceImage, TechnicalServiceImageGetDto>();
+
+            // ================================
+            // TECHNICAL SERVICE FORM IMAGE
+            // ================================
+            config.NewConfig<TechnicalServiceFormImage, TechnicalServiceFormImageGetDto>();
+
+            // ================================
+            // USED MATERIAL
+            // ================================
+            config.NewConfig<UsedMaterial, UsedMaterialGetDto>();
+            config.NewConfig<UsedMaterialCreateDto, UsedMaterial>()
+                .Ignore(dest => dest.Id)
+                .Map(dest => dest.CreatedDate, _ => DateTimeOffset.Now);
         }
     }
 }
