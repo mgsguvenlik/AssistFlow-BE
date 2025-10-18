@@ -22,7 +22,9 @@ namespace Business.Services
         protected override Expression<Func<Customer, bool>> KeyPredicate(long id) => x => x.Id == id;
 
         protected override Func<IQueryable<Customer>, IIncludableQueryable<Customer, object>>? IncludeExpression()
-            => q => q.Include(c => c.CustomerType);
+            => q => q
+            .Include(c => c.CustomerType)
+            .Include(x=>x.CustomerGroup);
 
         protected override Task<Customer?> ResolveEntityForUpdateAsync(CustomerUpdateDto dto)
             => _unitOfWork.Repository.GetSingleAsync<Customer>(false, x => x.Id == dto.Id,

@@ -18,14 +18,14 @@ namespace Model.Dtos.Customer
         [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.SubscriberCompanyCannotBeWhitespace)]
         public string? SubscriberCompany { get; set; }
 
-        [StringLength(120, ErrorMessage = Messages.CustomerMainGroupNameMaxLength)]
-        public string? CustomerMainGroupName { get; set; }
-
         [StringLength(500, ErrorMessage = Messages.AddressMaxLength)]
         public string? SubscriberAddress { get; set; }
 
         [StringLength(100, ErrorMessage = Messages.CityMaxLength)]
         public string? City { get; set; }
+
+        [StringLength(100, ErrorMessage = Messages.CityMaxLength)]
+        public string? District { get; set; }
 
         [StringLength(64, ErrorMessage = Messages.LocationCodeMaxLength)]
         [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.LocationCodeInvalidChars)]
@@ -66,6 +66,8 @@ namespace Model.Dtos.Customer
         public long? CustomerTypeId { get; set; }
         public string? Longitude { get; set; }
         public string? Latitude { get; set; }
+        public DateTimeOffset? InstallationDate { get; set; }
+
     }
 
 }

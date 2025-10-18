@@ -1,4 +1,4 @@
-﻿using Model.Dtos.ProgressApprover;
+﻿using Model.Dtos.CustomerGroup;
 
 namespace Model.Dtos.Customer
 {
@@ -7,9 +7,9 @@ namespace Model.Dtos.Customer
         public long Id { get; set; }
         public string? SubscriberCode { get; set; }
         public string? SubscriberCompany { get; set; }
-        public string? CustomerMainGroupName { get; set; }
         public string? SubscriberAddress { get; set; }
         public string? City { get; set; }
+        public string? District { get; set; }
         public string? LocationCode { get; set; }
         public string? OracleCode { get; set; }
         public string? ContactName1 { get; set; }
@@ -23,7 +23,7 @@ namespace Model.Dtos.Customer
         public long? CustomerTypeId { get; set; }
         public string? Longitude { get; set; }
         public string? Latitude { get; set; }
-
-
+        public DateTimeOffset? InstallationDate { get; set; }
+        public CustomerGroupGetDto CustomerGroup { get; set; } = new();
     }
 }

@@ -22,10 +22,6 @@ namespace Model.Concrete
         /// </summary>
         public string? SubscriberCompany { get; set; }
 
-        /// <summary>
-        /// Müşterinin bağlı olduğu ana grup adı (segment/kategori).
-        /// </summary>
-        public string? CustomerMainGroupName { get; set; }
 
         /// <summary>
         /// Abonenin açık adresi (cadde, mahalle, no vb.).
@@ -36,6 +32,12 @@ namespace Model.Concrete
         /// Şehir/İl bilgisi (örn. İzmir).
         /// </summary>
         public string? City { get; set; }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public string? District { get; set; }
 
         /// <summary>
         /// Lokasyon tanımlayıcı kodu (iç sistemlerdeki Lokasyon ID/Code).
@@ -87,6 +89,11 @@ namespace Model.Concrete
         /// </summary>
         public string? CorporateLocationId { get; set; }
 
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+
+        public DateTimeOffset? InstallationDate { get; set; }
+
         /// <summary>
         /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
         /// </summary>
@@ -94,9 +101,7 @@ namespace Model.Concrete
         [ForeignKey(nameof(CustomerGroup))]
         public long? CustomerGroupId { get; set; }
         public CustomerGroup? CustomerGroup { get; set; }
-        public string? Longitude { get; set; }
-        public string? Latitude { get; set; }
-
+    
 
         [ForeignKey(nameof(CustomerType))]
         public long? CustomerTypeId { get; set; }

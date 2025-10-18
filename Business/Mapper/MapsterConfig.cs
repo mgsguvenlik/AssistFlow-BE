@@ -104,7 +104,6 @@ namespace Business.Mapper
             // ---------------- CustomerGroup ----------------
             config.NewConfig<CustomerGroupCreateDto, CustomerGroup>()
                   .Ignore(d => d.Id);
-
             config.NewConfig<CustomerGroupUpdateDto, CustomerGroup>()
                   .IgnoreNullValues(true);
 
