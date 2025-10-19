@@ -551,6 +551,7 @@ namespace Business.Services
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             wf.IsLocationValid = dto.IsLocationValid;
+            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
             _uow.Repository.Update(wf);
 
 
