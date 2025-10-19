@@ -171,7 +171,7 @@ namespace Business.Services
                 {
                     RequestNo = request.RequestNo,
                     DeliveryDate = dto.DeliveryDate,
-                    Description = dto.Description,
+                    Description = string.Empty,
                     IsSended = false,
                 };
                 warehouse.CreatedDate = DateTime.Now;

@@ -1,5 +1,6 @@
 ﻿using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Model.Concrete
 {
@@ -33,6 +34,7 @@ namespace Model.Concrete
         /// Bağlı olduğu müşteri kaydının kimliği (Customer.Id).
         /// </summary>
         [Required]
+        [ForeignKey(nameof(CustomerGroupId))]
         public long CustomerGroupId { get; set; }
 
         /// <summary>

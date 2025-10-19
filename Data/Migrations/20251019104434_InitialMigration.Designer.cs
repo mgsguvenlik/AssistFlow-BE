@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    [Migration("20251018191420_RefUsedMaterials")]
-    partial class RefUsedMaterials
+    [Migration("20251019104434_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -177,20 +177,23 @@ namespace Data.Migrations
                     b.Property<long?>("CustomerGroupId")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("CustomerMainGroupName")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("CustomerShortCode")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<long?>("CustomerTypeId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("District")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Email1")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email2")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("InstallationDate")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -896,6 +899,9 @@ namespace Data.Migrations
                     b.Property<long>("CreatedUser")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("EndLocation")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTimeOffset?>("EndTime")
                         .HasColumnType("datetimeoffset");
 
@@ -927,6 +933,9 @@ namespace Data.Migrations
 
                     b.Property<int>("ServicesStatus")
                         .HasColumnType("int");
+
+                    b.Property<string>("StartLocation")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset?>("StartTime")
                         .HasColumnType("datetimeoffset");
@@ -1051,9 +1060,6 @@ namespace Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<long?>("ApproverTechnicianId")
-                        .HasColumnType("bigint");
-
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("datetimeoffset");
 
@@ -1085,8 +1091,6 @@ namespace Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ApproverTechnicianId");
-
                     b.ToTable("Warehouses");
                 });
 
@@ -1097,6 +1101,9 @@ namespace Data.Migrations
                         .HasColumnType("bigint");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApproverTechnicianId")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("datetimeoffset");
@@ -1111,6 +1118,9 @@ namespace Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocationValid")
                         .HasColumnType("bit");
 
                     b.Property<int>("Priority")
@@ -1139,6 +1149,8 @@ namespace Data.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApproverTechnicianId");
 
                     b.HasIndex("RequestNo")
                         .IsUnique();
@@ -1411,22 +1423,19 @@ namespace Data.Migrations
                     b.Navigation("TechnicalService");
                 });
 
-            modelBuilder.Entity("Model.Concrete.WorkFlows.Warehouse", b =>
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlow", b =>
                 {
                     b.HasOne("Model.Concrete.User", "ApproverTechnician")
                         .WithMany()
                         .HasForeignKey("ApproverTechnicianId");
 
-                    b.Navigation("ApproverTechnician");
-                });
-
-            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlow", b =>
-                {
                     b.HasOne("Model.Concrete.WorkFlows.WorkFlowStatus", "Status")
                         .WithMany()
                         .HasForeignKey("StatuId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ApproverTechnician");
 
                     b.Navigation("Status");
                 });
