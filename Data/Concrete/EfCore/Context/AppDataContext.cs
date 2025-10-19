@@ -52,13 +52,10 @@ namespace Data.Concrete.EfCore.Context
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
             {
-                b.HasIndex(x => x.CustomerGroupId);
-                b.HasIndex(x => new { x.CustomerGroupId, x.Email }).IsUnique();
-
                 b.HasOne(x => x.CustomerGroup)
-                 .WithMany()              // eğer Customer tarafında koleksiyon ekleyeceksen .WithMany(c => c.ProgressApprovers)
-                 .HasForeignKey(x => x.CustomerGroupId)
-                 .OnDelete(DeleteBehavior.Cascade);
+                .WithMany(c => c.ProgressApprovers) 
+                .HasForeignKey(x => x.CustomerGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
             });
 
             /// User Entity Configuration
@@ -228,6 +225,8 @@ namespace Data.Concrete.EfCore.Context
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+
+        
         }
     }
 }

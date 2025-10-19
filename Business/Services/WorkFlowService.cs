@@ -103,8 +103,8 @@ namespace Business.Services
                     IsCancelled = false,
                     IsComplated = false,
                     ReconciliationStatus = WorkFlowReconciliationStatus.Pending,
-                    IsLocationValid= dto.IsLocationValid,
-                    ApproverTechnicianId= dto.ApproverTechnicianId
+                    IsLocationValid = dto.IsLocationValid,
+                    ApproverTechnicianId = dto.ApproverTechnicianId
                 };
 
                 await _uow.Repository.AddAsync(wf);
@@ -119,7 +119,7 @@ namespace Business.Services
                 return ResponseModel<ServicesRequestGetDto>.Fail($"Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
-     
+
         //2.1 Depoya Gönderim  (Ürün var ise)
         public async Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
         {
@@ -397,11 +397,38 @@ namespace Business.Services
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
         }
 
-
-
         // 4️ Teknik Servis Servisi Başlatma 
+        public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(TechnicalServiceUpdateDto dto)
+        {
+            // 2️ WorkFlow getir
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (wf is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            var technicalService = await _uow.Repository
+           .GetQueryable<TechnicalService>()
+           .AsNoTracking()
+           .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
+
+            technicalService.Adapt(dto, _config);
+            technicalService.StartTime = DateTime.Now;
+            technicalService.ServicesStatus = TechnicalServiceStatus.Started;
 
 
+            return null;
+        }
+        // 45 Teknik Servis Servisi Tamamlama 
+        public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(TechnicalServiceUpdateDto dto)
+        {
+            return null;
+        }
         //-----------------------------
 
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
@@ -460,9 +487,9 @@ namespace Business.Services
 
             var workflow = await _uow.Repository
                 .GetQueryable<WorkFlow>()
-                .FirstOrDefaultAsync(x=>x.RequestNo==dto.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
-            dto.ApproverTechnicianId = workflow?.ApproverTechnicianId??0;
+            dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
@@ -520,7 +547,7 @@ namespace Business.Services
             // Ana talep bilgilerini güncelle
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
-            wf.IsLocationValid= dto.IsLocationValid;
+            wf.IsLocationValid = dto.IsLocationValid;
             _uow.Repository.Update(wf);
 
 
@@ -635,10 +662,10 @@ namespace Business.Services
             var dto = await query
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
-                .Include(x=>x.UsedMaterials)
-                .Include(x=>x.ServiceRequestFormImages)
-                .Include(x=>x.ServicesImages)
-                .Include(x=>x.ServiceType)
+                .Include(x => x.UsedMaterials)
+                .Include(x => x.ServiceRequestFormImages)
+                .Include(x => x.ServicesImages)
+                .Include(x => x.ServiceType)
                 .ProjectToType<TechnicalServiceGetDto>(_config)
                 .FirstOrDefaultAsync();
             if (dto is null)
