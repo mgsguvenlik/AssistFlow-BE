@@ -11,7 +11,6 @@ namespace Model.Dtos.Customer
         public string? City { get; set; }
         public string? District { get; set; }
         public string? LocationCode { get; set; }
-        public string? OracleCode { get; set; }
         public string? ContactName1 { get; set; }
         public string? Phone1 { get; set; }
         public string? Email1 { get; set; }

@@ -71,5 +71,19 @@ namespace WebAPI.Controllers
         }
 
 
+        [HttpGet("by-role/{roleId:long}")]
+        public async Task<IActionResult> GetUsersByRole(long roleId)
+        {
+            if (roleId <= 0)
+                return BadRequest("Geçersiz rol kimliği.");
+
+            var resp = await _userService.GetUserByRoleAsync(roleId);
+
+            if (resp is null)
+                return StatusCode(StatusCodes.Status500InternalServerError, "Servis yanıtı null döndü.");
+
+            return StatusCode((int)resp.StatusCode, resp);
+        }
+
     }
 }

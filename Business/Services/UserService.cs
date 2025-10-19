@@ -521,5 +521,28 @@ public class UserService
     }
 
 
+    public async Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long roleId)
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Bu role ait kullanıcı bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
+
 
 }

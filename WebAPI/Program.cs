@@ -87,6 +87,9 @@ builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
 builder.Services.AddDataSeeding(
     typeof(TurkeyCitiesSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
+builder.Services.AddDataSeeding(
+    typeof(ConfigSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
 
 
 builder.Services.AddDbContext<AppDataContext>(options =>

@@ -33,9 +33,6 @@ namespace Model.Dtos.Customer
         [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.LocationCodeInvalidChars)]
         public string? LocationCode { get; set; }
 
-        [StringLength(64, ErrorMessage = Messages.OracleCodeMaxLength)]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCodeInvalidChars)]
-        public string? OracleCode { get; set; }
 
         [StringLength(120, ErrorMessage = Messages.FirstPersonNameMaxLength)]
         [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.FirstPersonNameCannotBeWhitespace)]

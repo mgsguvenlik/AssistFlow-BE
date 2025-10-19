@@ -45,11 +45,6 @@ namespace Model.Concrete
         public string? LocationCode { get; set; }
 
         /// <summary>
-        /// Oracle sistemindeki karşılık gelen kod (varsa).
-        /// </summary>
-        public string? OracleCode { get; set; }
-
-        /// <summary>
         /// Birincil iletişim kişisinin adı-soyadı.
         /// </summary>
         public string? ContactName1 { get; set; }
