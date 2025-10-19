@@ -557,6 +557,7 @@ namespace Business.Services
 
 
             dto.Adapt(entity, _config);
+            entity.IsSended = false;
 
             // Mevcut ürünleri çek (RequestNo bazlı)
             var existingProducts = await _uow.Repository
