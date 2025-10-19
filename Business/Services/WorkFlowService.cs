@@ -75,6 +75,7 @@ namespace Business.Services
 
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+                request.IsSended = false;
 
                 if (dto.Products is not null)
                 {
@@ -186,7 +187,7 @@ namespace Business.Services
 
             request.IsSended = true;
             request.SendedStatusId = depoda.Id;
-            request.WorkFlowStatus = null; // opsiyonel, FK resetlenebilir
+            request.WorkFlowStatus = null;
             request.UpdatedDate = DateTime.Now;
             request.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
             _uow.Repository.Update(request);
@@ -397,7 +398,7 @@ namespace Business.Services
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
         }
 
-        // 4️ Teknik Servis Servisi Başlatma 
+        // 4️ Teknik Servis Servisi Başlatma /MZK Devam Edecek...
         public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(TechnicalServiceUpdateDto dto)
         {
             // 2️ WorkFlow getir
@@ -424,7 +425,7 @@ namespace Business.Services
 
             return null;
         }
-        // 45 Teknik Servis Servisi Tamamlama 
+        // 5 Teknik Servis Servisi Tamamlama  /MZK Devam Edecek...
         public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(TechnicalServiceUpdateDto dto)
         {
             return null;
@@ -681,6 +682,7 @@ namespace Business.Services
                .ProjectToType<ServicesRequestProductGetDto>(_config)
                .ToListAsync();
             dto.Products = products; // DTO’da ürün listesi property’si olmalı
+
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
