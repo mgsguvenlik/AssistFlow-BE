@@ -491,6 +491,7 @@ namespace Business.Services
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
+            dto.IsLocationValid = workflow.IsLocationValid;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
@@ -525,6 +526,7 @@ namespace Business.Services
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
+            dto.IsLocationValid = workflow.IsLocationValid;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
