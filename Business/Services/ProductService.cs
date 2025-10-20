@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
+using Castle.Core.Resource;
 using Core.Common;
 using Core.Enums;
 using Mapster;
@@ -19,24 +20,20 @@ namespace Business.Services
     {
         public ProductService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
             : base(uow, mapper, config) { }
-
         protected override long ReadKey(Product e) => e.Id;
         protected override Expression<Func<Product, bool>> KeyPredicate(long id) => x => x.Id == id;
-
         protected override Func<IQueryable<Product>, IIncludableQueryable<Product, object>>? IncludeExpression()
             => q => q.Include(p => p.Brand)
                      .Include(p => p.Model)
                      .Include(p => p.CurrencyType)
+                     .Include(p => p.CustomerProductPrices)
                      .Include(p => p.ProductType);
-
         protected override Task<Product?> ResolveEntityForUpdateAsync(ProductUpdateDto dto)
             => _unitOfWork.Repository.GetSingleAsync<Product>(false, x => x.Id == dto.Id,
                    q => q.Include(p => p.Brand)
                          .Include(p => p.Model)
                          .Include(p => p.CurrencyType)
                          .Include(p => p.ProductType));
-
-
         public async Task<ResponseModel<List<ProductEffectivePriceDto>>> GetProductsByCustomerIdAsync(long customerId)
         {
             // Müşteri + grup + fiyat ilişkileriyle birlikte yükle
@@ -175,9 +172,6 @@ namespace Business.Services
 
             return ResponseModel<ProductEffectivePriceDto>.Success(dto);
         }
-
-
-
         public async Task<ResponseModel<List<ProductEffectivePriceDto>>> GetEffectivePricesAsync(CustomerProductRequestDto dto)
         {
             // 🔍 Müşteriyi fiyat bilgileriyle birlikte getir
@@ -244,6 +238,97 @@ namespace Business.Services
 
             return ResponseModel<List<ProductEffectivePriceDto>>.Success(result);
         }
+        public async Task<ResponseModel<PagedResult<ProductEffectivePriceDto>>> GetEffectivePriceByCustomerAsync(QueryParams q, long? customerId)
+        {
+            // 1️ Önce sayfalı ürün listesini al (ProductGetDto tipinde)
+            var productResponse = await GetPagedAsync(q);
+            if (!productResponse.IsSuccess || productResponse.Data == null)
+                return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Fail("Ürün listesi alınamadı.", StatusCode.BadRequest);
 
+            var products = productResponse.Data.Items.ToList();
+
+            // 2️ Eğer müşteri belirtilmemişse: sadece ürün fiyatlarını döndür
+            if (customerId == null)
+            {
+                var result = products.Select(p => new ProductEffectivePriceDto
+                {
+                    ProductId = p.Id,
+                    ProductCode = p.ProductCode,
+                    Description = p.Description,
+                    BasePrice = p.Price,
+                    BaseCurrency = p.PriceCurrency,
+                    ProductPrice = p.Price ?? 0m,
+                    EffectivePrice = p.Price ?? 0m,
+                    EffectiveCurrency = p.PriceCurrency
+                }).ToList();
+
+                return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
+                     new PagedResult<ProductEffectivePriceDto>(result, productResponse.Data.TotalCount, q.Page, q.PageSize)
+                );
+            }
+
+            // 3️ Müşteri ve ilişkili fiyat bilgilerini getir
+            var customer = await _unitOfWork.Repository.GetSingleAsync<Customer>(
+                asNoTracking: true,
+                whereExpression: x => x.Id == customerId.Value,
+                includeExpression: qx => qx
+                    .Include(x => x.CustomerGroup)
+                        .ThenInclude(g => g.GroupProductPrices)
+                    .Include(x => x.CustomerProductPrices)
+            );
+
+            if (customer is null)
+                return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Fail("Müşteri bulunamadı.", StatusCode.NotFound);
+
+            var customerPrices = customer.CustomerProductPrices;
+            var groupPrices = customer.CustomerGroup?.GroupProductPrices ?? new List<CustomerGroupProductPrice>();
+
+            // 4️ Ürün bazında efektif fiyat hesapla
+            var effectiveList = new List<ProductEffectivePriceDto>();
+
+            foreach (var product in products)
+            {
+                decimal effectivePrice;
+                string? effectiveCurrency;
+
+              
+                var custPrice = customerPrices.FirstOrDefault(cp => cp.ProductId == product.Id);
+                 
+                // Öncelik 1: Grup fiyatı
+                if  (groupPrices.FirstOrDefault(gp => gp.ProductId == product.Id) is { } groupPrice)
+                {
+                    effectivePrice = groupPrice.Price;
+                    effectiveCurrency = groupPrice.CurrencyCode ?? product.PriceCurrency;
+                }
+                // Öncelik 2: Müşteri özel fiyatı
+                else if  (custPrice != null)
+                {
+                    effectivePrice = custPrice.Price;
+                    effectiveCurrency = custPrice.CurrencyCode ?? product.PriceCurrency;
+                }
+                // Öncelik 3️: Ürün genel fiyatı
+                else
+                {
+                    effectivePrice = product.Price ?? 0m;
+                    effectiveCurrency = product.PriceCurrency;
+                }
+
+                effectiveList.Add(new ProductEffectivePriceDto
+                {
+                    ProductId = product.Id,
+                    ProductCode = product.ProductCode,
+                    Description = product.Description,
+                    BasePrice = product.Price,
+                    BaseCurrency = product.PriceCurrency,
+                    ProductPrice = product.Price ?? 0m,
+                    EffectivePrice = effectivePrice,
+                    EffectiveCurrency = effectiveCurrency
+                });
+            }
+
+            return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
+             new PagedResult<ProductEffectivePriceDto>(effectiveList, productResponse.Data.TotalCount, q.Page, q.PageSize));
+
+        }
     }
 }

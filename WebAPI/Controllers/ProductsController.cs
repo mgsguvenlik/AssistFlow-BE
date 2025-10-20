@@ -28,7 +28,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-effective-price")]
-        public async Task<IActionResult> GetEffectivePrice([FromQuery] long customerId,[FromQuery] long productId)
+        public async Task<IActionResult> GetEffectivePrice([FromQuery] long customerId, [FromQuery] long productId)
         {
             if (customerId <= 0 || productId <= 0)
                 return BadRequest(ResponseModel.Fail("customerId ve productId zorunludur.", Core.Enums.StatusCode.BadRequest));
@@ -44,6 +44,13 @@ namespace WebAPI.Controllers
                 return BadRequest(ResponseModel.Fail("customerId ve productIds zorunludur.", Core.Enums.StatusCode.BadRequest));
 
             var result = await _productService.GetEffectivePricesAsync(dto);
+            return ToActionResult(result);
+        }
+
+        [HttpPost("get-effective-prices-bycustomer")]
+        public async Task<IActionResult> GetEffectiveByCustomer([FromQuery] QueryParams q, long? customerId)
+        {
+            var result = await _productService.GetEffectivePriceByCustomerAsync(q, customerId);
             return ToActionResult(result);
         }
 
