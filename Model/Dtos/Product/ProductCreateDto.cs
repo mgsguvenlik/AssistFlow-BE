@@ -4,12 +4,6 @@ using System.Text.RegularExpressions;
 
 namespace Model.Dtos.Product
 {
-    [PriceNeedsCurrency(nameof(Price), nameof(PriceCurrency), nameof(CurrencyTypeId),
-        ErrorMessage = Messages.CurrencyRequiredIfPriceEntered)]
-    [DateOrder(nameof(InstallationDate), nameof(ConnectionDate),
-        ErrorMessage = Messages.ConnectionDateBeforeInstallationDate)]
-    [ModelNeedsBrand(nameof(ModelId), nameof(BrandId),
-        ErrorMessage = Messages.BrandRequiredIfModelSelected)]
     public class ProductCreateDto
     {
         [StringLength(64, ErrorMessage = Messages.ProductCodeMaxLength)]
@@ -42,8 +36,6 @@ namespace Model.Dtos.Product
         [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidCurrency)]
         public long? CurrencyTypeId { get; set; }
 
-        public DateTimeOffset? InstallationDate { get; set; }
-        public DateTimeOffset? ConnectionDate { get; set; }
 
         [StringLength(32, ErrorMessage = Messages.CorporateShortCodeMaxLength)]
         [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.CorporateShortCodeInvalidChars)]
@@ -185,24 +177,4 @@ namespace Model.Dtos.Product
         }
     }
 
-    /// InstallationDate ≤ ConnectionDate (ikisi de varsa)
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class DateOrderAttribute : ValidationAttribute
-    {
-        public string FromProperty { get; }
-        public string ToProperty { get; }
-        public DateOrderAttribute(string fromProperty, string toProperty)
-        { FromProperty = fromProperty; ToProperty = toProperty; }
-
-        protected override ValidationResult? IsValid(object? value, ValidationContext ctx)
-        {
-            if (value is null) return ValidationResult.Success;
-
-            var f = ctx.ObjectType.GetProperty(FromProperty)?.GetValue(value) as DateTimeOffset?;
-            var t = ctx.ObjectType.GetProperty(ToProperty)?.GetValue(value) as DateTimeOffset?;
-            if (f.HasValue && t.HasValue && t.Value < f.Value)
-                return new ValidationResult(ErrorMessage ?? Messages.InvalidDateOrder);
-            return ValidationResult.Success;
-        }
-    }
 }

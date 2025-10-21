@@ -11,11 +11,11 @@ namespace Business.Interfaces
     {
         // ServicesRequest
         Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
-        Task<ResponseModel<ServicesRequestGetDto>> GetRequestByNoAsync(string requestNo);
+        Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByNoAsync(string requestNo);
       
-        Task<ResponseModel<ServicesRequestGetDto>> GetRequestByIdAsync(long id);
+        Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
         Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto);
-        Task<ResponseModel<ServicesRequestGetDto>> UpdateRequestAsync(ServicesRequestUpdateDto dto);
+        Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto);
         Task<ResponseModel> DeleteRequestAsync(long id);
 
         Task<ResponseModel<TechnicalServiceGetDto>> SendTechnicalServiceAsync(SendTechnicalServiceDto dto);

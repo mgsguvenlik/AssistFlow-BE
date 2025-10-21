@@ -36,5 +36,6 @@ namespace Model.Concrete.WorkFlows
         [ForeignKey(nameof(ApproverTechnician))]
         public long? ApproverTechnicianId { get; set; }
         public User? ApproverTechnician { get; set; }
+        public string? ApproverTechnicianName { get; set; }
     }
 }

@@ -77,7 +77,7 @@ namespace WebAPI.Controllers
         [HttpGet("get-servicesrequest-getbyid/{id:long}")]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {
-            var result = await _workFlowService.GetRequestByIdAsync(id);
+            var result = await _workFlowService.GetServiceRequestByIdAsync(id);
             return Ok(result);
         }
 
@@ -92,7 +92,7 @@ namespace WebAPI.Controllers
         [HttpGet("get-servicesrequest-byrequestno")]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
-            var result = await _workFlowService.GetRequestByNoAsync(requestNo);
+            var result = await _workFlowService.GetServiceRequestByNoAsync(requestNo);
             return Ok(result);
         }
 
@@ -102,7 +102,7 @@ namespace WebAPI.Controllers
             if (dto.Id != id)
                 return BadRequest(new ResponseModel(false, "Route id ile body id eşleşmiyor.", Core.Enums.StatusCode.BadRequest));
 
-            var resp = await _workFlowService.UpdateRequestAsync(dto);
+            var resp = await _workFlowService.UpdateServiceRequestAsync(dto);
             return ToActionResult(resp);
         }
 

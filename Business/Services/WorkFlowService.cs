@@ -105,14 +105,15 @@ namespace Business.Services
                     IsComplated = false,
                     ReconciliationStatus = WorkFlowReconciliationStatus.Pending,
                     IsLocationValid = dto.IsLocationValid,
-                    ApproverTechnicianId = dto.ApproverTechnicianId
+                    ApproverTechnicianId = dto.ApproverTechnicianId,
+                    ApproverTechnicianName = dto.ApproverTechnician
                 };
 
                 await _uow.Repository.AddAsync(wf);
                 await _uow.Repository.CompleteAsync();
 
                 // 5) Tekrar oku ve DTO döndür (include’ları uygula)
-                return await GetRequestByIdAsync(request.Id);
+                return await GetServiceRequestByIdAsync(request.Id);
             }
             catch (Exception ex)
             {
@@ -462,7 +463,7 @@ namespace Business.Services
                 .Success(new PagedResult<ServicesRequestGetDto>(items, total, q.Page, q.PageSize));
         }
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> GetRequestByIdAsync(long id)
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
@@ -491,12 +492,13 @@ namespace Business.Services
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
+            dto.ApproverTechnician = workflow?.ApproverTechnicianName;
             dto.IsLocationValid = workflow.IsLocationValid;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> GetRequestByNoAsync(string requestNo)
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByNoAsync(string requestNo)
         {
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
@@ -525,12 +527,13 @@ namespace Business.Services
                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
+            dto.ApproverTechnician = workflow?.ApproverTechnicianName;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             dto.IsLocationValid = workflow.IsLocationValid;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> UpdateRequestAsync(ServicesRequestUpdateDto dto)
+        public async Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto)
         {
             var entity = await _uow.Repository.GetSingleAsync<ServicesRequest>(
                 false,
@@ -552,6 +555,7 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
+            wf.ApproverTechnicianName = dto.ApproverTechnician;
             _uow.Repository.Update(wf);
 
 
@@ -637,7 +641,7 @@ namespace Business.Services
             }
             await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
-            return await GetRequestByIdAsync(entity.Id);
+            return await GetServiceRequestByIdAsync(entity.Id);
         }
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {

@@ -23,7 +23,6 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         public ServicesCostStatus? ServicesCostStatus { get; set; }
         public List<string>? ServiceImageUrls { get; set; }
         public List<string>? FormImageUrls { get; set; }
-        public List<UsedMaterialUpdateDto>? UsedMaterials { get; set; }
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
     }
 }

@@ -45,6 +45,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long? UpdatedUser { get; set; }
         public bool IsDeleted { get; set; }
         public long? ApproverTechnicianId { get; set; }
+        public string? ApproverTechnician { get; set; }
 
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
         public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();

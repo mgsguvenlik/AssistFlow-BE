@@ -42,6 +42,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long? CustomerApproverId { get; set; }
 
         public long? ApproverTechnicianId { get; set; }
+        public string? ApproverTechnician { get; set; }
 
         /// <summary>Zorunlu ilişkiler</summary>
         [Required] public long CustomerId { get; set; }
