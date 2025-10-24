@@ -1,12 +1,17 @@
-﻿using Azure.Core;
+﻿using Autofac.Core;
 using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Settings.Concrete;
+using Core.Utilities.IoC;
 using Mapster;
 using MapsterMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
@@ -15,7 +20,9 @@ using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
+using System.Globalization;
 using System.Security.Cryptography;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Business.Services
 {
@@ -24,13 +31,15 @@ namespace Business.Services
         private readonly IUnitOfWork _uow;
         private readonly IMapper _mapper;
         private readonly IAuthService _authService;
+        private readonly IMailService _mailService;
         private readonly TypeAdapterConfig _config;
-        public WorkFlowService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IAuthService authService)
+        public WorkFlowService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IAuthService authService, IMailService mailService)
         {
             _uow = uow;
             _mapper = mapper;
             _config = config;
             _authService = authService;
+            _mailService = mailService;
         }
 
         // -------------------- ServicesRequest --------------------
@@ -106,7 +115,7 @@ namespace Business.Services
                     ReconciliationStatus = WorkFlowReconciliationStatus.Pending,
                     IsLocationValid = dto.IsLocationValid,
                     ApproverTechnicianId = dto.ApproverTechnicianId,
-                    ApproverTechnicianName = dto.ApproverTechnician
+                    CustomerApproverName = dto.CustomerApproverName
                 };
 
                 await _uow.Repository.AddAsync(wf);
@@ -258,6 +267,7 @@ namespace Business.Services
                 ServicesStatus = TechnicalServiceStatus.Pending,
                 ServicesCostStatus = request.ServicesCostStatus,
             };
+
             _uow.Repository.Add(technicalService);
 
             // 🔹 Warehouse bilgilerini güncelle
@@ -270,7 +280,7 @@ namespace Business.Services
             var statu = await _uow.Repository
                 .GetQueryable<WorkFlowStatus>()
                 .AsNoTracking()
-                .Where(x => x.Code != null && x.Code == "TECNICALSERVICE")
+                .Where(x => x.Code != null && x.Code == "TECHNICALSERVICE")
                 .Select(x => new { x.Id })
                 .FirstOrDefaultAsync();
 
@@ -282,6 +292,9 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
 
+
+
+            #region Ürünler 
             // 🔹 ServicesRequestProduct senkronizasyonu
             var existingProducts = await _uow.Repository
                 .GetMultipleAsync<ServicesRequestProduct>(
@@ -323,6 +336,8 @@ namespace Business.Services
                 };
                 _uow.Repository.Add(newEntity);
             }
+
+            #endregion
 
             // 🔹 Değişiklikleri kaydet
             await _uow.Repository.CompleteAsync();
@@ -400,9 +415,9 @@ namespace Business.Services
         }
 
         // 4️ Teknik Servis Servisi Başlatma /MZK Devam Edecek...
-        public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(TechnicalServiceUpdateDto dto)
+        public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto)
         {
-            // 2️ WorkFlow getir
+            //WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
@@ -411,28 +426,478 @@ namespace Business.Services
             if (wf is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
+            var request = await _uow.Repository
+               .GetQueryable<ServicesRequest>()
+               .Include(x => x.Customer)
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+            var customer = await _uow.Repository
+                .GetQueryable<Customer>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == request.CustomerId);
+
+            if (customer is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili müşteri kaydı bulunamadı.", StatusCode.NotFound);
+
             var technicalService = await _uow.Repository
-           .GetQueryable<TechnicalService>()
-           .AsNoTracking()
-           .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             if (technicalService is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
 
-            technicalService.Adapt(dto, _config);
+            if (technicalService.ServicesStatus == TechnicalServiceStatus.Started)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Teknik servis zaten başlatılmış", StatusCode.Conflict);
+
+
+            var statu = await _uow.Repository
+                .GetQueryable<WorkFlowStatus>()
+                .AsNoTracking()
+                .Where(x => x.Code != null && x.Code == "TECHNICALSERVICE")
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync();
+            if (statu is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("WorkFlowStatus içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
+
+
+            //Lokasyon kontrolü
+            if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
+            {
+                if (string.IsNullOrEmpty(dto.Longitude) && !string.IsNullOrEmpty(dto.Latitude))
+                {
+                    return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.InvalidCustomerLocation);
+                }
+                else
+                {
+                    var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, dto.Latitude, dto.Longitude);
+                    if (!locationResult.IsSuccess)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
+                    }
+                }
+            }
+
+
             technicalService.StartTime = DateTime.Now;
             technicalService.ServicesStatus = TechnicalServiceStatus.Started;
+            technicalService.StartLocation = dto.StartLocation;
+            technicalService.EndLocation = string.Empty;//Henüz servis bitmediği için boş bırakılıyor
+            technicalService.UpdatedDate = DateTime.Now;
+            technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            _uow.Repository.Update(technicalService);
+
+            #region Ürünler Güncellemesi
+            //// 🔹 ServicesRequestProduct senkronizasyonu
+            //var existingProducts = await _uow.Repository
+            //    .GetMultipleAsync<ServicesRequestProduct>(
+            //        asNoTracking: false,
+            //        whereExpression: x => x.RequestNo == dto.RequestNo
+            //    );
+
+            //// Dictionary ile hızlı karşılaştırma
+            //var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+            //// 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+            //foreach (var existing in existingProducts)
+            //{
+            //    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+            //    {
+            //        // Güncelle
+            //        existing.Quantity = delivered.Quantity;
+            //        _uow.Repository.Update(existing);
+
+            //        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+            //        deliveredDict.Remove(existing.ProductId);
+            //    }
+            //    else
+            //    {
+            //        // Tekniks Servis listede yok → Sil
+            //        _uow.Repository.HardDelete(existing);
+            //    }
+            //}
+
+            //// 2️ Yeni ürünleri ekle (TekniksServiste'te olup DB'de olmayanlar)
+            //foreach (var newItem in deliveredDict.Values)
+            //{
+            //    var newEntity = new ServicesRequestProduct
+            //    {
+            //        CustomerId = request.CustomerId,
+            //        RequestNo = request.RequestNo,
+            //        ProductId = newItem.ProductId,
+            //        Quantity = newItem.Quantity,
+            //    };
+            //    _uow.Repository.Add(newEntity);
+            //}
+
+            //wf.StatuId = statu.Id;
+            //wf.UpdatedDate = DateTime.Now;
+            //wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            //_uow.Repository.Update(wf);
+
+            #endregion
+
+            await _uow.Repository.CompleteAsync();
 
 
-            return null;
+            return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
         }
-        // 5 Teknik Servis Servisi Tamamlama  /MZK Devam Edecek...
-        public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(TechnicalServiceUpdateDto dto)
+
+        // 5 Teknik Servis Servisi Tamamlama 
+        public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto)
         {
-            return null;
+
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (wf is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            var request = await _uow.Repository
+               .GetQueryable<ServicesRequest>()
+               .Include(x => x.Customer)
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+            var customer = await _uow.Repository
+                .GetQueryable<Customer>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == request.CustomerId);
+
+            if (customer is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili müşteri kaydı bulunamadı.", StatusCode.NotFound);
+
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
+
+            var statu = await _uow.Repository
+                .GetQueryable<WorkFlowStatus>()
+                .AsNoTracking()
+                .Where(x => x.Code != null && x.Code == "TECHNICALSERVICE")
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync();
+            if (statu is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("WorkFlowStatus içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
+
+
+            //------------------ Lokasyon kontrolü----------------
+            if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
+            {
+                if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
+                {
+                    return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
+                }
+                else
+                {
+                    var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
+                    var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
+                    var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
+                    if (!locationResult.IsSuccess)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
+                    }
+                }
+            }
+
+            technicalService.EndTime = DateTime.Now;
+            technicalService.ServicesStatus = TechnicalServiceStatus.Finished;
+            technicalService.ProblemDescription = dto.ProblemDescription;
+            technicalService.ResolutionAndActions = dto.ResolutionAndActions;
+            technicalService.ServiceTypeId = dto.ServiceTypeId;
+            technicalService.EndLocation = dto.EndLocation;
+            technicalService.ServicesCostStatus = dto.ServicesCostStatus;
+            technicalService.UpdatedDate = DateTime.Now;
+            technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            _uow.Repository.Update(technicalService);
+
+
+            #region Dosya Ekleme/Güncelleme işlemleri
+
+            var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+            var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/') ?? "";
+            var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+            Directory.CreateDirectory(uploadRoot);
+
+            static bool IsAllowed(string fileName, string? contentType)
+            {
+                var ext = Path.GetExtension(fileName).ToLowerInvariant();
+                var okExt = new HashSet<string> { ".jpg", ".jpeg", ".png", ".webp", ".pdf" };
+                if (!okExt.Contains(ext)) return false;
+
+                if (contentType is null) return true;
+                contentType = contentType.ToLowerInvariant();
+                var okCt = new HashSet<string> { "image/jpeg", "image/png", "image/webp", "application/pdf" };
+                return okCt.Contains(contentType);
+            }
+
+            async Task<string?> SaveAsync(IFormFile file, CancellationToken ct)
+            {
+                if (file.Length <= 0) return null;
+                if (!IsAllowed(file.FileName, file.ContentType))
+                    throw new InvalidOperationException($"Desteklenmeyen dosya türü: {file.FileName}");
+
+                var ext = Path.GetExtension(file.FileName);
+                var name = $"{Guid.NewGuid()}{ext}";
+                var path = Path.Combine(uploadRoot, name);
+
+                await using var read = file.OpenReadStream();
+                await using var write = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                                                       bufferSize: 1024 * 64,
+                                                       options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+                await read.CopyToAsync(write, 1024 * 64, CancellationToken.None);
+
+                return string.IsNullOrEmpty(baseUrl) ? $"/uploads/{name}" : $"{baseUrl}/uploads/{name}";
+            }
+
+            var toAddImages = new List<TechnicalServiceImage>();
+            var toAddFormImages = new List<TechnicalServiceFormImage>();
+            var savedFiles = new List<string>(); // olası temizlik için
+
+            try
+            {
+                if (dto.ServiceImages is not null)
+                {
+                    foreach (var f in dto.ServiceImages)
+                    {
+                        var url = await SaveAsync(f, CancellationToken.None);
+                        if (url is null) continue;
+                        toAddImages.Add(new TechnicalServiceImage
+                        {
+                            TechnicalServiceId = technicalService.Id,
+                            Url = url,
+                            Caption = "Servis Fotoğrafları"
+                        });
+                        savedFiles.Add(url);
+                    }
+                }
+
+                if (dto.FormImages is not null)
+                {
+                    foreach (var f in dto.FormImages)
+                    {
+                        var url = await SaveAsync(f, CancellationToken.None);
+                        if (url is null) continue;
+                        toAddFormImages.Add(new TechnicalServiceFormImage
+                        {
+                            TechnicalServiceId = technicalService.Id,
+                            Url = url,
+                            Caption = "Form Resmi"
+                        });
+                        savedFiles.Add(url);
+                    }
+                }
+
+                if (toAddImages.Count > 0) await _uow.Repository.AddRangeAsync(toAddImages);
+                if (toAddFormImages.Count > 0) await _uow.Repository.AddRangeAsync(toAddFormImages);
+            }
+            catch
+            {
+
+                throw;
+            }
+
+            #endregion
+
+            #region Ürünler Güncellemesi
+            // 🔹 ServicesRequestProduct senkronizasyonu
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<ServicesRequestProduct>(
+                    asNoTracking: false,
+                    whereExpression: x => x.RequestNo == dto.RequestNo
+                );
+
+            // Dictionary ile hızlı karşılaştırma
+            var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+            // 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+            foreach (var existing in existingProducts)
+            {
+                if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                {
+                    // Güncelle
+                    existing.Quantity = delivered.Quantity;
+                    _uow.Repository.Update(existing);
+
+                    // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+                    deliveredDict.Remove(existing.ProductId);
+                }
+                else
+                {
+                    // Tekniks Servis listede yok → Sil
+                    _uow.Repository.HardDelete(existing);
+                }
+            }
+
+            // 2️ Yeni ürünleri ekle (TekniksServiste'te olup DB'de olmayanlar)
+            foreach (var newItem in deliveredDict.Values)
+            {
+                var newEntity = new ServicesRequestProduct
+                {
+                    CustomerId = request.CustomerId,
+                    RequestNo = request.RequestNo,
+                    ProductId = newItem.ProductId,
+                    Quantity = newItem.Quantity,
+                };
+                _uow.Repository.Add(newEntity);
+            }
+
+            wf.StatuId = statu.Id;
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(wf);
+
+            #endregion
+
+            await _uow.Repository.CompleteAsync();
+
+
+            return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
         }
+
+
+        //Lokasyon Kontrol  Ezme Maili 
+        public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)
+        {
+            var request = await _uow.Repository
+               .GetQueryable<ServicesRequest>()
+               .Include(x => x.Customer)
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+            var customer = await _uow.Repository
+                .GetQueryable<Customer>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == request.CustomerId);
+
+            if (customer is null)
+                return ResponseModel.Fail("İlgili müşteri kaydı bulunamadı.", StatusCode.NotFound);
+
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService is null)
+                return ResponseModel.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
+
+            // (İdempotent davranış) Zaten kapalıysa gereksiz mail atmayalım
+            if (technicalService.IsLocationCheckRequired == false)
+                return ResponseModel.Fail("Lokasyon kontrolü zaten devre dışı bırakılmış.", StatusCode.Conflict);
+
+            //  Mail içeriğini hazırla
+            var me = (await _authService.MeAsync())?.Data;
+            var techUserId = me?.Id ?? 0;
+            var techUserName = me?.TechnicianName ?? me?.Email ?? "Bilinmiyor";
+
+            string custLat = customer.Latitude ?? "-";
+            string custLon = customer.Longitude ?? "-";
+            string techLat = dto.TechnicianLatitude ?? "-";
+            string techLon = dto.TechnicianLongitude ?? "-";
+
+            string mapsLinkCustomer = (custLat != "-" && custLon != "-")
+                ? $"https://www.google.com/maps?q={custLat},{custLon}"
+                : "#";
+
+            string mapsLinkTechnician = (techLat != "-" && techLon != "-")
+                ? $"https://www.google.com/maps?q={techLat},{techLon}"
+                : "#";
+
+            // İsteğe bağlı: mesafeyi hesaplayıp maile eklemek istersen, elindeki helper'ı kullan:
+            double? distanceKm = null;
+            if (double.TryParse(techLat, out var tlat) && double.TryParse(techLon, out var tlon) &&
+                double.TryParse(custLat, out var clat) && double.TryParse(custLon, out var clon))
+            {
+                distanceKm = GetDistanceInKm(tlat, tlon, clat, clon); // mevcut helper
+            }
+
+            var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+            var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/');
+            var subject = $"[Lokasyon Onayı] RequestNo: {dto.RequestNo} – {request.Customer?.ContactName1}";
+            var distanceInfo = distanceKm.HasValue ? $"{Math.Round(distanceKm.Value, 2)} km" : "Hesaplanamadı";
+            // Link parçaları (önce hazırla)
+            var customerLink = mapsLinkCustomer != "#"
+                ? $"<a href=\"{mapsLinkCustomer}\">Google Maps</a>"
+                : string.Empty;
+
+            var technicianLink = mapsLinkTechnician != "#"
+                ? $"<a href=\"{mapsLinkTechnician}\">Google Maps</a>"
+                : string.Empty;
+
+            var viewLink = baseUrl is not null
+                ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">Kaydı görüntüle</a></p>"
+                : string.Empty;
+
+            // Ana HTML (tek bir $@ ile)
+            var html = $@"
+                    <div style=""font-family:Arial,sans-serif;font-size:14px"">
+                        <h3>Teknik Servis Lokasyon Kontrol Aşımı Bilgisi</h3>
+                        <p><b>Request No:</b> {dto.RequestNo}</p>
+                        <p><b>Müşteri:</b> {(request.Customer?.ContactName1 ?? "-")} (Id: {request.CustomerId})</p>
+                        <p><b>Teknisyen:</b> {techUserName} (Id: {techUserId})</p>
+                        <hr/>
+                        <p><b>Müşteri Konumu:</b> {custLat}, {custLon} {customerLink}</p>
+                        <p><b>Teknisyen Konumu:</b> {techLat}, {techLon} {technicianLink}</p>
+                        <p><b>Kuş Uçuşu Mesafe:</b> {distanceInfo}</p>
+                        {(string.IsNullOrWhiteSpace(dto.Reason) ? "" : $"<p><b>Açıklama:</b> {System.Net.WebUtility.HtmlEncode(dto.Reason)}</p>")}
+                        <hr/>
+                        <p>Bilgi: Bu talep ile teknik servis için lokasyon kontrolü devre dışı bırakılmıştır (<b>IsLocationCheckRequired = false</b>).</p>
+                        {viewLink}
+                    </div>";
+
+            // Mail alıcıları (tercihen Config/DB'den)
+            var managerMails = new List<string>();
+            var managerMailConfig = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Name == "TechnicalServiceManagerEmails");
+
+            if (managerMailConfig is not null && !string.IsNullOrWhiteSpace(managerMailConfig.Value))
+            {
+                managerMails = managerMailConfig.Value
+                    .Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            if (managerMails.Count == 0)
+                return ResponseModel.Fail("Yönetici e-posta adresi tanımlı değil.", StatusCode.BadRequest);
+
+            //MZK : Mail gönderimi responsu işlenecek
+            //var result = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
+            //if (result.IsSuccess)
+            //{
+            //    technicalService.IsLocationCheckRequired = false;
+            //    technicalService.UpdatedDate = DateTime.Now;
+            //    technicalService.UpdatedUser = techUserId;
+            //    _uow.Repository.Update(technicalService);
+            //}
+
+            _ = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
+            technicalService.IsLocationCheckRequired = false;
+            technicalService.UpdatedDate = DateTime.Now;
+            technicalService.UpdatedUser = techUserId;
+            _uow.Repository.Update(technicalService);
+            await _uow.Repository.CompleteAsync();
+
+            // Son durumu döndür
+            return ResponseModel.Success("Lokasyon kontrolü devre dışı bırakma talebi iletildi ve ilgili yöneticilere e-posta gönderildi.");
+        }
+
         //-----------------------------
 
+        // -------------------- Services Request --------------------
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
             => q => q
                 .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
@@ -492,9 +957,10 @@ namespace Business.Services
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
-            dto.ApproverTechnician = workflow?.ApproverTechnicianName;
+            dto.CustomerApproverName = workflow?.CustomerApproverName;
             dto.IsLocationValid = workflow.IsLocationValid;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
+            dto.CustomerApproverName = string.IsNullOrEmpty(dto.CustomerApproverName) ? workflow.CustomerApproverName : dto.CustomerApproverName;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
@@ -527,9 +993,10 @@ namespace Business.Services
                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
-            dto.ApproverTechnician = workflow?.ApproverTechnicianName;
+            dto.CustomerApproverName = workflow?.CustomerApproverName;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             dto.IsLocationValid = workflow.IsLocationValid;
+            dto.CustomerApproverName = string.IsNullOrEmpty(dto.CustomerApproverName) ? workflow.CustomerApproverName : dto.CustomerApproverName;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
@@ -555,9 +1022,8 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
-            wf.ApproverTechnicianName = dto.ApproverTechnician;
+            wf.CustomerApproverName = dto.ApproverTechnician;
             _uow.Repository.Update(wf);
-
 
 
             dto.Adapt(entity, _config);
@@ -665,35 +1131,6 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
-        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
-        {
-            var query = _uow.Repository.GetQueryable<TechnicalService>();
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .Include(x => x.UsedMaterials)
-                .Include(x => x.ServiceRequestFormImages)
-                .Include(x => x.ServicesImages)
-                .Include(x => x.ServiceType)
-                .ProjectToType<TechnicalServiceGetDto>(_config)
-                .FirstOrDefaultAsync();
-            if (dto is null)
-                return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            var products = await _uow.Repository
-               .GetQueryable<ServicesRequestProduct>()
-               .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-               .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-               .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
-               .AsNoTracking()
-               .Where(p => p.RequestNo == dto.RequestNo)
-               .ProjectToType<ServicesRequestProductGetDto>(_config)
-               .ToListAsync();
-            dto.Products = products; // DTO’da ürün listesi property’si olmalı
-
-            return ResponseModel<TechnicalServiceGetDto>.Success(dto);
-        }
-
         // -------------------- Warehouse --------------------
         public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
         {
@@ -744,6 +1181,37 @@ namespace Business.Services
             dto.WarehouseProducts = products; // DTO’da ürün listesi property’si olmalı
             return ResponseModel<WarehouseGetDto>.Success(dto);
 
+        }
+
+
+        // -------------------- Teknical Services --------------------
+        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<TechnicalService>();
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .Include(x => x.UsedMaterials)
+                .Include(x => x.ServiceRequestFormImages)
+                .Include(x => x.ServicesImages)
+                .Include(x => x.ServiceType)
+                .ProjectToType<TechnicalServiceGetDto>(_config)
+                .FirstOrDefaultAsync();
+            if (dto is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var products = await _uow.Repository
+               .GetQueryable<ServicesRequestProduct>()
+               .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+               .AsNoTracking()
+               .Where(p => p.RequestNo == dto.RequestNo)
+               .ProjectToType<ServicesRequestProductGetDto>(_config)
+               .ToListAsync();
+            dto.Products = products; // DTO’da ürün listesi property’si olmalı
+
+            return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
 
@@ -893,6 +1361,7 @@ namespace Business.Services
             return await GetWorkFlowByIdAsync(entity.Id);
         }
 
+
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)
@@ -914,5 +1383,52 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
+
+
+        //-------------Private-------------
+        private async Task<ResponseModel> IsTechnicianInValidLocation(string lat1, string lon1, string lat2, string lon2)
+        {
+            var data = await _uow.Repository.GetSingleAsync<Configuration>(false, x => x.Name == "TechnicianCustomerMinDistanceKm");
+            if (data is null)
+                return ResponseModel.Fail("Konum kontrolü için gerekli 'TechnicianCustomerMinDistanceKm' tanımı bulunamadı.", StatusCode.NotFound);
+
+            double minDistanceKm = double.Parse(data.Value ?? "0");
+            double latitude1 = double.Parse(lat1, CultureInfo.InvariantCulture);
+            double longitude1 = double.Parse(lon1, CultureInfo.InvariantCulture);
+            double latitude2 = double.Parse(lat2, CultureInfo.InvariantCulture);
+            double longitude2 = double.Parse(lon2, CultureInfo.InvariantCulture);
+            double distance = GetDistanceInKm(latitude1, longitude1, latitude2, longitude2);
+            // 🔹 Virgülden sonra 2 basamak formatla
+            string distanceFormatted = distance.ToString("F2", CultureInfo.InvariantCulture);
+            string minDistanceFormatted = minDistanceKm.ToString("F2", CultureInfo.InvariantCulture);
+            if (distance > minDistanceKm)
+                return ResponseModel.Fail(
+                    $"Mevcut konumunuz müşteri konumuna {distanceFormatted} km uzaklıkta, izin verilen maksimum mesafe {minDistanceFormatted} km.",
+                    StatusCode.DistanceNotSatisfied
+                );
+
+            return ResponseModel.Success();
+
+        }
+        private static double GetDistanceInKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371; // Dünya yarıçapı (km)
+            double latRad1 = ToRadians(lat1);
+            double lonRad1 = ToRadians(lon1);
+            double latRad2 = ToRadians(lat2);
+            double lonRad2 = ToRadians(lon2);
+
+            double deltaLat = latRad2 - latRad1;
+            double deltaLon = lonRad2 - lonRad1;
+
+            double a = Math.Sin(deltaLat / 2) * Math.Sin(deltaLat / 2) +
+                       Math.Cos(latRad1) * Math.Cos(latRad2) *
+                       Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
+
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            return R * c; // km cinsinden döner
+        }
+        private static double ToRadians(double deg) => deg * (Math.PI / 180);
     }
 }

@@ -367,10 +367,19 @@ namespace Business.Mapper
             // ================================
             // TECHNICAL SERVICE
             // ================================
+            // Entity -> DTO
             config.NewConfig<TechnicalService, TechnicalServiceGetDto>()
-                .Map(dest => dest.ServicesImages, src => src.ServicesImages)
-                .Map(dest => dest.ServiceRequestFormImages, src => src.ServiceRequestFormImages)
-                .Map(dest => dest.UsedMaterials, src => src.UsedMaterials);
+                .Map(d => d.ServicesImages, s => s.ServicesImages)
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages)
+                .Map(d => d.UsedMaterials, s => s.UsedMaterials);
+
+            // DTO -> Entity (tersi)
+            config.NewConfig<TechnicalServiceGetDto, TechnicalService>()
+                .Map(d => d.ServicesImages, s => s.ServicesImages)
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages)
+                .Map(d => d.UsedMaterials, s => s.UsedMaterials);
+
+
 
             config.NewConfig<TechnicalServiceCreateDto, TechnicalService>()
                 .Ignore(dest => dest.Id)

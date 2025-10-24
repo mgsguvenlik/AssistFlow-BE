@@ -10,6 +10,9 @@
         Conflict = 409,
         ValidationError = 422,
         Error = 500,
-        Unauthorized = 403
+        Unauthorized = 403,
+        // Özel hata kodları (460–499 arası kullanışlıdır)
+        InvalidCustomerLocation = 460,  //Müşteri konumu geçersiz
+        DistanceNotSatisfied = 461,// Belirtilen mesafe şartı sağlanmadı
     }
 }

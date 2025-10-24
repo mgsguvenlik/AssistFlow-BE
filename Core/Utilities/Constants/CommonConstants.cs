@@ -17,6 +17,7 @@
         public const string MailUser = "MailUser";
         public const string MailPassword = "MailPassword";
         public const string MailFrom = "MailFrom";
+        public const string MailFromName = "MailFromName";
         public const string TurkishCharacters = "MailFrom";
         public const string AsciiEquivalents = "MailFrom";
         public static readonly string[] TrChars = { "Ç", "ç", "Ğ", "ğ", "ı", "İ", "Ö", "ö", "Ş", "ş", "Ü", "ü" };

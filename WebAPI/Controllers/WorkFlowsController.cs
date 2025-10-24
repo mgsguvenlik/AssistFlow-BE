@@ -1,5 +1,4 @@
-﻿using Autofac.Core;
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
@@ -41,7 +40,7 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpPost("get-warehouse-getbyid")]
+        [HttpPost("get-warehouse-byid")]
         public async Task<IActionResult> GetWarehouseById([FromBody] long id)
         {
             var result = await _workFlowService.GetWarehouseByIdAsync(id);
@@ -74,7 +73,7 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpGet("get-servicesrequest-getbyid/{id:long}")]
+        [HttpGet("get-servicesrequest-byid/{id:long}")]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {
             var result = await _workFlowService.GetServiceRequestByIdAsync(id);
@@ -106,7 +105,7 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-        [HttpGet("technicalservice-by-requestno")]
+        [HttpGet("get-technicalservice-by-requestno")]
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
@@ -117,6 +116,31 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] SendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
+            return Ok(result);
+        }
+
+
+        [HttpPost("start-technical-service")]   
+        public async Task<IActionResult> StartTechnicalServiceAsync([FromBody] StartTechnicalServiceDto dto)
+        {
+            var result = await _workFlowService.StartService(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("finish-technical-service")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(200_000_000)] // 200 MB örnek
+        [RequestFormLimits(MultipartBodyLengthLimit = 200_000_000, ValueCountLimit = 2048)]
+        public async Task<IActionResult> FinishTechnicalServiceAsync([FromForm] FinishTechnicalServiceDto dto)
+        {
+            var result = await _workFlowService.FinishService(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("location-override")]
+        public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] OverrideLocationCheckDto dto)
+        {
+            var result = await _workFlowService.RequestLocationOverrideAsync(dto);
             return Ok(result);
         }
 

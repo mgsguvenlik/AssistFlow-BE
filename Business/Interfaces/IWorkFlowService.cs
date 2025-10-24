@@ -17,8 +17,11 @@ namespace Business.Interfaces
         Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto);
         Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto);
         Task<ResponseModel> DeleteRequestAsync(long id);
-
         Task<ResponseModel<TechnicalServiceGetDto>> SendTechnicalServiceAsync(SendTechnicalServiceDto dto);
+        Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto);
+        Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto);
+
+        Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto);
 
         // ServicesRequest - ürün yönetimi
 

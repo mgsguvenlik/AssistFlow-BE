@@ -6,82 +6,185 @@ using Core.Utilities.Constants;
 using Model.Concrete;
 using System.Net;
 using System.Net.Mail;
+using System.Globalization;
 
 namespace Business.Services
 {
     public class MailService : IMailService
     {
         private readonly IUnitOfWork _uow;
-        public MailService(IUnitOfWork uow)
+        private MailConfig _cfg;
+
+        private sealed class MailConfig
         {
-            _uow = uow;
+            public string Server { get; init; } = "";
+            public int Port { get; init; } = 25;
+            public bool UseSsl { get; init; }
+            public string User { get; init; } = "";
+            public string Pass { get; init; } = "";
+            public string From { get; init; } = "";
+            public string FromName { get; init; } = "";
         }
 
-        public async Task<ResponseModel<bool>> SendResetPassMailAsync(string bodyMesage, string to)
+        public MailService(IUnitOfWork uow)
         {
-            ///MZK Not: Burası düzenlenecek
+            _uow = uow ?? throw new ArgumentNullException(nameof(uow));
+            _cfg = LoadConfig(); // ⬅️ uygulama ayağa kalkarken tek sefer yükle
+        }
+
+        /// <summary>
+        /// İstersen dışarıdan manuel çağırıp yeniden yükleyebilirsin (örn. panelden ayar değişti).
+        /// </summary>
+        public void ReloadConfig()
+        {
+            _cfg = LoadConfig();
+        }
+
+        private MailConfig LoadConfig()
+        {
             try
             {
-                var configuration = await _uow.Repository.GetMultipleAsync<Configuration>(true);
-                string mailserver = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailServer)?.Value ?? "";
-                string mailserverportValue = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailServerPort)?.Value ?? "";
-                int mailserverport = !string.IsNullOrEmpty(mailserverportValue) ? int.Parse(mailserverportValue) : 0;
-                bool useSSL = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailUseSSL)?.Value?.ToLower() == "1";
-                string user = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailUser)?.Value ?? "";
-                string pass = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailPassword)?.Value ?? "";
-                string from = configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFrom)?.Value ?? "";
-                string subject = Messages.CityNotFound;
+                // ctor’da await edemeyeceğimiz için sync bekleme
+                var configuration = _uow.Repository
+                    .GetMultipleAsync<Configuration>(true)
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
 
-                SendMail(from, to, "", subject, bodyMesage, true, mailserver, mailserverport, useSSL, true, user, pass, "", Messages.MGSHelpDesk);
-                return new ResponseModel<bool>(true, true, Messages.MailSentSuccessfully, StatusCode.Ok);
+                string Get(string name, string @default = "") =>
+                    configuration.FirstOrDefault(x => x.Name == name)?.Value ?? @default;
+
+                var portStr = Get(CommonConstants.MailServerPort, "25");
+                var useSslStr = Get(CommonConstants.MailUseSSL, "0");
+
+                return new MailConfig
+                {
+                    Server = Get(CommonConstants.MailServer),
+                    Port = int.TryParse(portStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var p) ? p : 25,
+                    UseSsl = useSslStr.Trim() is "1" or "true" or "True",
+                    User = Get(CommonConstants.MailUser),
+                    Pass = Get(CommonConstants.MailPassword),
+                    From = Get(CommonConstants.MailFrom),
+                    FromName = Get(CommonConstants.MailFromName, Messages.MGSHelpDesk)
+                };
             }
             catch (Exception ex)
             {
-                return new ResponseModel<bool>(false, false, $"{Messages.MailSendFailed} {ex.Message}", StatusCode.Ok);
+                // Fail fast: yanlış mail konfigürasyonu varsa servis başında patlasın
+                throw new InvalidOperationException("Mail konfigürasyonu yüklenemedi.", ex);
             }
         }
 
-        public static void SendMail(string from, string tos, string ccs, string subject,
+        public Task<ResponseModel<bool>> SendLocationOverrideMailAsync(List<string> managers, string subject, string html)
+        {
+            try
+            {
+                if (managers is null || managers.Count == 0)
+                    return Task.FromResult(new ResponseModel<bool>(false, false, "Alıcı bulunamadı.", StatusCode.BadRequest));
+
+                var tos = string.Join(";", managers);
+
+                SendMail(
+                    from: _cfg.From,
+                    tos: tos,
+                    ccs: "",
+                    subject: subject,
+                    body: html,
+                    isHtml: true,
+                    mailServer: _cfg.Server,
+                    mailServerPort: _cfg.Port,
+                    useSsl: _cfg.UseSsl,
+                    useCredential: true,
+                    user: _cfg.User,
+                    pass: _cfg.Pass,
+                    domain: "",
+                    fromName: _cfg.FromName
+                );
+
+                return Task.FromResult(new ResponseModel<bool>(true, true, Messages.MailSentSuccessfully, StatusCode.Ok));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(new ResponseModel<bool>(false, false, $"{Messages.MailSendFailed} {ex.Message}", StatusCode.Ok));
+            }
+        }
+
+        public Task<ResponseModel<bool>> SendResetPassMailAsync(string bodyMesage, string to)
+        {
+            try
+            {
+                string subject = "MGS - Şifre Değiştirme";
+
+                SendMail(
+                    from: _cfg.From,
+                    tos: to,
+                    ccs: "",
+                    subject: subject,
+                    body: bodyMesage,
+                    isHtml: true,
+                    mailServer: _cfg.Server,
+                    mailServerPort: _cfg.Port,
+                    useSsl: _cfg.UseSsl,
+                    useCredential: true,
+                    user: _cfg.User,
+                    pass: _cfg.Pass,
+                    domain: "",
+                    fromName: _cfg.FromName
+                );
+
+                return Task.FromResult(new ResponseModel<bool>(true, true, Messages.MailSentSuccessfully, StatusCode.Ok));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(new ResponseModel<bool>(false, false, $"{Messages.MailSendFailed} {ex.Message}", StatusCode.Ok));
+            }
+        }
+
+        public static void SendMail(
+            string from, string tos, string ccs, string subject,
             string body, bool isHtml, string mailServer, int mailServerPort, bool useSsl,
             bool useCredential, string user, string pass, string domain, string fromName, string attachment = "")
         {
             try
             {
-                string[] tosArray = tos.ToString().Replace(",", ";").Split(';');
-                string[] ccsArray = ccs.ToString().Replace(",", ";").Split(';');
-                MailMessage mail = new MailMessage();
-                mail.From = new MailAddress(from, fromName);
-                try { foreach (string address in tosArray) { try { mail.To.Add(new MailAddress(address)); } catch { } } }
-                catch { }
-                if (ccs != null) try { foreach (string address in ccsArray) { try { mail.CC.Add(new MailAddress(address)); } catch { } } }
-                    catch { }
-                mail.Subject = subject;
-                mail.IsBodyHtml = isHtml;
-                mail.Body = body;
-                SmtpClient smtp = new SmtpClient(mailServer, mailServerPort);
-                smtp.EnableSsl = useSsl;
+                var tosArray = (tos ?? string.Empty).Replace(",", ";").Split(';', StringSplitOptions.RemoveEmptyEntries);
+                var ccsArray = (ccs ?? string.Empty).Replace(",", ";").Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+                using var mail = new MailMessage
+                {
+                    From = new MailAddress(from, fromName),
+                    Subject = subject,
+                    IsBodyHtml = isHtml,
+                    Body = body
+                };
+
+                foreach (var a in tosArray) { try { mail.To.Add(new MailAddress(a.Trim())); } catch { } }
+                foreach (var a in ccsArray) { try { mail.CC.Add(new MailAddress(a.Trim())); } catch { } }
+
+                if (!string.IsNullOrWhiteSpace(attachment))
+                    mail.Attachments.Add(new Attachment(attachment));
+
+                using var smtp = new SmtpClient(mailServer, mailServerPort)
+                {
+                    EnableSsl = useSsl
+                };
+
                 if (useCredential)
                 {
-                    if (domain == "") smtp.Credentials = new System.Net.NetworkCredential(user, pass);
-                    else smtp.Credentials = new System.Net.NetworkCredential(user, pass, domain);
-                }
-                if (attachment != "")
-                {
-                    Attachment mailAttachment;
-                    mailAttachment = new Attachment(("" + attachment));
-                    mail.Attachments.Add(mailAttachment);
+                    smtp.Credentials = string.IsNullOrWhiteSpace(domain)
+                        ? new NetworkCredential(user, pass)
+                        : new NetworkCredential(user, pass, domain);
                 }
 
-                // Geçici çözüm: Sertifika doğrulamasını atla (sadece test için!)
-                ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, sslPolicyErrors) => true;
+                // TEST ortamı: sertifika doğrulamasını atla (PROD’da kaldırın)
+                //ServicePointManager.ServerCertificateValidationCallback = (s, cert, chain, sslPolicyErrors) => true;
+
                 smtp.Send(mail);
             }
-            catch (Exception ex)
+            catch
             {
                 throw;
             }
         }
-
-
     }
 }

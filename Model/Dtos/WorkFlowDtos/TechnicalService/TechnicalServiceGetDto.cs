@@ -18,6 +18,7 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
 
         public string? ProblemDescription { get; set; }
         public string? ResolutionAndActions { get; set; }
+        public bool IsLocationCheckRequired { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public string? StartLocation { get; set; }//Örn: "41.01224, 28.976018"

@@ -34,6 +34,7 @@
 
   <ItemGroup>
     <Folder Include="Logs\" />
+    <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
 </Project>

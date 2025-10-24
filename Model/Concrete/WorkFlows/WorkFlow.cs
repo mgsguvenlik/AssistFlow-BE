@@ -28,6 +28,7 @@ namespace Model.Concrete.WorkFlows
         public bool IsCancelled { get; set; } = false;// iptal edildi mi?
         public bool IsComplated { get; set; } = false; // diyagramdaki yazımı korudum
         public bool IsLocationValid { get; set; } = true;
+        public string? CustomerApproverName { get; set; }
 
         // Mutabakat durumu
         public WorkFlowReconciliationStatus ReconciliationStatus { get; set; } = WorkFlowReconciliationStatus.Pending;
@@ -36,6 +37,5 @@ namespace Model.Concrete.WorkFlows
         [ForeignKey(nameof(ApproverTechnician))]
         public long? ApproverTechnicianId { get; set; }
         public User? ApproverTechnician { get; set; }
-        public string? ApproverTechnicianName { get; set; }
-    }
+    } 
 }

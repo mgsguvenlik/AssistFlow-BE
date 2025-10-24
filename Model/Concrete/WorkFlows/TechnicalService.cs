@@ -23,10 +23,12 @@ namespace Model.Concrete.WorkFlows
         // Teknik alanlar
         public string? ProblemDescription { get; set; } //Problem Tanımı
         public string? ResolutionAndActions { get; set; }//Alınan Aksiyonlar ve Çözüm
-        public string? Latitude { get; set; }
-        public string? Longitude { get; set; }
+        public string? Latitude { get; set; } //Gidilen müşteri enlem Lokasyonu
+        public string? Longitude { get; set; }//Gidilen müşteri boylam Lokasyonu
         public string? StartLocation { get; set; }//Örn: "41.01224, 28.976018"
         public string? EndLocation { get; set; }//Örn: "41.01224, 28.976018"
+        public bool IsLocationCheckRequired { get; set; } = true;//Lokasyon kontrolü gerekli mi?
+
 
         // Durumlar
         public TechnicalServiceStatus ServicesStatus { get; set; } = TechnicalServiceStatus.Pending;
