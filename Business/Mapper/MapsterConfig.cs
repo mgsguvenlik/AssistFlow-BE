@@ -252,12 +252,12 @@ namespace Business.Mapper
             //-------------  WorkFlow  ----------------
             config.NewConfig<WorkFlowCreateDto, WorkFlow>()
             .Ignore(d => d.Id)
-            .Map(d => d.CreatedDate, _ => DateTimeOffset.UtcNow)
+            .Map(d => d.CreatedDate, _ => DateTime.Now)
             .Ignore(d => d.Status); // FK set edilecek
 
             config.NewConfig<WorkFlowUpdateDto, WorkFlow>()
                   .IgnoreNullValues(true)
-                  .Map(d => d.UpdatedDate, _ => DateTimeOffset.UtcNow);
+                  .Map(d => d.UpdatedDate, _ => DateTime.Now);
 
             config.NewConfig<WorkFlow, WorkFlowGetDto>();
 

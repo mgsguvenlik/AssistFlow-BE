@@ -1022,7 +1022,7 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
-            wf.CustomerApproverName = dto.ApproverTechnician;
+            wf.CustomerApproverName = dto.CustomerApproverName;
             _uow.Repository.Update(wf);
 
 
@@ -1107,7 +1107,7 @@ namespace Business.Services
             }
             await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
-            return await GetServiceRequestByIdAsync(entity.Id);
+            return await GetServiceRequestByNoAsync(entity.RequestNo);
         }
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
