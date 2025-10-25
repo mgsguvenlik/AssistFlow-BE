@@ -1,7 +1,7 @@
 ﻿using Core.Enums;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
-using Model.Dtos.WorkFlowDtos.UsedMaterial;
+
 
 namespace Model.Dtos.WorkFlowDtos.TechnicalService
 {
@@ -29,7 +29,6 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
 
         public List<TechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
         public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
-        public List<UsedMaterialGetDto> UsedMaterials { get; set; } = new();
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
 
     }

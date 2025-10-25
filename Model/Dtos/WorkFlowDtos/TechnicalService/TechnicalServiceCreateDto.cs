@@ -1,5 +1,4 @@
 ﻿using Core.Enums;
-using Model.Dtos.WorkFlowDtos.UsedMaterial;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.WorkFlowDtos.TechnicalService
@@ -21,6 +20,5 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         public ServicesCostStatus ServicesCostStatus { get; set; }
         public List<string>? ServiceImageUrls { get; set; }
         public List<string>? FormImageUrls { get; set; }
-        public List<UsedMaterialCreateDto>? UsedMaterials { get; set; }
     }
 }

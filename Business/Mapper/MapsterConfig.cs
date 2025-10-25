@@ -24,7 +24,6 @@ using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
-using Model.Dtos.WorkFlowDtos.UsedMaterial;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
@@ -370,27 +369,23 @@ namespace Business.Mapper
             // Entity -> DTO
             config.NewConfig<TechnicalService, TechnicalServiceGetDto>()
                 .Map(d => d.ServicesImages, s => s.ServicesImages)
-                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages)
-                .Map(d => d.UsedMaterials, s => s.UsedMaterials);
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages);
 
             // DTO -> Entity (tersi)
             config.NewConfig<TechnicalServiceGetDto, TechnicalService>()
                 .Map(d => d.ServicesImages, s => s.ServicesImages)
-                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages)
-                .Map(d => d.UsedMaterials, s => s.UsedMaterials);
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages);
 
 
 
             config.NewConfig<TechnicalServiceCreateDto, TechnicalService>()
                 .Ignore(dest => dest.Id)
                 .Ignore(dest => dest.ServicesImages)
-                .Ignore(dest => dest.ServiceRequestFormImages)
-                .Ignore(dest => dest.UsedMaterials);
+                .Ignore(dest => dest.ServiceRequestFormImages);
 
             config.NewConfig<TechnicalServiceUpdateDto, TechnicalService>()
                 .Ignore(dest => dest.ServicesImages)
-                .Ignore(dest => dest.ServiceRequestFormImages)
-                .Ignore(dest => dest.UsedMaterials);
+                .Ignore(dest => dest.ServiceRequestFormImages);
 
             // ================================
             // TECHNICAL SERVICE IMAGE
@@ -402,13 +397,6 @@ namespace Business.Mapper
             // ================================
             config.NewConfig<TechnicalServiceFormImage, TechnicalServiceFormImageGetDto>();
 
-            // ================================
-            // USED MATERIAL
-            // ================================
-            config.NewConfig<UsedMaterial, UsedMaterialGetDto>();
-            config.NewConfig<UsedMaterialCreateDto, UsedMaterial>()
-                .Ignore(dest => dest.Id)
-                .Map(dest => dest.CreatedDate, _ => DateTimeOffset.Now);
         }
     }
 }

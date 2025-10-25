@@ -1191,7 +1191,6 @@ namespace Business.Services
             var dto = await query
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
-                .Include(x => x.UsedMaterials)
                 .Include(x => x.ServiceRequestFormImages)
                 .Include(x => x.ServicesImages)
                 .Include(x => x.ServiceType)

@@ -38,7 +38,6 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<TechnicalService> TechnicalServices { get; set; }
         public DbSet<TechnicalServiceImage> TechnicalServiceImages { get; set; }
         public DbSet<TechnicalServiceFormImage> TechnicalServiceFormImages { get; set; }
-        public DbSet<UsedMaterial> UsedMaterials { get; set; }
 
 
         /// <summary>
