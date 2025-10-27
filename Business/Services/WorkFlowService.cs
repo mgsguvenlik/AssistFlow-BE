@@ -961,6 +961,7 @@ namespace Business.Services
             dto.IsLocationValid = workflow.IsLocationValid;
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             dto.CustomerApproverName = string.IsNullOrEmpty(dto.CustomerApproverName) ? workflow.CustomerApproverName : dto.CustomerApproverName;
+            dto.Priority = workflow.Priority;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
@@ -997,6 +998,7 @@ namespace Business.Services
             dto.ServicesRequestProducts = products; // DTO’da ürün listesi property’si olmalı
             dto.IsLocationValid = workflow.IsLocationValid;
             dto.CustomerApproverName = string.IsNullOrEmpty(dto.CustomerApproverName) ? workflow.CustomerApproverName : dto.CustomerApproverName;
+            dto.Priority = workflow.Priority;
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
 
@@ -1155,7 +1157,6 @@ namespace Business.Services
                  .ProjectToType<ServicesRequestProductGetDto>(_config)
                  .ToListAsync();
             dto.WarehouseProducts = products; // DTO’da ürün listesi property’si olmalı
-
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
         public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
@@ -1182,7 +1183,6 @@ namespace Business.Services
             return ResponseModel<WarehouseGetDto>.Success(dto);
 
         }
-
 
         // -------------------- Teknical Services --------------------
         public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
@@ -1212,7 +1212,6 @@ namespace Business.Services
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
-
 
         // -------------------- WorkFlowStatus --------------------
         public async Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q)

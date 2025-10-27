@@ -512,11 +512,10 @@ public class UserService
     /// </summary>
     private static string? ValidatePasswordStrength(string password)
     {
-        if (password.Length < 8) return "Şifre en az 8 karakter olmalıdır.";
+        if (password.Length < 6) return "Şifre en az 6 karakter olmalıdır.";
         if (!password.Any(char.IsDigit)) return "Şifre en az bir rakam içermelidir.";
         if (!password.Any(char.IsLower)) return "Şifre en az bir küçük harf içermelidir.";
         if (!password.Any(char.IsUpper)) return "Şifre en az bir büyük harf içermelidir.";
-        // if (!password.Any(ch => !char.IsLetterOrDigit(ch))) return "Şifre en az bir özel karakter içermelidir.";
         return null;
     }
 
