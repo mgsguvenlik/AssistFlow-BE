@@ -64,6 +64,7 @@ namespace Model.Dtos.Customer
         public string? Longitude { get; set; }
         public string? Latitude { get; set; }
         public DateTimeOffset? InstallationDate { get; set; }
+        public long? CustomerGroupId { get; set; }
 
     }
 
