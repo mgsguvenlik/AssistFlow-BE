@@ -68,7 +68,7 @@ namespace Business.Services
                     dto.RequestNo = rn.Data!;
                 }
 
-                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo);
+                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
                 if (exists)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
@@ -160,7 +160,7 @@ namespace Business.Services
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<WarehouseGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
@@ -235,7 +235,7 @@ namespace Business.Services
             var wf = await _uow.Repository
                .GetQueryable<WorkFlow>()
                .AsNoTracking()
-               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<WarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -386,7 +386,7 @@ namespace Business.Services
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -469,7 +469,7 @@ namespace Business.Services
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -538,7 +538,7 @@ namespace Business.Services
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -934,7 +934,7 @@ namespace Business.Services
 
             var workflow = await _uow.Repository
                 .GetQueryable<WorkFlow>()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
             dto.CustomerApproverName = workflow?.CustomerApproverName;
@@ -971,7 +971,7 @@ namespace Business.Services
 
             var workflow = await _uow.Repository
                .GetQueryable<WorkFlow>()
-               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             dto.ApproverTechnicianId = workflow?.ApproverTechnicianId ?? 0;
             dto.CustomerApproverName = workflow?.CustomerApproverName;
@@ -995,7 +995,7 @@ namespace Business.Services
             var wf = await _uow.Repository
             .GetQueryable<WorkFlow>()
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -1420,7 +1420,7 @@ namespace Business.Services
                 // WorkFlow tablosunda var mı?
                 var query = _uow.Repository.GetQueryable<WorkFlow>();
                 bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == candidate);
+                                         .AnyAsync(x => x.RequestNo == candidate &&!x.IsDeleted);
 
                 if (!exists)
                     return ResponseModel<string>.Success(candidate, "Yeni Akış Numarası üretildi.");
@@ -1477,8 +1477,6 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return await GetWorkFlowByIdAsync(entity.Id);
         }
-
-
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)

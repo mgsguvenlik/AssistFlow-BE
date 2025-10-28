@@ -73,6 +73,13 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("delete-workflow")]
+        public async Task<IActionResult> DeleteWorkFlow([FromBody] long id)
+        {
+            var result = await _workFlowService.DeleteWorkFlowAsync(id);
+            return Ok(result);
+        }
+
         [HttpGet("get-servicesrequest-byid/{id:long}")]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {
@@ -120,7 +127,7 @@ namespace WebAPI.Controllers
         }
 
 
-        [HttpPost("start-technical-service")]   
+        [HttpPost("start-technical-service")]
         public async Task<IActionResult> StartTechnicalServiceAsync([FromBody] StartTechnicalServiceDto dto)
         {
             var result = await _workFlowService.StartService(dto);
