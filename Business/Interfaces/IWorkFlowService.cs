@@ -44,6 +44,7 @@ namespace Business.Interfaces
         Task<ResponseModel<WorkFlowGetDto>> CreateWorkFlowAsync(WorkFlowCreateDto dto);
         Task<ResponseModel<WorkFlowGetDto>> UpdateWorkFlowAsync(WorkFlowUpdateDto dto);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
+        Task<ResponseModel> CancelWorkFlowFlowAsync(long id);
 
         // Warehouse (depo) ile ilgili işlemler 
         Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto);

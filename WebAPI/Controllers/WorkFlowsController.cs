@@ -80,6 +80,13 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("cancel-workflow")]
+        public async Task<IActionResult> CancelWorkFlow([FromBody] long id)
+        {
+            var result = await _workFlowService.CancelWorkFlowFlowAsync(id);
+            return Ok(result);
+        }
+
         [HttpGet("get-servicesrequest-byid/{id:long}")]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {

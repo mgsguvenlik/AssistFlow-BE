@@ -1420,7 +1420,7 @@ namespace Business.Services
                 // WorkFlow tablosunda var mı?
                 var query = _uow.Repository.GetQueryable<WorkFlow>();
                 bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == candidate &&!x.IsDeleted);
+                                         .AnyAsync(x => x.RequestNo == candidate && !x.IsDeleted);
 
                 if (!exists)
                     return ResponseModel<string>.Success(candidate, "Yeni Akış Numarası üretildi.");
@@ -1499,7 +1499,23 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
+        public async Task<ResponseModel> CancelWorkFlowFlowAsync(long id)
+        {
+            var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
+              asNoTracking: false,
+              x => x.Id == id);
 
+            if (entity is null)
+                return ResponseModel.Fail("İptal edilecek kayıt bulunamadı.", StatusCode.NotFound);
+
+            // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
+            entity.WorkFlowStatus = WorkFlowStatus.Cancelled;                // varsa
+            entity.UpdatedDate = DateTime.Now; // varsa
+            entity.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(entity);
+            await _uow.Repository.CompleteAsync();
+            return ResponseModel.Success(status: StatusCode.NoContent);
+        }
         //-------------Private-------------
         private async Task<ResponseModel> IsTechnicianInValidLocation(string lat1, string lon1, string lat2, string lon2)
         {
