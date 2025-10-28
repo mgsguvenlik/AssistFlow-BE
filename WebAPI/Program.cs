@@ -90,6 +90,12 @@ builder.Services.AddDataSeeding(
 builder.Services.AddDataSeeding(
     typeof(ConfigSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
+builder.Services.AddDataSeeding(
+    typeof(WorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
+builder.Services.AddDataSeeding(
+    typeof(WorkFlowTransitionSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
 
 
 builder.Services.AddDbContext<AppDataContext>(options =>

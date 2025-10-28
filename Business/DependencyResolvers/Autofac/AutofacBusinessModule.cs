@@ -37,6 +37,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
             services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
+            services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -139,7 +140,7 @@ namespace Business.DependencyResolvers.Autofac
 
 
             services.AddScoped<
-             ICrudService<Model.Dtos.Role.RoleCreateDto,
+               ICrudService<Model.Dtos.Role.RoleCreateDto,
                           Model.Dtos.Role.RoleUpdateDto,
                           Model.Dtos.Role.RoleGetDto,
                           long>, RoleService>();
@@ -151,24 +152,30 @@ namespace Business.DependencyResolvers.Autofac
                              long>, UserService>();
 
             services.AddScoped<
-              ICrudService<Model.Dtos.Configuration.ConfigurationCreateDto,
+                ICrudService<Model.Dtos.Configuration.ConfigurationCreateDto,
                            Model.Dtos.Configuration.ConfigurationUpdateDto,
                            Model.Dtos.Configuration.ConfigurationGetDto,
                            long>, ConfigurationService>();
 
 
             services.AddScoped<
-              ICrudService<Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceCreateDto,
+                ICrudService<Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceCreateDto,
                            Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceUpdateDto,
                            Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceGetDto,
                            long>, CustomerGroupProductPriceService>();
 
 
             services.AddScoped<
-           ICrudService<Model.Dtos.CustomerProductPrice.CustomerProductPriceCreateDto,
+                ICrudService<Model.Dtos.CustomerProductPrice.CustomerProductPriceCreateDto,
                         Model.Dtos.CustomerProductPrice.CustomerProductPriceUpdateDto,
                         Model.Dtos.CustomerProductPrice.CustomerProductPriceGetDto,
                         long>, CustomerProductPriceService>();
+
+            services.AddScoped<
+                ICrudService<Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionCreateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionUpdateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionGetDto,
+                    long>, WorkFlowTransitionService>();
         }
         protected override void Load(ContainerBuilder builder)
         {

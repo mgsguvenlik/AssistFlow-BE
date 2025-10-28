@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Model.Dtos.WorkFlowDtos.WorkFlowStatus
+namespace Model.Dtos.WorkFlowDtos.WorkFlowStep
 {
-    public class WorkFlowStatusUpdateDto
+    public class WorkFlowStepUpdateDto
     {
         public long Id { get; set; }
         public string? Name { get; set; }   // null gelirse mevcut değer kalsın (Mapster IgnoreNullValues)

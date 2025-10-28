@@ -29,9 +29,10 @@ namespace Model.Concrete.WorkFlows
         public string? EndLocation { get; set; }//Örn: "41.01224, 28.976018"
         public bool IsLocationCheckRequired { get; set; } = true;//Lokasyon kontrolü gerekli mi?
 
-
         // Durumlar
-        public TechnicalServiceStatus ServicesStatus { get; set; } = TechnicalServiceStatus.Pending;
+        public TechnicalServiceStatus ServicesStatus { get; set; } 
+
+        // Maliyet durumu
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
         // Görseller

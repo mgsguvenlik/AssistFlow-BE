@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Model.Dtos.WorkFlowDtos.WorkFlowStatus
+namespace Model.Dtos.WorkFlowDtos.WorkFlowStep
 {
-    public class WorkFlowStatusGetDto
+    public class WorkFlowStepGetDto
     {
         public long Id { get; set; }
         public string Name { get; set; } = null!;

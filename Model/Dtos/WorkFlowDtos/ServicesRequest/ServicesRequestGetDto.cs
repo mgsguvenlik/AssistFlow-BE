@@ -22,9 +22,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         /// <summary>Ürün/Parça ihtiyacı var mı?</summary>
         public bool IsProductRequirement { get; set; }   // <-- yeni
 
-        public bool IsSended { get; set; }
-        public long? SendedStatusId { get; set; }
-        public bool IsReview { get; set; }
         public bool IsMailSended { get; set; }
         public bool IsLocationValid { get; set; }
         public long? CustomerApproverId { get; set; }
@@ -35,10 +32,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         public long ServiceTypeId { get; set; }
         public string? ServiceTypeName { get; set; }
-
-        public long? WorkFlowStatusId => SendedStatusId;
-        public string? WorkFlowStatusName { get; set; }
-
+        public string? WorkFlowStepName { get; set; }
         public DateTimeOffset CreatedDate { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }
         public long CreatedUser { get; set; }
@@ -47,6 +41,8 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long? ApproverTechnicianId { get; set; }
 
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
+
+        public ServicesRequestStatus ServicesRequestStatus { get; set; }
         public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
     }
 }

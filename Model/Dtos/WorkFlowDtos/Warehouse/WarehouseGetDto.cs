@@ -1,4 +1,5 @@
-﻿using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+﻿using Core.Enums;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.Warehouse
 {
@@ -8,7 +9,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public string RequestNo { get; set; } = string.Empty;
         public DateTimeOffset DeliveryDate { get; set; }
         public string? Description { get; set; }
-        public bool IsSended { get; set; }
+        public WarehouseStatus WarehouseStatus { get; set; }
 
         // Ekranlar için yalnızca ürün Id listesi
         public List<ServicesRequestProductGetDto> WarehouseProducts { get; set; } = new();

@@ -26,7 +26,8 @@ using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
-using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
+using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
 
 namespace Business.Mapper
 {
@@ -238,21 +239,21 @@ namespace Business.Mapper
             config.NewConfig<ServiceType, ConfigurationGetDto>();
 
 
-            //-------------  WorkFlowStatus  ----------------
-            config.NewConfig<WorkFlowStatusCreateDto, WorkFlowStatus>()
+            //-------------  WorkFlowStep  ----------------
+            config.NewConfig<WorkFlowStepCreateDto, WorkFlowStep>()
                     .Ignore(d => d.Id);
 
-            config.NewConfig<WorkFlowStatusUpdateDto, WorkFlowStatus>()
+            config.NewConfig<WorkFlowStepUpdateDto, WorkFlowStep>()
                   .IgnoreNullValues(true); // partial update
 
-            config.NewConfig<WorkFlowStatus, WorkFlowStatusGetDto>();
+            config.NewConfig<WorkFlowStep, WorkFlowStepGetDto>();
 
 
             //-------------  WorkFlow  ----------------
             config.NewConfig<WorkFlowCreateDto, WorkFlow>()
             .Ignore(d => d.Id)
             .Map(d => d.CreatedDate, _ => DateTime.Now)
-            .Ignore(d => d.Status); // FK set edilecek
+            .Ignore(d => d.CurrentStep); // FK set edilecek
 
             config.NewConfig<WorkFlowUpdateDto, WorkFlow>()
                   .IgnoreNullValues(true)
@@ -268,7 +269,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Customer)          // nav
                   .Ignore(d => d.CustomerApprover)  // nav
                   .Ignore(d => d.ServiceType)       // nav
-                  .Ignore(d => d.WorkFlowStatus);   // nav
+                  .Ignore(d => d.WorkFlowStep);   // nav
 
             // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
             config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
@@ -277,7 +278,7 @@ namespace Business.Mapper
                   .Ignore(d => d.Customer)          // nav
                   .Ignore(d => d.CustomerApprover)  // nav
                   .Ignore(d => d.ServiceType)       // nav
-                  .Ignore(d => d.WorkFlowStatus);   // nav
+                  .Ignore(d => d.WorkFlowStep);   // nav
 
             // --- ServicesRequest: ENTITY -> GET DTO ---
             config.NewConfig<ServicesRequest, ServicesRequestGetDto>()
@@ -286,8 +287,7 @@ namespace Business.Mapper
                   .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.ContactName1 : null)
                   .Map(d => d.CustomerApproverName, s => s.CustomerApprover != null ? s.CustomerApprover.FullName : null)
                   .Map(d => d.ServiceTypeName, s => s.ServiceType != null ? s.ServiceType.Name : null)
-                  .Map(d => d.WorkFlowStatusId, s => s.SendedStatusId) // DTO’daki alias
-                  .Map(d => d.WorkFlowStatusName, s => s.WorkFlowStatus != null ? s.WorkFlowStatus.Name : null);
+                  .Map(d => d.WorkFlowStepName, s => s.WorkFlowStep != null ? s.WorkFlowStep.Name : null);
 
 
             // ---------------- Pricing: CustomerGroupProductPrice ----------------
@@ -396,6 +396,16 @@ namespace Business.Mapper
             // TECHNICAL SERVICE FORM IMAGE
             // ================================
             config.NewConfig<TechnicalServiceFormImage, TechnicalServiceFormImageGetDto>();
+
+
+
+            // ---------------- WorkFlowTransition  ----------------
+            config.NewConfig<WorkFlowTransition, WorkFlowTransitionGetDto>()
+               .Map(dest => dest.FromStepName, src => src.FromStep.Name)
+               .Map(dest => dest.ToStepName, src => src.ToStep.Name);
+
+            config.NewConfig<WorkFlowTransitionCreateDto, WorkFlowTransition>();
+            config.NewConfig<WorkFlowTransitionUpdateDto, WorkFlowTransition>();
 
         }
     }

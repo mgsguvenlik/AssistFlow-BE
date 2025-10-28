@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251027213746_WorkFlowTransitionAndSteps")]
+    partial class WorkFlowTransitionAndSteps
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -777,6 +780,12 @@ namespace Data.Migrations
                     b.Property<bool>("IsProductRequirement")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsReview")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSended")
+                        .HasColumnType("bit");
+
                     b.Property<string>("OracleNo")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1021,9 +1030,6 @@ namespace Data.Migrations
                     b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("WarehouseStatus")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.ToTable("Warehouses");
@@ -1052,7 +1058,10 @@ namespace Data.Migrations
                     b.Property<string>("CustomerApproverName")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool?>("IsAgreement")
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsComplated")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
@@ -1062,6 +1071,9 @@ namespace Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReconciliationStatus")
                         .HasColumnType("int");
 
                     b.Property<string>("RequestNo")
@@ -1079,9 +1091,6 @@ namespace Data.Migrations
 
                     b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
-
-                    b.Property<int>("WorkFlowStatus")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -1115,9 +1124,14 @@ namespace Data.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("int");
 
+                    b.Property<long?>("WorkFlowId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
-                    b.ToTable("WorkFlowSteps");
+                    b.HasIndex("WorkFlowId");
+
+                    b.ToTable("WorkFlowStepes");
                 });
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowTransition", b =>
@@ -1392,6 +1406,13 @@ namespace Data.Migrations
                     b.Navigation("CurrentStep");
                 });
 
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowStep", b =>
+                {
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlow", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("WorkFlowId");
+                });
+
             modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowTransition", b =>
                 {
                     b.HasOne("Model.Concrete.WorkFlows.WorkFlowStep", "FromStep")
@@ -1474,6 +1495,11 @@ namespace Data.Migrations
                     b.Navigation("ServiceRequestFormImages");
 
                     b.Navigation("ServicesImages");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlow", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowStep", b =>

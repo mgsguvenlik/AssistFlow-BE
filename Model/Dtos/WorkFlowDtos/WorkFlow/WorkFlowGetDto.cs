@@ -2,7 +2,7 @@
 using Model.Abstractions;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.User;
-using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
+using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -19,14 +19,11 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         public string RequestTitle { get; set; } = null!;
         public string RequestNo { get; set; } = null!;
 
-        public long StatuId { get; set; }
-        public WorkFlowStatusGetDto? Status { get; set; }  // ilişki
-
+        public long CurrentStepId { get; set; }
+        public WorkFlowStepGetDto? CurrentStep { get; set; }  // ilişki
         public WorkFlowPriority Priority { get; set; }
-        public bool IsCancelled { get; set; }
-        public bool IsComplated { get; set; }
-        public bool IsLocationValid { get; set; } = true;
-        public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
+        public WorkFlowStatus WorkFlowStatus { get; set; }
+        public bool? IsAgreement { get; set; }
 
         public DateTimeOffset CreatedDate { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }

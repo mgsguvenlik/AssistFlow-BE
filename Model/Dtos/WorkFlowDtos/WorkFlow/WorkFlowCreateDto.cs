@@ -10,17 +10,14 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
         [Required, MaxLength(100)]
         public string RequestNo { get; set; } = null!;
 
-        public long StatuId { get; set; } // WorkFlowStatus FK
+        public long CurrentStepId { get; set; } // WorkFlowStep FK
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
 
-        public bool IsCancelled { get; set; } = false;
-        public bool IsComplated { get; set; } = false;
         public bool IsLocationValid { get; set; } = true;
 
-        public WorkFlowReconciliationStatus ReconciliationStatus { get; set; }
-            = WorkFlowReconciliationStatus.Pending;
+        public WorkFlowStatus WorkFlowStatus { get; set; }
 
-
+        public bool? IsAgreement { get; set; }
         public long? ApproverTechnicianId { get; set; }
     }
 }

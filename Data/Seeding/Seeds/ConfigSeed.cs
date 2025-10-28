@@ -9,12 +9,10 @@ namespace Data.Seeding.Seeds
     public class ConfigSeed : IDataSeed
     {
         private readonly ILogger<ConfigSeed> _logger;
-
         public ConfigSeed(ILogger<ConfigSeed> logger)
         {
             _logger = logger;
         }
-
         public string Key => CommonConstants.SeedConfiguration; // SeedHistory için benzersiz anahtar
         public int Order => 10; // sıralama
         public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
@@ -48,7 +46,6 @@ namespace Data.Seeding.Seeds
 
             _logger.LogInformation(Messages.ConfigurationSeedCompleted, configs.Count);
         }
-
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)
         {
             return !await db.Set<Configuration>().AnyAsync(ct);

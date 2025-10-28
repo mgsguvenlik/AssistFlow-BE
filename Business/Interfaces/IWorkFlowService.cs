@@ -3,7 +3,7 @@ using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
-using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
+using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 
 namespace Business.Interfaces
 {
@@ -26,12 +26,12 @@ namespace Business.Interfaces
         // ServicesRequest - ürün yönetimi
 
 
-        // WorkFlowStatus
-        Task<ResponseModel<PagedResult<WorkFlowStatusGetDto>>> GetStatusesAsync(QueryParams q);
-        Task<ResponseModel<WorkFlowStatusGetDto>> GetStatusByIdAsync(long id);
-        Task<ResponseModel<WorkFlowStatusGetDto>> CreateStatusAsync(WorkFlowStatusCreateDto dto);
-        Task<ResponseModel<WorkFlowStatusGetDto>> UpdateStatusAsync(WorkFlowStatusUpdateDto dto);
-        Task<ResponseModel> DeleteStatusAsync(long id);
+        // WorkFlowStep
+        Task<ResponseModel<PagedResult<WorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
+        Task<ResponseModel<WorkFlowStepGetDto>> GetStepByIdAsync(long id);
+        Task<ResponseModel<WorkFlowStepGetDto>> CreateStepAsync(WorkFlowStepCreateDto dto);
+        Task<ResponseModel<WorkFlowStepGetDto>> UpdateStepAsync(WorkFlowStepUpdateDto dto);
+        Task<ResponseModel> DeleteStepAsync(long id);
 
         // WorkFlow (tanım)
 

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
-using Model.Dtos.WorkFlowDtos.WorkFlowStatus;
+using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 
 namespace WebAPI.Controllers
 {
@@ -144,51 +144,51 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        // ---------- WorkFlowStatus CRUD ----------
-        // GET: /api/workflows/statuses
-        [HttpGet("get-workflow-statuses")]
-        public async Task<IActionResult> GetStatuses([FromQuery] QueryParams q)
+        // ---------- WorkFlowStep CRUD ----------
+        // GET: /api/workflows/steps
+        [HttpGet("get-workflow-steps")]
+        public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
-            var resp = await _workFlowService.GetStatusesAsync(q);
+            var resp = await _workFlowService.GetStepsAsync(q);
             return ToActionResult(resp);
         }
 
-        // GET: /api/workflows/statuses/{id}
-        [HttpGet("get-workflow-statuses/{id:long}")]
-        public async Task<IActionResult> GetStatusById([FromRoute] long id)
+        // GET: /api/workflows/steps/{id}
+        [HttpGet("get-workflow-steps/{id:long}")]
+        public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
-            var resp = await _workFlowService.GetStatusByIdAsync(id);
+            var resp = await _workFlowService.GetStepByIdAsync(id);
             return ToActionResult(resp);
         }
 
-        // POST: /api/workflows/statuses
-        [HttpPost("create-statuses")]
-        public async Task<IActionResult> CreateStatus([FromBody] WorkFlowStatusCreateDto dto)
+        // POST: /api/workflows/steps
+        [HttpPost("create-steps")]
+        public async Task<IActionResult> CreateSteps([FromBody] WorkFlowStepCreateDto dto)
         {
-            var resp = await _workFlowService.CreateStatusAsync(dto);
+            var resp = await _workFlowService.CreateStepAsync(dto);
 
             if (resp.IsSuccess && resp.Data is not null)
-                return CreatedAtAction(nameof(GetStatusById), new { id = resp.Data.Id }, resp);
+                return CreatedAtAction(nameof(GetStepsById), new { id = resp.Data.Id }, resp);
 
             return ToActionResult(resp);
         }
 
-        // PUT: /api/workflows/statuses/{id}
-        [HttpPost("update-statuses/{id:long}")]
-        public async Task<IActionResult> UpdateStatus([FromRoute] long id, [FromBody] WorkFlowStatusUpdateDto dto)
+        // PUT: /api/workflows/steps/{id}
+        [HttpPost("update-steps/{id:long}")]
+        public async Task<IActionResult> UpdateSteps([FromRoute] long id, [FromBody] WorkFlowStepUpdateDto dto)
         {
             if (dto.Id != id)
                 return BadRequest(new ResponseModel(false, "Route id ile body id eşleşmiyor.", Core.Enums.StatusCode.BadRequest));
 
-            var resp = await _workFlowService.UpdateStatusAsync(dto);
+            var resp = await _workFlowService.UpdateStepAsync(dto);
             return ToActionResult(resp);
         }
 
-        // DELETE: /api/workflows/statuses/{id}
-        [HttpPost("delete-statuses/{id:long}")]
-        public async Task<IActionResult> DeleteStatus([FromRoute] long id)
+        // DELETE: /api/workflows/steps/{id}
+        [HttpPost("delete-steps/{id:long}")]
+        public async Task<IActionResult> DeleteSteps([FromRoute] long id)
         {
-            var resp = await _workFlowService.DeleteStatusAsync(id);
+            var resp = await _workFlowService.DeleteStepAsync(id);
             if (resp.IsSuccess && resp.StatusCode == Core.Enums.StatusCode.Ok)
                 return NoContent();
 

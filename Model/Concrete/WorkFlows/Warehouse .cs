@@ -1,4 +1,5 @@
-﻿using Model.Abstractions;
+﻿using Core.Enums;
+using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -17,11 +18,11 @@ namespace Model.Concrete.WorkFlows
         [Required]
         public DateTimeOffset DeliveryDate { get; set; }
 
-      
         /// <summary>Açıklama (opsiyonel)</summary>
         public string? Description { get; set; }
 
         /// <summary>Depodan sevk edildi mi?</summary>
         public bool IsSended { get; set; }
+        public WarehouseStatus WarehouseStatus { get; set; }
     }
 }

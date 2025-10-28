@@ -28,7 +28,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
 
         public DbSet<WorkFlow> WorkFlows { get; set; }
-        public DbSet<WorkFlowStatus> WorkFlowStatuses { get; set; }
+        public DbSet<WorkFlowStep> WorkFlowSteps { get; set; }
         public DbSet<ServicesRequest> ServicesRequests { get; set; }
 
         public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
@@ -38,6 +38,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<TechnicalService> TechnicalServices { get; set; }
         public DbSet<TechnicalServiceImage> TechnicalServiceImages { get; set; }
         public DbSet<TechnicalServiceFormImage> TechnicalServiceFormImages { get; set; }
+        public DbSet<WorkFlowTransition> WorkFlowTransitions { get; set; }
 
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<ProgressApprover>(b =>
             {
                 b.HasOne(x => x.CustomerGroup)
-                .WithMany(c => c.ProgressApprovers) 
+                .WithMany(c => c.ProgressApprovers)
                 .HasForeignKey(x => x.CustomerGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
             });
@@ -225,7 +226,37 @@ namespace Data.Concrete.EfCore.Context
                 .OnDelete(DeleteBehavior.Cascade);
 
 
-        
+
+            modelBuilder.Entity<WorkFlowTransition>()
+                .HasOne(t => t.FromStep)
+                .WithMany(s => s.OutgoingTransitions)
+                .HasForeignKey(t => t.FromStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkFlowTransition>()
+                .HasOne(t => t.ToStep)
+                .WithMany(s => s.IncomingTransitions)
+                .HasForeignKey(t => t.ToStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+
+            modelBuilder.Entity<WorkFlowTransition>(entity =>
+            {
+                // FromStep (Başlangıç Adımı) İlişkisi:
+                // WorkFlowStep'teki OutgoingTransitions koleksiyonuna bağlanır.
+                entity.HasOne(t => t.FromStep)
+                      .WithMany(s => s.OutgoingTransitions)
+                      .HasForeignKey(t => t.FromStepId)
+                      .OnDelete(DeleteBehavior.Restrict); // Silme davranışını ayarlayın
+
+                // ToStep (Hedef Adım) İlişkisi:
+                // WorkFlowStep'teki IncomingTransitions koleksiyonuna bağlanır.
+                entity.HasOne(t => t.ToStep)
+                      .WithMany(s => s.IncomingTransitions)
+                      .HasForeignKey(t => t.ToStepId)
+                      .OnDelete(DeleteBehavior.Restrict); // Silme davranışını ayarlayın
+            });
+
         }
     }
 }

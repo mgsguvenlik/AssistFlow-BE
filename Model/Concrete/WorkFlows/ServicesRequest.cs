@@ -24,11 +24,8 @@ namespace Model.Concrete.WorkFlows
 
         public string? Description { get; set; }
         public bool IsProductRequirement { get; set; }
-
-        public bool IsSended { get; set; }
-        public WorkFlowStatus?  WorkFlowStatus { get; set; } // gönderim statüsü FK/lookup (opsiyonel)
-        public long? SendedStatusId { get; set; } // gönderim statüsü FK/lookup (opsiyonel)
-        public bool IsReview { get; set; }
+        public WorkFlowStep? WorkFlowStep { get; set; } // gönderim adımı FK/lookup (opsiyonel)
+        public long? WorkFlowStepId { get; set; } // gönderim adımı FK/lookup (opsiyonel)
         public bool IsMailSended { get; set; }
 
         // (İsterseniz navigation’ları sonra ekleyin)
@@ -43,9 +40,8 @@ namespace Model.Concrete.WorkFlows
         [ForeignKey(nameof(ServiceTypeId))]
         public ServiceType ServiceType { get; set; } = default!;
         public long ServiceTypeId { get; set; }       // ServiceType FK
-
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
-
+        public ServicesRequestStatus ServicesRequestStatus { get; set; }
 
     }
 }

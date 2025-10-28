@@ -29,12 +29,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public string? Description { get; set; }
         public bool IsProductRequirement { get; set; }
 
-        public bool IsSended { get; set; }
-
-        /// <summary>Gönderim statüsü (opsiyonel). Entity’de WorkFlowStatus navigation + SendedStatusId FK var.</summary>
-        public long? SendedStatusId { get; set; }
-
-        public bool IsReview { get; set; }
         public bool IsMailSended { get; set; }
         public bool IsLocationValid { get; set; }
 
