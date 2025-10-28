@@ -1490,10 +1490,8 @@ namespace Business.Services
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.IsDeleted = true;                // varsa
             entity.UpdatedDate = DateTime.Now; // varsa
-                                               // entity.DeletedByUserId = currentUserId;   // varsa
-
-            // 3) SoftDelete çağrısı -> 2 tip argümanı verin ve entity gönderin
-            await _uow.Repository.SoftDeleteAsync<Model.Concrete.WorkFlows.WorkFlow, long>(entity);
+            entity.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(entity);
 
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
