@@ -23,6 +23,9 @@ namespace Business.Interfaces
 
         Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto);
 
+
+        Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
+
         // ServicesRequest - ürün yönetimi
 
 

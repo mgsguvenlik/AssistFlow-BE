@@ -22,7 +22,6 @@ namespace Model.Concrete.WorkFlows
         public string? Description { get; set; }
 
         /// <summary>Depodan sevk edildi mi?</summary>
-        public bool IsSended { get; set; }
         public WarehouseStatus WarehouseStatus { get; set; }
     }
 }

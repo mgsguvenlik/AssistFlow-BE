@@ -144,6 +144,14 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+
+        [HttpPost("send-back-for-review")]
+        public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
+        {
+            var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
+            return Ok(result);
+        }
+
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]

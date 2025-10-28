@@ -16,7 +16,6 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public DateTimeOffset DeliveryDate { get; set; }
 
         public string? Description { get; set; }
-        public bool IsSended { get; set; }
 
         // Depoya gidecek ürünler
         public List<long>? ProductIds { get; set; }

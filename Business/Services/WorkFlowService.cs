@@ -188,7 +188,6 @@ namespace Business.Services
                     RequestNo = request.RequestNo,
                     DeliveryDate = dto.DeliveryDate,
                     Description = string.Empty,
-                    IsSended = false,
                     WarehouseStatus = WarehouseStatus.Pending
                 };
                 warehouse.CreatedDate = DateTime.Now;
@@ -282,6 +281,7 @@ namespace Business.Services
                 technicalService.Longitude = request.Customer.Longitude;
                 technicalService.ServicesStatus = TechnicalServiceStatus.Pending;
                 technicalService.ServicesCostStatus = request.ServicesCostStatus;
+                _uow.Repository.Update(technicalService);
             }
             //Yoksa Teknik servis kaydı oluştur
             else
@@ -301,12 +301,10 @@ namespace Business.Services
                     ServicesStatus = TechnicalServiceStatus.Pending,
                     ServicesCostStatus = request.ServicesCostStatus,
                 };
+                _uow.Repository.Add(technicalService);
             }
 
-            _uow.Repository.Add(technicalService);
-
             // 🔹 Warehouse bilgilerini güncelle
-            warehouse.IsSended = true;
             warehouse.DeliveryDate = dto.DeliveryDate;
             warehouse.Description = dto.Description;
             warehouse.WarehouseStatus = WarehouseStatus.Shipped;
@@ -450,6 +448,8 @@ namespace Business.Services
                 _uow.Repository.Add(technicalService);
             }
 
+
+            request.ServicesRequestStatus = ServicesRequestStatus.TechnicialServiceSubmitted;
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
@@ -1109,7 +1109,9 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
-        public async Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string targetStepCode, string reviewNotes)
+
+        //Akışı bir önceki adıma geri alma işlemi
+        public async Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes)
         {
             //WorkFlow'u (Akışı) Getir
             var wf = await _uow.Repository.GetQueryable<WorkFlow>(x => x.RequestNo == requestNo)
@@ -1118,21 +1120,15 @@ namespace Business.Services
             if (wf is null)
                 return ResponseModel<WorkFlowGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-            if (wf.WorkFlowStatus== WorkFlowStatus.Cancelled|| wf.WorkFlowStatus == WorkFlowStatus.Complated)
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled || wf.WorkFlowStatus == WorkFlowStatus.Complated)
                 return ResponseModel<WorkFlowGetDto>.Fail("İptal edilmiş veya tamamlanmış akışlar geri alınamaz.", StatusCode.Conflict);
 
-            //Hedef Geri Dönüş Adımını (TargetStep) Bul
-            var targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Code == targetStepCode.ToUpperInvariant());
-
-            if (targetStep is null)
-                return ResponseModel<WorkFlowGetDto>.Fail($"Hedef iş akışı adımı ({targetStepCode}) tanımlı değil.", StatusCode.BadRequest);
-
-            //Geçiş Kuralını (Transition) Kontrol Et
-            var transitionAllowed = await _uow.Repository.GetQueryable<WorkFlowTransition>()
-                .AsNoTracking()
-                .AnyAsync(t => t.FromStepId == wf.CurrentStepId && t.ToStepId == targetStep.Id);
+            var servicesRequest = await _uow.Repository
+               .GetQueryable<ServicesRequest>()
+               .Include(x => x.Customer)
+               .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+            if (servicesRequest is null)
+                return ResponseModel<WorkFlowGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
             var currentStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
                 .AsNoTracking()
@@ -1141,40 +1137,85 @@ namespace Business.Services
 
             if (currentStep is null)
                 return ResponseModel<WorkFlowGetDto>.Fail("Akışın mevcut adımı bulunamadı.", StatusCode.NotFound);
+            var targetStep = new WorkFlowStep();
+            var warehouse = new Warehouse();
 
-
+            var technicalService = new TechnicalService();
             // Mevcut Adım Koduna Göre Dinamik Güncelleme
             switch (currentStep.Code)
             {
                 case "TS": // Teknik Servis Adımı (TechnicalService)
-                    var technicalService = await _uow.Repository
-                        .GetQueryable<TechnicalService>()
-                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-
+                    technicalService = await _uow.Repository
+                       .GetQueryable<TechnicalService>()
+                       .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
                     if (technicalService != null)
                     {
+                        //Ürün var ise depoya geri gönder
+                        if (servicesRequest.IsProductRequirement)
+                        {
+                            //Depo Adımına Geri
+                            targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                               .AsNoTracking()
+                               .FirstOrDefaultAsync(s => s.Code == "WH");
+                            if (targetStep is null)
+                                return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (WH) tanımlı değil.", StatusCode.BadRequest);
+
+                            warehouse = await _uow.Repository
+                           .GetQueryable<Warehouse>()
+                           .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                            if (warehouse is null)
+                                return ResponseModel<WorkFlowGetDto>.Fail("Depo Kaydı Bulunamadı.", StatusCode.BadRequest);
+
+                            warehouse.WarehouseStatus = WarehouseStatus.Pending;
+                            warehouse.UpdatedDate = DateTime.Now;
+                            warehouse.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                            _uow.Repository.Update(warehouse);
+                        }
+                        //Ürün yok ise direkt servis talebine geri gönder
+                        else
+                        {
+                            targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                           .AsNoTracking()
+                           .FirstOrDefaultAsync(s => s.Code == "SR");
+                            if (targetStep is null)
+                                return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
+
+                            servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                            servicesRequest.Description = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
+                            servicesRequest.UpdatedDate = DateTime.Now;
+                            servicesRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                            _uow.Repository.Update(servicesRequest);
+                        }
+
                         technicalService.ServicesStatus = TechnicalServiceStatus.AwaitingReview;
                         technicalService.ResolutionAndActions = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
                         technicalService.UpdatedDate = DateTime.Now;
                         technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
                         _uow.Repository.Update(technicalService);
                     }
+
                     break;
 
                 case "WH": // Depo Adımı (Warehouse)
                            // Depo adımında bir durum (status) alanı olmadığını varsayarak sadece IsSended bayrağını sıfırlayabiliriz
-                    var warehouse = await _uow.Repository
+                    warehouse = await _uow.Repository
                         .GetQueryable<Warehouse>()
                         .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
 
                     if (warehouse != null)
                     {
-                        warehouse.IsSended = false; // Depodan sevkiyatı geri al
-                        warehouse.Description = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
-                        warehouse.UpdatedDate = DateTime.Now;
-                        warehouse.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
-                        warehouse.WarehouseStatus = WarehouseStatus.AwaitingReview;
-                        _uow.Repository.Update(warehouse);
+
+                        targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                         .AsNoTracking()
+                         .FirstOrDefaultAsync(s => s.Code == "SR");
+                        if (targetStep is null)
+                            return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
+
+                        servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                        servicesRequest.Description = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
+                        servicesRequest.UpdatedDate = DateTime.Now;
+                        servicesRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        _uow.Repository.Update(servicesRequest);
                     }
                     break;
 
@@ -1192,16 +1233,14 @@ namespace Business.Services
                     break;
 
                 default:
-                    // Tanımlanmamış adımlar için bir hata döndürülebilir veya atlanabilir.
-                    // Bu, akışınızın genişlemesiyle dinamik olarak genişletilmesi gereken yerdir.
                     break;
             }
-
+            if (targetStep.Code is null)
+                return ResponseModel<WorkFlowGetDto>.Fail("Herhangi bir işlem yapılamadı.", StatusCode.BadRequest);
             //Ana WorkFlow'u Yeni Adıma Güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
-            wf.CurrentStepId = targetStep.Id;
             _uow.Repository.Update(wf);
 
             //Değişiklikleri Kaydet
@@ -1393,7 +1432,7 @@ namespace Business.Services
         {
             var query = _uow.Repository.GetQueryable<WorkFlow>();
             if (!string.IsNullOrWhiteSpace(q.Search))
-                query = query.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search));
+                query = query.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search) && !x.IsDeleted);
 
             var total = await query.CountAsync();
             var items = await query
@@ -1410,7 +1449,7 @@ namespace Business.Services
         public async Task<ResponseModel<WorkFlowGetDto>> GetWorkFlowByIdAsync(long id)
         {
             var dto = await _uow.Repository.GetQueryable<WorkFlow>()
-                .Where(x => x.Id == id)
+                .Where(x => x.Id == id && !x.IsDeleted)
                 .ProjectToType<WorkFlowGetDto>(_config)
                 .FirstOrDefaultAsync();
 
