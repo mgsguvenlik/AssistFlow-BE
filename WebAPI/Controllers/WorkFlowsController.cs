@@ -73,17 +73,17 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpPost("delete-workflow")]
-        public async Task<IActionResult> DeleteWorkFlow([FromBody] long id)
+        [HttpPost("delete-workflow/{id:long}")]
+        public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);
             return Ok(result);
         }
 
-        [HttpPost("cancel-workflow")]
-        public async Task<IActionResult> CancelWorkFlow([FromBody] long id)
+        [HttpPost("cancel-workflow/{id:long}")]
+        public async Task<IActionResult> CancelWorkFlow([FromRoute] long id)
         {
-            var result = await _workFlowService.CancelWorkFlowFlowAsync(id);
+            var result = await _workFlowService.CancelWorkFlowAsync(id);
             return Ok(result);
         }
 

@@ -1499,7 +1499,7 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
-        public async Task<ResponseModel> CancelWorkFlowFlowAsync(long id)
+        public async Task<ResponseModel> CancelWorkFlowAsync(long id)
         {
             var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
               asNoTracking: false,
