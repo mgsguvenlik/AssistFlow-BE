@@ -1430,7 +1430,7 @@ namespace Business.Services
         }
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
-            var query = _uow.Repository.GetQueryable<WorkFlow>();
+            var query = _uow.Repository.GetQueryable<WorkFlow>().Where(x=>!x.IsDeleted);
             if (!string.IsNullOrWhiteSpace(q.Search))
                 query = query.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search) && !x.IsDeleted);
 
