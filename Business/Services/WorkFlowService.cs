@@ -203,6 +203,7 @@ namespace Business.Services
                 warehouse.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
                 warehouse.DeliveryDate = dto.DeliveryDate;
                 warehouse.WarehouseStatus = WarehouseStatus.Pending;
+                _uow.Repository.Update(warehouse);
             }
 
             request.WorkFlowStepId = targetStep.Id;
@@ -1211,6 +1212,10 @@ namespace Business.Services
                         if (targetStep is null)
                             return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
 
+
+                        warehouse.WarehouseStatus = WarehouseStatus.AwaitingReview;
+                        warehouse.UpdatedDate = DateTime.Now;
+                        warehouse.UpdatedUser= (await _authService.MeAsync())?.Data?.Id ?? 0;
                         servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
                         servicesRequest.Description = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
                         servicesRequest.UpdatedDate = DateTime.Now;
