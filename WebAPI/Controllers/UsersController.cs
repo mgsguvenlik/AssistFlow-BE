@@ -85,5 +85,18 @@ namespace WebAPI.Controllers
             return StatusCode((int)resp.StatusCode, resp);
         }
 
+
+
+        [HttpGet("technicians")]
+        public async Task<IActionResult> GetTechnicians()
+        {
+            var resp = await _userService.GetTechniciansAsync();
+
+            if (resp is null)
+                return StatusCode(StatusCodes.Status500InternalServerError, "Servis yanıtı null döndü.");
+
+            return StatusCode((int)resp.StatusCode, resp);
+        }
+
     }
 }

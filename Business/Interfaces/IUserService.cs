@@ -19,5 +19,7 @@ namespace Business.Interfaces
         );
 
         Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long role);
+
+        Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync();
     }
 }

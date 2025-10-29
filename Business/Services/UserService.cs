@@ -543,5 +543,28 @@ public class UserService
         }
     }
 
+    public async Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync()
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.Role != null && ur.Role.Code == "TECHNICIAN"))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Teknisyen bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
+
 
 }
