@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Azure.Core;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -101,6 +102,27 @@ namespace Business.Services
             var entities = await _uow.Repository.GetQueryable<WorkFlowActivityRecord>()
                 .AsNoTracking()
                 .Where(a => a.RequestNo != null && a.RequestNo.ToLower() == rnLower)
+                .OrderByDescending(a => a.OccurredAtUtc)
+                .ThenByDescending(a => a.Id)
+                .ToListAsync();
+
+            if (entities.Count == 0)
+                return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // EF translation riskini kaldırmak için bellekte map’le
+            var items = entities.Adapt<List<WorkFlowActivityRecorGetDto>>(_config);
+
+            return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Success(items, "", StatusCode.Ok);
+        }
+
+        public async Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId)
+        {
+            if (userId==0)
+                return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Fail("userId boş olamaz.", StatusCode.BadRequest);
+
+            var entities = await _uow.Repository.GetQueryable<WorkFlowActivityRecord>()
+                .AsNoTracking()
+                .Where(a => a.PerformedByUserId ==userId)
                 .OrderByDescending(a => a.OccurredAtUtc)
                 .ThenByDescending(a => a.Id)
                 .ToListAsync();

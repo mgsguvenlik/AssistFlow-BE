@@ -1,4 +1,5 @@
 ﻿using Business.Interfaces;
+using Business.Services;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.User;
@@ -14,15 +15,18 @@ namespace WebAPI.Controllers
     {
         private readonly IUserService _userService;
         private readonly IAuthService _authService;
+        private readonly IActivationRecordService _activationRecordService;
         public UsersController(
         ICrudService<UserCreateDto, UserUpdateDto, UserGetDto, long> service,
         IUserService userService,
         ILogger<UsersController> logger,
-        IAuthService authService)
+        IAuthService authService,
+        IActivationRecordService activationRecordService)
        : base(service, logger)
         {
             _userService = userService;
             _authService = authService;
+            _activationRecordService = activationRecordService;
         }
 
 
@@ -96,6 +100,14 @@ namespace WebAPI.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Servis yanıtı null döndü.");
 
             return StatusCode((int)resp.StatusCode, resp);
+        }
+
+
+        [HttpGet("get-user-activity/{userId}")]
+        public async Task<IActionResult> GetUserActivityRecords([FromRoute] int userId)
+        {
+            var result = await _activationRecordService.GetUserActivity(userId);
+            return ToActionResult(result);
         }
 
     }

@@ -24,5 +24,6 @@ namespace Business.Interfaces
             object? payload,
             CancellationToken ct = default);
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestActivityRecordByRequestNoAsync(string requestNo);
+        Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId);
     }
 }
