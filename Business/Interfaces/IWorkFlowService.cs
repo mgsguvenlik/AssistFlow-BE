@@ -3,6 +3,7 @@ using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 
 namespace Business.Interfaces
@@ -26,8 +27,7 @@ namespace Business.Interfaces
 
         Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
 
-        // ServicesRequest - ürün yönetimi
-
+    
 
         // WorkFlowStep
         Task<ResponseModel<PagedResult<WorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);

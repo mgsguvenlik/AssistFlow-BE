@@ -18,11 +18,13 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         public string? EndLocation { get; set; }//Örn: "41.01224, 28.976018"
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
-        [Required]
-        public required List<IFormFile> ServiceImages { get; set; }
+        [Required(ErrorMessage = "En az bir servis fotoğrafı yüklemelisiniz.")]
+        [MinLength(1, ErrorMessage = "En az bir servis fotoğrafı seçin.")]
+        public List<IFormFile>? ServiceImages { get; set; }
 
-        [Required]
-        public required List<IFormFile> FormImages { get; set; }
+        [Required(ErrorMessage = "En az bir form görseli yüklemelisiniz.")]
+        [MinLength(1, ErrorMessage = "En az bir form görseli seçin.")]
+        public List<IFormFile>? FormImages { get; set; }
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
     }
 }

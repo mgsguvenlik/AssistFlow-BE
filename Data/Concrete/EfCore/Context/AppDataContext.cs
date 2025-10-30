@@ -26,11 +26,9 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Region> Regions { get; set; }
         public DbSet<Configuration> Configurations { get; set; }
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
-
         public DbSet<WorkFlow> WorkFlows { get; set; }
         public DbSet<WorkFlowStep> WorkFlowSteps { get; set; }
         public DbSet<ServicesRequest> ServicesRequests { get; set; }
-
         public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
         public DbSet<CustomerProductPrice> CustomerProductPrices { get; set; }
         public DbSet<CustomerGroupProductPrice> CustomerGroupProductPrices { get; set; }
@@ -39,7 +37,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<TechnicalServiceImage> TechnicalServiceImages { get; set; }
         public DbSet<TechnicalServiceFormImage> TechnicalServiceFormImages { get; set; }
         public DbSet<WorkFlowTransition> WorkFlowTransitions { get; set; }
-
+        public DbSet<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.

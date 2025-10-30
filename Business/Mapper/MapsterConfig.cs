@@ -26,6 +26,7 @@ using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
 
@@ -336,7 +337,7 @@ namespace Business.Mapper
 
             // Warehosue UpdateDto -> Entity
             config.NewConfig<WarehouseUpdateDto, Warehouse>(); // koleksiyon güncellemesini servis katmanında yapacağız
-                  
+
 
             //ServicesRequestProduct Dto <-> Entity
             config.NewConfig<ServicesRequestProductCreateDto, ServicesRequestProduct>()
@@ -407,6 +408,7 @@ namespace Business.Mapper
             config.NewConfig<WorkFlowTransitionCreateDto, WorkFlowTransition>();
             config.NewConfig<WorkFlowTransitionUpdateDto, WorkFlowTransition>();
 
+            config.NewConfig<WorkFlowActivityRecorGetDto, WorkFlowActivityRecord>(); // koleksiyon başlat
         }
     }
 }

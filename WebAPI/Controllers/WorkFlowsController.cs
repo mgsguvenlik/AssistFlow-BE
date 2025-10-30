@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 
 namespace WebAPI.Controllers
@@ -13,9 +14,11 @@ namespace WebAPI.Controllers
     public class WorkFlowsController : ControllerBase
     {
         private readonly IWorkFlowService _workFlowService;
-        public WorkFlowsController(IWorkFlowService workFlowService)
+        private readonly IActivationRecordService _activationRecordService;
+        public WorkFlowsController(IWorkFlowService workFlowService, IActivationRecordService activationRecordService)
         {
             _workFlowService = workFlowService;
+            _activationRecordService = activationRecordService;
         }
 
         [HttpGet("generate-request-no")]
@@ -31,7 +34,6 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.CreateRequestAsync(dto);
             return Ok(result);
         }
-
 
         [HttpPost("send-warehouse")]
         public async Task<IActionResult> SendWarehouse([FromBody] SendWarehouseDto dto)
@@ -166,6 +168,15 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+
+        [HttpGet("activity-records/{requestNo}")]
+        public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)
+        {
+            var result = await _activationRecordService.GetLatestActivityRecordByRequestNoAsync(requestNo);
+            return ToActionResult(result);
+        }
+
+
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
@@ -174,6 +185,8 @@ namespace WebAPI.Controllers
             var resp = await _workFlowService.GetStepsAsync(q);
             return ToActionResult(resp);
         }
+
+
 
         // GET: /api/workflows/steps/{id}
         [HttpGet("get-workflow-steps/{id:long}")]

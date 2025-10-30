@@ -19,6 +19,7 @@ using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -33,17 +34,19 @@ namespace Business.Services
         private readonly IAuthService _authService;
         private readonly IMailService _mailService;
         private readonly TypeAdapterConfig _config;
-        public WorkFlowService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IAuthService authService, IMailService mailService)
+        private readonly IActivationRecordService _activationRecord;
+
+        public WorkFlowService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IAuthService authService, IMailService mailService, IActivationRecordService activationRecord)
         {
             _uow = uow;
             _mapper = mapper;
             _config = config;
             _authService = authService;
             _mailService = mailService;
+            _activationRecord = activationRecord;
         }
 
-        // -------------------- ServicesRequest --------------------
-
+        /// -------------------- ServicesRequest --------------------
         //1 Servis Talebi oluşturma akışı:
         public async Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto)
         {
@@ -126,6 +129,23 @@ namespace Business.Services
                 };
 
                 await _uow.Repository.AddAsync(wf);
+
+                #region Hareket Kaydı
+                await _activationRecord.LogAsync(
+                      WorkFlowActionType.ServiceRequestCreated,
+                      request.RequestNo,
+                      null,
+                      null,
+                      "SR",
+                      "Servis talebi oluşturuldu",
+                      new
+                      {
+                          dto,
+                          request.Id,
+                          Products = dto.Products?.Select(p => new { p.ProductId, p.Quantity })
+                      });
+                #endregion
+
                 await _uow.Repository.CompleteAsync();
 
                 //Tekrar oku ve DTO döndür (include’ları uygula)
@@ -220,6 +240,23 @@ namespace Business.Services
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
+
+
+            #region Hareket Kaydı 
+            await _activationRecord.LogAsync(
+                 WorkFlowActionType.WarehouseSent,
+                 request.RequestNo,
+                 wf.Id,
+                 "SR",
+                 "WH",
+                 "Talep depoya gönderildi",
+                 new
+                 {
+                     DeliveryDate = dto.DeliveryDate,
+                     Products = product.Select(x => new { x.ProductId, x.Quantity })
+                 }
+            );
+            #endregion
 
             // Commit
             await _uow.Repository.CompleteAsync();
@@ -372,6 +409,24 @@ namespace Business.Services
 
             #endregion
 
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                    WorkFlowActionType.WorkFlowStepChanged,
+                    dto.RequestNo,
+                    wf.Id,
+                    "WH",
+                    "TS",
+                    "Depo teslimatı tamamlandı, Teknik Servise geçildi",
+                    new
+                    {
+                        warehouse.Id,
+                        tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                        technicalServiceId = technicalService.Id,
+                        DeliveredProducts = dto.DeliveredProducts?.Select(p => new { p.ProductId, p.Quantity })
+                    }
+            );
+            #endregion
+
             // 🔹 Değişiklikleri kaydet
             await _uow.Repository.CompleteAsync();
 
@@ -456,6 +511,23 @@ namespace Business.Services
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
 
+
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                    WorkFlowActionType.WorkFlowStepChanged,
+                    dto.RequestNo,
+                    wf.Id,
+                    "SR",
+                    "TS",
+                    "Teknik servise gönderildi (ürünsüz)",
+                    new
+                    {
+                        tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                        technicalServiceId = technicalService.Id,
+                    }
+            );
+            #endregion
+
             // 🔹 Değişiklikleri kaydet
             await _uow.Repository.CompleteAsync();
 
@@ -514,6 +586,18 @@ namespace Business.Services
                     var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, dto.Latitude, dto.Longitude);
                     if (!locationResult.IsSuccess)
                     {
+                        #region Hareket Loglama
+                        await _activationRecord.LogAsync(
+                           WorkFlowActionType.LocationCheckFailed,
+                           dto.RequestNo,
+                           wf.Id,
+                           "TS",
+                           "TS",
+                           "Lokasyon kontrolü başarısız",
+                           new { locationResult.Message }
+                       );
+                        #endregion
+
                         return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
                     }
                 }
@@ -527,6 +611,19 @@ namespace Business.Services
             technicalService.UpdatedDate = DateTime.Now;
             technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
             _uow.Repository.Update(technicalService);
+
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                WorkFlowActionType.TechnicalServiceStarted,
+                dto.RequestNo,
+                wf.Id,
+                "TS",
+                "TS",
+                "Teknik servis başlatıldı",
+                new { dto.StartLocation, technicalService.Id }
+            );
+
+            #endregion
 
             await _uow.Repository.CompleteAsync();
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
@@ -599,7 +696,6 @@ namespace Business.Services
             _uow.Repository.Update(technicalService);
 
             #region Dosya Ekleme/Güncelleme işlemleri
-
             var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
             var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/') ?? "";
             var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
@@ -741,6 +837,31 @@ namespace Business.Services
 
             #endregion
 
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                 WorkFlowActionType.TechnicalServiceFinished,
+                 dto.RequestNo,
+                 wf.Id,
+                 "TS",
+                 "PRC",
+                 "Teknik servis tamamlandı ve fiyatlama aşamasına geçildi",
+                 new
+                 {
+                     dto.ProblemDescription,
+                     dto.ResolutionAndActions,
+                     dto.ServiceTypeId,
+                     dto.ServicesCostStatus,
+                     Images = new
+                     {
+                         Service = toAddImages.Select(x => x.Url),
+                         Form = toAddFormImages.Select(x => x.Url)
+                     },
+                     Products = dto.Products?.Select(p => new { p.ProductId, p.Quantity })
+                 }
+             );
+
+            #endregion
+
             await _uow.Repository.CompleteAsync();
 
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
@@ -875,8 +996,7 @@ namespace Business.Services
             // Son durumu döndür
             return ResponseModel.Success("Lokasyon kontrolü devre dışı bırakma talebi iletildi ve ilgili yöneticilere e-posta gönderildi.");
         }
-
-        //-----------------------------
+        ///-----------------------------
 
         // -------------------- Services Request --------------------
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
@@ -1111,6 +1231,8 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
+
+      
         //Akışı bir önceki adıma geri alma işlemi
         public async Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes)
         {
@@ -1215,7 +1337,7 @@ namespace Business.Services
 
                         warehouse.WarehouseStatus = WarehouseStatus.AwaitingReview;
                         warehouse.UpdatedDate = DateTime.Now;
-                        warehouse.UpdatedUser= (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        warehouse.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
                         servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
                         servicesRequest.Description = $"REVİZYON TALEBİ: {reviewNotes}. Hedef Adım: {targetStep.Name}";
                         servicesRequest.UpdatedDate = DateTime.Now;
@@ -1247,6 +1369,16 @@ namespace Business.Services
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
+
+            await _activationRecord.LogAsync(
+                WorkFlowActionType.WorkFlowStepChanged,
+                requestNo,
+                wf.Id,
+                currentStep.Code,
+                targetStep.Code,
+                "Akış geri gönderildi",
+                new { reviewNotes, targetStep = targetStep.Name }
+            );
 
             //Değişiklikleri Kaydet
             await _uow.Repository.CompleteAsync();
@@ -1435,7 +1567,7 @@ namespace Business.Services
         }
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
-            var query = _uow.Repository.GetQueryable<WorkFlow>().Where(x=>!x.IsDeleted);
+            var query = _uow.Repository.GetQueryable<WorkFlow>().Where(x => !x.IsDeleted);
             if (!string.IsNullOrWhiteSpace(q.Search))
                 query = query.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search) && !x.IsDeleted);
 
