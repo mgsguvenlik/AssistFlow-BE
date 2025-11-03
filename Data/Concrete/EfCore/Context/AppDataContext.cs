@@ -38,6 +38,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<TechnicalServiceFormImage> TechnicalServiceFormImages { get; set; }
         public DbSet<WorkFlowTransition> WorkFlowTransitions { get; set; }
         public DbSet<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }
+        public DbSet<WorkFlowReviewLog> WorkFlowReviewLogs { get; set; } = default!;
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -255,6 +256,46 @@ namespace Data.Concrete.EfCore.Context
                       .OnDelete(DeleteBehavior.Restrict); // Silme davranışını ayarlayın
             });
 
+            modelBuilder.Entity<WorkFlowReviewLog>(b =>
+            {
+                b.ToTable("WorkFlowReviewLogs");
+
+                b.HasKey(x => x.Id);
+
+                // Zorunlu alanlar & uzunluklar
+                b.Property(x => x.RequestNo)
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                b.Property(x => x.FromStepCode)
+                    .HasMaxLength(16)
+                    .IsRequired();
+
+                b.Property(x => x.ToStepCode)
+                    .HasMaxLength(16)
+                    .IsRequired();
+
+                b.Property(x => x.ReviewNotes)
+                    .HasMaxLength(2000)
+                    .IsRequired();
+
+                b.Property(x => x.CreatedUser)
+                    .IsRequired();
+
+                b.Property(x => x.CreatedDate)
+                    .IsRequired();
+                // İstersen provider'a göre default value:
+                // SQL Server: .HasDefaultValueSql("GETUTCDATE()")
+                // PostgreSQL: .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'")
+
+                // Nullable FK-id alanları (isteğe bağlı; navigation yoksa sadece id tutacağız)
+                b.Property(x => x.FromStepId);
+                b.Property(x => x.ToStepId);
+
+                // Indexler
+                b.HasIndex(x => x.RequestNo);
+                b.HasIndex(x => new { x.WorkFlowId, x.CreatedDate });
+            });
         }
     }
 }

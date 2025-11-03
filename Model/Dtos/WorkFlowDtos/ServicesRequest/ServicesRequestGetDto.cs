@@ -1,6 +1,7 @@
 ﻿using Core.Enums;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
 namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 {
@@ -44,5 +45,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
         public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
+        public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
     }
 }
