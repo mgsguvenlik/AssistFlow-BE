@@ -3,6 +3,7 @@ using Business.Services;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Requests;
 using System.Security.Claims;
 
@@ -104,9 +105,23 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-user-activity/{userId}")]
-        public async Task<IActionResult> GetUserActivityRecords([FromRoute] int userId)
+        public async Task<IActionResult> GetUserActivityRecords([FromRoute] int userId, [FromQuery] QueryParams q)
         {
-            var result = await _activationRecordService.GetUserActivity(userId);
+            var result = await _activationRecordService.GetUserActivity(userId, q);
+            return ToActionResult(result);
+        }
+
+
+        [HttpGet("get-user-activity-grouped/{userId:int}")]
+        [ProducesResponseType(typeof(ResponseModel<PagedResult<WorkFlowActivityGroupDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetUserActivityGroupedByRequestNo( [FromRoute] int userId,    [FromQuery] QueryParams q,   [FromQuery] int perGroupTake = 50)
+        {
+            if (userId <= 0)
+                return BadRequest("Geçersiz kullanıcı kimliği.");
+
+            var result = await _activationRecordService
+                .GetUserActivityGroupedByRequestNo(userId, q, perGroupTake);
+
             return ToActionResult(result);
         }
 
