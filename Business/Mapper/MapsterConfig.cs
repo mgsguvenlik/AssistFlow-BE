@@ -20,6 +20,7 @@ using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
+using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
@@ -411,7 +412,31 @@ namespace Business.Mapper
 
             config.NewConfig<WorkFlowActivityRecorGetDto, WorkFlowActivityRecord>(); 
             config.NewConfig<WorkFlowReviewLog, WorkFlowReviewLogDto>(); 
-            config.NewConfig<WorkFlowReviewLogDto, WorkFlowReviewLog>(); 
+            config.NewConfig<WorkFlowReviewLogDto, WorkFlowReviewLog>();
+
+
+            // ---------------- Pricing ----------------
+            config.NewConfig<PricingCreateDto, Pricing>()
+                  .Ignore(d => d.Id);                 // audit alanları serviste set edilecek
+
+            config.NewConfig<PricingUpdateDto, Pricing>()
+                  .IgnoreNullValues(true)             // partial update
+                  .Ignore(d => d.Id);                 // Id dışındaki null olmayanları uygula
+
+            // Entity -> GetDto (detay)
+            config.NewConfig<Pricing, PricingGetDto>()
+                  .Map(d => d.Id, s => s.Id)
+                  .Map(d => d.RequestNo, s => s.RequestNo)
+                  .Map(d => d.Status, s => s.Status)
+                  .Map(d => d.Currency, s => s.Currency)
+                  .Map(d => d.Notes, s => s.Notes)
+                  .Map(d => d.TotalAmount, s => s.TotalAmount)
+                  // audit
+                  .Map(d => d.CreatedDate, s => s.CreatedDate)
+                  .Map(d => d.CreatedUser, s => s.CreatedUser)
+                  .Map(d => d.UpdatedDate, s => s.UpdatedDate)
+                  .Map(d => d.UpdatedUser, s => s.UpdatedUser);
+
         }
     }
 }

@@ -39,6 +39,8 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlowTransition> WorkFlowTransitions { get; set; }
         public DbSet<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }
         public DbSet<WorkFlowReviewLog> WorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<Pricing> Pricings { get; set; } = default!;
+
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -188,8 +190,6 @@ namespace Data.Concrete.EfCore.Context
            });
 
 
-
-
             // CustomerProductPrice: Customer + Product tekil olsun
             modelBuilder.Entity<CustomerProductPrice>()
                 .HasIndex(x => new { x.CustomerId, x.ProductId })
@@ -295,6 +295,32 @@ namespace Data.Concrete.EfCore.Context
                 // Indexler
                 b.HasIndex(x => x.RequestNo);
                 b.HasIndex(x => new { x.WorkFlowId, x.CreatedDate });
+            });
+
+
+
+            // ---------------- Pricing ----------------
+            modelBuilder.Entity<Pricing>(e =>
+            {
+                e.ToTable("Pricing");
+
+                e.Property(x => x.RequestNo)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                // Attribute ile de var ama burada da garanti altına alıyoruz
+                e.HasIndex(x => x.RequestNo)
+                    .IsUnique();
+
+                e.Property(x => x.Currency)
+                    .HasMaxLength(3)
+                    .IsRequired();
+
+                e.Property(x => x.Notes)
+                    .HasMaxLength(1000);
+
+                e.Property(x => x.TotalAmount)
+                    .HasPrecision(18, 2);
             });
         }
     }

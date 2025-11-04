@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
@@ -152,6 +153,19 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.FinishService(dto);
             return Ok(result);
         }
+
+
+
+        [HttpPost("approve-pricing")]
+        public async Task<IActionResult> ApprovePricingAsync([FromBody] PricingUpdateDto dto)
+        {
+            var result = await _workFlowService.ApprovePricing(dto);
+            return Ok(result);
+        }
+
+
+
+
 
         [HttpPost("location-override")]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] OverrideLocationCheckDto dto)

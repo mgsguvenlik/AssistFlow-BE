@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
@@ -49,7 +50,6 @@ namespace Business.Services
         {
             try
             {
-
                 #region Validasyon/Kontroller
                 // Başlangıç WorkFlowStep'i Bul
                 var initialStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
@@ -86,12 +86,15 @@ namespace Business.Services
 
                 #endregion
 
-                //ServicesRequest map + ürün bağları (N-N join)
+                #region Servis talebi güncelleme 
                 var request = dto.Adapt<ServicesRequest>(_config);
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                await _uow.Repository.AddAsync(request);
+                #endregion
 
+                #region Ürün Ekleme
                 // Varsa ürünleri ekle
                 if (dto.Products is not null)
                 {
@@ -106,10 +109,10 @@ namespace Business.Services
                         });
                     }
                 }
+                #endregion
 
-                var res = await _uow.Repository.AddAsync(request);
+                #region  WorkFlow oluştur (aynı RequestNo ile)
 
-                // WorkFlow oluştur (aynı RequestNo ile)
                 var wf = new WorkFlow
                 {
                     RequestNo = request.RequestNo,
@@ -126,6 +129,7 @@ namespace Business.Services
                 };
 
                 await _uow.Repository.AddAsync(wf);
+                #endregion
 
                 #region Hareket Kaydı
                 await _activationRecord.LogAsync(
@@ -145,7 +149,6 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
-                //Tekrar oku ve DTO döndür (include’ları uygula)
                 return await GetServiceRequestByIdAsync(request.Id);
             }
             catch (Exception ex)
@@ -157,6 +160,8 @@ namespace Business.Services
         //2.1 Depoya Gönderim  (Ürün var ise)
         public async Task<ResponseModel<WarehouseGetDto>> SendWarehouseAsync(SendWarehouseDto dto)
         {
+
+            #region Validasyon/Kontroller
             //Talep getir (tracking kapalı)
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
@@ -196,7 +201,9 @@ namespace Business.Services
                 .GetQueryable<Warehouse>()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+            #endregion
 
+            #region Depo Ekle/Güncelle
             //Yoksa oluştur
             if (warehouse == null)
             {
@@ -222,22 +229,26 @@ namespace Business.Services
                 warehouse.WarehouseStatus = WarehouseStatus.Pending;
                 _uow.Repository.Update(warehouse);
             }
+            #endregion
 
+            #region Servis Talebi Güncelle
             request.WorkFlowStepId = targetStep.Id;
             request.WorkFlowStep = null;
             request.UpdatedDate = DateTime.Now;
             request.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
             request.ServicesRequestStatus = ServicesRequestStatus.WarehouseSubmitted;
             _uow.Repository.Update(request);
+            #endregion
 
+            #region WorkFlow güncelle
 
-            //WorkFlow güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.IsAgreement = null;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
 
+            #endregion
 
             #region Hareket Kaydı 
             await _activationRecord.LogAsync(
@@ -265,7 +276,6 @@ namespace Business.Services
         //2.2 Depo Teslimatı ve Teknik servise Gönderim (Ürün var ise)
         public async Task<ResponseModel<WarehouseGetDto>> CompleteDeliveryAsync(CompleteDeliveryDto dto)
         {
-
             #region Validasyon/Kontroller
             var wf = await _uow.Repository
                .GetQueryable<WorkFlow>()
@@ -296,8 +306,21 @@ namespace Business.Services
 
             if (warehouse is null)
                 return ResponseModel<WarehouseGetDto>.Fail("Depo kaydı bulunamadı.", StatusCode.NotFound);
+
+
+            // 🔹 WorkFlow güncelle
+            var targetStep = await _uow.Repository
+                .GetQueryable<WorkFlowStep>()
+                .AsNoTracking()
+                .Where(x => x.Code != null && x.Code == "TS")
+                .Select(x => new { x.Id })
+                .FirstOrDefaultAsync();
+
+            if (targetStep is null)
+                return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStep içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
             #endregion
 
+            #region Teknik servis kaydı Ekle/Güncelle
 
             var technicalService = await _uow.Repository
                 .GetQueryable<TechnicalService>()
@@ -339,29 +362,24 @@ namespace Business.Services
                 _uow.Repository.Add(technicalService);
             }
 
-            // 🔹 Warehouse bilgilerini güncelle
+            #endregion
+
+            #region Warehouse  bilgilerini güncelle
             warehouse.DeliveryDate = dto.DeliveryDate;
             warehouse.Description = dto.Description;
             warehouse.WarehouseStatus = WarehouseStatus.Shipped;
             _uow.Repository.Update(warehouse);
+            #endregion
 
-            // 🔹 WorkFlow güncelle
-            var statu = await _uow.Repository
-                .GetQueryable<WorkFlowStep>()
-                .AsNoTracking()
-                .Where(x => x.Code != null && x.Code == "TS")
-                .Select(x => new { x.Id })
-                .FirstOrDefaultAsync();
+            #region Wordflow kaydı güncelle
 
-            if (statu is null)
-                return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStep içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
-
-            wf.CurrentStepId = statu.Id;
+            wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
+            #endregion
 
-            #region Ürünler 
+            #region Ürünler  Ekle/Güncelle
             // 🔹 ServicesRequestProduct senkronizasyonu
             var existingProducts = await _uow.Repository
                 .GetMultipleAsync<ServicesRequestProduct>(
@@ -461,9 +479,10 @@ namespace Business.Services
 
             #endregion
 
+            #region Teknik servis kaydını Ekle/Güncelle
             var technicalService = await _uow.Repository
-             .GetQueryable<TechnicalService>()
-             .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                 .GetQueryable<TechnicalService>()
+                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             //Varsa Teknik servis kaydını güncelle
             if (technicalService is { })
@@ -500,14 +519,16 @@ namespace Business.Services
                 };
                 _uow.Repository.Add(technicalService);
             }
-
+            #endregion
 
             request.ServicesRequestStatus = ServicesRequestStatus.TechnicialServiceSubmitted;
+
+            #region Workflow Güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
             _uow.Repository.Update(wf);
-
+            #endregion
 
             #region Hareket Kaydı
             await _activationRecord.LogAsync(
@@ -516,7 +537,7 @@ namespace Business.Services
                     wf.Id,
                     "SR",
                     "TS",
-                    "Teknik servise gönderildi (ürünsüz)",
+                    "Teknik servise gönderildi (ürün yok)",
                     new
                     {
                         tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
@@ -535,6 +556,8 @@ namespace Business.Services
         // 4️ Teknik Servis Servisi Başlatma 
         public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto)
         {
+
+            #region Validasyon/Kontroller
             //WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
@@ -570,8 +593,9 @@ namespace Business.Services
 
             if (technicalService.ServicesStatus == TechnicalServiceStatus.InProgress)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Teknik servis zaten başlatılmış", StatusCode.Conflict);
+            #endregion
 
-            //Lokasyon kontrolü
+            #region Lokasyon kontrolü
             if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
             {
                 if (string.IsNullOrEmpty(dto.Longitude) && !string.IsNullOrEmpty(dto.Latitude))
@@ -601,6 +625,9 @@ namespace Business.Services
             }
 
 
+            #endregion
+
+            #region Tekniks servisi güncelle
             technicalService.StartTime = DateTime.Now;
             technicalService.ServicesStatus = TechnicalServiceStatus.InProgress;
             technicalService.StartLocation = dto.StartLocation;
@@ -608,6 +635,7 @@ namespace Business.Services
             technicalService.UpdatedDate = DateTime.Now;
             technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
             _uow.Repository.Update(technicalService);
+            #endregion
 
             #region Hareket Kaydı
             await _activationRecord.LogAsync(
@@ -626,14 +654,15 @@ namespace Business.Services
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
         }
 
-        // 5 Teknik Servis Servisi Tamamlama 
+        // 5 Teknik Servis Servisi Tamamlama  ve Fiyatlamaya gönderimi
         public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto)
         {
 
+            #region Validasyon/Kontroller
             var wf = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+               .GetQueryable<WorkFlow>()
+               .AsNoTracking()
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
@@ -662,7 +691,14 @@ namespace Business.Services
             if (technicalService is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
 
-            //------------------ Lokasyon kontrolü----------------
+            var targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Code == "PRC");
+            if (targetStep is null)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Hedef iş akışı adımı (PRC) tanımlı değil.", StatusCode.BadRequest);
+            #endregion
+
+            #region Lokasyon kontrolü
             if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
             {
                 if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
@@ -680,7 +716,9 @@ namespace Business.Services
                     }
                 }
             }
+            #endregion
 
+            #region Teknik Servis Kaydı güncelle 
             technicalService.EndTime = DateTime.Now;
             technicalService.ServicesStatus = TechnicalServiceStatus.Completed;
             technicalService.ProblemDescription = dto.ProblemDescription;
@@ -691,6 +729,44 @@ namespace Business.Services
             technicalService.UpdatedDate = DateTime.Now;
             technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
             _uow.Repository.Update(technicalService);
+            #endregion
+
+            #region Workflow güncelle
+            wf.CurrentStepId = targetStep.Id;
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(wf);
+            #endregion
+
+            #region Fiyatlamaya Gönder
+            var pricing = await _uow.Repository
+            .GetQueryable<Pricing>()
+            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (pricing is null)
+            {
+                pricing = new Pricing()
+                {
+                    RequestNo = dto.RequestNo,
+                    Status = PricingStatus.Pending,
+                    Currency = "TRY", ///İncelencek
+                    Notes = string.Empty,
+                    TotalAmount = 0,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = (await _authService.MeAsync()).Data?.Id ?? 0,
+                };
+                _uow.Repository.Add(pricing);
+            }
+            else
+            {
+                pricing.Status = PricingStatus.Pending;
+                pricing.RequestNo = dto.RequestNo;
+                pricing.Currency = "TRY";
+                pricing.UpdatedDate = DateTime.Now;
+                pricing.UpdatedUser = (await _authService.MeAsync()).Data?.Id ?? 0;
+                _uow.Repository.Update(pricing);
+            }
+            #endregion
 
             #region Dosya Ekleme/Güncelleme işlemleri
             var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
@@ -820,18 +896,6 @@ namespace Business.Services
                 _uow.Repository.Add(newEntity);
             }
 
-
-            var targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
-           .AsNoTracking()
-           .FirstOrDefaultAsync(s => s.Code == "PRC");
-            if (targetStep is null)
-                return ResponseModel<TechnicalServiceGetDto>.Fail("Hedef iş akışı adımı (PRC) tanımlı değil.", StatusCode.BadRequest);
-
-            wf.CurrentStepId = targetStep.Id;
-            wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
-            _uow.Repository.Update(wf);
-
             #endregion
 
             #region Hareket Kaydı
@@ -862,6 +926,124 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
 
             return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
+        }
+
+        // 6 Fiyatlama onay ve kontrole gönderim.
+        public async Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto)
+        {
+            #region Validasyonlar/Kontroller
+
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<PricingGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            var request = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel<PricingGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+
+            var targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Code == "APR");
+            if (targetStep is null)
+                return ResponseModel<PricingGetDto>.Fail("Hedef iş akışı adımı (TS) tanımlı değil.", StatusCode.BadRequest);
+
+            var pricing = await _uow.Repository
+               .GetQueryable<Pricing>()
+               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (pricing is null)
+                return ResponseModel<PricingGetDto>.Fail("Fiyatlama kaydı tanımlı değil.", StatusCode.BadRequest);
+
+            #endregion
+
+            #region Fiyatlama ve Workflow  güncelleme 
+            pricing.Status = PricingStatus.Approved;
+            pricing.UpdatedDate = DateTime.Now;
+            pricing.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            pricing.Notes = dto.Notes;
+            pricing.TotalAmount = dto.TotalAmount;
+            _uow.Repository.Update(pricing);
+
+
+            wf.CurrentStepId = targetStep.Id;
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            _uow.Repository.Update(wf);
+            #endregion
+
+            #region Ürünler Güncellemesi
+            // 🔹 ServicesRequestProduct senkronizasyonu
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<ServicesRequestProduct>(
+                    asNoTracking: false,
+                    whereExpression: x => x.RequestNo == dto.RequestNo
+                );
+
+            // Dictionary ile hızlı karşılaştırma
+            var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+            // 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+            foreach (var existing in existingProducts)
+            {
+                if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                {
+                    // Güncelle
+                    existing.Quantity = delivered.Quantity;
+                    _uow.Repository.Update(existing);
+
+                    // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+                    deliveredDict.Remove(existing.ProductId);
+                }
+                else
+                {
+                    //  listede yok → Sil
+                    _uow.Repository.HardDelete(existing);
+                }
+            }
+
+            // 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
+            foreach (var newItem in deliveredDict.Values)
+            {
+                var newEntity = new ServicesRequestProduct
+                {
+                    CustomerId = request.CustomerId,
+                    RequestNo = request.RequestNo,
+                    ProductId = newItem.ProductId,
+                    Quantity = newItem.Quantity,
+                };
+                _uow.Repository.Add(newEntity);
+            }
+
+            #endregion
+
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                 WorkFlowActionType.PricingApproved,
+                 dto.RequestNo,
+                 wf.Id,
+                 "PRC",
+                 "APR",
+                 "Fiyatlama tamamlandı ve onay aşamasına geçildi",
+                 new
+                 {
+                     dto.Notes,
+                     dto.Currency,
+                     Products = dto.Products?.Select(p => new { p.ProductId, p.Quantity })
+                 }
+             );
+
+            #endregion
+
+            await _uow.Repository.CompleteAsync();
+            return await GetPricingByRequestNoAsync(dto.RequestNo);
         }
 
         //Lokasyon Kontrol  Ezme Maili 
@@ -1078,7 +1260,7 @@ namespace Business.Services
 
             // Gözden Geçirme Logları (NEW)
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode =="SR" || x.ToStepCode == "SR"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1135,7 +1317,7 @@ namespace Business.Services
 
             // Gözden Geçir Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "SR" || x.ToStepCode == "SR"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1160,7 +1342,6 @@ namespace Business.Services
 
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
-
 
         public async Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto)
         {
@@ -1290,7 +1471,7 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
-        //Akışı bir önceki adıma geri alma işlemi
+        //-------------------------Akışı bir önceki adıma geri alma işlemi----------------------------
         public async Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes)
         {
             //WorkFlow'u (Akışı) Getir
@@ -1319,11 +1500,42 @@ namespace Business.Services
                 return ResponseModel<WorkFlowGetDto>.Fail("Akışın mevcut adımı bulunamadı.", StatusCode.NotFound);
             var targetStep = new WorkFlowStep();
             var warehouse = new Warehouse();
-
             var technicalService = new TechnicalService();
+            var pricing = new Pricing();
             // Mevcut Adım Koduna Göre Dinamik Güncelleme
             switch (currentStep.Code)
             {
+                case "APR": // Teknik Servis Adımı (TechnicalService)
+                    pricing = await _uow.Repository
+                       .GetQueryable<Pricing>()
+                       .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                    if (pricing != null)
+                    {
+                        targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                          .AsNoTracking()
+                          .FirstOrDefaultAsync(s => s.Code == "TS");
+                        if (targetStep is null)
+                            return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (TS) tanımlı değil.", StatusCode.BadRequest);
+
+                        technicalService = await _uow.Repository
+                             .GetQueryable<TechnicalService>()
+                             .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+
+                        if (technicalService is null)
+                            return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı Teknik Servis tanımlı değil.", StatusCode.BadRequest);
+
+                        technicalService.ServicesStatus = TechnicalServiceStatus.Pending;
+                        technicalService.UpdatedDate = DateTime.Now;
+                        technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+
+                        pricing.Status = PricingStatus.AwaitingReview;
+                        pricing.UpdatedDate = DateTime.Now;
+                        pricing.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        _uow.Repository.Update(technicalService);
+                    }
+
+                    break;
+
                 case "TS": // Teknik Servis Adımı (TechnicalService)
                     technicalService = await _uow.Repository
                        .GetQueryable<TechnicalService>()
@@ -1442,7 +1654,7 @@ namespace Business.Services
             {
                 WorkFlowId = wf.Id,
                 RequestNo = requestNo,
-                FromStepId = wf.CurrentStepId,          // mevcut (eski) adım id
+                FromStepId = currentStep.Id,          // mevcut (eski) adım id
                 FromStepCode = currentStep.Code,          // mevcut (eski) adım kodu
                 ToStepId = targetStep.Id,             // hedef (yeni) adım id
                 ToStepCode = targetStep.Code,           // hedef (yeni) adım kodu
@@ -1486,9 +1698,15 @@ namespace Business.Services
                 .ProjectToType<ServicesRequestProductGetDto>(_config)
                 .ToListAsync();
 
+            var workflow = await query
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .ProjectToType<WorkFlow>(_config)
+                .FirstOrDefaultAsync();
+
             // Gözden Geçir Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1524,9 +1742,15 @@ namespace Business.Services
                 .ProjectToType<ServicesRequestProductGetDto>(_config)
                 .ToListAsync();
 
+            var workflow = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ProjectToType<WorkFlow>(_config)
+                .FirstOrDefaultAsync();
+
             // Gözden Geçir (Review) Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1537,7 +1761,6 @@ namespace Business.Services
 
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
-
 
         // -------------------- Teknical Services --------------------
         public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
@@ -1567,9 +1790,17 @@ namespace Business.Services
                 .ProjectToType<ServicesRequestProductGetDto>(_config)
                 .ToListAsync();
 
+
+            var workflow = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ProjectToType<WorkFlow>(_config)
+                .FirstOrDefaultAsync();
+
+
             // Gözden Geçir (Review) Logları — YENİ
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "TS" || x.ToStepCode == "TS"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1579,6 +1810,46 @@ namespace Business.Services
             dto.ReviewLogs = reviewLogs;
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
+        }
+
+        /// ------------------ Pricing -----------------------------------
+        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<Pricing>();
+
+            var dto = await query
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ProjectToType<PricingGetDto>(_config)
+                .FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // Ürünler
+            var products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .ToListAsync();
+
+            // Gözden Geçir (Review) Logları — YENİ
+            var reviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "PRC" || x.ToStepCode == "PRC"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            dto.Products = products;
+            dto.ReviewLogs = reviewLogs;
+
+            return ResponseModel<PricingGetDto>.Success(dto);
+
         }
 
         // -------------------- WorkFlowStep --------------------
@@ -1722,8 +1993,14 @@ namespace Business.Services
                     CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
                     CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.ContactName1),
                     CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
-
-
+                    CurrentStep = x.wf.CurrentStep == null
+                                   ? null
+                                   : new WorkFlowStepGetDto
+                                   {
+                                       Id = x.wf.CurrentStep.Id,
+                                       Name = x.wf.CurrentStep.Name,
+                                       Code = x.wf.CurrentStep.Code
+                                   }
                 })
                 .ToListAsync();
 

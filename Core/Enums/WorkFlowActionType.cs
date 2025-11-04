@@ -34,7 +34,13 @@ namespace Core.Enums
 
         // Kurallar/İstisnalar
         LocationOverrideRequested = 50,
-        LocationCheckFailed = 51
+        LocationCheckFailed = 51,
+
+        //Fiyatlama
+        PricingPending = 1,
+        PricingApproved = 2,
+        PricingRejected = 3,
+        PricingAwaitingReview = 4,
     }
 
 }

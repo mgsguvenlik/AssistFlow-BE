@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
@@ -21,7 +22,7 @@ namespace Business.Interfaces
         Task<ResponseModel<TechnicalServiceGetDto>> SendTechnicalServiceAsync(SendTechnicalServiceDto dto);
         Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto);
         Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto);
-
+        Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto);
         Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto);
 
 
