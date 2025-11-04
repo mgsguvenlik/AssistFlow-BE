@@ -1677,23 +1677,6 @@ namespace Business.Services
             // Çok istisnai durumda buraya düşer
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
-        {
-            var query = _uow.Repository.GetQueryable<WorkFlow>().Where(x => !x.IsDeleted);
-            if (!string.IsNullOrWhiteSpace(q.Search))
-                query = query.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search) && !x.IsDeleted);
-
-            var total = await query.CountAsync();
-            var items = await query
-                .OrderByDescending(x => x.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .ProjectToType<WorkFlowGetDto>(_config)
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<WorkFlowGetDto>>
-                .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
-        }
 
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
