@@ -1677,7 +1677,7 @@ namespace Business.Services
             // Çok istisnai durumda buraya düşer
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
         {
             var query = _uow.Repository.GetQueryable<WorkFlow>().Where(x => !x.IsDeleted);
             if (!string.IsNullOrWhiteSpace(q.Search))
@@ -1694,6 +1694,60 @@ namespace Business.Services
             return ResponseModel<PagedResult<WorkFlowGetDto>>
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
         }
+
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        {
+            var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted);
+
+            if (!string.IsNullOrWhiteSpace(q.Search))
+                // parantez önemli: OR'un kapsamını netleştirir
+                wfBase = wfBase.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search));
+
+            // LEFT JOIN: WorkFlow.RequestNo == ServicesRequest.RequestNo
+            var qJoined =
+                from wf in wfBase
+                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                     on wf.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new { wf, sr };
+
+            var total = await qJoined.CountAsync();
+
+            var items = await qJoined
+                .OrderByDescending(x => x.wf.CreatedDate)
+                .Skip((q.Page - 1) * q.PageSize)
+                .Take(q.PageSize)
+                .Select(x => new WorkFlowGetDto
+                {
+                    // WorkFlow alanları
+                    Id = x.wf.Id,
+                    RequestTitle = x.wf.RequestTitle,
+                    RequestNo = x.wf.RequestNo,
+                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+                    Priority = x.wf.Priority,
+                    WorkFlowStatus = x.wf.WorkFlowStatus,
+                    IsAgreement = x.wf.IsAgreement,
+                    CreatedDate = x.wf.CreatedDate,
+                    UpdatedDate = x.wf.UpdatedDate,
+                    CreatedUser = x.wf.CreatedUser,
+                    UpdatedUser = x.wf.UpdatedUser,
+                    IsDeleted = x.wf.IsDeleted,
+                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
+
+                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
+                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.ContactName1),
+                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+
+
+                })
+                .ToListAsync();
+
+            return ResponseModel<PagedResult<WorkFlowGetDto>>
+                .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
+        }
+
 
         public async Task<ResponseModel<WorkFlowGetDto>> GetWorkFlowByIdAsync(long id)
         {
