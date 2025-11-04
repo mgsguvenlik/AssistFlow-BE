@@ -23,6 +23,7 @@ namespace Business.Interfaces
         Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto);
         Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto);
         Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto);
+        Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo);
         Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto);
 
 
