@@ -1,14 +1,10 @@
-﻿using Azure.Core;
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Business.UnitOfWork;
-using Castle.Core.Logging;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
 using Core.Utilities.IoC;
-using Data.Seeding.Infrastructure;
 using Mapster;
-using MapsterMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
@@ -22,12 +18,10 @@ using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
-using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 
 namespace Business.Services
 {
@@ -873,7 +867,7 @@ namespace Business.Services
         //Lokasyon Kontrol  Ezme Maili 
         public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)
         {
-           
+
             var request = await _uow.Repository
                .GetQueryable<ServicesRequest>()
                .Include(x => x.Customer)
@@ -1084,7 +1078,7 @@ namespace Business.Services
 
             // Gözden Geçirme Logları (NEW)
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo)
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1141,7 +1135,7 @@ namespace Business.Services
 
             // Gözden Geçir Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo)
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1295,7 +1289,7 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
-      
+
         //Akışı bir önceki adıma geri alma işlemi
         public async Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes)
         {
@@ -1367,14 +1361,14 @@ namespace Business.Services
                                 return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
 
                             servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
-                         
+
                             servicesRequest.UpdatedDate = DateTime.Now;
                             servicesRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
                             _uow.Repository.Update(servicesRequest);
                         }
 
                         technicalService.ServicesStatus = TechnicalServiceStatus.AwaitingReview;
-                     
+
                         technicalService.UpdatedDate = DateTime.Now;
                         technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
                         _uow.Repository.Update(technicalService);
@@ -1494,7 +1488,7 @@ namespace Business.Services
 
             // Gözden Geçir Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo)
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1532,7 +1526,7 @@ namespace Business.Services
 
             // Gözden Geçir (Review) Logları
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo)
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
@@ -1575,7 +1569,7 @@ namespace Business.Services
 
             // Gözden Geçir (Review) Logları — YENİ
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo)
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepId == dto.Id || x.ToStepId == dto.Id))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
