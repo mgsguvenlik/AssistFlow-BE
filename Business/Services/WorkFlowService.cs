@@ -190,6 +190,9 @@ namespace Business.Services
             if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 return ResponseModel<WarehouseGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
 
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<WarehouseGetDto>.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
+
 
 
             var targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
@@ -339,6 +342,8 @@ namespace Business.Services
                 technicalService.Longitude = request.Customer.Longitude;
                 technicalService.ServicesStatus = TechnicalServiceStatus.Pending;
                 technicalService.ServicesCostStatus = request.ServicesCostStatus;
+                technicalService.UpdatedDate = DateTime.Now;
+                technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
                 _uow.Repository.Update(technicalService);
             }
             //Yoksa Teknik servis kaydı oluştur
@@ -358,6 +363,8 @@ namespace Business.Services
                     Longitude = request.Customer.Longitude,
                     ServicesStatus = TechnicalServiceStatus.Pending,
                     ServicesCostStatus = request.ServicesCostStatus,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0
                 };
                 _uow.Repository.Add(technicalService);
             }
@@ -455,12 +462,18 @@ namespace Business.Services
             #region Validasyonlar/Kontroller
 
             var wf = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+              .GetQueryable<WorkFlow>()
+              .AsNoTracking()
+              .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
-                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
 
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
@@ -560,12 +573,20 @@ namespace Business.Services
             #region Validasyon/Kontroller
             //WorkFlow getir
             var wf = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+            .GetQueryable<WorkFlow>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
-                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
+
+
 
             var request = await _uow.Repository
                .GetQueryable<ServicesRequest>()
@@ -665,7 +686,14 @@ namespace Business.Services
                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
-                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<TechnicalServiceGetDto>.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
+
 
             var request = await _uow.Repository
                .GetQueryable<ServicesRequest>()
@@ -934,12 +962,18 @@ namespace Business.Services
             #region Validasyonlar/Kontroller
 
             var wf = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+              .GetQueryable<WorkFlow>()
+              .AsNoTracking()
+              .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
             if (wf is null)
-                return ResponseModel<PricingGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<PricingGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                return ResponseModel<PricingGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<PricingGetDto>.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
 
             var request = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
@@ -1070,7 +1104,8 @@ namespace Business.Services
 
             if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 return ResponseModel.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
-
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
 
 
             var customer = await _uow.Repository
@@ -1260,7 +1295,7 @@ namespace Business.Services
 
             // Gözden Geçirme Logları (NEW)
             var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode =="SR" || x.ToStepCode == "SR"))
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "SR" || x.ToStepCode == "SR"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
