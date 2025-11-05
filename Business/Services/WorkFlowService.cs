@@ -2037,7 +2037,7 @@ namespace Business.Services
                                 },
 
                     CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.ContactName1),
+                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
                     CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
                     CurrentStep = x.wf.CurrentStep == null
                                    ? null
