@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -2021,6 +2022,19 @@ namespace Business.Services
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
                     ApproverTechnicianId = x.wf.ApproverTechnicianId,
+                    ApproverTechnician = x.wf.ApproverTechnician == null
+                                ? null
+                                : new UserGetDto
+                                {
+                                    Id= x.wf.ApproverTechnician.Id,
+                                    TechnicianName = x.wf.ApproverTechnician.TechnicianName,
+                                    TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
+                                    TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
+                                    City = x.wf.ApproverTechnician.City,
+                                    District = x.wf.ApproverTechnician.District,
+                                    TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+
+                                },
 
                     CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
                     CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.ContactName1),
