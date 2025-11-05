@@ -2109,22 +2109,78 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
+
+
         //-------------Private-------------
-        private async Task<ResponseModel> IsTechnicianInValidLocation(string lat1, string lon1, string lat2, string lon2)
+
+        //private async Task<ResponseModel> IsTechnicianInValidLocation(string lat1, string lon1, string lat2, string lon2)
+        //{
+        //    var data = await _uow.Repository.GetSingleAsync<Configuration>(false, x => x.Name == "TechnicianCustomerMinDistanceKm");
+        //    if (data is null)
+        //        return ResponseModel.Fail("Konum kontrolü için gerekli 'TechnicianCustomerMinDistanceKm' tanımı bulunamadı.", StatusCode.NotFound);
+
+        //    double minDistanceKm = double.Parse(data.Value ?? "0");
+        //    double latitude1 = double.Parse(lat1, CultureInfo.InvariantCulture);
+        //    double longitude1 = double.Parse(lon1, CultureInfo.InvariantCulture);
+        //    double latitude2 = double.Parse(lat2, CultureInfo.InvariantCulture);
+        //    double longitude2 = double.Parse(lon2, CultureInfo.InvariantCulture);
+        //    double distance = GetDistanceInKm(latitude1, longitude1, latitude2, longitude2);
+        //    // 🔹 Virgülden sonra 2 basamak formatla
+        //    string distanceFormatted = distance.ToString("F2", CultureInfo.InvariantCulture);
+        //    string minDistanceFormatted = minDistanceKm.ToString("F2", CultureInfo.InvariantCulture);
+        //    if (distance > minDistanceKm)
+        //        return ResponseModel.Fail(
+        //            $"Mevcut konumunuz müşteri konumuna {distanceFormatted} km uzaklıkta, izin verilen maksimum mesafe {minDistanceFormatted} km.",
+        //            StatusCode.DistanceNotSatisfied
+        //        );
+
+        //    return ResponseModel.Success();
+
+        //}
+
+
+        // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
+        private static bool TryParseLatLon(string? s, out double value)
         {
-            var data = await _uow.Repository.GetSingleAsync<Configuration>(false, x => x.Name == "TechnicianCustomerMinDistanceKm");
-            if (data is null)
+            value = default;
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            // ondalık ayırıcıyı normalize et
+            s = s.Trim().Replace(" ", "").Replace(',', '.');
+            return double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
+        }
+
+        private async Task<ResponseModel> IsTechnicianInValidLocation(string? lat1, string? lon1, string? lat2, string? lon2)
+        {
+            // --- Config oku (min mesafe)
+            var cfg = await _uow.Repository.GetSingleAsync<Configuration>(false, x => x.Name == "TechnicianCustomerMinDistanceKm");
+            if (cfg is null)
                 return ResponseModel.Fail("Konum kontrolü için gerekli 'TechnicianCustomerMinDistanceKm' tanımı bulunamadı.", StatusCode.NotFound);
 
-            double minDistanceKm = double.Parse(data.Value ?? "0");
-            double latitude1 = double.Parse(lat1, CultureInfo.InvariantCulture);
-            double longitude1 = double.Parse(lon1, CultureInfo.InvariantCulture);
-            double latitude2 = double.Parse(lat2, CultureInfo.InvariantCulture);
-            double longitude2 = double.Parse(lon2, CultureInfo.InvariantCulture);
-            double distance = GetDistanceInKm(latitude1, longitude1, latitude2, longitude2);
-            // 🔹 Virgülden sonra 2 basamak formatla
-            string distanceFormatted = distance.ToString("F2", CultureInfo.InvariantCulture);
-            string minDistanceFormatted = minDistanceKm.ToString("F2", CultureInfo.InvariantCulture);
+            // Güvenli parse: boş/format hatasında 0 değil, bilinçli hata dönelim
+            if (!TryParseLatLon(cfg.Value, out var minDistanceKm))
+                return ResponseModel.Fail("'TechnicianCustomerMinDistanceKm' değeri sayısal formatta değil.", StatusCode.InvalidConfiguration);
+
+            // --- 1) Müşteri lokasyonu zorunlu
+            if (string.IsNullOrWhiteSpace(lat1) || string.IsNullOrWhiteSpace(lon1))
+                return ResponseModel.Fail("Müşteri lokasyonu geçersiz veya eksik.", StatusCode.InvalidCustomerLocation);
+
+            if (!TryParseLatLon(lat1, out var latitude1) || !TryParseLatLon(lon1, out var longitude1))
+                return ResponseModel.Fail("Müşteri lokasyonu hatalı formatta.", StatusCode.InvalidCustomerLocation);
+
+            // --- 2) Teknisyen lokasyonu zorunlu
+            if (string.IsNullOrWhiteSpace(lat2) || string.IsNullOrWhiteSpace(lon2))
+                return ResponseModel.Fail("Teknisyen lokasyonu geçersiz veya eksik.", StatusCode.InvalidTechnicianLocation);
+
+            if (!TryParseLatLon(lat2, out var latitude2) || !TryParseLatLon(lon2, out var longitude2))
+                return ResponseModel.Fail("Teknisyen lokasyonu hatalı formatta.", StatusCode.InvalidTechnicianLocation);
+
+            // --- 3) Mesafe hesabı
+            var distance = GetDistanceInKm(latitude1, longitude1, latitude2, longitude2);
+
+            // Sunulacak metin formatı
+            var distanceFormatted = distance.ToString("F2", CultureInfo.InvariantCulture);
+            var minDistanceFormatted = minDistanceKm.ToString("F2", CultureInfo.InvariantCulture);
+
             if (distance > minDistanceKm)
                 return ResponseModel.Fail(
                     $"Mevcut konumunuz müşteri konumuna {distanceFormatted} km uzaklıkta, izin verilen maksimum mesafe {minDistanceFormatted} km.",
@@ -2132,7 +2188,6 @@ namespace Business.Services
                 );
 
             return ResponseModel.Success();
-
         }
         private static double GetDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
