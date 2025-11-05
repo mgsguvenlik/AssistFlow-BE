@@ -31,6 +31,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
+using System.Globalization;
 
 namespace Business.Mapper
 {
@@ -40,6 +41,7 @@ namespace Business.Mapper
         {
 
             config.Default.MaxDepth(2);
+
 
             // ---------------- Brand ----------------
             config.NewConfig<BrandCreateDto, Brand>()
