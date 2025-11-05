@@ -1790,13 +1790,10 @@ namespace Business.Services
                 .ProjectToType<ServicesRequestProductGetDto>(_config)
                 .ToListAsync();
 
-
-            var workflow = await query
+            var workflow = await _uow.Repository
+                .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .ProjectToType<WorkFlow>(_config)
-                .FirstOrDefaultAsync();
-
+                .FirstOrDefaultAsync(w => w.RequestNo == requestNo);
 
             // Gözden Geçir (Review) Logları — YENİ
             var reviewLogs = await _uow.Repository
