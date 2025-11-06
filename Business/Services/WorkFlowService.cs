@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Azure.Core;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -35,7 +36,8 @@ namespace Business.Services
         private readonly TypeAdapterConfig _config;
         private readonly IActivationRecordService _activationRecord;
         private readonly ILogger<WorkFlowService> _logger;
-        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IMailService mailService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger)
+        private readonly IMailPushService _mailPush;
+        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IMailService mailService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush)
         {
             _uow = uow;
             _config = config;
@@ -43,6 +45,7 @@ namespace Business.Services
             _mailService = mailService;
             _activationRecord = activationRecord;
             _logger = logger;
+            _mailPush = mailPush;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -69,7 +72,7 @@ namespace Business.Services
                     dto.RequestNo = rn.Data!;
                 }
 
-                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().Include(x => x.ApproverTechnician).AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
                 if (exists)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
@@ -182,6 +185,7 @@ namespace Business.Services
             //WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo && !x.IsDeleted);
 
@@ -270,6 +274,15 @@ namespace Business.Services
             );
             #endregion
 
+            #region Bilgilendirme Maili
+            await PushTransitionMailsAsync(
+                wf: wf,
+                fromCode: "SR",
+                toCode: "WH",
+                requestNo: dto.RequestNo,
+                customerName: request.Customer?.ContactName1
+            );
+            #endregion
             // Commit
             await _uow.Repository.CompleteAsync();
 
@@ -283,6 +296,7 @@ namespace Business.Services
             #region Validasyon/Kontroller
             var wf = await _uow.Repository
                .GetQueryable<WorkFlow>()
+               .Include(x => x.ApproverTechnician)
                .AsNoTracking()
                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
@@ -450,6 +464,14 @@ namespace Business.Services
             );
             #endregion
 
+            #region Bilgilendirme Maili
+            await PushTransitionMailsAsync(
+                wf, fromCode: "WH", toCode: "TS",
+                requestNo: dto.RequestNo,
+                customerName: request.Customer?.ContactName1
+            );
+            #endregion
+
             // 🔹 Değişiklikleri kaydet
             await _uow.Repository.CompleteAsync();
 
@@ -464,6 +486,7 @@ namespace Business.Services
 
             var wf = await _uow.Repository
               .GetQueryable<WorkFlow>()
+              .Include(x => x.ApproverTechnician)
               .AsNoTracking()
               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
@@ -560,6 +583,13 @@ namespace Business.Services
             );
             #endregion
 
+            #region Bilgilendirme Maili
+            await PushTransitionMailsAsync(
+                wf, fromCode: "SR", toCode: "TS",
+                requestNo: dto.RequestNo,
+                customerName: request.Customer?.ContactName1
+            );
+            #endregion
             // 🔹 Değişiklikleri kaydet
             await _uow.Repository.CompleteAsync();
 
@@ -575,6 +605,7 @@ namespace Business.Services
             //WorkFlow getir
             var wf = await _uow.Repository
             .GetQueryable<WorkFlow>()
+            .Include(x => x.ApproverTechnician)
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
@@ -683,6 +714,7 @@ namespace Business.Services
             #region Validasyon/Kontroller
             var wf = await _uow.Repository
                .GetQueryable<WorkFlow>()
+               .Include(x => x.ApproverTechnician)
                .AsNoTracking()
                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
@@ -964,6 +996,7 @@ namespace Business.Services
 
             var wf = await _uow.Repository
               .GetQueryable<WorkFlow>()
+              .Include(x => x.ApproverTechnician)
               .AsNoTracking()
               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
@@ -1081,7 +1114,7 @@ namespace Business.Services
             return await GetPricingByRequestNoAsync(dto.RequestNo);
         }
 
-        //Lokasyon Kontrol  Ezme Maili 
+        //Lokasyon Kontrolü  Ezme Maili 
         public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)
         {
 
@@ -1097,6 +1130,7 @@ namespace Business.Services
             //WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == request.RequestNo && !x.IsDeleted);
 
@@ -1210,7 +1244,7 @@ namespace Business.Services
             if (managerMails.Count == 0)
                 return ResponseModel.Fail("Yönetici e-posta adresi tanımlı değil.", StatusCode.BadRequest);
 
-            //MZK : Mail gönderimi responsu işlenecek
+            ///MZK : Mail gönderimi responsu işlenecek
             //var result = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
             //if (result.IsSuccess)
             //{
@@ -1219,8 +1253,18 @@ namespace Business.Services
             //    technicalService.UpdatedUser = techUserId;
             //    _uow.Repository.Update(technicalService);
             //}
+            //_ = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
+            await _mailPush.EnqueueAsync(new MailOutbox
+            {
+                RequestNo = dto.RequestNo,
+                FromStepCode = "TS",
+                ToStepCode = "TS",
+                ToRecipients = string.Join(";", managerMails),
+                Subject = subject,
+                BodyHtml = html,
+                CreatedUser = me?.Id
+            });
 
-            _ = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
             technicalService.IsLocationCheckRequired = false;
             technicalService.UpdatedDate = DateTime.Now;
             technicalService.UpdatedUser = techUserId;
@@ -1700,8 +1744,20 @@ namespace Business.Services
             };
 
             _uow.Repository.Add(reviewLog);
+
+            /// Mail Gönderimi
+            await PushTransitionMailsAsync(
+                 wf, fromCode: currentStep.Code!, toCode: targetStep.Code!,
+                 requestNo: requestNo,
+                 customerName: servicesRequest.Customer?.ContactName1
+            );
+
+
             ///Değişiklikleri Kaydet
             await _uow.Repository.CompleteAsync();
+
+
+
 
             /// Dönüş tipi WorkFlow GetDto olarak ayarlandı.
             return ResponseModel<WorkFlowGetDto>.Success(
@@ -2026,7 +2082,7 @@ namespace Business.Services
                                 ? null
                                 : new UserGetDto
                                 {
-                                    Id= x.wf.ApproverTechnician.Id,
+                                    Id = x.wf.ApproverTechnician.Id,
                                     TechnicianName = x.wf.ApproverTechnician.TechnicianName,
                                     TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
                                     TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
@@ -2127,32 +2183,6 @@ namespace Business.Services
 
         //-------------Private-------------
 
-        //private async Task<ResponseModel> IsTechnicianInValidLocation(string lat1, string lon1, string lat2, string lon2)
-        //{
-        //    var data = await _uow.Repository.GetSingleAsync<Configuration>(false, x => x.Name == "TechnicianCustomerMinDistanceKm");
-        //    if (data is null)
-        //        return ResponseModel.Fail("Konum kontrolü için gerekli 'TechnicianCustomerMinDistanceKm' tanımı bulunamadı.", StatusCode.NotFound);
-
-        //    double minDistanceKm = double.Parse(data.Value ?? "0");
-        //    double latitude1 = double.Parse(lat1, CultureInfo.InvariantCulture);
-        //    double longitude1 = double.Parse(lon1, CultureInfo.InvariantCulture);
-        //    double latitude2 = double.Parse(lat2, CultureInfo.InvariantCulture);
-        //    double longitude2 = double.Parse(lon2, CultureInfo.InvariantCulture);
-        //    double distance = GetDistanceInKm(latitude1, longitude1, latitude2, longitude2);
-        //    // 🔹 Virgülden sonra 2 basamak formatla
-        //    string distanceFormatted = distance.ToString("F2", CultureInfo.InvariantCulture);
-        //    string minDistanceFormatted = minDistanceKm.ToString("F2", CultureInfo.InvariantCulture);
-        //    if (distance > minDistanceKm)
-        //        return ResponseModel.Fail(
-        //            $"Mevcut konumunuz müşteri konumuna {distanceFormatted} km uzaklıkta, izin verilen maksimum mesafe {minDistanceFormatted} km.",
-        //            StatusCode.DistanceNotSatisfied
-        //        );
-
-        //    return ResponseModel.Success();
-
-        //}
-
-
         // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
         private static bool TryParseLatLon(string? s, out double value)
         {
@@ -2223,5 +2253,105 @@ namespace Business.Services
             return R * c; // km cinsinden döner
         }
         private static double ToRadians(double deg) => deg * (Math.PI / 180);
+
+        private async Task<List<string>> ResolveWarehouseEmailsAsync(CancellationToken ct = default)
+        {
+            // Depo rol kodları (case-insensitive karşılaştırma için üst versiyonunu da alıyoruz)
+            var WH_CODES = new[] { "WH", "WAREHOUSE", "Depo" };
+            var WH_CODES_UP = WH_CODES.Select(x => x.ToUpperInvariant()).ToArray();
+
+            var emails = await _uow.Repository.GetQueryable<User>()
+                .AsNoTracking()
+                .Where(u => !u.IsDeleted
+                    && u.UserRoles.Any(ur =>
+                           ur.Role != null
+                           && ur.Role.Code != null
+                           && WH_CODES_UP.Contains(ur.Role.Code.ToUpper())))
+                .Select(u => string.IsNullOrWhiteSpace(u.TechnicianEmail) ? "" : u.TechnicianEmail)
+                .Where(mail => !string.IsNullOrWhiteSpace(mail))
+                .Distinct()
+                .ToListAsync(ct);
+
+            return emails!;
+        }
+
+        private static string? GetTechnicianEmail(WorkFlow wf)
+        {
+            return wf?.ApproverTechnician?.TechnicianEmail;
+        }
+
+        private async Task PushTransitionMailsAsync(WorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
+        {
+            var me = (await _authService.MeAsync())?.Data?.Id;
+            var createdUser = me ?? 0;
+
+            // 1) Teknisyen’e — TS yönüne gidişler ve TS’den geri dönüşler
+            var techMail = GetTechnicianEmail(wf);
+            if (!string.IsNullOrWhiteSpace(techMail) && (toCode == "TS"))
+            {
+                var (subject, html) = BuildToTechnician(requestNo, fromCode, toCode, customerName);
+                await _mailPush.EnqueueAsync(new MailOutbox
+                {
+                    RequestNo = requestNo,
+                    FromStepCode = fromCode,
+                    ToStepCode = toCode,
+                    ToRecipients = techMail,
+                    Subject = subject,
+                    BodyHtml = html,
+                    CreatedUser = createdUser
+                });
+            }
+
+            // 2) Depo — WH yönüne gidişler ve WH’den geri dönüşler
+            if (toCode == "WH")
+            {
+                var whMails = await ResolveWarehouseEmailsAsync();
+                if (whMails.Count > 0)
+                {
+                    var (subject, html) = BuildToWarehouse(requestNo, fromCode, toCode, customerName);
+                    await _mailPush.EnqueueAsync(new MailOutbox
+                    {
+                        RequestNo = requestNo,
+                        FromStepCode = fromCode,
+                        ToStepCode = toCode,
+                        ToRecipients = string.Join(";", whMails),
+                        Subject = subject,
+                        BodyHtml = html,
+                        CreatedUser = createdUser
+                    });
+                }
+            }
+        }
+
+
+        private static (string subject, string html) BuildToTechnician(string requestNo, string fromCode, string toCode, string? customerName)
+        {
+            var subject = $"[{requestNo}] Akış güncellendi: {fromCode} → {toCode}";
+            var html = $@"
+                <div style='font-family:Arial'>
+                    <h3>İş Akışı Güncellemesi</h3>
+                    <p><b>Talep No:</b> {requestNo}</p>
+                    <p><b>Aşama:</b> {fromCode} → {toCode}</p>
+                    {(string.IsNullOrWhiteSpace(customerName) ? "" : $"<p><b>Müşteri:</b> {System.Net.WebUtility.HtmlEncode(customerName)}</p>")}
+                    <p>Teknik servis için yeni bir adım oluştu. Lütfen kontrol ediniz.</p>
+                </div>";
+            return (subject, html);
+        }
+
+        private static (string subject, string html) BuildToWarehouse(string requestNo, string fromCode, string toCode, string? customerName)
+        {
+            var subject = $"[{requestNo}] Depo bilgilendirmesi: {fromCode} → {toCode}";
+            var html = $@"
+                 <div style='font-family:Arial'>
+                     <h3>Depo Talep Bildirimi</h3>
+                     <p><b>Talep No:</b> {requestNo}</p>
+                     <p><b>Aşama:</b> {fromCode} → {toCode}</p>
+                     {(string.IsNullOrWhiteSpace(customerName) ? "" : $"<p><b>Müşteri:</b> {System.Net.WebUtility.HtmlEncode(customerName)}</p>")}
+                     <p>Servis Talebi ilgili adımda. Lütfen hazırlık/işlem yapınız.</p>
+                 </div>";
+            return (subject, html);
+        }
+
+
     }
 }

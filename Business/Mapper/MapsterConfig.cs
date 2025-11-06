@@ -1,4 +1,5 @@
-﻿using Mapster;
+﻿using Core.Enums;
+using Mapster;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Brand;
@@ -10,6 +11,7 @@ using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerGroupProductPrice;
 using Model.Dtos.CustomerProductPrice;
 using Model.Dtos.CustomerType;
+using Model.Dtos.MailOutbox;
 using Model.Dtos.Model;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
@@ -438,6 +440,24 @@ namespace Business.Mapper
                   .Map(d => d.CreatedUser, s => s.CreatedUser)
                   .Map(d => d.UpdatedDate, s => s.UpdatedDate)
                   .Map(d => d.UpdatedUser, s => s.UpdatedUser);
+
+
+
+            // ---------------- MailOutbox ----------------
+            config.NewConfig<MailOutboxCreateDto, MailOutbox>()
+                  .Ignore(d => d.Id)
+                  .Map(d => d.Status, _ => MailOutboxStatus.Pending)
+                  .Map(d => d.TryCount, _ => 0)
+                  .Map(d => d.MaxTry, s => s.MaxTry ?? 5)
+                  .Map(d => d.CreatedDate, _ => DateTime.Now)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser);
+
+            config.NewConfig<MailOutboxUpdateDto, MailOutbox>()
+                  .IgnoreNullValues(true);
+
+            config.NewConfig<MailOutbox, MailOutboxGetDto>()
+                  .Map(d => d.Status, s => (int)s.Status);
 
         }
     }

@@ -8,6 +8,14 @@ namespace Core.Enums
 {
     public enum WorkFlowActionType : short
     {
+
+        //Fiyatlama
+        PricingPending = 1,
+        PricingApproved = 2,
+        PricingRejected = 3,
+        PricingAwaitingReview = 4,
+
+
         // SR (Service Request) evreleri
         ServiceRequestCreated = 10,
         ServiceRequestUpdated = 11,
@@ -36,11 +44,12 @@ namespace Core.Enums
         LocationOverrideRequested = 50,
         LocationCheckFailed = 51,
 
-        //Fiyatlama
-        PricingPending = 1,
-        PricingApproved = 2,
-        PricingRejected = 3,
-        PricingAwaitingReview = 4,
+
+        //Mail 
+        MailSent = 60,
+        MailQueued = 61,
+        MailQueueFailed = 62,
+        MailSendFailed = 63,
     }
 
 }

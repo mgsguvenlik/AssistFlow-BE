@@ -10,6 +10,7 @@ using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Model.Concrete;
+using Model.Dtos.MailOutbox;
 
 namespace Business.DependencyResolvers.Autofac
 {
@@ -39,6 +40,9 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
             services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));
             services.AddScoped(typeof(IActivationRecordService), typeof(ActivationRecordService));
+            services.AddScoped(typeof(IMailPushService), typeof(MailPushService));
+            services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddHostedService<MailOutboxDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -177,6 +181,12 @@ namespace Business.DependencyResolvers.Autofac
                     Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionUpdateDto,
                     Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionGetDto,
                     long>, WorkFlowTransitionService>();
+
+
+            services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddScoped<
+                ICrudService<MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto, long>,
+                MailOutboxService>();
         }
         protected override void Load(ContainerBuilder builder)
         {

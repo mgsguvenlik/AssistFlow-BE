@@ -41,7 +41,7 @@ namespace Business.Services
         }
 
         private MailConfig LoadConfig()
-        {
+         {
             try
             {
                 // ctor’da await edemeyeceğimiz için sync bekleme

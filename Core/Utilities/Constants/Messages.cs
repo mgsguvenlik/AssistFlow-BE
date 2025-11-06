@@ -191,6 +191,7 @@
         public const string Deleted = "Silindi";
         public const string Unauthorized = "Yetkisiz erişim";
         public const string MGSHelpDesk = "MGS Destek";
+        public const string MailDomain = "Domain";
         public const string Success = "Başarılı";
         public const string NewPasswordAndConfirmationDoNotMatch = "Yeni şifre ile şifre tekrarı eşleşmiyor.";
         public const string RecoveryOldNewRequired = "Eski şifre, yeni şifre ve şifre tekrarı alanları zorunludur.";

@@ -40,6 +40,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }
         public DbSet<WorkFlowReviewLog> WorkFlowReviewLogs { get; set; } = default!;
         public DbSet<Pricing> Pricings { get; set; } = default!;
+        public DbSet<MailOutbox> MailOutboxes { get; set; } = default!;
 
 
         /// <summary>
