@@ -24,35 +24,10 @@ public class MailPushService : IMailPushService
             item.NextAttemptAt ??= DateTime.Now;
             await _uow.Repository.AddAsync(item);
             await _uow.Repository.CompleteAsync();
-
-            // Aktivite logu
-            //await _uow.Repository.AddAsync(new WorkFlowActivityRecord
-            //{
-            //    RequestNo = item.RequestNo,
-            //    FromStepCode = item.FromStepCode, 
-            //    ToStepCode = item.ToStepCode,
-            //    ActionType = WorkFlowActionType.MailQueued,
-            //    Summary = $"Mail kuyruğa alındı: {item.Subject} → {item.ToRecipients}",
-            //    OccurredAtUtc = DateTime.Now
-            //});
-            //await _uow.Repository.CompleteAsync();
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Mail enqueue başarısız: {Subject}", item.Subject);
-
-            //await _uow.Repository.AddAsync(new WorkFlowActivityRecord
-            //{
-            //    RequestNo = item.RequestNo,
-            //    FromStepCode = item.FromStepCode,
-            //    ToStepCode = item.ToStepCode,
-            //    ActionType = WorkFlowActionType.MailQueueFailed,
-            //    Summary = $"Mail kuyruğa alınamadı: {ex.Message}",
-            //    OccurredAtUtc = DateTime.Now
-            //});
-            //await _uow.Repository.CompleteAsync();
-
-            // akışı ASLA düşürmeyelim
         }
     }
 }
