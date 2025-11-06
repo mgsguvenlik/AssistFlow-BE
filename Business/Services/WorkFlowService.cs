@@ -1991,7 +1991,6 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return await GetStepByIdAsync(entity.Id);
         }
-
         public async Task<ResponseModel> DeleteStepAsync(long id)
         {
             // 1) Kaydı (tracked) getir
@@ -2009,7 +2008,6 @@ namespace Business.Services
 
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
-
 
         // -------------------- WorkFlow (tanım) --------------------
 
@@ -2180,7 +2178,6 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
-
         //-------------Private-------------
 
         // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
@@ -2192,7 +2189,6 @@ namespace Business.Services
             s = s.Trim().Replace(" ", "").Replace(',', '.');
             return double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
         }
-
         private async Task<ResponseModel> IsTechnicianInValidLocation(string? lat1, string? lon1, string? lat2, string? lon2)
         {
             // --- Config oku (min mesafe)
@@ -2253,7 +2249,6 @@ namespace Business.Services
             return R * c; // km cinsinden döner
         }
         private static double ToRadians(double deg) => deg * (Math.PI / 180);
-
         private async Task<List<string>> ResolveWarehouseEmailsAsync(CancellationToken ct = default)
         {
             // Depo rol kodları (case-insensitive karşılaştırma için üst versiyonunu da alıyoruz)
@@ -2274,12 +2269,10 @@ namespace Business.Services
 
             return emails!;
         }
-
         private static string? GetTechnicianEmail(WorkFlow wf)
         {
             return wf?.ApproverTechnician?.TechnicianEmail;
         }
-
         private async Task PushTransitionMailsAsync(WorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
         {
             var me = (await _authService.MeAsync())?.Data?.Id;
@@ -2322,8 +2315,6 @@ namespace Business.Services
                 }
             }
         }
-
-
         private static (string subject, string html) BuildToTechnician(string requestNo, string fromCode, string toCode, string? customerName)
         {
             var subject = $"[{requestNo}] Akış güncellendi: {fromCode} → {toCode}";
