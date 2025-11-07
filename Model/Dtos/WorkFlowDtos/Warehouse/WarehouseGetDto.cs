@@ -9,8 +9,14 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public long Id { get; set; }
         public string RequestNo { get; set; } = string.Empty;
         public DateTimeOffset DeliveryDate { get; set; }
-        public string? Description { get; set; }
+        public string? Description { get; set; } // Warehouse.Description
         public WarehouseStatus WarehouseStatus { get; set; }
+
+        // Yeni alanlar (JOIN ile gelecek)
+        public string? WorkFlowRequestTitle { get; set; }        // WorkFlow.RequestTitle
+        public WorkFlowPriority WorkFlowPriority { get; set; }   // WorkFlow.Priority
+        public string? ServicesRequestDescription { get; set; }  // ServicesRequest.Description
+
 
         // Ekranlar için yalnızca ürün Id listesi
         public List<ServicesRequestProductGetDto> WarehouseProducts { get; set; } = new();
