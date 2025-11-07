@@ -1627,7 +1627,7 @@ namespace Business.Services
             // Mevcut Adım Koduna Göre Dinamik Güncelleme
             switch (currentStep.Code)
             {
-                case "APR": // Teknik Servis Adımı (TechnicalService)
+                case "PRC": // Teknik Servis Adımı (TechnicalService)
                     pricing = await _uow.Repository
                        .GetQueryable<Pricing>()
                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
