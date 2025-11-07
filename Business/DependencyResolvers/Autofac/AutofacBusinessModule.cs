@@ -42,6 +42,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IActivationRecordService), typeof(ActivationRecordService));
             services.AddScoped(typeof(IMailPushService), typeof(MailPushService));
             services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddHostedService<MailOutboxDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı

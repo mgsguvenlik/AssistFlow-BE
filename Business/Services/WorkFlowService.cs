@@ -31,21 +31,21 @@ namespace Business.Services
     public class WorkFlowService : IWorkFlowService
     {
         private readonly IUnitOfWork _uow;
-        private readonly IAuthService _authService;
         private readonly IMailService _mailService;
         private readonly TypeAdapterConfig _config;
         private readonly IActivationRecordService _activationRecord;
         private readonly ILogger<WorkFlowService> _logger;
         private readonly IMailPushService _mailPush;
-        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IMailService mailService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush)
+        private readonly ICurrentUser _currentUser;
+        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IMailService mailService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser)
         {
             _uow = uow;
             _config = config;
-            _authService = authService;
             _mailService = mailService;
             _activationRecord = activationRecord;
             _logger = logger;
             _mailPush = mailPush;
+            _currentUser = currentUser;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -88,12 +88,15 @@ namespace Business.Services
                 if (!customerApproverExist)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
 
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
                 #endregion
 
                 #region Servis talebi güncelleme 
                 var request = dto.Adapt<ServicesRequest>(_config);
                 request.CreatedDate = DateTime.Now;
-                request.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+                request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
                 await _uow.Repository.AddAsync(request);
                 #endregion
@@ -124,7 +127,7 @@ namespace Business.Services
                     Priority = dto.Priority,
                     CurrentStepId = initialStep.Id,
                     CreatedDate = DateTime.Now,
-                    CreatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0,
+                    CreatedUser = meId,
                     WorkFlowStatus = WorkFlowStatus.Pending,
                     IsAgreement = null,
                     IsLocationValid = dto.IsLocationValid,
@@ -209,6 +212,9 @@ namespace Business.Services
                 .GetQueryable<Warehouse>()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Depo Ekle/Güncelle
@@ -223,7 +229,7 @@ namespace Business.Services
                     WarehouseStatus = WarehouseStatus.Pending
                 };
                 warehouse.CreatedDate = DateTime.Now;
-                warehouse.CreatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+                warehouse.CreatedUser = meId;
 
                 warehouse = await _uow.Repository.AddAsync(warehouse);
             }
@@ -232,7 +238,7 @@ namespace Business.Services
             else
             {
                 warehouse.UpdatedDate = DateTime.Now;
-                warehouse.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+                warehouse.UpdatedUser = meId;
                 warehouse.DeliveryDate = dto.DeliveryDate;
                 warehouse.WarehouseStatus = WarehouseStatus.Pending;
                 _uow.Repository.Update(warehouse);
@@ -243,7 +249,7 @@ namespace Business.Services
             request.WorkFlowStepId = targetStep.Id;
             request.WorkFlowStep = null;
             request.UpdatedDate = DateTime.Now;
-            request.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            request.UpdatedUser = meId;
             request.ServicesRequestStatus = ServicesRequestStatus.WarehouseSubmitted;
             _uow.Repository.Update(request);
             #endregion
@@ -253,7 +259,7 @@ namespace Business.Services
             wf.CurrentStepId = targetStep.Id;
             wf.IsAgreement = null;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
 
             #endregion
@@ -336,6 +342,10 @@ namespace Business.Services
 
             if (targetStep is null)
                 return ResponseModel<WarehouseGetDto>.Fail("WorkFlowStep içinde 'Teknik Servis' statüsü tanımlı değil.", StatusCode.BadRequest);
+
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Teknik servis kaydı Ekle/Güncelle
@@ -358,7 +368,7 @@ namespace Business.Services
                 technicalService.ServicesStatus = TechnicalServiceStatus.Pending;
                 technicalService.ServicesCostStatus = request.ServicesCostStatus;
                 technicalService.UpdatedDate = DateTime.Now;
-                technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                technicalService.UpdatedUser = meId;
                 _uow.Repository.Update(technicalService);
             }
             //Yoksa Teknik servis kaydı oluştur
@@ -379,7 +389,7 @@ namespace Business.Services
                     ServicesStatus = TechnicalServiceStatus.Pending,
                     ServicesCostStatus = request.ServicesCostStatus,
                     CreatedDate = DateTime.Now,
-                    CreatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0
+                    CreatedUser = meId
                 };
                 _uow.Repository.Add(technicalService);
             }
@@ -397,7 +407,7 @@ namespace Business.Services
 
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
             #endregion
 
@@ -514,6 +524,9 @@ namespace Business.Services
             if (targetStep is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Hedef iş akışı adımı (TS) tanımlı değil.", StatusCode.BadRequest);
 
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Teknik servis kaydını Ekle/Güncelle
@@ -563,7 +576,7 @@ namespace Business.Services
             #region Workflow Güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
             #endregion
 
@@ -646,6 +659,9 @@ namespace Business.Services
 
             if (technicalService.ServicesStatus == TechnicalServiceStatus.InProgress)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Teknik servis zaten başlatılmış", StatusCode.Conflict);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Lokasyon kontrolü
@@ -686,7 +702,7 @@ namespace Business.Services
             technicalService.StartLocation = dto.StartLocation;
             technicalService.EndLocation = string.Empty;//Henüz servis bitmediği için boş bırakılıyor
             technicalService.UpdatedDate = DateTime.Now;
-            technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            technicalService.UpdatedUser = meId;
             _uow.Repository.Update(technicalService);
             #endregion
 
@@ -757,6 +773,9 @@ namespace Business.Services
                 .FirstOrDefaultAsync(s => s.Code == "PRC");
             if (targetStep is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Hedef iş akışı adımı (PRC) tanımlı değil.", StatusCode.BadRequest);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Lokasyon kontrolü
@@ -788,14 +807,14 @@ namespace Business.Services
             technicalService.EndLocation = dto.EndLocation;
             technicalService.ServicesCostStatus = dto.ServicesCostStatus;
             technicalService.UpdatedDate = DateTime.Now;
-            technicalService.UpdatedUser = _authService.MeAsync().Result?.Data?.Id ?? 0;
+            technicalService.UpdatedUser = meId;
             _uow.Repository.Update(technicalService);
             #endregion
 
             #region Workflow güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
             #endregion
 
@@ -814,7 +833,7 @@ namespace Business.Services
                     Notes = string.Empty,
                     TotalAmount = 0,
                     CreatedDate = DateTime.Now,
-                    CreatedUser = (await _authService.MeAsync()).Data?.Id ?? 0,
+                    CreatedUser = meId,
                 };
                 _uow.Repository.Add(pricing);
             }
@@ -824,7 +843,7 @@ namespace Business.Services
                 pricing.RequestNo = dto.RequestNo;
                 pricing.Currency = "TRY";
                 pricing.UpdatedDate = DateTime.Now;
-                pricing.UpdatedUser = (await _authService.MeAsync()).Data?.Id ?? 0;
+                pricing.UpdatedUser = meId;
                 _uow.Repository.Update(pricing);
             }
             #endregion
@@ -1031,12 +1050,14 @@ namespace Business.Services
             if (pricing is null)
                 return ResponseModel<PricingGetDto>.Fail("Fiyatlama kaydı tanımlı değil.", StatusCode.BadRequest);
 
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             #endregion
 
             #region Fiyatlama ve Workflow  güncelleme 
             pricing.Status = PricingStatus.Approved;
             pricing.UpdatedDate = DateTime.Now;
-            pricing.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            pricing.UpdatedUser = meId;
             pricing.Notes = dto.Notes;
             pricing.TotalAmount = dto.TotalAmount;
             _uow.Repository.Update(pricing);
@@ -1044,7 +1065,7 @@ namespace Business.Services
 
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
             #endregion
 
@@ -1164,8 +1185,7 @@ namespace Business.Services
             if (technicalService.IsLocationCheckRequired == false)
                 return ResponseModel.Fail("Lokasyon kontrolü zaten devre dışı bırakılmış.", StatusCode.Conflict);
 
-            //  Mail içeriğini hazırla
-            var me = (await _authService.MeAsync())?.Data;
+            var me = await _currentUser.GetAsync();
             var techUserId = me?.Id ?? 0;
             var techUserName = me?.TechnicianName ?? me?.Email ?? "Bilinmiyor";
 
@@ -1440,9 +1460,14 @@ namespace Business.Services
 
             if (wf is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
             // Ana talep bilgilerini güncelle
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
             wf.CustomerApproverName = dto.CustomerApproverName;
@@ -1578,6 +1603,10 @@ namespace Business.Services
 
             if (currentStep is null)
                 return ResponseModel<WorkFlowGetDto>.Fail("Akışın mevcut adımı bulunamadı.", StatusCode.NotFound);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
             var targetStep = new WorkFlowStep();
             var warehouse = new Warehouse();
             var technicalService = new TechnicalService();
@@ -1606,11 +1635,11 @@ namespace Business.Services
 
                         technicalService.ServicesStatus = TechnicalServiceStatus.Pending;
                         technicalService.UpdatedDate = DateTime.Now;
-                        technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        technicalService.UpdatedUser = meId;
 
                         pricing.Status = PricingStatus.AwaitingReview;
                         pricing.UpdatedDate = DateTime.Now;
-                        pricing.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        pricing.UpdatedUser = meId;
                         _uow.Repository.Update(technicalService);
                     }
 
@@ -1640,7 +1669,7 @@ namespace Business.Services
 
                             warehouse.WarehouseStatus = WarehouseStatus.Pending;
                             warehouse.UpdatedDate = DateTime.Now;
-                            warehouse.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                            warehouse.UpdatedUser = meId;
                             _uow.Repository.Update(warehouse);
                         }
                         //Ürün yok ise direkt servis talebine geri gönder
@@ -1655,14 +1684,14 @@ namespace Business.Services
                             servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
 
                             servicesRequest.UpdatedDate = DateTime.Now;
-                            servicesRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                            servicesRequest.UpdatedUser = meId;
                             _uow.Repository.Update(servicesRequest);
                         }
 
                         technicalService.ServicesStatus = TechnicalServiceStatus.AwaitingReview;
 
                         technicalService.UpdatedDate = DateTime.Now;
-                        technicalService.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        technicalService.UpdatedUser = meId;
                         _uow.Repository.Update(technicalService);
                     }
 
@@ -1686,10 +1715,10 @@ namespace Business.Services
 
                         warehouse.WarehouseStatus = WarehouseStatus.AwaitingReview;
                         warehouse.UpdatedDate = DateTime.Now;
-                        warehouse.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        warehouse.UpdatedUser = meId;
                         servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
                         servicesRequest.UpdatedDate = DateTime.Now;
-                        servicesRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        servicesRequest.UpdatedUser = meId;
                         _uow.Repository.Update(servicesRequest);
                     }
                     break;
@@ -1701,7 +1730,7 @@ namespace Business.Services
                     if (serviceRequest != null)
                     {
                         serviceRequest.UpdatedDate = DateTime.Now;
-                        serviceRequest.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+                        serviceRequest.UpdatedUser = meId;
                         _uow.Repository.Update(serviceRequest);
                     }
                     break;
@@ -1714,7 +1743,7 @@ namespace Business.Services
             //Ana WorkFlow'u Yeni Adıma Güncelle
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
 
             ///Aktivite Kaydı Yaz
@@ -1729,7 +1758,6 @@ namespace Business.Services
             );
 
             /// Gözden geçirme logu yaz
-            var me = (await _authService.MeAsync())?.Data?.Id ?? 0;
             var reviewLog = new WorkFlowReviewLog
             {
                 WorkFlowId = wf.Id,
@@ -1739,7 +1767,7 @@ namespace Business.Services
                 ToStepId = targetStep.Id,             // hedef (yeni) adım id
                 ToStepCode = targetStep.Code,           // hedef (yeni) adım kodu
                 ReviewNotes = reviewNotes,
-                CreatedUser = me,
+                CreatedUser = meId,
                 CreatedDate = DateTime.Now
             };
 
@@ -1986,6 +2014,7 @@ namespace Business.Services
             var dto = await query
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
+                .AsSplitQuery()
                 .Include(x => x.ServiceRequestFormImages)
                 .Include(x => x.ServicesImages)
                 .Include(x => x.ServiceType)
@@ -2026,7 +2055,7 @@ namespace Business.Services
         }
 
         /// ------------------ Pricing -----------------------------------
-        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync_(string requestNo)
         {
             var query = _uow.Repository.GetQueryable<Pricing>();
 
@@ -2064,6 +2093,68 @@ namespace Business.Services
             return ResponseModel<PricingGetDto>.Success(dto);
 
         }
+
+        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
+        {
+            var qPricing = _uow.Repository.GetQueryable<Pricing>().AsNoTracking();
+            var qRequest = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+
+            // HEADER: Pricing (zorunlu) + ServicesRequest (left)
+            var dto = await (
+                from pr in qPricing
+                where pr.RequestNo == requestNo
+                join sr0 in qRequest on pr.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new PricingGetDto
+                {
+                    // Pricing’ten
+                    Id = pr.Id,
+                    RequestNo = pr.RequestNo,
+                    Status = pr.Status,
+                    Currency = pr.Currency,
+                    Notes = pr.Notes,
+                    TotalAmount = pr.TotalAmount,
+
+                    // ✅ AUDIT (Pricing tablosundan)
+                    CreatedDate = pr.CreatedDate,
+                    CreatedUser = pr.CreatedUser,
+                    UpdatedDate = pr.UpdatedDate,
+                    UpdatedUser = pr.UpdatedUser,
+
+                    // ServicesRequest’ten
+                    OracleNo = sr != null ? sr.OracleNo : null,
+                    ServicesCostStatus = sr != null ? sr.ServicesCostStatus : ServicesCostStatus.Unknown
+                    // (Unknown yoksa enum’un default değeri)
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ÜRÜNLER
+            dto.Products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .ToListAsync();
+
+            // REVIEW LOG’LARI
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "PRC" || x.ToStepCode == "PRC"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<PricingGetDto>.Success(dto);
+        }
+
 
         // -------------------- WorkFlowStep --------------------
         public async Task<ResponseModel<PagedResult<WorkFlowStepGetDto>>> GetStepsAsync(QueryParams q)
@@ -2266,6 +2357,8 @@ namespace Business.Services
         }
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)
             var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
                 asNoTracking: false,
@@ -2277,7 +2370,7 @@ namespace Business.Services
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.IsDeleted = true;                // varsa
             entity.UpdatedDate = DateTime.Now; // varsa
-            entity.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            entity.UpdatedUser = meId;
             _uow.Repository.Update(entity);
 
             await _uow.Repository.CompleteAsync();
@@ -2286,6 +2379,8 @@ namespace Business.Services
 
         public async Task<ResponseModel> CancelWorkFlowAsync(long id)
         {
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
             var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
               asNoTracking: false,
               x => x.Id == id);
@@ -2296,7 +2391,7 @@ namespace Business.Services
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.WorkFlowStatus = WorkFlowStatus.Cancelled;                // varsa
             entity.UpdatedDate = DateTime.Now; // varsa
-            entity.UpdatedUser = (await _authService.MeAsync())?.Data?.Id ?? 0;
+            entity.UpdatedUser = meId;
             _uow.Repository.Update(entity);
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
@@ -2399,8 +2494,8 @@ namespace Business.Services
         }
         private async Task PushTransitionMailsAsync(WorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
         {
-            var me = (await _authService.MeAsync())?.Data?.Id;
-            var createdUser = me ?? 0;
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
 
             // 1) Teknisyen’e — TS yönüne gidişler ve TS’den geri dönüşler
             var techMail = GetTechnicianEmail(wf);
@@ -2415,7 +2510,7 @@ namespace Business.Services
                     ToRecipients = techMail,
                     Subject = subject,
                     BodyHtml = html,
-                    CreatedUser = createdUser
+                    CreatedUser = meId
                 });
             }
 
@@ -2434,7 +2529,7 @@ namespace Business.Services
                         ToRecipients = string.Join(";", whMails),
                         Subject = subject,
                         BodyHtml = html,
-                        CreatedUser = createdUser
+                        CreatedUser = meId
                     });
                 }
             }

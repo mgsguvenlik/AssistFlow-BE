@@ -18,6 +18,9 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         public string Currency { get; set; } = "TRY";
         public string? Notes { get; set; }
         public decimal TotalAmount { get; set; }
+        public string? OracleNo { get; set; }
+        public ServicesCostStatus ServicesCostStatus { get; set; }
+
 
         // Audit
         public DateTimeOffset CreatedDate { get; set; }
