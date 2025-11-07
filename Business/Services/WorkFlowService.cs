@@ -1138,17 +1138,15 @@ namespace Business.Services
         //Lokasyon Kontrolü  Ezme Maili 
         public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)
         {
-
+            // 1) Talep & WorkFlow & Customer & TechnicalService kontrolleri
             var request = await _uow.Repository
-               .GetQueryable<ServicesRequest>()
-               .Include(x => x.Customer)
-               .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
             if (request is null)
                 return ResponseModel.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
-
-            //WorkFlow getir
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .Include(x => x.ApproverTechnician)
@@ -1162,7 +1160,6 @@ namespace Business.Services
                 return ResponseModel.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
             if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
                 return ResponseModel.Fail("İlgili akış iptal tamamlanmış.", StatusCode.NotFound);
-
 
             var customer = await _uow.Repository
                 .GetQueryable<Customer>()
@@ -1179,9 +1176,6 @@ namespace Business.Services
             if (technicalService is null)
                 return ResponseModel.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
 
-
-
-
             if (technicalService.IsLocationCheckRequired == false)
                 return ResponseModel.Fail("Lokasyon kontrolü zaten devre dışı bırakılmış.", StatusCode.Conflict);
 
@@ -1189,37 +1183,53 @@ namespace Business.Services
             var techUserId = me?.Id ?? 0;
             var techUserName = me?.TechnicianName ?? me?.Email ?? "Bilinmiyor";
 
+            // 2) Konum alanlarını hazırla
             string custLat = customer.Latitude ?? "-";
             string custLon = customer.Longitude ?? "-";
             string techLat = dto.TechnicianLatitude ?? "-";
             string techLon = dto.TechnicianLongitude ?? "-";
 
-            string mapsLinkCustomer = (custLat != "-" && custLon != "-")
+            bool hasCustomerLoc = custLat != "-" && custLon != "-";
+            bool hasTechnicianLoc = techLat != "-" && techLon != "-";
+
+            string mapsLinkCustomer = hasCustomerLoc
                 ? $"https://www.google.com/maps?q={custLat},{custLon}"
                 : "#";
 
-            string mapsLinkTechnician = (techLat != "-" && techLon != "-")
+            string mapsLinkTechnician = hasTechnicianLoc
                 ? $"https://www.google.com/maps?q={techLat},{techLon}"
                 : "#";
 
-            // İsteğe bağlı: mesafeyi hesaplayıp maile eklemek istersen, elindeki helper'ı kullan:
-            double? distanceKm = null;
-            if (double.TryParse(techLat, out var tlat) && double.TryParse(techLon, out var tlon) &&
-                double.TryParse(custLat, out var clat) && double.TryParse(custLon, out var clon))
+            // 3) Mesafeyi güvenli hesapla (virgül/nokta normalize)
+            static bool TryParseCoord(string s, out double v)
             {
-                distanceKm = GetDistanceInKm(tlat, tlon, clat, clon); // mevcut helper
+                v = default;
+                if (string.IsNullOrWhiteSpace(s) || s == "-") return false;
+                s = s.Trim().Replace(" ", "").Replace(',', '.');
+                return double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out v);
+            }
+
+            double? distanceKm = null;
+            if (hasCustomerLoc && hasTechnicianLoc
+                && TryParseCoord(techLat, out var tlat)
+                && TryParseCoord(techLon, out var tlon)
+                && TryParseCoord(custLat, out var clat)
+                && TryParseCoord(custLon, out var clon))
+            {
+                distanceKm = GetDistanceInKm(tlat, tlon, clat, clon);
             }
 
             var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
             var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/');
             var subject = $"[Lokasyon Onayı] RequestNo: {dto.RequestNo} – {request.Customer?.ContactName1}";
             var distanceInfo = distanceKm.HasValue ? $"{Math.Round(distanceKm.Value, 2)} km" : "Hesaplanamadı";
-            // Link parçaları (önce hazırla)
-            var customerLink = mapsLinkCustomer != "#"
+
+            // 4) Link parçaları (sadece varsa üret)
+            var customerLink = hasCustomerLoc
                 ? $"<a href=\"{mapsLinkCustomer}\">Google Maps</a>"
                 : string.Empty;
 
-            var technicianLink = mapsLinkTechnician != "#"
+            var technicianLink = hasTechnicianLoc
                 ? $"<a href=\"{mapsLinkTechnician}\">Google Maps</a>"
                 : string.Empty;
 
@@ -1227,25 +1237,34 @@ namespace Business.Services
                 ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">Kaydı görüntüle</a></p>"
                 : string.Empty;
 
-            // Ana HTML (tek bir $@ ile)
-            var html = $@"
-                    <div style=""font-family:Arial,sans-serif;font-size:14px"">
-                        <h3>Teknik Servis Lokasyon Kontrol Aşımı Bilgisi</h3>
-                        <p><b>Talep No:</b> {dto.RequestNo}</p>
-                        <p><b>Talep Başlığı:</b> {wf.RequestTitle}</p>
-                        <p><b>Müşteri:</b> {(request.Customer?.ContactName1 ?? "-")} (Id: {request.CustomerId})</p>
-                        <p><b>Teknisyen:</b> {techUserName} (Id: {techUserId})</p>
-                        <hr/>
-                        <p><b>Müşteri Konumu:</b> {custLat}, {custLon} {customerLink}</p>
-                        <p><b>Teknisyen Konumu:</b> {techLat}, {techLon} {technicianLink}</p>
-                        <p><b>Kuş Uçuşu Mesafe:</b> {distanceInfo}</p>
-                        {(string.IsNullOrWhiteSpace(dto.Reason) ? "" : $"<p><b>Açıklama:</b> {System.Net.WebUtility.HtmlEncode(dto.Reason)}</p>")}
-                        <hr/>
-                        <p>Bilgi: Bu talep ile teknik servis için lokasyon kontrolü devre dışı bırakılmıştır </p>
-                        {viewLink}
-                    </div>";
+            // 5) Konum satırlarını koşullu yaz
+            string customerLocRow = hasCustomerLoc
+                ? $@"<p><b>Müşteri Konumu:</b> {custLat}, {custLon} {customerLink}</p>"
+                : @"<p><b>Müşteri Konumu:</b> <span style=""color:#b00"">Kayıtlı değil / bulunamadı</span></p>";
 
-            // Mail alıcıları (tercihen Config/DB'den)
+            string technicianLocRow = hasTechnicianLoc
+                ? $@"<p><b>Teknisyen Konumu:</b> {techLat}, {techLon} {technicianLink}</p>"
+                : @"<p><b>Teknisyen Konumu:</b> <span style=""color:#b00"">Kayıtlı değil / bulunamadı</span></p>";
+
+            // 6) Mail HTML
+            var html = $@"
+                 <div style=""font-family:Arial,sans-serif;font-size:14px"">
+                     <h3>Teknik Servis Lokasyon Kontrol Aşımı Bilgisi</h3>
+                     <p><b>Talep No:</b> {dto.RequestNo}</p>
+                     <p><b>Talep Başlığı:</b> {wf.RequestTitle}</p>
+                     <p><b>Müşteri:</b> {(request.Customer?.ContactName1 ?? "-")} </p>
+                     <p><b>Teknisyen:</b> {techUserName}</p>
+                     <hr/>
+                     {customerLocRow}
+                     {technicianLocRow}
+                     <p><b>Kuş Uçuşu Mesafe:</b> {distanceInfo}</p>
+                     {(string.IsNullOrWhiteSpace(dto.Reason) ? "" : $"<p><b>Açıklama:</b> {System.Net.WebUtility.HtmlEncode(dto.Reason)}</p>")}
+                     <hr/>
+                     <p>Bilgi: Bu talep ile teknik servis için lokasyon kontrolü devre dışı bırakılmıştır </p>
+                     {viewLink}
+                 </div>";
+
+            // 7) Mail alıcıları
             var managerMails = new List<string>();
             var managerMailConfig = await _uow.Repository
                 .GetQueryable<Configuration>()
@@ -1264,16 +1283,7 @@ namespace Business.Services
             if (managerMails.Count == 0)
                 return ResponseModel.Fail("Yönetici e-posta adresi tanımlı değil.", StatusCode.BadRequest);
 
-            ///MZK : Mail gönderimi responsu işlenecek
-            //var result = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
-            //if (result.IsSuccess)
-            //{
-            //    technicalService.IsLocationCheckRequired = false;
-            //    technicalService.UpdatedDate = DateTime.Now;
-            //    technicalService.UpdatedUser = techUserId;
-            //    _uow.Repository.Update(technicalService);
-            //}
-            //_ = await _mailService.SendLocationOverrideMailAsync(managerMails, subject, html);
+            // 8) Mail outbox’a yaz
             await _mailPush.EnqueueAsync(new MailOutbox
             {
                 RequestNo = dto.RequestNo,
@@ -1285,15 +1295,18 @@ namespace Business.Services
                 CreatedUser = me?.Id
             });
 
+            // 9) Lokasyon kontrolünü kapat ve kaydet
             technicalService.IsLocationCheckRequired = false;
             technicalService.UpdatedDate = DateTime.Now;
             technicalService.UpdatedUser = techUserId;
             _uow.Repository.Update(technicalService);
+
             await _uow.Repository.CompleteAsync();
 
-            // Son durumu döndür
+            // 10) Sonuç
             return ResponseModel.Success("Lokasyon kontrolü devre dışı bırakma talebi iletildi ve ilgili yöneticilere e-posta gönderildi.");
         }
+
         ///-----------------------------
 
         // -------------------- Services Request --------------------
