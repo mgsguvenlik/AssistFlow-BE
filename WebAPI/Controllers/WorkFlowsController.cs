@@ -164,7 +164,7 @@ namespace WebAPI.Controllers
         }
 
 
-        [HttpPost("get-pricing-by-requestno")]
+        [HttpGet("get-pricing-by-requestno")]
         public async Task<IActionResult> GetPricingByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetPricingByRequestNoAsync(requestNo);
