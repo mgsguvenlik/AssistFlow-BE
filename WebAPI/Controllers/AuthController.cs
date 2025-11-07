@@ -43,22 +43,8 @@ public class AuthController : ControllerBase
         {
             return BadRequest(Messages.EmailRequired);
         }
-
-
         var result = await _userService.ResetPasswordRequestAsync(resetPasswordRequest.Email, cancellationToken);
-
-        if (!result.IsSuccess)
-        {
-            return BadRequest(result.Message ?? Messages.FailedToProcessResetPasswordRequest);
-        }
-
-        return Ok(
-            new
-            {
-                Status = result.StatusCode,
-                Message = result.Message ?? Messages.ResetPasswordRequestSuccess
-            }
-        );
+        return Ok(result);
     }
 
     [HttpPost("ChangePassword")]
@@ -76,19 +62,7 @@ public class AuthController : ControllerBase
         }
 
         var result = await _userService.ChangePasswordAsync(changePasswordDto.RecoveryCode, changePasswordDto.NewPassword, cancellationToken);
-
-        if (!result.IsSuccess)
-        {
-            return BadRequest(result.Message ?? Messages.FailedToChangePassword);
-        }
-
-        return Ok(
-            new
-            {
-                Status = result.StatusCode,
-                Message = result.Message ?? Messages.PasswordChangedSuccessfully
-            }
-        );
+        return Ok(result);
     }
 
 }
