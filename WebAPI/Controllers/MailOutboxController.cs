@@ -24,7 +24,7 @@ namespace WebAPI.Controllers
         /// <summary>
         /// Tek bir mail outbox kaydı için yeniden deneme tetikleme
         /// </summary>
-        [HttpPost("{id:long}/retry")]
+        [HttpPost("retry/{id:long}")]
         public async Task<IActionResult> Retry(long id, CancellationToken ct)
         {
             var ok = await _mailOutboxService.RetryAsync(id, ct);
