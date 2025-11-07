@@ -50,6 +50,10 @@ namespace Core.Enums
         MailQueued = 61,
         MailQueueFailed = 62,
         MailSendFailed = 63,
+
+
+        FinalApprovalUpdated =70,
+        FinalApprovalCreated = 71,
     }
 
 }

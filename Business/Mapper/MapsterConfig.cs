@@ -22,6 +22,7 @@ using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
+using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -458,6 +459,13 @@ namespace Business.Mapper
 
             config.NewConfig<MailOutbox, MailOutboxGetDto>()
                   .Map(d => d.Status, s => (int)s.Status);
+
+
+            // Entity -> GetDto
+            //config.NewConfig<FinalApproval, FinalApprovalGetDto>();
+
+            //// CreateDto -> Entity
+            //config.NewConfig<FinalApprovalCreateDto, FinalApproval>();
 
         }
     }

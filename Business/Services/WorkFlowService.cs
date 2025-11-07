@@ -1,5 +1,4 @@
-﻿using Azure.Core;
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -15,6 +14,7 @@ using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -1062,7 +1062,6 @@ namespace Business.Services
             pricing.TotalAmount = dto.TotalAmount;
             _uow.Repository.Update(pricing);
 
-
             wf.CurrentStepId = targetStep.Id;
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = meId;
@@ -1113,6 +1112,31 @@ namespace Business.Services
 
             #endregion
 
+            #region Son Onaya Gönderim 
+            var finalApproval = await _uow.Repository
+                    .GetQueryable<FinalApproval>()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+            if (finalApproval is null)
+            {
+                finalApproval = new FinalApproval
+                {
+                    RequestNo = dto.RequestNo,
+                    Status = FinalApprovalStatus.Pending,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = meId
+                };
+                _uow.Repository.Add(finalApproval);
+            }
+            else
+            {
+                finalApproval.RequestNo = dto.RequestNo;
+                finalApproval.Status = FinalApprovalStatus.Pending;
+                finalApproval.UpdatedDate = DateTime.Now;
+                finalApproval.UpdatedUser = meId;
+                _uow.Repository.Update(finalApproval);
+            }
+            #endregion
+
             #region Hareket Kaydı
             await _activationRecord.LogAsync(
                  WorkFlowActionType.PricingApproved,
@@ -1135,6 +1159,90 @@ namespace Business.Services
             return await GetPricingByRequestNoAsync(dto.RequestNo);
         }
 
+
+        // 7) Kontrol ve Son Onay (FinalApproval) — CREATE
+        public async Task<ResponseModel<FinalApprovalGetDto>> FinalApprovalAsync(FinalApprovalUpdateDto dto)
+        {
+            // 1) WorkFlow & Request kontrolleri
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                return ResponseModel<FinalApprovalGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
+
+            if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                return ResponseModel<FinalApprovalGetDto>.Fail("İlgili akış tamamlanmış.", StatusCode.NotFound);
+
+            var request = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (request is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
+
+            // 2) Hedef adım: APR (Approval / Final Approval)
+            var targetStep = await _uow.Repository
+                .GetQueryable<WorkFlowStep>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Code == "APR");
+
+            if (targetStep is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
+            // 3) FinalApproval var mı? (unique: RequestNo)
+            var exists = await _uow.Repository
+                .GetQueryable<FinalApproval>()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (exists is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.BadRequest);
+
+
+            exists.Notes = dto.Notes;
+            exists.Status = dto.FinalApprovalStatus;
+            exists.DecidedBy = meId;
+
+            exists.UpdatedDate = DateTime.Now;
+            exists.UpdatedUser = meId;
+            _uow.Repository.Update(exists);
+
+            // WorkFlow’u APR’da konumla (emin olmak için)
+            var wfTracked = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+            if (wfTracked is not null)
+            {
+                wfTracked.CurrentStepId = targetStep.Id;
+                wfTracked.UpdatedDate = DateTime.Now;
+                wfTracked.UpdatedUser = meId;
+                wfTracked.WorkFlowStatus = dto.WorkFlowStatus;
+                _uow.Repository.Update(wfTracked);
+            }
+
+            await _activationRecord.LogAsync(
+                WorkFlowActionType.FinalApprovalUpdated,
+                dto.RequestNo,
+                wf?.Id,
+                fromStepCode: wf?.CurrentStep?.Code ?? "APR",
+                toStepCode: "APR",
+                 "Kontrol ve Son Onay kaydı güncellendi.",
+                new { dto.Notes, dto.WorkFlowStatus, meId, DateTime.Now }
+            );
+
+            await _uow.Repository.CompleteAsync();
+
+            return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
+        }
 
 
         //Lokasyon Kontrolü  Ezme Maili 
@@ -2165,6 +2273,81 @@ namespace Business.Services
                 .ToListAsync();
 
             return ResponseModel<PricingGetDto>.Success(dto);
+        }
+
+        //----------------------FinalApproval ---------------------------------------------------
+        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo)
+        {
+            // HEADER
+            var dto = await _uow.Repository
+                .GetQueryable<FinalApproval>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ProjectToType<FinalApprovalGetDto>(_config)
+                .FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // PRODUCTS (RequestNo bazlı)
+            dto.Products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .ToListAsync();
+
+            // REVIEW LOG’lar (APR ile ilgili gelen/giden tüm hareketler)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<FinalApprovalGetDto>.Success(dto);
+        }
+       
+        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id)
+        {
+            // HEADER
+            var dto = await _uow.Repository
+                .GetQueryable<FinalApproval>()
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .ProjectToType<FinalApprovalGetDto>(_config)
+                .FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // PRODUCTS (RequestNo bazlı)
+            dto.Products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
+                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .ToListAsync();
+
+            // REVIEW LOG’lar (APR ile ilgili gelen/giden tüm hareketler)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<FinalApprovalGetDto>.Success(dto);
         }
 
 

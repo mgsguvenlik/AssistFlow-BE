@@ -2,6 +2,7 @@
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
@@ -174,6 +175,27 @@ namespace WebAPI.Controllers
         }
 
 
+        [HttpPost("final-approve")]
+        public async Task<IActionResult> FinalApprove([FromBody] FinalApprovalUpdateDto dto)
+        {
+            var result = await _workFlowService.FinalApprovalAsync(dto);
+            return Ok(result);
+        }
+
+
+        [HttpGet("get-finalapproval-by-requestno")]
+        public async Task<IActionResult> GetFinalApprovalByRequestNoAsync([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetFinalApprovalByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+        [HttpGet("get-finalapproval-by-id")]
+        public async Task<IActionResult> GetFinalApprovalByIdAsync([FromQuery] long id)
+        {
+            var result = await _workFlowService.GetFinalApprovalByIdAsync(id);
+            return Ok(result);
+        }
 
         [HttpPost("location-override")]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] OverrideLocationCheckDto dto)

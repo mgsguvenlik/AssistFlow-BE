@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
@@ -14,7 +15,7 @@ namespace Business.Interfaces
         // ServicesRequest
         Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByNoAsync(string requestNo);
-      
+
         Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
         Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto);
         Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto);
@@ -29,7 +30,9 @@ namespace Business.Interfaces
 
         Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
 
-    
+        Task<ResponseModel<FinalApprovalGetDto>> FinalApprovalAsync(FinalApprovalUpdateDto dto);
+        Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo);
+        Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id);
 
         // WorkFlowStep
         Task<ResponseModel<PagedResult<WorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
