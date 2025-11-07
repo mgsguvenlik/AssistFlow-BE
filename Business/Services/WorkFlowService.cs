@@ -1135,6 +1135,8 @@ namespace Business.Services
             return await GetPricingByRequestNoAsync(dto.RequestNo);
         }
 
+
+
         //Lokasyon Kontrolü  Ezme Maili 
         public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)
         {
@@ -1793,11 +1795,8 @@ namespace Business.Services
                  customerName: servicesRequest.Customer?.ContactName1
             );
 
-
             ///Değişiklikleri Kaydet
             await _uow.Repository.CompleteAsync();
-
-
 
 
             /// Dönüş tipi WorkFlow GetDto olarak ayarlandı.
