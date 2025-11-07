@@ -462,7 +462,7 @@ namespace Business.Mapper
 
 
             // Entity -> GetDto
-            //config.NewConfig<FinalApproval, FinalApprovalGetDto>();
+            config.NewConfig<FinalApproval, FinalApprovalGetDto>();
 
             //// CreateDto -> Entity
             //config.NewConfig<FinalApprovalCreateDto, FinalApproval>();

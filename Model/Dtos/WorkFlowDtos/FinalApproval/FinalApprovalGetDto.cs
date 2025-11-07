@@ -11,14 +11,7 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
         public string? Notes { get; set; }
 
         public long? DecidedBy { get; set; }
-        public DateTime? DecidedAt { get; set; }
         public FinalApprovalStatus Status { get; set; } = FinalApprovalStatus.Pending;
-
-        // AUDIT (entity’den)
-        public DateTime CreatedDate { get; set; }
-        public long CreatedUser { get; set; }
-        public DateTime? UpdatedDate { get; set; }
-        public long? UpdatedUser { get; set; }
 
         // Review loglar (APR adımı için)
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
