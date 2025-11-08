@@ -87,7 +87,17 @@ namespace Model.Concrete
         public string? Longitude { get; set; }
         public string? Latitude { get; set; }
 
+        /// <summary>
+        /// Kurulum tarihi 
+        /// </summary>
         public DateTimeOffset? InstallationDate { get; set; }
+
+        /// <summary>
+        /// Garanti süresi (yıl). Null ise garanti takibi yok kabul edilir.
+        /// Örn: 1, 2, 3...
+        /// </summary>
+        public int? WarrantyYears { get; set; }
+
 
         /// <summary>
         /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
