@@ -1209,7 +1209,7 @@ namespace Business.Services
 
 
             exists.Notes = dto.Notes;
-            exists.Status = dto.FinalApprovalStatus;
+            exists.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated ? FinalApprovalStatus.Approved : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
             exists.DecidedBy = meId;
 
             exists.UpdatedDate = DateTime.Now;
@@ -2312,7 +2312,7 @@ namespace Business.Services
 
             return ResponseModel<FinalApprovalGetDto>.Success(dto);
         }
-       
+
         public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id)
         {
             // HEADER
