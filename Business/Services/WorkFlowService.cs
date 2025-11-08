@@ -15,6 +15,7 @@ using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
+using Model.Dtos.Role;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
@@ -2307,7 +2308,7 @@ namespace Business.Services
 
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync__(long id)
         {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
@@ -2431,6 +2432,150 @@ namespace Business.Services
 
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
+
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
+        {
+            var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
+            var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
+            var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+            var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+
+            // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
+            var dto = await (
+                from w in qWarehouse
+                where w.Id == id
+
+                join wf0 in qWorkFlow on w.RequestNo equals wf0.RequestNo into wfj
+                from wf in wfj
+                    .OrderByDescending(x => x.CreatedDate)   // en güncel WF
+                    .Take(1)
+                    .DefaultIfEmpty()
+
+                join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+
+                    // 🔹 ApproverTechnician (User) join
+                join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
+                from u in uj.DefaultIfEmpty()
+
+                select new WarehouseGetDto
+                {
+                    Id = w.Id,
+                    RequestNo = w.RequestNo,
+                    DeliveryDate = w.DeliveryDate,
+                    Description = w.Description,
+                    WarehouseStatus = w.WarehouseStatus,
+
+                    // WorkFlow
+                    WorkFlowRequestTitle = wf != null ? wf.RequestTitle : null,
+                    WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    // ServicesRequest
+                    ServicesRequestDescription = sr != null ? sr.Description : null,
+
+                    // Customer
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null,
+
+                    // 🔹 User (WorkFlow.ApproverTechnician)
+                    User = u == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = u.Id,
+                              TechnicianCode = u.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = u.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = u.TechnicianAddress,       // adres
+                              City = u.City,
+                              District = u.District,
+                              TechnicianName = u.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = u.TechnicianPhone,         // tel
+                              TechnicianEmail = u.TechnicianEmail,         // e-posta
+                              IsActive = u.IsActive,
+
+                              // Roller (Include gerektirmez; alt-sorgu olarak çevrilir)
+                              Roles = u.UserRoles
+                                  .Select(ur => new RoleGetDto
+                                  {
+                                      Id = ur.Role.Id,
+                                      Name = ur.Role.Name,
+                                      Code = ur.Role.Code
+                                  })
+                                  .ToList()
+                          }
+
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ÜRÜNLER: depo aşamasında fiyat yok
+            dto.WarehouseProducts = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null
+                    // Fiyat alanları (ProductPrice/EffectivePrice/PriceCurrency) depoda gösterilmiyor
+                })
+                .ToListAsync();
+
+            // REVIEW LOG’LARI (Warehouse adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId = x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId = x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId = x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes = x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
+                .ToListAsync();
+
+            return ResponseModel<WarehouseGetDto>.Success(dto);
+        }
+
         public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync_(string requestNo)
         {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
@@ -2492,7 +2637,7 @@ namespace Business.Services
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
 
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync__(string requestNo)
         {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
@@ -2589,6 +2734,148 @@ namespace Business.Services
                     //        .FirstOrDefault()
                     //    ?? (decimal?)p.Product.Price
                     //    ?? 0m
+                })
+                .ToListAsync();
+
+            // REVIEW LOG’LARI (Warehouse adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId = x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId = x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId = x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes = x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
+                .ToListAsync();
+
+            return ResponseModel<WarehouseGetDto>.Success(dto);
+        }
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
+        {
+            var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
+            var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
+            var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+            var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+
+            // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
+            var dto = await (
+                from w in qWarehouse
+                where w.RequestNo == requestNo
+
+                join wf0 in qWorkFlow on w.RequestNo equals wf0.RequestNo into wfj
+                from wf in wfj
+                    .OrderByDescending(x => x.CreatedDate)   // en güncel WF
+                    .Take(1)
+                    .DefaultIfEmpty()
+
+                join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+
+                    // 🔹 ApproverTechnician (User) join
+                join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
+                from u in uj.DefaultIfEmpty()
+
+                select new WarehouseGetDto
+                {
+                    Id = w.Id,
+                    RequestNo = w.RequestNo,
+                    DeliveryDate = w.DeliveryDate,
+                    Description = w.Description,
+                    WarehouseStatus = w.WarehouseStatus,
+
+                    // WorkFlow
+                    WorkFlowRequestTitle = wf != null ? wf.RequestTitle : null,
+                    WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    // ServicesRequest
+                    ServicesRequestDescription = sr != null ? sr.Description : null,
+
+                    // Customer
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null,
+
+                    // 🔹 User (WorkFlow.ApproverTechnician)
+                    User = u == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = u.Id,
+                              TechnicianCode = u.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = u.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = u.TechnicianAddress,       // adres
+                              City = u.City,
+                              District = u.District,
+                              TechnicianName = u.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = u.TechnicianPhone,         // tel
+                              TechnicianEmail = u.TechnicianEmail,         // e-posta
+                              IsActive = u.IsActive,
+
+                              // Roller (Include gerektirmez; alt-sorgu olarak çevrilir)
+                              Roles = u.UserRoles
+                                  .Select(ur => new RoleGetDto
+                                  {
+                                      Id = ur.Role.Id,
+                                      Name = ur.Role.Name,
+                                      Code = ur.Role.Code
+                                  })
+                                  .ToList()
+                          }
+
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ÜRÜNLER: depo aşamasında fiyat yok
+            dto.WarehouseProducts = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null
+                    // Fiyat alanları (ProductPrice/EffectivePrice/PriceCurrency) depoda gösterilmiyor
                 })
                 .ToListAsync();
 

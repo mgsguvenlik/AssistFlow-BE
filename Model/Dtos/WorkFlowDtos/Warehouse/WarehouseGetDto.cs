@@ -1,5 +1,6 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
+using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
@@ -23,6 +24,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public List<ServicesRequestProductGetDto> WarehouseProducts { get; set; } = new();
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+        public UserGetDto? User { get; set; }
     }
 
 }
