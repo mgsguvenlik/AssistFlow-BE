@@ -14,7 +14,7 @@ namespace Business.Interfaces
     {
         // ServicesRequest
         Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
-        Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByNoAsync(string requestNo);
+        Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
 
         Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
         Task<ResponseModel<ServicesRequestGetDto>> CreateRequestAsync(ServicesRequestCreateDto dto);

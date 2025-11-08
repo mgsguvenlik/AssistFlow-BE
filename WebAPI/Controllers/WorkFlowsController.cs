@@ -111,7 +111,7 @@ namespace WebAPI.Controllers
         [HttpGet("get-servicesrequest-byrequestno")]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
-            var result = await _workFlowService.GetServiceRequestByNoAsync(requestNo);
+            var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
             return Ok(result);
         }
 

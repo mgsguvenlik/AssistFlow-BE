@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
@@ -32,6 +33,7 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
 
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
+        public CustomerGetDto? Customer { get; set; }
 
     }
 }

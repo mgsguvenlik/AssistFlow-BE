@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
@@ -18,5 +19,7 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
 
         // Ürünler
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
+
+        public CustomerGetDto? Customer { get; set; }
     }
 }

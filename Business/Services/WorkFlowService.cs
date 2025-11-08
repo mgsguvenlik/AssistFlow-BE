@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Azure.Core;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Dtos.Customer;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
@@ -1450,7 +1452,7 @@ namespace Business.Services
                 .Success(new PagedResult<ServicesRequestGetDto>(items, total, q.Page, q.PageSize));
         }
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync_(long id)
         {
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
@@ -1506,8 +1508,146 @@ namespace Business.Services
 
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
         }
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
+        {
+            var now = DateTimeOffset.UtcNow;
 
-        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByNoAsync(string requestNo)
+            // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
+            var baseDto = await (
+                from sr in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                where sr.Id == id
+
+                // left join: aynı RequestNo’ya sahip ve silinmemiş workflow’lar
+                join wf0 in _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted)
+                    on sr.RequestNo equals wf0.RequestNo into wfJoin
+                from wf in wfJoin
+                    .OrderByDescending(x => x.CreatedDate)  // “en güncel” workflow tercih ediliyorsa
+                    .Take(1)
+                    .DefaultIfEmpty()
+                select new ServicesRequestGetDto
+                {
+                    Id = sr.Id,
+                    RequestNo = sr.RequestNo,
+                    OracleNo = sr.OracleNo,
+                    ServicesDate = sr.ServicesDate,
+                    PlannedCompletionDate = sr.PlannedCompletionDate,
+                    ServicesCostStatus = sr.ServicesCostStatus,
+                    Description = sr.Description,
+                    IsProductRequirement = sr.IsProductRequirement,
+
+                    IsMailSended = sr.IsMailSended,
+                    CustomerApproverId = sr.CustomerApproverId,
+                    CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
+
+                    CustomerId = sr.CustomerId,
+                    CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
+
+                    ServiceTypeId = sr.ServiceTypeId,
+                    ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                    WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
+
+                    CreatedDate = sr.CreatedDate,
+                    UpdatedDate = sr.UpdatedDate,
+                    CreatedUser = sr.CreatedUser,
+                    UpdatedUser = sr.UpdatedUser,
+                    IsDeleted = sr.IsDeleted,
+
+                    ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
+                    IsLocationValid = wf != null && wf.IsLocationValid,
+                    Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    ServicesRequestStatus = sr.ServicesRequestStatus,
+
+                    // 🔹 Customer alt DTO + warranty türetmeleri
+                    Customer = sr.Customer == null ? null : new CustomerGetDto
+                    {
+                        Id = sr.Customer.Id,
+                        SubscriberCode = sr.Customer.SubscriberCode,
+                        SubscriberCompany = sr.Customer.SubscriberCompany,
+                        SubscriberAddress = sr.Customer.SubscriberAddress,
+                        City = sr.Customer.City,
+                        District = sr.Customer.District,
+                        LocationCode = sr.Customer.LocationCode,
+                        ContactName1 = sr.Customer.ContactName1,
+                        Phone1 = sr.Customer.Phone1,
+                        Email1 = sr.Customer.Email1,
+                        ContactName2 = sr.Customer.ContactName2,
+                        Phone2 = sr.Customer.Phone2,
+                        Email2 = sr.Customer.Email2,
+                        CustomerShortCode = sr.Customer.CustomerShortCode,
+                        CorporateLocationId = sr.Customer.CorporateLocationId,
+                        Longitude = sr.Customer.Longitude,
+                        Latitude = sr.Customer.Latitude,
+                        InstallationDate = sr.Customer.InstallationDate,
+                        WarrantyYears = sr.Customer.WarrantyYears,
+                        CustomerGroupId = sr.Customer.CustomerGroupId,
+                        CustomerTypeId = sr.Customer.CustomerTypeId
+                    }
+                }
+            ).FirstOrDefaultAsync();
+
+            if (baseDto is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
+            baseDto.ServicesRequestProducts = await _uow.Repository
+                     .GetQueryable<ServicesRequestProduct>()
+                     .AsNoTracking()
+                     .Where(p => p.RequestNo == baseDto.RequestNo)
+                     .Select(p => new ServicesRequestProductGetDto
+                     {
+                         Id = p.Id,
+                         RequestNo = p.RequestNo,
+                         ProductId = p.ProductId,
+
+                         // Ürün temel alanları
+                         ProductName = p.Product != null ? p.Product.Description : null,
+                         ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                         ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+                         PriceCurrency = p.Product.PriceCurrency,
+
+                         Quantity = p.Quantity,
+
+                         // --- EF-translatable EffectivePrice ---
+                         // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Ürün liste fiyatı → 0
+                         EffectivePrice =
+                             p.Customer.CustomerGroup.GroupProductPrices
+                                 .Where(gp => gp.ProductId == p.ProductId)
+                                 .Select(gp => (decimal?)gp.Price)
+                                 .FirstOrDefault()
+                             ?? p.Customer.CustomerProductPrices
+                                 .Where(cp => cp.ProductId == p.ProductId)
+                                 .Select(cp => (decimal?)cp.Price)
+                                 .FirstOrDefault()
+                             ?? (decimal?)p.Product.Price
+                             ?? 0m
+                     })
+               .ToListAsync();
+
+            // 3) Review logs (tek bağımsız sorgu — SR adımıyla sınırlı)
+            baseDto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == baseDto.RequestNo && (x.FromStepCode == "SR" || x.ToStepCode == "SR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId = x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId = x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId = x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes = x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
+                .ToListAsync();
+
+            return ResponseModel<ServicesRequestGetDto>.Success(baseDto);
+        }
+
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByRequestNoAsync_(string requestNo)
         {
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
@@ -1564,6 +1704,145 @@ namespace Business.Services
             dto.ReviewLogs = reviewLogs; // <-- Yeni
 
             return ResponseModel<ServicesRequestGetDto>.Success(dto);
+        }
+
+        public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
+            var baseDto = await (
+                from sr in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                where sr.RequestNo == requestNo
+
+                // left join: aynı RequestNo’ya sahip ve silinmemiş workflow’lar
+                join wf0 in _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted)
+                    on sr.RequestNo equals wf0.RequestNo into wfJoin
+                from wf in wfJoin
+                    .OrderByDescending(x => x.CreatedDate)  // “en güncel” workflow tercih ediliyorsa
+                    .Take(1)
+                    .DefaultIfEmpty()
+                select new ServicesRequestGetDto
+                {
+                    Id = sr.Id,
+                    RequestNo = sr.RequestNo,
+                    OracleNo = sr.OracleNo,
+                    ServicesDate = sr.ServicesDate,
+                    PlannedCompletionDate = sr.PlannedCompletionDate,
+                    ServicesCostStatus = sr.ServicesCostStatus,
+                    Description = sr.Description,
+                    IsProductRequirement = sr.IsProductRequirement,
+
+                    IsMailSended = sr.IsMailSended,
+                    CustomerApproverId = sr.CustomerApproverId,
+                    CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
+
+                    CustomerId = sr.CustomerId,
+                    CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
+
+                    ServiceTypeId = sr.ServiceTypeId,
+                    ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                    WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
+
+                    CreatedDate = sr.CreatedDate,
+                    UpdatedDate = sr.UpdatedDate,
+                    CreatedUser = sr.CreatedUser,
+                    UpdatedUser = sr.UpdatedUser,
+                    IsDeleted = sr.IsDeleted,
+
+                    ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
+                    IsLocationValid = wf != null && wf.IsLocationValid,
+                    Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    ServicesRequestStatus = sr.ServicesRequestStatus,
+
+                    // 🔹 Customer alt DTO + warranty türetmeleri
+                    Customer = sr.Customer == null ? null : new CustomerGetDto
+                    {
+                        Id = sr.Customer.Id,
+                        SubscriberCode = sr.Customer.SubscriberCode,
+                        SubscriberCompany = sr.Customer.SubscriberCompany,
+                        SubscriberAddress = sr.Customer.SubscriberAddress,
+                        City = sr.Customer.City,
+                        District = sr.Customer.District,
+                        LocationCode = sr.Customer.LocationCode,
+                        ContactName1 = sr.Customer.ContactName1,
+                        Phone1 = sr.Customer.Phone1,
+                        Email1 = sr.Customer.Email1,
+                        ContactName2 = sr.Customer.ContactName2,
+                        Phone2 = sr.Customer.Phone2,
+                        Email2 = sr.Customer.Email2,
+                        CustomerShortCode = sr.Customer.CustomerShortCode,
+                        CorporateLocationId = sr.Customer.CorporateLocationId,
+                        Longitude = sr.Customer.Longitude,
+                        Latitude = sr.Customer.Latitude,
+                        InstallationDate = sr.Customer.InstallationDate,
+                        WarrantyYears = sr.Customer.WarrantyYears,
+                        CustomerGroupId = sr.Customer.CustomerGroupId,
+                        CustomerTypeId = sr.Customer.CustomerTypeId
+                    }
+                }
+            ).FirstOrDefaultAsync();
+
+            if (baseDto is null)
+                return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
+            baseDto.ServicesRequestProducts = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == requestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+
+                    // Ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+                    PriceCurrency = p.Product.PriceCurrency,
+
+                    Quantity = p.Quantity,
+
+                    // --- EF-translatable EffectivePrice ---
+                    // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Ürün liste fiyatı → 0
+                    EffectivePrice =
+                             p.Customer.CustomerGroup.GroupProductPrices
+                                 .Where(gp => gp.ProductId == p.ProductId)
+                                 .Select(gp => (decimal?)gp.Price)
+                                 .FirstOrDefault()
+                             ?? p.Customer.CustomerProductPrices
+                                 .Where(cp => cp.ProductId == p.ProductId)
+                                 .Select(cp => (decimal?)cp.Price)
+                                 .FirstOrDefault()
+                             ?? (decimal?)p.Product.Price
+                             ?? 0m
+                })
+                .ToListAsync();
+
+            // 3) Review logs (tek bağımsız sorgu — SR adımıyla sınırlı)
+            baseDto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == requestNo && (x.FromStepCode == "SR" || x.ToStepCode == "SR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId=x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId=x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId=x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes=x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
+                .ToListAsync();
+
+            return ResponseModel<ServicesRequestGetDto>.Success(baseDto);
         }
 
         public async Task<ResponseModel<ServicesRequestGetDto>> UpdateServiceRequestAsync(ServicesRequestUpdateDto dto)
@@ -1675,7 +1954,7 @@ namespace Business.Services
             }
             await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
-            return await GetServiceRequestByNoAsync(entity.RequestNo);
+            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
         }
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
@@ -1916,51 +2195,6 @@ namespace Business.Services
         // -------------------- Warehouse --------------------
         public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync_(long id)
         {
-            var query = _uow.Repository.GetQueryable<Warehouse>();
-
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.Id == id)
-                .ProjectToType<WarehouseGetDto>(_config)
-                .FirstOrDefaultAsync();
-
-            if (dto is null)
-                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            // Ürünler
-            var products = await _uow.Repository
-                .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
-                .AsNoTracking()
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
-                .ToListAsync();
-
-            var workflow = await query
-                .AsNoTracking()
-                .Where(x => x.Id == id)
-                .ProjectToType<WorkFlow>(_config)
-                .FirstOrDefaultAsync();
-
-            // Gözden Geçir Logları
-            var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
-                .AsNoTracking()
-                .OrderByDescending(x => x.CreatedDate)
-                .ProjectToType<WorkFlowReviewLogDto>(_config)
-                .ToListAsync();
-
-            dto.WarehouseProducts = products;
-            dto.ReviewLogs = reviewLogs; // <-- Yeni
-
-            return ResponseModel<WarehouseGetDto>.Success(dto);
-        }
-
-
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
-        {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
             var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
@@ -2019,52 +2253,131 @@ namespace Business.Services
 
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
-
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync_(string requestNo)
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
         {
-            var query = _uow.Repository.GetQueryable<Warehouse>();
+            var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
+            var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
+            var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
 
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .ProjectToType<WarehouseGetDto>(_config)
-                .FirstOrDefaultAsync();
+            // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer)
+            var dto = await (
+                from w in qWarehouse
+                where w.Id == id
+                join wf0 in qWorkFlow on w.RequestNo equals wf0.RequestNo into wfj
+                from wf in wfj
+                    .OrderByDescending(x => x.CreatedDate)    // en güncel workflow
+                    .Take(1)
+                    .DefaultIfEmpty()
+                join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new WarehouseGetDto
+                {
+                    Id = w.Id,
+                    RequestNo = w.RequestNo,
+                    DeliveryDate = w.DeliveryDate,
+                    Description = w.Description,
+                    WarehouseStatus = w.WarehouseStatus,
+
+                    // WorkFlow
+                    WorkFlowRequestTitle = wf != null ? wf.RequestTitle : null,
+                    WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    // ServicesRequest
+                    ServicesRequestDescription = sr != null ? sr.Description : null,
+
+                    // 🔹 Customer bilgisi (yalnızca WarrantyYears istendi)
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears, // <-- sadece bu (türetilmiş alan yok)
+
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
 
             if (dto is null)
                 return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // Ürünler
-            var products = await _uow.Repository
+            // ÜRÜNLER: sadece ihtiyaç alanları + EffectivePrice (server-side)
+            dto.WarehouseProducts = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
                 .AsNoTracking()
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // Ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    ///Depo Aşamsında fiyat göremez
+
+                    //ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+                    //PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+                    //EffectivePrice =
+                    //    p.Customer.CustomerGroup.GroupProductPrices
+                    //        .Where(gp => gp.ProductId == p.ProductId)
+                    //        .Select(gp => (decimal?)gp.Price)
+                    //        .FirstOrDefault()
+                    //    ?? p.Customer.CustomerProductPrices
+                    //        .Where(cp => cp.ProductId == p.ProductId)
+                    //        .Select(cp => (decimal?)cp.Price)
+                    //        .FirstOrDefault()
+                    //    ?? (decimal?)p.Product.Price
+                    //    ?? 0m
+                })
                 .ToListAsync();
 
-            var workflow = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .ProjectToType<WorkFlow>(_config)
-                .FirstOrDefaultAsync();
-
-            // Gözden Geçir (Review) Logları
-            var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
+            // REVIEW LOG’LARI (Warehouse adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
-                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId = x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId = x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId = x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes = x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
                 .ToListAsync();
-
-            dto.WarehouseProducts = products;
-            dto.ReviewLogs = reviewLogs; // <-- eklendi
 
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
-
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync_(string requestNo)
         {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
@@ -2125,9 +2438,134 @@ namespace Business.Services
             return ResponseModel<WarehouseGetDto>.Success(dto);
         }
 
+        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByRequestNoAsync(string requestNo)
+        {
+            var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
+            var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
+            var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+
+            // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer)
+            var dto = await (
+                from w in qWarehouse
+                where w.RequestNo == requestNo
+                join wf0 in qWorkFlow on w.RequestNo equals wf0.RequestNo into wfj
+                from wf in wfj
+                    .OrderByDescending(x => x.CreatedDate)    // en güncel workflow
+                    .Take(1)
+                    .DefaultIfEmpty()
+                join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new WarehouseGetDto
+                {
+                    Id = w.Id,
+                    RequestNo = w.RequestNo,
+                    DeliveryDate = w.DeliveryDate,
+                    Description = w.Description,
+                    WarehouseStatus = w.WarehouseStatus,
+
+                    // WorkFlow
+                    WorkFlowRequestTitle = wf != null ? wf.RequestTitle : null,
+                    WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+
+                    // ServicesRequest
+                    ServicesRequestDescription = sr != null ? sr.Description : null,
+
+                    // 🔹 Customer bilgisi (yalnızca WarrantyYears istendi)
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears, // <-- sadece bu (türetilmiş alan yok)
+
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ÜRÜNLER: sadece ihtiyaç alanları + EffectivePrice (server-side)
+            dto.WarehouseProducts = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // Ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    ///Depo Aşamsında fiyat göremez
+                    
+                    //ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+                    //PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+                    //EffectivePrice =
+                    //    p.Customer.CustomerGroup.GroupProductPrices
+                    //        .Where(gp => gp.ProductId == p.ProductId)
+                    //        .Select(gp => (decimal?)gp.Price)
+                    //        .FirstOrDefault()
+                    //    ?? p.Customer.CustomerProductPrices
+                    //        .Where(cp => cp.ProductId == p.ProductId)
+                    //        .Select(cp => (decimal?)cp.Price)
+                    //        .FirstOrDefault()
+                    //    ?? (decimal?)p.Product.Price
+                    //    ?? 0m
+                })
+                .ToListAsync();
+
+            // REVIEW LOG’LARI (Warehouse adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new WorkFlowReviewLogDto
+                {
+                    Id = x.Id,
+                    WorkFlowId = x.WorkFlowId,
+                    RequestNo = x.RequestNo,
+                    FromStepId = x.FromStepId,
+                    FromStepCode = x.FromStepCode,
+                    ToStepId = x.ToStepId,
+                    ToStepCode = x.ToStepCode,
+                    ReviewNotes = x.ReviewNotes,
+                    CreatedDate = x.CreatedDate,
+                    CreatedUser = x.CreatedUser
+                })
+                .ToListAsync();
+
+            return ResponseModel<WarehouseGetDto>.Success(dto);
+        }
+
 
         // -------------------- Teknical Services --------------------
-        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync_(string requestNo)
         {
             var query = _uow.Repository.GetQueryable<TechnicalService>();
 
@@ -2174,47 +2612,96 @@ namespace Business.Services
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
-        /// ------------------ Pricing -----------------------------------
-        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync_(string requestNo)
+        public async Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo)
         {
-            var query = _uow.Repository.GetQueryable<Pricing>();
+            var query = _uow.Repository.GetQueryable<TechnicalService>();
 
+            // HEADER (mevcut mapster config'ine göre)
             var dto = await query
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
-                .ProjectToType<PricingGetDto>(_config)
+                .AsSplitQuery()
+                .Include(x => x.ServiceRequestFormImages)
+                .Include(x => x.ServicesImages)
+                .Include(x => x.ServiceType)
+                .ProjectToType<TechnicalServiceGetDto>(_config)
                 .FirstOrDefaultAsync();
 
             if (dto is null)
-                return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // Ürünler
-            var products = await _uow.Repository
+            // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
+            dto.Customer = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .AsNoTracking()
+                .Where(sr => sr.RequestNo == requestNo && sr.Customer != null)
+                .Select(sr => new CustomerGetDto
+                {
+                    Id = sr.Customer!.Id,
+                    SubscriberCode = sr.Customer.SubscriberCode,
+                    SubscriberCompany = sr.Customer.SubscriberCompany,
+                    SubscriberAddress = sr.Customer.SubscriberAddress,
+                    City = sr.Customer.City,
+                    District = sr.Customer.District,
+                    LocationCode = sr.Customer.LocationCode,
+                    ContactName1 = sr.Customer.ContactName1,
+                    Phone1 = sr.Customer.Phone1,
+                    Email1 = sr.Customer.Email1,
+                    ContactName2 = sr.Customer.ContactName2,
+                    Phone2 = sr.Customer.Phone2,
+                    Email2 = sr.Customer.Email2,
+                    CustomerShortCode = sr.Customer.CustomerShortCode,
+                    CorporateLocationId = sr.Customer.CorporateLocationId,
+                    Longitude = sr.Customer.Longitude,
+                    Latitude = sr.Customer.Latitude,
+
+                    // garanti: sadece süreyi geçiriyoruz (türetilmiş alan yok)
+                    InstallationDate = sr.Customer.InstallationDate,
+                    WarrantyYears = sr.Customer.WarrantyYears,
+
+                    CustomerGroupId = sr.Customer.CustomerGroupId,
+                    CustomerTypeId = sr.Customer.CustomerTypeId
+                })
+                .FirstOrDefaultAsync();
+
+            // ÜRÜNLER: teknisyen fiyat görmeyecek → price alanlarını projekte etmiyoruz
+            dto.Products = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
                 .AsNoTracking()
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+
+                    // temel alanlar (fiyat YOK)
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+
+                    Quantity = p.Quantity
+
+                    // Not: ProductPrice / EffectivePrice maplenmedi (teknisyen görmeyecek)
+                    // DTO'nun TotalPrice'ı EffectivePrice'a bağlıysa, UI tarafında gizleyin ya da DTO'dan çıkartın.
+                })
                 .ToListAsync();
 
-            // Gözden Geçir (Review) Logları — YENİ
-            var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x => x.RequestNo == dto.RequestNo && (x.FromStepCode == "PRC" || x.ToStepCode == "PRC"))
+            // GÖZDEN GEÇİR (TS adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "TS" || x.ToStepCode == "TS"))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
                 .ToListAsync();
 
-            dto.Products = products;
-            dto.ReviewLogs = reviewLogs;
-
-            return ResponseModel<PricingGetDto>.Success(dto);
-
+            return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
-        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
+        /// ------------------ Pricing -----------------------------------
+        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync_(string requestNo)
         {
             var qPricing = _uow.Repository.GetQueryable<Pricing>().AsNoTracking();
             var qRequest = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
@@ -2275,8 +2762,120 @@ namespace Business.Services
             return ResponseModel<PricingGetDto>.Success(dto);
         }
 
+        public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
+        {
+            var qPricing = _uow.Repository.GetQueryable<Pricing>().AsNoTracking();
+            var qRequest = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+
+            // HEADER: Pricing (zorunlu) + ServicesRequest (left) + Customer (projection)
+            var dto = await (
+                from pr in qPricing
+                where pr.RequestNo == requestNo
+                join sr0 in qRequest on pr.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new PricingGetDto
+                {
+                    // Pricing
+                    Id = pr.Id,
+                    RequestNo = pr.RequestNo,
+                    Status = pr.Status,
+                    Currency = pr.Currency,
+                    Notes = pr.Notes,
+                    TotalAmount = pr.TotalAmount,
+
+                    // Audit (Pricing)
+                    CreatedDate = pr.CreatedDate,
+                    CreatedUser = pr.CreatedUser,
+                    UpdatedDate = pr.UpdatedDate,
+                    UpdatedUser = pr.UpdatedUser,
+
+                    // ServicesRequest
+                    OracleNo = sr != null ? sr.OracleNo : null,
+                    ServicesCostStatus = sr != null ? sr.ServicesCostStatus : ServicesCostStatus.Unknown,
+
+                    // Customer (yalnızca gerekli alanlar + WarrantyYears)
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            dto.Products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // Ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+
+                    // 1) Grup fiyatı → 2) Müşteri özel fiyatı → 3) Liste fiyatı → 0
+                    EffectivePrice =
+                        p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m
+                    // TotalPrice DTO'da => Quantity * EffectivePrice
+                })
+                .ToListAsync();
+
+            // REVIEW LOG’LARI (Pricing adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "PRC" || x.ToStepCode == "PRC"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<PricingGetDto>.Success(dto);
+        }
+
+
         //----------------------FinalApproval ---------------------------------------------------
-        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync_(string requestNo)
         {
             // HEADER
             var dto = await _uow.Repository
@@ -2313,31 +2912,189 @@ namespace Business.Services
             return ResponseModel<FinalApprovalGetDto>.Success(dto);
         }
 
-        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id)
+        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo)
         {
-            // HEADER
-            var dto = await _uow.Repository
-                .GetQueryable<FinalApproval>()
-                .AsNoTracking()
-                .Where(x => x.Id == id)
-                .ProjectToType<FinalApprovalGetDto>(_config)
-                .FirstOrDefaultAsync();
+            var qFinal = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
+            var qRequest = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+
+            // HEADER: FinalApproval + (left) ServicesRequest -> Customer
+            var dto = await (
+                from fa in qFinal
+                where fa.RequestNo == requestNo
+                join sr0 in qRequest on fa.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new FinalApprovalGetDto
+                {
+                    Id = fa.Id,
+                    RequestNo = fa.RequestNo,
+                    Notes = fa.Notes,
+                    DecidedBy = fa.DecidedBy,
+                    Status = fa.Status,
+
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
 
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS (RequestNo bazlı)
+            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
             dto.Products = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
                 .AsNoTracking()
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+
+                    // 1) Grup fiyatı → 2) Müşteri özel fiyatı → 3) Liste fiyatı → 0
+                    EffectivePrice =
+                        p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m
+                    // TotalPrice: DTO'da => Quantity * EffectivePrice
+                })
                 .ToListAsync();
 
-            // REVIEW LOG’lar (APR ile ilgili gelen/giden tüm hareketler)
+            // REVIEW LOG’ları (APR adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<WorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<FinalApprovalGetDto>.Success(dto);
+        }
+        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id)
+        {
+            var qFinal = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
+            var qRequest = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
+
+            // HEADER: FinalApproval + (left) ServicesRequest -> Customer
+            var dto = await (
+                from fa in qFinal
+                where fa.Id == id
+                join sr0 in qRequest on fa.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new FinalApprovalGetDto
+                {
+                    Id = fa.Id,
+                    RequestNo = fa.RequestNo,
+                    Notes = fa.Notes,
+                    DecidedBy = fa.DecidedBy,
+                    Status = fa.Status,
+
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
+            dto.Products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
+                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
+
+                    // 1) Grup fiyatı → 2) Müşteri özel fiyatı → 3) Liste fiyatı → 0
+                    EffectivePrice =
+                        p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m
+                    // TotalPrice: DTO'da => Quantity * EffectivePrice
+                })
+                .ToListAsync();
+
+            // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>
                     x.RequestNo == dto.RequestNo &&
