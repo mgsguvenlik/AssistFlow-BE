@@ -1165,6 +1165,8 @@ namespace Business.Services
         // 7) Kontrol ve Son Onay (FinalApproval) — CREATE
         public async Task<ResponseModel<FinalApprovalGetDto>> FinalApprovalAsync(FinalApprovalUpdateDto dto)
         {
+
+            #region  Validasyonlar/Kontroller
             // 1) WorkFlow & Request kontrolleri
             var wf = await _uow.Repository
                 .GetQueryable<WorkFlow>()
@@ -1198,8 +1200,7 @@ namespace Business.Services
             if (targetStep is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
 
-            var me = await _currentUser.GetAsync();
-            var meId = me?.Id ?? 0;
+
 
             // 3) FinalApproval var mı? (unique: RequestNo)
             var exists = await _uow.Repository
@@ -1209,15 +1210,20 @@ namespace Business.Services
             if (exists is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.BadRequest);
 
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+            #endregion
 
+            #region Fiyatlama Güncelleme
             exists.Notes = dto.Notes;
             exists.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated ? FinalApprovalStatus.Approved : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
             exists.DecidedBy = meId;
-
             exists.UpdatedDate = DateTime.Now;
             exists.UpdatedUser = meId;
             _uow.Repository.Update(exists);
+            #endregion
 
+            #region Workflow Güncelleme
             // WorkFlow’u APR’da konumla (emin olmak için)
             var wfTracked = await _uow.Repository
                 .GetQueryable<WorkFlow>()
@@ -1230,16 +1236,64 @@ namespace Business.Services
                 wfTracked.WorkFlowStatus = dto.WorkFlowStatus;
                 _uow.Repository.Update(wfTracked);
             }
+            #endregion
 
+            #region Ürünler Güncellemesi
+            // 🔹 ServicesRequestProduct senkronizasyonu
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<ServicesRequestProduct>(
+                    asNoTracking: false,
+                    whereExpression: x => x.RequestNo == dto.RequestNo
+                );
+
+            // Dictionary ile hızlı karşılaştırma
+            var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+            // 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+            foreach (var existing in existingProducts)
+            {
+                if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                {
+                    // Güncelle
+                    existing.Quantity = delivered.Quantity;
+                    _uow.Repository.Update(existing);
+
+                    // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+                    deliveredDict.Remove(existing.ProductId);
+                }
+                else
+                {
+                    //  listede yok → Sil
+                    _uow.Repository.HardDelete(existing);
+                }
+            }
+
+            // 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
+            foreach (var newItem in deliveredDict.Values)
+            {
+                var newEntity = new ServicesRequestProduct
+                {
+                    CustomerId = request.CustomerId,
+                    RequestNo = request.RequestNo,
+                    ProductId = newItem.ProductId,
+                    Quantity = newItem.Quantity,
+                };
+                _uow.Repository.Add(newEntity);
+            }
+
+            #endregion
+
+            #region Hareket Kaydı
             await _activationRecord.LogAsync(
-                WorkFlowActionType.FinalApprovalUpdated,
-                dto.RequestNo,
-                wf?.Id,
-                fromStepCode: wf?.CurrentStep?.Code ?? "APR",
-                toStepCode: "APR",
-                 "Kontrol ve Son Onay kaydı güncellendi.",
-                new { dto.Notes, dto.WorkFlowStatus, meId, DateTime.Now }
-            );
+              WorkFlowActionType.FinalApprovalUpdated,
+              dto.RequestNo,
+              wf?.Id,
+              fromStepCode: wf?.CurrentStep?.Code ?? "APR",
+              toStepCode: "APR",
+               "Kontrol ve Son Onay kaydı güncellendi.",
+              new { dto.Notes, dto.WorkFlowStatus, meId, DateTime.Now }
+          );
+
+            #endregion
 
             await _uow.Repository.CompleteAsync();
 
@@ -1830,13 +1884,13 @@ namespace Business.Services
                 .Select(x => new WorkFlowReviewLogDto
                 {
                     Id = x.Id,
-                    WorkFlowId=x.WorkFlowId,
+                    WorkFlowId = x.WorkFlowId,
                     RequestNo = x.RequestNo,
-                    FromStepId=x.FromStepId,
+                    FromStepId = x.FromStepId,
                     FromStepCode = x.FromStepCode,
-                    ToStepId=x.ToStepId,
+                    ToStepId = x.ToStepId,
                     ToStepCode = x.ToStepCode,
-                    ReviewNotes=x.ReviewNotes,
+                    ReviewNotes = x.ReviewNotes,
                     CreatedDate = x.CreatedDate,
                     CreatedUser = x.CreatedUser
                 })
@@ -2521,7 +2575,7 @@ namespace Business.Services
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
                     ///Depo Aşamsında fiyat göremez
-                    
+
                     //ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
                     //PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
                     //EffectivePrice =

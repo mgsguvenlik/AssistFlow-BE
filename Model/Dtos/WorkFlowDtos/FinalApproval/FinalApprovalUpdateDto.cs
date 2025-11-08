@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.FinalApproval
 {
@@ -8,5 +9,6 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
         public string? Notes { get; set; }
         public WorkFlowStatus WorkFlowStatus { get; set; }
         public FinalApprovalStatus FinalApprovalStatus { get; set; }
+        public List<ServicesRequestProductCreateDto>? Products { get; set; }
     }
 }
