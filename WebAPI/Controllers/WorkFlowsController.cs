@@ -2,17 +2,20 @@
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Model.Abstractions;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
+using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using System.Net;
 
 namespace WebAPI.Controllers
 {
 
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WorkFlowsController : ControllerBase
@@ -264,6 +267,26 @@ namespace WebAPI.Controllers
                 return NoContent();
 
             return ToActionResult(resp);
+        }
+
+
+        // ----------- Report ------------
+        /// <summary>
+        /// Çoklu filtreli rapor arama (paging + sort).
+        /// </summary>
+        /// <remarks>
+        /// Örnek:
+        /// GET /api/reports?Page=1&PageSize=20&CreatedFrom=2025-11-01&CreatedTo=2025-11-10&RequestNo=SR-20251108
+        /// &WorkFlowStatuses=Pending&WorkFlowStatuses=Complated&TechnicianId=12&ProductCode=ABC
+        /// </remarks>
+        [HttpGet ("workflow-report")]
+        [ProducesResponseType(typeof(PagedResult<WorkFlowReportListItemDto>), (int)HttpStatusCode.OK)]
+        public async Task<IActionResult> Get([FromQuery] ReportQueryParams q, CancellationToken ct)
+        {
+            q.Normalize(maxPageSize: 500);
+
+            var result = await _workFlowService.GetReportsAsync(q);
+            return Ok(result);
         }
 
         // ---------- Helpers ----------

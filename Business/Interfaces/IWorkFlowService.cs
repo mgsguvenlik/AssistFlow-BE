@@ -1,6 +1,7 @@
 ﻿using Core.Common;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
+using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
@@ -55,6 +56,12 @@ namespace Business.Interfaces
 
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+
+
+        // Report 
+
+        Task<ResponseModel<PagedResult<WorkFlowReportListItemDto>>> GetReportsAsync(ReportQueryParams q);
+        Task<ResponseModel<WorkFlowReportDto>> GetReportAsync(string requestNo);
 
     }
 }

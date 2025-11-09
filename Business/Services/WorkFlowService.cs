@@ -21,6 +21,7 @@ using Model.Dtos.Role;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
+using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
@@ -1065,7 +1066,6 @@ namespace Business.Services
         // 6 Fiyatlama onay ve kontrole gönderim.
         public async Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto)
         {
-
             try
             {
                 #region Validasyonlar/Kontroller
@@ -1232,7 +1232,6 @@ namespace Business.Services
                 _logger.LogError(ex, "ApprovePricing");
                 return ResponseModel<PricingGetDto>.Fail($" Fiyatlama onay ve kontrole gönderim  sırasında hata: {ex.Message}", StatusCode.Error);
             }
-          
         }
 
 
@@ -1351,6 +1350,13 @@ namespace Business.Services
                     _uow.Repository.Add(newEntity);
                 }
 
+                #endregion
+
+                #region Ürün  Fiyat Sabitleme 
+                if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                {
+                    await EnsurePricesCapturedAsync(dto.RequestNo);
+                }
                 #endregion
 
                 #region Hareket Kaydı
@@ -3227,6 +3233,533 @@ namespace Business.Services
             return ResponseModel.Success(status: StatusCode.NoContent);
         }
 
+        //------------------------ Report ------------------------
+       
+        public async Task<ResponseModel<WorkFlowReportDto>> GetReportAsync(string requestNo)
+        {
+            // 1) WorkFlow + CurrentStep + ApproverTechnician
+            var wf = await _uow.Repository.GetQueryable<WorkFlow>()
+                .Include(x => x.CurrentStep)
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<WorkFlowReportDto>.Fail("Akış bulunamadı.", StatusCode.NotFound);
+
+            var dto = new WorkFlowReportDto
+            {
+                RequestNo = requestNo,
+                Header = new HeaderSectionDto
+                {
+                    Title = wf.RequestTitle,
+                    WorkFlowStatus = wf.WorkFlowStatus.ToString(),
+                    CurrentStepId = wf.CurrentStepId,
+                    CurrentStepCode = wf.CurrentStep?.Code,
+                    IsAgreement = wf.IsAgreement,
+                    IsLocationValid = wf.IsLocationValid,
+                    CustomerApproverName = wf.CustomerApproverName,
+                    ApproverTechnicianId = wf.ApproverTechnicianId,
+                    ApproverTechnicianName = wf.ApproverTechnician?.TechnicianName,
+                    ApproverTechnicianEmail = wf.ApproverTechnician?.TechnicianEmail,
+                    ApproverTechnicianCode = wf.ApproverTechnician?.TechnicianCode,
+                    Priority = (int)wf.Priority
+                }
+            };
+
+            // 2) ServicesRequest + Customer(+Group+Approvers) + ServiceType
+            var sr = await _uow.Repository.GetQueryable<ServicesRequest>()
+                .AsNoTracking()
+                .Include(x => x.ServiceType)
+                .Include(x => x.Customer)
+                    .ThenInclude(c => c.CustomerGroup)
+                        .ThenInclude(g => g.ProgressApprovers)
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+
+            if (sr is not null)
+            {
+                dto.ServiceRequest = new ServiceRequestSectionDto
+                {
+                    Id = sr.Id,
+                    OracleNo = sr.OracleNo,
+                    ServicesDate = sr.ServicesDate,
+                    PlannedCompletionDate = sr.PlannedCompletionDate,
+                    ServicesCostStatus = sr.ServicesCostStatus.ToString(),
+                    Description = sr.Description,
+                    IsProductRequirement = sr.IsProductRequirement,
+                    WorkFlowStepId = sr.WorkFlowStepId,
+                    CustomerApproverId = sr.CustomerApproverId,
+                    ServiceTypeId = sr.ServiceTypeId,
+                    ServiceTypeName = sr.ServiceType?.Name,
+                    Priority = sr.Priority.ToString(),
+                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString()
+                };
+
+                if (sr.Customer is not null)
+                {
+                    dto.Customer = new CustomerSectionDto
+                    {
+                        Id = sr.Customer.Id,
+                        SubscriberCode = sr.Customer.SubscriberCode,
+                        SubscriberCompany = sr.Customer.SubscriberCompany,
+                        SubscriberAddress = sr.Customer.SubscriberAddress,
+                        City = sr.Customer.City,
+                        District = sr.Customer.District,
+                        LocationCode = sr.Customer.LocationCode,
+                        ContactName1 = sr.Customer.ContactName1,
+                        Phone1 = sr.Customer.Phone1,
+                        Email1 = sr.Customer.Email1,
+                        CustomerShortCode = sr.Customer.CustomerShortCode,
+                        CorporateLocationId = sr.Customer.CorporateLocationId,
+                        Longitude = sr.Customer.Longitude,
+                        Latitude = sr.Customer.Latitude,
+                        InstallationDate = sr.Customer.InstallationDate,
+                        WarrantyYears = sr.Customer.WarrantyYears
+                    };
+
+                    if (sr.Customer.CustomerGroup is not null)
+                    {
+                        dto.Customer.CustomerGroup = new CustomerGroupLiteDto
+                        {
+                            Id = sr.Customer.CustomerGroup.Id,
+                            GroupName = sr.Customer.CustomerGroup.GroupName,
+                            Code = sr.Customer.CustomerGroup.Code,
+                            ParentGroupId = sr.Customer.CustomerGroup.ParentGroupId,
+                            ProgressApprovers = sr.Customer.CustomerGroup.ProgressApprovers?
+                                .Select(p => new ProgressApproverLiteDto
+                                {
+                                    Id = p.Id,
+                                }).ToList() ?? new()
+                        };
+                    }
+                }
+            }
+
+            // 3) Ürün satırları (captured-first)
+            var lines = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Include(p => p.Product)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerGroup).ThenInclude(g => g.GroupProductPrices)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerProductPrices)
+                .Where(p => p.RequestNo == requestNo)
+                .ToListAsync();
+
+            foreach (var p in lines)
+            {
+                bool captured = p.IsPriceCaptured;
+                decimal unit = captured ? (p.CapturedUnitPrice ?? 0m) : p.GetEffectivePrice();
+                string currency = captured ? (p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY")
+                                           : (p.Product?.PriceCurrency ?? "TRY");
+                decimal total = captured ? (p.CapturedTotal ?? unit * p.Quantity)
+                                         : unit * p.Quantity;
+                string src = captured
+                    ? (p.CapturedSource?.ToString() ?? "Standard")
+                    : (p.Customer?.CustomerGroup?.GroupProductPrices?.Any(g => g.ProductId == p.ProductId) == true ? "Group"
+                       : p.Customer?.CustomerProductPrices?.Any(c => c.ProductId == p.ProductId) == true ? "Customer"
+                       : "Standard");
+
+                dto.Products.Add(new ProductLineDto
+                {
+                    Id = p.Id,
+                    ProductId = p.ProductId,
+                    ProductCode = p.Product?.ProductCode,
+                    ProductName = p.Product?.Description,
+                    Quantity = p.Quantity,
+                    IsPriceCaptured = captured,
+                    UnitPrice = unit,
+                    Currency = currency,
+                    LineTotal = total,
+                    PriceSource = src
+                });
+            }
+
+            // 4) TechnicalService + Images
+            var ts = await _uow.Repository.GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .Include(t => t.ServicesImages)
+                .Include(t => t.ServiceRequestFormImages)
+                .Include(t => t.ServiceType)
+                .FirstOrDefaultAsync(t => t.RequestNo == requestNo);
+
+            if (ts is not null)
+            {
+                dto.TechnicalService = new TechnicalServiceSectionDto
+                {
+                    Id = ts.Id,
+                    ServiceTypeId = ts.ServiceTypeId,
+                    ServiceTypeName = ts.ServiceType?.Name,
+                    StartTime = ts.StartTime,
+                    EndTime = ts.EndTime,
+                    ProblemDescription = ts.ProblemDescription,
+                    ResolutionAndActions = ts.ResolutionAndActions,
+                    Latitude = ts.Latitude,
+                    Longitude = ts.Longitude,
+                    StartLocation = ts.StartLocation,
+                    EndLocation = ts.EndLocation,
+                    IsLocationCheckRequired = ts.IsLocationCheckRequired,
+                    ServicesStatus = ts.ServicesStatus.ToString(),
+                    ServicesCostStatus = ts.ServicesCostStatus.ToString(),
+                    ServiceImages = ts.ServicesImages.Select(i => new ImageDto { Id = i.Id, Url = i.Url, Caption = i.Caption }).ToList(),
+                    FormImages = ts.ServiceRequestFormImages.Select(i => new ImageDto { Id = i.Id, Url = i.Url, Caption = i.Caption }).ToList()
+                };
+            }
+
+            // 5) Warehouse
+            var wh = await _uow.Repository.GetQueryable<Warehouse>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(w => w.RequestNo == requestNo);
+            if (wh is not null)
+            {
+                dto.Warehouse = new WarehouseSectionDto
+                {
+                    Id = wh.Id,
+                    DeliveryDate = wh.DeliveryDate,
+                    Description = wh.Description,
+                    WarehouseStatus = wh.WarehouseStatus.ToString()
+                };
+            }
+
+            // 6) Pricing
+            var pr = await _uow.Repository.GetQueryable<Pricing>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.RequestNo == requestNo);
+            if (pr is not null)
+            {
+                dto.Pricing = new PricingSectionDto
+                {
+                    Id = pr.Id,
+                    Status = pr.Status.ToString(),
+                    Currency = pr.Currency,
+                    Notes = pr.Notes,
+                    TotalAmount = pr.TotalAmount
+                };
+            }
+
+            // 7) FinalApproval
+            var fa = await _uow.Repository.GetQueryable<FinalApproval>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.RequestNo == requestNo);
+            if (fa is not null)
+            {
+                dto.FinalApproval = new FinalApprovalSectionDto
+                {
+                    Id = fa.Id,
+                    Status = fa.Status.ToString(),
+                    Notes = fa.Notes,
+                    DecidedBy = fa.DecidedBy,
+                    // İstersen user lookup ile isim de koyabilirsin
+                    DecidedByUserName = null
+                };
+            }
+
+            // 8) Review Logs
+            dto.ReviewLogs = await _uow.Repository.GetQueryable<WorkFlowReviewLog>()
+                .AsNoTracking()
+                .Where(l => l.RequestNo == requestNo)
+                .OrderBy(l => l.CreatedDate)
+                .Select(l => new ReviewLogDto
+                {
+                    Id = l.Id,
+                    FromStepId = l.FromStepId,
+                    FromStepCode = l.FromStepCode,
+                    ToStepId = l.ToStepId,
+                    ToStepCode = l.ToStepCode,
+                    ReviewNotes = l.ReviewNotes,
+                    CreatedUser = l.CreatedUser,
+                    CreatedDate = l.CreatedDate
+                })
+                .ToListAsync();
+
+            // 9) Özet toplamlar (Captured-first)
+            dto.Currency = dto.Products.Select(p => p.Currency).FirstOrDefault() ?? (dto.Pricing?.Currency ?? "TRY");
+            dto.Subtotal = dto.Products.Sum(p => p.LineTotal);
+            dto.DiscountTotal = 0; // ileride indirimin varsa hesapla
+            dto.GrandTotal = dto.Subtotal; // + kargo/ek gider vs. eklenebilir
+
+            return ResponseModel<WorkFlowReportDto>.Success(dto);
+        }
+        public async Task<ResponseModel<PagedResult<WorkFlowReportListItemDto>>> GetReportsAsync(ReportQueryParams q)
+        {
+            q.Normalize(500);
+
+            // İsteğe bağlı: timeout artır
+            //_ctx.Database.SetCommandTimeout(60);
+
+            // ---- Taban sorgu: yalın projeksiyon (Include yok) ----
+            var baseQ =
+                from wf in _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking()
+                where !wf.IsDeleted
+                join sr in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                     on wf.RequestNo equals sr.RequestNo
+                join st in _uow.Repository.GetQueryable<ServiceType>().AsNoTracking()
+                     on sr.ServiceTypeId equals st.Id into stj
+                from st in stj.DefaultIfEmpty()
+                join tech in _uow.Repository.GetQueryable<User>().AsNoTracking()
+                     on wf.ApproverTechnicianId equals tech.Id into techj
+                from tech in techj.DefaultIfEmpty()
+                select new
+                {
+                    wf.RequestNo,
+                    wf.RequestTitle,
+                    wf.WorkFlowStatus,
+                    wf.CreatedDate,
+                    StepCode = wf.CurrentStep != null ? wf.CurrentStep.Code : null,  // dikkat: CurrentStep.Include etmiyoruz
+                    sr.CustomerId,
+                    sr.ServicesDate,
+                    sr.ServiceTypeId,
+                    ServiceTypeName = st != null ? st.Name : null,
+                    TechnicianId = wf.ApproverTechnicianId,
+                    TechnicianName = tech != null ? tech.TechnicianName : null
+                };
+
+            // ---- Dinamik filtreler (erken uygula) ----
+            if (!string.IsNullOrWhiteSpace(q.RequestNo))
+                baseQ = baseQ.Where(x => x.RequestNo.Contains(q.RequestNo));
+
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var s = q.Search.Trim();
+                // Customer/company araması için müşteriyi dahil eden semi-join
+                var custQ = _uow.Repository.GetQueryable<Customer>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where x.RequestNo.Contains(s) || x.RequestTitle.Contains(s)
+                       || custQ.Any(c => c.Id == x.CustomerId &&
+                                         (c.SubscriberCompany.Contains(s) || c.ContactName1.Contains(s)))
+                    select x;
+            }
+
+            if (q.CreatedFrom.HasValue)
+                baseQ = baseQ.Where(x => x.CreatedDate >= q.CreatedFrom.Value.LocalDateTime);
+            if (q.CreatedTo.HasValue)
+                baseQ = baseQ.Where(x => x.CreatedDate < q.CreatedTo.Value.LocalDateTime);
+
+            if (q.ServicesDateFrom.HasValue)
+                baseQ = baseQ.Where(x => x.ServicesDate >= q.ServicesDateFrom.Value);
+            if (q.ServicesDateTo.HasValue)
+                baseQ = baseQ.Where(x => x.ServicesDate < q.ServicesDateTo.Value);
+
+            if (q.CustomerId.HasValue)
+                baseQ = baseQ.Where(x => x.CustomerId == q.CustomerId.Value);
+
+            if (!string.IsNullOrWhiteSpace(q.CustomerName))
+            {
+                var custQ = _uow.Repository.GetQueryable<Customer>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where custQ.Any(c => c.Id == x.CustomerId && c.SubscriberCompany.Contains(q.CustomerName))
+                    select x;
+            }
+
+            if (q.TechnicianId.HasValue)
+                baseQ = baseQ.Where(x => x.TechnicianId == q.TechnicianId.Value);
+
+            if (q.ServiceTypeId.HasValue)
+                baseQ = baseQ.Where(x => x.ServiceTypeId == q.ServiceTypeId.Value);
+
+            if (!string.IsNullOrWhiteSpace(q.StepCode))
+            {
+                // CurrentStep.Code için semi-join
+                var stepQ = _uow.Repository.GetQueryable<WorkFlowStep>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where stepQ.Any(s => s.Code == q.StepCode &&
+                                         s.Id == _uow.Repository.GetQueryable<WorkFlow>()
+                                             .Where(w => w.RequestNo == x.RequestNo)
+                                             .Select(w => w.CurrentStepId).FirstOrDefault())
+                    select x;
+            }
+
+            if (q.IsAgreement.HasValue)
+            {
+                var wfQ = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where wfQ.Any(w => w.RequestNo == x.RequestNo && w.IsAgreement == q.IsAgreement.Value)
+                    select x;
+            }
+
+            if (q.IsLocationValid.HasValue)
+            {
+                var wfQ = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where wfQ.Any(w => w.RequestNo == x.RequestNo && w.IsLocationValid == q.IsLocationValid.Value)
+                    select x;
+            }
+
+            if (q.WorkFlowStatuses is { Count: > 0 })
+                baseQ = baseQ.Where(x => q.WorkFlowStatuses!.Contains(x.WorkFlowStatus));
+
+            if (q.TechnicalStatuses is { Count: > 0 })
+            {
+                var tsQ = _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where tsQ.Any(t => t.RequestNo == x.RequestNo && q.TechnicalStatuses!.Contains(t.ServicesStatus))
+                    select x;
+            }
+
+            if (q.PricingStatuses is { Count: > 0 })
+            {
+                var prQ = _uow.Repository.GetQueryable<Pricing>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where prQ.Any(p => p.RequestNo == x.RequestNo && q.PricingStatuses!.Contains(p.Status))
+                    select x;
+            }
+
+            if (q.FinalApprovalStatuses is { Count: > 0 })
+            {
+                var faQ = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
+                baseQ =
+                    from x in baseQ
+                    where faQ.Any(f => f.RequestNo == x.RequestNo && q.FinalApprovalStatuses!.Contains(f.Status))
+                    select x;
+            }
+
+            // Ürün filtreleri (semi-join)
+            if (q.ProductId.HasValue || !string.IsNullOrWhiteSpace(q.ProductCode))
+            {
+                var lines = _uow.Repository.GetQueryable<ServicesRequestProduct>().AsNoTracking();
+                if (q.ProductId.HasValue)
+                    lines = lines.Where(l => l.ProductId == q.ProductId.Value);
+
+                if (!string.IsNullOrWhiteSpace(q.ProductCode))
+                {
+                    var prod = _uow.Repository.GetQueryable<Product>().AsNoTracking();
+                    lines =
+                        from l in lines
+                        where prod.Any(p => p.Id == l.ProductId && p.ProductCode.Contains(q.ProductCode))
+                        select l;
+                }
+
+                var reqNosHavingProduct = lines.Select(l => l.RequestNo).Distinct();
+                baseQ = baseQ.Where(x => reqNosHavingProduct.Contains(x.RequestNo));
+            }
+
+            // ---- Toplam kayıt (paging öncesi) ----
+            var total = await baseQ.CountAsync();
+
+            // ---- Sıralama ----
+            baseQ = q.SortBy?.ToLowerInvariant() switch
+            {
+                "created_asc" => baseQ.OrderBy(x => x.CreatedDate),
+                "servicesdate_asc" => baseQ.OrderBy(x => x.ServicesDate),
+                "servicesdate_desc" => baseQ.OrderByDescending(x => x.ServicesDate),
+                "title_asc" => baseQ.OrderBy(x => x.RequestTitle),
+                "title_desc" => baseQ.OrderByDescending(x => x.RequestTitle),
+                _ => baseQ.OrderByDescending(x => x.CreatedDate),
+            };
+
+            // ---- Sayfalama + hafif materialize ----
+            var pageRows = await baseQ
+                .Skip((q.Page - 1) * q.PageSize)
+                .Take(q.PageSize)
+                .ToListAsync();
+
+            if (pageRows.Count == 0)
+                return ResponseModel<PagedResult<WorkFlowReportListItemDto>>
+                    .Success(new PagedResult<WorkFlowReportListItemDto>([], total, q.Page, q.PageSize));
+
+            var pageReqNos = pageRows.Select(x => x.RequestNo).Distinct().ToList();
+
+            // ---- Toplamları tek grouped query ile getir (Captured-first) ----
+            // Not: Non-captured için Product.Price kullanıyoruz (liste ekranı).
+            var totals = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => pageReqNos.Contains(p.RequestNo))
+                .GroupBy(p => p.RequestNo)
+                .Select(g => new
+                {
+                    RequestNo = g.Key,
+                    Subtotal = g.Sum(p => p.IsPriceCaptured
+                                          ? (p.CapturedTotal ?? (p.CapturedUnitPrice ?? 0) * p.Quantity)
+                                          : (p.Quantity * (p.Product.Price))),
+                    Currency = g.Max(p => p.IsPriceCaptured
+                                          ? (p.CapturedCurrency ?? p.Product.PriceCurrency)
+                                          : p.Product.PriceCurrency)
+                })
+                .ToListAsync();
+
+            var totalsDict = totals.ToDictionary(x => x.RequestNo,
+                                                 x => (x.Subtotal, Currency: x.Currency ?? "TRY"));
+
+            // ---- HasImages bayrağı (tek toplu sorgu) ----
+            bool needImages = q.HasImages.HasValue;
+            HashSet<string>? reqNosWithImages = null;
+
+            if (needImages)
+            {
+                var tsIds = await _uow.Repository.GetQueryable<TechnicalService>()
+                    .AsNoTracking()
+                    .Where(t => pageReqNos.Contains(t.RequestNo))
+                    .Select(t => new { t.Id, t.RequestNo })
+                    .ToListAsync();
+
+                var tsIdList = tsIds.Select(x => x.Id).ToList();
+
+                var imgReqNos = await (
+                    (
+                        from t in _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking()
+                        where pageReqNos.Contains(t.RequestNo)
+                        join si in _uow.Repository.GetQueryable<TechnicalServiceImage>().AsNoTracking()
+                            on t.Id equals si.TechnicalServiceId
+                        select t.RequestNo
+                    )
+                    .Union
+                    (
+                        from t in _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking()
+                        where pageReqNos.Contains(t.RequestNo)
+                        join fi in _uow.Repository.GetQueryable<TechnicalServiceFormImage>().AsNoTracking()
+                            on t.Id equals fi.TechnicalServiceId
+                        select t.RequestNo
+                    )
+                )
+                .Distinct()
+                .ToListAsync();
+
+                reqNosWithImages = imgReqNos.ToHashSet();
+            }
+
+            // ---- DTO compose ----
+            var items = pageRows.Select(x =>
+            {
+                var t = totalsDict.TryGetValue(x.RequestNo, out var v) ? v : (0m, "TRY");
+                var hasImg = !needImages ? false : (reqNosWithImages?.Contains(x.RequestNo) ?? false);
+
+                return new WorkFlowReportListItemDto
+                {
+                    RequestNo = x.RequestNo,
+                    Title = x.RequestTitle,
+                    WorkFlowStatus = x.WorkFlowStatus,
+                    StepCode = x.StepCode,
+                    CreatedDate = x.CreatedDate,
+                    CustomerId = x.CustomerId,
+                    CustomerName = null, // Dilersen üstte Customer join ekleyip doldurabilirsin
+                    City = null,
+                    District = null,
+                    ServicesDate = x.ServicesDate,
+                    ServiceTypeId = x.ServiceTypeId,
+                    ServiceTypeName = x.ServiceTypeName,
+                    TechnicianId = x.TechnicianId,
+                    TechnicianName = x.TechnicianName,
+                    Currency = v.Currency,
+                    Subtotal = v.Subtotal,
+                    TechnicalStatus = null,     // Liste için gerekiyorsa yukarıda semijoin ile çekip ekle
+                    PricingStatus = null,
+                    FinalApprovalStatus = null,
+                    HasImages = hasImg
+                };
+            }).ToList();
+
+            return ResponseModel<PagedResult<WorkFlowReportListItemDto>>
+                .Success(new PagedResult<WorkFlowReportListItemDto>(items, total, q.Page, q.PageSize));
+        }
+
+
         //-------------Private-------------
 
         // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
@@ -3392,6 +3925,66 @@ namespace Business.Services
             return (subject, html);
         }
 
+        private async Task<ResponseModel> EnsurePricesCapturedAsync(string requestNo, bool force = false)
+        {
+            // Customer + Product navigations lazım → include’ları aç
+            var q = _uow.Repository.GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product)
+                .Include(x => x.Customer)
+                    .ThenInclude(c => c.CustomerGroup).ThenInclude(g => g.GroupProductPrices)
+                .Include(x => x.Customer)
+                    .ThenInclude(c => c.CustomerProductPrices)
+                .Where(x => x.RequestNo == requestNo);
+
+            if (!force)
+                q = q.Where(x => !x.IsPriceCaptured);
+
+            var list = await q.ToListAsync();
+            if (list.Count == 0) return ResponseModel.Success();
+
+            foreach (var p in list)
+            {
+                // Kaynak ve birim fiyatı belirle
+                CapturedPriceSource src;
+                decimal unit;
+
+                var grp = p.Customer?.CustomerGroup?.GroupProductPrices?.FirstOrDefault(g => g.ProductId == p.ProductId);
+                if (grp is not null)
+                {
+                    src = CapturedPriceSource.Group;
+                    unit = grp.Price;
+                }
+                else
+                {
+                    var cust = p.Customer?.CustomerProductPrices?.FirstOrDefault(c => c.ProductId == p.ProductId);
+                    if (cust is not null)
+                    {
+                        src = CapturedPriceSource.Customer;
+                        unit = cust.Price;
+                    }
+                    else
+                    {
+                        src = CapturedPriceSource.Standard;
+                        unit = p.Product?.Price ?? 0m;
+                    }
+                }
+
+                var currency = p.Product?.PriceCurrency ?? "TRY";
+                var total = unit * p.Quantity;
+
+                p.CapturedSource = src;
+                p.CapturedUnitPrice = unit;
+                p.CapturedCurrency = currency;
+                p.CapturedTotal = total;
+                p.CapturedAt = DateTime.Now;
+                p.IsPriceCaptured = true;
+
+                _uow.Repository.Update(p);
+            }
+
+            await _uow.Repository.CompleteAsync();
+            return ResponseModel.Success();
+        }
 
     }
 }
