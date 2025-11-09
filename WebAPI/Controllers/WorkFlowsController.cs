@@ -285,7 +285,7 @@ namespace WebAPI.Controllers
         {
             q.Normalize(maxPageSize: 500);
 
-            var result = await _workFlowService.GetReportsAsync(q);
+            var result = await _workFlowService.GetReportLinesAsync(q);
             return Ok(result);
         }
 

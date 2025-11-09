@@ -5,10 +5,13 @@ using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
 using Core.Utilities.IoC;
+using Dapper;
+using Data.Concrete.EfCore.Context;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,6 +32,7 @@ using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
 
@@ -42,7 +46,8 @@ namespace Business.Services
         private readonly ILogger<WorkFlowService> _logger;
         private readonly IMailPushService _mailPush;
         private readonly ICurrentUser _currentUser;
-        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser)
+        private readonly AppDataContext _ctx;
+        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx)
         {
             _uow = uow;
             _config = config;
@@ -50,6 +55,7 @@ namespace Business.Services
             _logger = logger;
             _mailPush = mailPush;
             _currentUser = currentUser;
+            _ctx = ctx;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -3234,7 +3240,6 @@ namespace Business.Services
         }
 
         //------------------------ Report ------------------------
-       
         public async Task<ResponseModel<WorkFlowReportDto>> GetReportAsync(string requestNo)
         {
             // 1) WorkFlow + CurrentStep + ApproverTechnician
@@ -3480,285 +3485,217 @@ namespace Business.Services
 
             return ResponseModel<WorkFlowReportDto>.Success(dto);
         }
-        public async Task<ResponseModel<PagedResult<WorkFlowReportListItemDto>>> GetReportsAsync(ReportQueryParams q)
+        public async Task<PagedResult<WorkFlowReportListItemDto>> GetReportsAsync(ReportQueryParams q)
         {
-            q.Normalize(500);
+            int commandTimeoutSeconds = 60;
+            // 1) EF bağlantısını al ve (gerekirse) aç
+            var conn = _ctx.Database.GetDbConnection();
+            var mustClose = false;
+            if (conn.State == ConnectionState.Closed)
+            {
+                await conn.OpenAsync();
+                mustClose = true; // metot bitiminde kapatacağız (DbContext dispose etmeden)
+            }
 
-            // İsteğe bağlı: timeout artır
-            //_ctx.Database.SetCommandTimeout(60);
+            // 2) EF’de aktif transaction varsa paylaş
+            var efTx = _ctx.Database.CurrentTransaction?.GetDbTransaction();
 
-            // ---- Taban sorgu: yalın projeksiyon (Include yok) ----
-            var baseQ =
-                from wf in _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking()
-                where !wf.IsDeleted
-                join sr in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                     on wf.RequestNo equals sr.RequestNo
-                join st in _uow.Repository.GetQueryable<ServiceType>().AsNoTracking()
-                     on sr.ServiceTypeId equals st.Id into stj
-                from st in stj.DefaultIfEmpty()
-                join tech in _uow.Repository.GetQueryable<User>().AsNoTracking()
-                     on wf.ApproverTechnicianId equals tech.Id into techj
-                from tech in techj.DefaultIfEmpty()
-                select new
+            try
+            {
+                // 3) Dapper parametreleri
+                var p = new DynamicParameters();
+                p.Add("@Page", q.Page);
+                p.Add("@PageSize", q.PageSize);
+                p.Add("@SortBy", q.SortBy);
+
+                p.Add("@CreatedFrom", q.CreatedFrom);
+                p.Add("@CreatedTo", q.CreatedTo);
+                p.Add("@ServicesDateFrom", q.ServicesDateFrom);
+                p.Add("@ServicesDateTo", q.ServicesDateTo);
+
+                p.Add("@Search", q.Search);
+                p.Add("@RequestNo", q.RequestNo);
+                p.Add("@CustomerId", q.CustomerId);
+                p.Add("@CustomerName", q.CustomerName);
+                p.Add("@TechnicianId", q.TechnicianId);
+                p.Add("@ServiceTypeId", q.ServiceTypeId);
+                p.Add("@StepCode", q.StepCode);
+
+                p.Add("@IsAgreement", q.IsAgreement);
+                p.Add("@IsLocationValid", q.IsLocationValid);
+                p.Add("@HasImages", q.HasImages);
+
+                string csvWF = (q.WorkFlowStatuses is { Count: > 0 }) ? string.Join(",", q.WorkFlowStatuses.Select(s => (int)s)) : null;
+                string csvTS = (q.TechnicalStatuses is { Count: > 0 }) ? string.Join(",", q.TechnicalStatuses.Select(s => (int)s)) : null;
+                string csvPR = (q.PricingStatuses is { Count: > 0 }) ? string.Join(",", q.PricingStatuses.Select(s => (int)s)) : null;
+                string csvFA = (q.FinalApprovalStatuses is { Count: > 0 }) ? string.Join(",", q.FinalApprovalStatuses.Select(s => (int)s)) : null;
+
+                p.Add("@WorkFlowStatusesCsv", csvWF);
+                p.Add("@TechStatusesCsv", csvTS);
+                p.Add("@PricingStatusesCsv", csvPR);
+                p.Add("@FinalStatusesCsv", csvFA);
+
+                p.Add("@ProductId", q.ProductId);
+                p.Add("@ProductCode", q.ProductCode);
+
+                // 4) SP çağrısı (tipli DTO ile)
+                var rows = await conn.QueryAsync<ReportRowDto>(new CommandDefinition(
+                    "dbo.usp_ReportSearch",
+                    p,
+                    transaction: efTx,
+                    commandType: CommandType.StoredProcedure,
+                    commandTimeout: commandTimeoutSeconds
+                ));
+
+                var list = new List<WorkFlowReportListItemDto>();
+                int total = 0;
+
+                foreach (var r in rows)
                 {
-                    wf.RequestNo,
-                    wf.RequestTitle,
-                    wf.WorkFlowStatus,
-                    wf.CreatedDate,
-                    StepCode = wf.CurrentStep != null ? wf.CurrentStep.Code : null,  // dikkat: CurrentStep.Include etmiyoruz
-                    sr.CustomerId,
-                    sr.ServicesDate,
-                    sr.ServiceTypeId,
-                    ServiceTypeName = st != null ? st.Name : null,
-                    TechnicianId = wf.ApproverTechnicianId,
-                    TechnicianName = tech != null ? tech.TechnicianName : null
-                };
+                    // Total’ı her satırdan alıyoruz (window COUNT), ilk satırdaki değer sayfa için yeterli
+                    if (total == 0) total = r.TotalCount;
 
-            // ---- Dinamik filtreler (erken uygula) ----
-            if (!string.IsNullOrWhiteSpace(q.RequestNo))
-                baseQ = baseQ.Where(x => x.RequestNo.Contains(q.RequestNo));
-
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var s = q.Search.Trim();
-                // Customer/company araması için müşteriyi dahil eden semi-join
-                var custQ = _uow.Repository.GetQueryable<Customer>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where x.RequestNo.Contains(s) || x.RequestTitle.Contains(s)
-                       || custQ.Any(c => c.Id == x.CustomerId &&
-                                         (c.SubscriberCompany.Contains(s) || c.ContactName1.Contains(s)))
-                    select x;
-            }
-
-            if (q.CreatedFrom.HasValue)
-                baseQ = baseQ.Where(x => x.CreatedDate >= q.CreatedFrom.Value.LocalDateTime);
-            if (q.CreatedTo.HasValue)
-                baseQ = baseQ.Where(x => x.CreatedDate < q.CreatedTo.Value.LocalDateTime);
-
-            if (q.ServicesDateFrom.HasValue)
-                baseQ = baseQ.Where(x => x.ServicesDate >= q.ServicesDateFrom.Value);
-            if (q.ServicesDateTo.HasValue)
-                baseQ = baseQ.Where(x => x.ServicesDate < q.ServicesDateTo.Value);
-
-            if (q.CustomerId.HasValue)
-                baseQ = baseQ.Where(x => x.CustomerId == q.CustomerId.Value);
-
-            if (!string.IsNullOrWhiteSpace(q.CustomerName))
-            {
-                var custQ = _uow.Repository.GetQueryable<Customer>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where custQ.Any(c => c.Id == x.CustomerId && c.SubscriberCompany.Contains(q.CustomerName))
-                    select x;
-            }
-
-            if (q.TechnicianId.HasValue)
-                baseQ = baseQ.Where(x => x.TechnicianId == q.TechnicianId.Value);
-
-            if (q.ServiceTypeId.HasValue)
-                baseQ = baseQ.Where(x => x.ServiceTypeId == q.ServiceTypeId.Value);
-
-            if (!string.IsNullOrWhiteSpace(q.StepCode))
-            {
-                // CurrentStep.Code için semi-join
-                var stepQ = _uow.Repository.GetQueryable<WorkFlowStep>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where stepQ.Any(s => s.Code == q.StepCode &&
-                                         s.Id == _uow.Repository.GetQueryable<WorkFlow>()
-                                             .Where(w => w.RequestNo == x.RequestNo)
-                                             .Select(w => w.CurrentStepId).FirstOrDefault())
-                    select x;
-            }
-
-            if (q.IsAgreement.HasValue)
-            {
-                var wfQ = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where wfQ.Any(w => w.RequestNo == x.RequestNo && w.IsAgreement == q.IsAgreement.Value)
-                    select x;
-            }
-
-            if (q.IsLocationValid.HasValue)
-            {
-                var wfQ = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where wfQ.Any(w => w.RequestNo == x.RequestNo && w.IsLocationValid == q.IsLocationValid.Value)
-                    select x;
-            }
-
-            if (q.WorkFlowStatuses is { Count: > 0 })
-                baseQ = baseQ.Where(x => q.WorkFlowStatuses!.Contains(x.WorkFlowStatus));
-
-            if (q.TechnicalStatuses is { Count: > 0 })
-            {
-                var tsQ = _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where tsQ.Any(t => t.RequestNo == x.RequestNo && q.TechnicalStatuses!.Contains(t.ServicesStatus))
-                    select x;
-            }
-
-            if (q.PricingStatuses is { Count: > 0 })
-            {
-                var prQ = _uow.Repository.GetQueryable<Pricing>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where prQ.Any(p => p.RequestNo == x.RequestNo && q.PricingStatuses!.Contains(p.Status))
-                    select x;
-            }
-
-            if (q.FinalApprovalStatuses is { Count: > 0 })
-            {
-                var faQ = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
-                baseQ =
-                    from x in baseQ
-                    where faQ.Any(f => f.RequestNo == x.RequestNo && q.FinalApprovalStatuses!.Contains(f.Status))
-                    select x;
-            }
-
-            // Ürün filtreleri (semi-join)
-            if (q.ProductId.HasValue || !string.IsNullOrWhiteSpace(q.ProductCode))
-            {
-                var lines = _uow.Repository.GetQueryable<ServicesRequestProduct>().AsNoTracking();
-                if (q.ProductId.HasValue)
-                    lines = lines.Where(l => l.ProductId == q.ProductId.Value);
-
-                if (!string.IsNullOrWhiteSpace(q.ProductCode))
-                {
-                    var prod = _uow.Repository.GetQueryable<Product>().AsNoTracking();
-                    lines =
-                        from l in lines
-                        where prod.Any(p => p.Id == l.ProductId && p.ProductCode.Contains(q.ProductCode))
-                        select l;
+                    list.Add(new WorkFlowReportListItemDto
+                    {
+                        RequestNo = r.RequestNo,
+                        Title = r.Title,
+                        WorkFlowStatus = (WorkFlowStatus)r.WorkFlowStatus,
+                        StepCode = r.StepCode,
+                        CreatedDate = r.CreatedDate,      // DateTimeOffset
+                        CustomerId = r.CustomerId,
+                        CustomerName = r.CustomerName,
+                        City = r.City,
+                        District = r.District,
+                        ServicesDate = r.ServicesDate,     // DateTimeOffset
+                        ServiceTypeId = r.ServiceTypeId,
+                        ServiceTypeName = r.ServiceTypeName,
+                        TechnicianId = r.TechnicianId,
+                        TechnicianName = r.TechnicianName,
+                        Currency = r.Currency ?? "TRY",
+                        Subtotal = r.Subtotal,
+                        HasImages = q.HasImages ?? false // SP’de döndürürsen r.HasImages
+                    });
                 }
 
-                var reqNosHavingProduct = lines.Select(l => l.RequestNo).Distinct();
-                baseQ = baseQ.Where(x => reqNosHavingProduct.Contains(x.RequestNo));
+                return new PagedResult<WorkFlowReportListItemDto>(list, total, q.Page, q.PageSize);
             }
-
-            // ---- Toplam kayıt (paging öncesi) ----
-            var total = await baseQ.CountAsync();
-
-            // ---- Sıralama ----
-            baseQ = q.SortBy?.ToLowerInvariant() switch
+            finally
             {
-                "created_asc" => baseQ.OrderBy(x => x.CreatedDate),
-                "servicesdate_asc" => baseQ.OrderBy(x => x.ServicesDate),
-                "servicesdate_desc" => baseQ.OrderByDescending(x => x.ServicesDate),
-                "title_asc" => baseQ.OrderBy(x => x.RequestTitle),
-                "title_desc" => baseQ.OrderByDescending(x => x.RequestTitle),
-                _ => baseQ.OrderByDescending(x => x.CreatedDate),
-            };
-
-            // ---- Sayfalama + hafif materialize ----
-            var pageRows = await baseQ
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .ToListAsync();
-
-            if (pageRows.Count == 0)
-                return ResponseModel<PagedResult<WorkFlowReportListItemDto>>
-                    .Success(new PagedResult<WorkFlowReportListItemDto>([], total, q.Page, q.PageSize));
-
-            var pageReqNos = pageRows.Select(x => x.RequestNo).Distinct().ToList();
-
-            // ---- Toplamları tek grouped query ile getir (Captured-first) ----
-            // Not: Non-captured için Product.Price kullanıyoruz (liste ekranı).
-            var totals = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
-                .AsNoTracking()
-                .Where(p => pageReqNos.Contains(p.RequestNo))
-                .GroupBy(p => p.RequestNo)
-                .Select(g => new
-                {
-                    RequestNo = g.Key,
-                    Subtotal = g.Sum(p => p.IsPriceCaptured
-                                          ? (p.CapturedTotal ?? (p.CapturedUnitPrice ?? 0) * p.Quantity)
-                                          : (p.Quantity * (p.Product.Price))),
-                    Currency = g.Max(p => p.IsPriceCaptured
-                                          ? (p.CapturedCurrency ?? p.Product.PriceCurrency)
-                                          : p.Product.PriceCurrency)
-                })
-                .ToListAsync();
-
-            var totalsDict = totals.ToDictionary(x => x.RequestNo,
-                                                 x => (x.Subtotal, Currency: x.Currency ?? "TRY"));
-
-            // ---- HasImages bayrağı (tek toplu sorgu) ----
-            bool needImages = q.HasImages.HasValue;
-            HashSet<string>? reqNosWithImages = null;
-
-            if (needImages)
-            {
-                var tsIds = await _uow.Repository.GetQueryable<TechnicalService>()
-                    .AsNoTracking()
-                    .Where(t => pageReqNos.Contains(t.RequestNo))
-                    .Select(t => new { t.Id, t.RequestNo })
-                    .ToListAsync();
-
-                var tsIdList = tsIds.Select(x => x.Id).ToList();
-
-                var imgReqNos = await (
-                    (
-                        from t in _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking()
-                        where pageReqNos.Contains(t.RequestNo)
-                        join si in _uow.Repository.GetQueryable<TechnicalServiceImage>().AsNoTracking()
-                            on t.Id equals si.TechnicalServiceId
-                        select t.RequestNo
-                    )
-                    .Union
-                    (
-                        from t in _uow.Repository.GetQueryable<TechnicalService>().AsNoTracking()
-                        where pageReqNos.Contains(t.RequestNo)
-                        join fi in _uow.Repository.GetQueryable<TechnicalServiceFormImage>().AsNoTracking()
-                            on t.Id equals fi.TechnicalServiceId
-                        select t.RequestNo
-                    )
-                )
-                .Distinct()
-                .ToListAsync();
-
-                reqNosWithImages = imgReqNos.ToHashSet();
+                // 5) Bağlantıyı biz açtıysak kibarca kapat
+                if (mustClose && conn.State == ConnectionState.Open)
+                    await conn.CloseAsync();
             }
-
-            // ---- DTO compose ----
-            var items = pageRows.Select(x =>
-            {
-                var t = totalsDict.TryGetValue(x.RequestNo, out var v) ? v : (0m, "TRY");
-                var hasImg = !needImages ? false : (reqNosWithImages?.Contains(x.RequestNo) ?? false);
-
-                return new WorkFlowReportListItemDto
-                {
-                    RequestNo = x.RequestNo,
-                    Title = x.RequestTitle,
-                    WorkFlowStatus = x.WorkFlowStatus,
-                    StepCode = x.StepCode,
-                    CreatedDate = x.CreatedDate,
-                    CustomerId = x.CustomerId,
-                    CustomerName = null, // Dilersen üstte Customer join ekleyip doldurabilirsin
-                    City = null,
-                    District = null,
-                    ServicesDate = x.ServicesDate,
-                    ServiceTypeId = x.ServiceTypeId,
-                    ServiceTypeName = x.ServiceTypeName,
-                    TechnicianId = x.TechnicianId,
-                    TechnicianName = x.TechnicianName,
-                    Currency = v.Currency,
-                    Subtotal = v.Subtotal,
-                    TechnicalStatus = null,     // Liste için gerekiyorsa yukarıda semijoin ile çekip ekle
-                    PricingStatus = null,
-                    FinalApprovalStatus = null,
-                    HasImages = hasImg
-                };
-            }).ToList();
-
-            return ResponseModel<PagedResult<WorkFlowReportListItemDto>>
-                .Success(new PagedResult<WorkFlowReportListItemDto>(items, total, q.Page, q.PageSize));
         }
+        public async Task<PagedResult<WorkFlowReportLineDto>> GetReportLinesAsync(ReportQueryParams q)
+        {
+            // Güvenli bound
+            q.Normalize(500);
 
+            // EF bağlantısı
+            var conn = _ctx.Database.GetDbConnection();
+            var mustClose = false;
+            if (conn.State == ConnectionState.Closed)
+            {
+                await conn.OpenAsync();
+                mustClose = true;
+            }
+
+            var efTx = _ctx.Database.CurrentTransaction?.GetDbTransaction();
+
+            try
+            {
+                // Dapper parametreleri (SP ile birebir)
+                var p = new DynamicParameters();
+                p.Add("@Page", q.Page);
+                p.Add("@PageSize", q.PageSize);
+                p.Add("@SortBy", q.SortBy);
+
+                p.Add("@CreatedFrom", q.CreatedFrom);
+                p.Add("@CreatedTo", q.CreatedTo);
+                p.Add("@ServicesDateFrom", q.ServicesDateFrom);
+                p.Add("@ServicesDateTo", q.ServicesDateTo);
+
+                p.Add("@Search", q.Search);
+                p.Add("@RequestNo", q.RequestNo);
+                p.Add("@CustomerId", q.CustomerId);
+                p.Add("@CustomerName", q.CustomerName);
+                p.Add("@TechnicianId", q.TechnicianId);
+                p.Add("@ServiceTypeId", q.ServiceTypeId);
+                p.Add("@StepCode", q.StepCode);
+
+                p.Add("@IsAgreement", q.IsAgreement);
+                p.Add("@IsLocationValid", q.IsLocationValid);
+                p.Add("@HasImages", q.HasImages);
+
+                string? csvWF = (q.WorkFlowStatuses is { Count: > 0 }) ? string.Join(",", q.WorkFlowStatuses.Select(s => (int)s)) : null;
+                string? csvTS = (q.TechnicalStatuses is { Count: > 0 }) ? string.Join(",", q.TechnicalStatuses.Select(s => (int)s)) : null;
+                string? csvPR = (q.PricingStatuses is { Count: > 0 }) ? string.Join(",", q.PricingStatuses.Select(s => (int)s)) : null;
+                string? csvFA = (q.FinalApprovalStatuses is { Count: > 0 }) ? string.Join(",", q.FinalApprovalStatuses.Select(s => (int)s)) : null;
+
+                p.Add("@WorkFlowStatusesCsv", csvWF);
+                p.Add("@TechStatusesCsv", csvTS);
+                p.Add("@PricingStatusesCsv", csvPR);
+                p.Add("@FinalStatusesCsv", csvFA);
+
+                p.Add("@ProductId", q.ProductId);
+                p.Add("@ProductCode", q.ProductCode);
+
+                // Çağrı: yeni SP adı
+                var rows = await conn.QueryAsync<ReportLineRowDto>(new CommandDefinition(
+                    "dbo.usp_ReportSearch_Lines",
+                    p,
+                    transaction: efTx,
+                    commandType: CommandType.StoredProcedure,
+                    commandTimeout: 60
+                ));
+
+                var list = new List<WorkFlowReportLineDto>();
+                int total = 0;
+
+                foreach (var r in rows)
+                {
+                    if (total == 0) total = r.TotalCount;
+
+                    list.Add(new WorkFlowReportLineDto
+                    {
+                        RequestNo = r.RequestNo,
+                        City = r.City,
+                        CustomerName = r.CustomerName,
+                        ProductCode = r.ProductCode,
+                        LocationCode = r.LocationCode,
+                        ProductOracleCode = r.ProductOracleCode,
+                        ProductDefinition = r.ProductDefinition,
+
+                        ServiceDate = r.ServiceDate,
+                        ServiceOracleNo = r.ServiceOracleNo,
+                        WorkOrder = r.WorkOrder,
+
+                        Quantity = r.Quantity,
+
+                        LineUnitPriceTL = r.LineUnitPriceTL,
+                        LineTotalTL = r.LineTotalTL,
+                        LineUnitPriceUSD = r.LineUnitPriceUSD,
+                        LineTotalUSD = r.LineTotalUSD,
+
+                        GLCode = r.GLCode,
+                        MGSDescription = r.MGSDescription,
+
+                        ContractNo = r.Contract_No,
+                        CostType = r.CostType,
+                        Description = r.Description,
+
+                        InstallationDate = r.InstallationDate
+                    });
+                }
+
+                return new PagedResult<WorkFlowReportLineDto>(list, total, q.Page, q.PageSize);
+            }
+            finally
+            {
+                if (mustClose && conn.State == ConnectionState.Open)
+                    await conn.CloseAsync();
+            }
+        }
 
         //-------------Private-------------
 
@@ -3984,6 +3921,27 @@ namespace Business.Services
 
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
+        }
+
+        private sealed class ReportRowDto
+        {
+            public int TotalCount { get; set; }
+            public string RequestNo { get; set; } = default!;
+            public string? Title { get; set; }
+            public int WorkFlowStatus { get; set; }
+            public string? StepCode { get; set; }
+            public DateTimeOffset CreatedDate { get; set; }
+            public long CustomerId { get; set; }
+            public string? CustomerName { get; set; }
+            public string? City { get; set; }
+            public string? District { get; set; }
+            public DateTimeOffset ServicesDate { get; set; }
+            public long ServiceTypeId { get; set; }
+            public string? ServiceTypeName { get; set; }
+            public long? TechnicianId { get; set; }
+            public string? TechnicianName { get; set; }
+            public decimal Subtotal { get; set; }
+            public string Currency { get; set; } = "TRY";
         }
 
     }
