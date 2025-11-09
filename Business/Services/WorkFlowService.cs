@@ -1053,6 +1053,13 @@ namespace Business.Services
             if (pricing is null)
                 return ResponseModel<PricingGetDto>.Fail("Fiyatlama kaydı tanımlı değil.", StatusCode.BadRequest);
 
+
+            var servicesRequest = await _uow.Repository
+              .GetQueryable<ServicesRequest>()
+              .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+            if (servicesRequest is null)
+                return ResponseModel<PricingGetDto>.Fail("Servis talebi kaydı bulunamadı.", StatusCode.BadRequest);
+
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
             #endregion
@@ -1069,6 +1076,11 @@ namespace Business.Services
             wf.UpdatedDate = DateTime.Now;
             wf.UpdatedUser = meId;
             _uow.Repository.Update(wf);
+            #endregion
+
+            #region  Servis Maliyet Durumu Güncelleme 
+            servicesRequest.ServicesCostStatus = dto.ServicesCostStatus;
+            _uow.Repository.Update(servicesRequest);
             #endregion
 
             #region Ürünler Güncellemesi
@@ -1114,6 +1126,7 @@ namespace Business.Services
             }
 
             #endregion
+
 
             #region Son Onaya Gönderim 
             var finalApproval = await _uow.Repository
@@ -1204,11 +1217,11 @@ namespace Business.Services
 
 
             // 3) FinalApproval var mı? (unique: RequestNo)
-            var exists = await _uow.Repository
+            var existsFinalApproval = await _uow.Repository
                 .GetQueryable<FinalApproval>()
                 .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
-            if (exists is null)
+            if (existsFinalApproval is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.BadRequest);
 
             var me = await _currentUser.GetAsync();
@@ -1216,28 +1229,26 @@ namespace Business.Services
             #endregion
 
             #region Fiyatlama Güncelleme
-            exists.Notes = dto.Notes;
-            exists.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated ? FinalApprovalStatus.Approved : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
-            exists.DecidedBy = meId;
-            exists.UpdatedDate = DateTime.Now;
-            exists.UpdatedUser = meId;
-            _uow.Repository.Update(exists);
+            existsFinalApproval.Notes = dto.Notes;
+            existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated ? FinalApprovalStatus.Approved : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
+            existsFinalApproval.DecidedBy = meId;
+            existsFinalApproval.UpdatedDate = DateTime.Now;
+            existsFinalApproval.UpdatedUser = meId;
+            _uow.Repository.Update(existsFinalApproval);
             #endregion
 
             #region Workflow Güncelleme
-            // WorkFlow’u APR’da konumla (emin olmak için)
-            var wfTracked = await _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-            if (wfTracked is not null)
+            if (wf is not null)
             {
-                wfTracked.CurrentStepId = targetStep.Id;
-                wfTracked.UpdatedDate = DateTime.Now;
-                wfTracked.UpdatedUser = meId;
-                wfTracked.WorkFlowStatus = dto.WorkFlowStatus;
-                _uow.Repository.Update(wfTracked);
+                wf.CurrentStepId = targetStep.Id;
+                wf.UpdatedDate = DateTime.Now;
+                wf.UpdatedUser = meId;
+                wf.WorkFlowStatus = dto.WorkFlowStatus;
+                _uow.Repository.Update(wf);
             }
             #endregion
+
+          
 
             #region Ürünler Güncellemesi
             // 🔹 ServicesRequestProduct senkronizasyonu
@@ -1300,7 +1311,6 @@ namespace Business.Services
 
             return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
         }
-
 
         //Lokasyon Kontrolü  Ezme Maili 
         public async Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto)

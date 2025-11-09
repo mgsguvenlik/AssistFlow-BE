@@ -23,6 +23,8 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         [Range(0, (double)decimal.MaxValue)]
         public decimal TotalAmount { get; set; } = 0m;
 
+        public ServicesCostStatus ServicesCostStatus { get; set; }
+
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
     }
 }
