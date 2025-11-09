@@ -27,7 +27,6 @@ namespace Business.Interfaces
         Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo);
         Task<ResponseModel> RequestLocationOverrideAsync(OverrideLocationCheckDto dto);
 
-
         Task<ResponseModel<WorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
 
         Task<ResponseModel<FinalApprovalGetDto>> FinalApprovalAsync(FinalApprovalUpdateDto dto);
@@ -45,9 +44,6 @@ namespace Business.Interfaces
 
         Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR");
         Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q);
-        Task<ResponseModel<WorkFlowGetDto>> GetWorkFlowByIdAsync(long id);
-        Task<ResponseModel<WorkFlowGetDto>> CreateWorkFlowAsync(WorkFlowCreateDto dto);
-        Task<ResponseModel<WorkFlowGetDto>> UpdateWorkFlowAsync(WorkFlowUpdateDto dto);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
         Task<ResponseModel> CancelWorkFlowAsync(long id);
 

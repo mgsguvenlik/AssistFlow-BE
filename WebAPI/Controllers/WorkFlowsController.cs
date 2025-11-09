@@ -157,8 +157,6 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-
-
         [HttpPost("approve-pricing")]
         public async Task<IActionResult> ApprovePricingAsync([FromBody] PricingUpdateDto dto)
         {
@@ -230,9 +228,6 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-
-
-        // GET: /api/workflows/steps/{id}
         [HttpGet("get-workflow-steps/{id:long}")]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
@@ -240,7 +235,6 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-        // POST: /api/workflows/steps
         [HttpPost("create-steps")]
         public async Task<IActionResult> CreateSteps([FromBody] WorkFlowStepCreateDto dto)
         {
@@ -252,7 +246,6 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-        // PUT: /api/workflows/steps/{id}
         [HttpPost("update-steps/{id:long}")]
         public async Task<IActionResult> UpdateSteps([FromRoute] long id, [FromBody] WorkFlowStepUpdateDto dto)
         {
@@ -263,7 +256,6 @@ namespace WebAPI.Controllers
             return ToActionResult(resp);
         }
 
-        // DELETE: /api/workflows/steps/{id}
         [HttpPost("delete-steps/{id:long}")]
         public async Task<IActionResult> DeleteSteps([FromRoute] long id)
         {
