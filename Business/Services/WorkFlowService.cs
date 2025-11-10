@@ -1294,15 +1294,6 @@ namespace Business.Services
                 var meId = me?.Id ?? 0;
                 #endregion
 
-                #region Fiyatlama Güncelleme
-                existsFinalApproval.Notes = dto.Notes;
-                existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated ? FinalApprovalStatus.Approved : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
-                existsFinalApproval.DecidedBy = meId;
-                existsFinalApproval.UpdatedDate = DateTime.Now;
-                existsFinalApproval.UpdatedUser = meId;
-                _uow.Repository.Update(existsFinalApproval);
-                #endregion
-
                 #region Workflow Güncelleme
                 if (wf is not null)
                 {
@@ -1358,11 +1349,41 @@ namespace Business.Services
 
                 #endregion
 
-                #region Ürün  Fiyat Sabitleme 
+                #region Ürün Fiyat Sabitleme
+                // Tamamlama/İptal anında zorunlu fiyat capture; diğer durumlarda da çalıştırmak istersen force=true verebilirsin
                 if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 {
                     await EnsurePricesCapturedAsync(dto.RequestNo);
                 }
+                else
+                {
+                    // İsteğe bağlı: satırlar capture edilmemişse, toplam hesap doğru olsun diye tetikleyebilirsin
+                    await EnsurePricesCapturedAsync(dto.RequestNo, force: false);
+                }
+                #endregion
+
+                #region Toplam Hesapla + İndirim Uygula
+                var discountPercent = GetDiscountPercentFromDto(dto);   // 0..100
+                var (subTotal, pct, discountAmount, grandTotal) = await CalculateTotalsAsync(dto.RequestNo, discountPercent);
+                #endregion
+
+                #region Fiyatlama Güncelleme (FinalApproval)
+                existsFinalApproval.Notes = dto.Notes;
+                existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
+                    ? FinalApprovalStatus.Approved
+                    : (dto.WorkFlowStatus == WorkFlowStatus.Cancelled ? FinalApprovalStatus.Rejected : FinalApprovalStatus.Pending);
+
+                existsFinalApproval.DecidedBy = meId;
+                existsFinalApproval.UpdatedDate = DateTime.Now;
+                existsFinalApproval.UpdatedUser = meId;
+
+                // 💡 yeni alanlar
+                existsFinalApproval.SubTotal = subTotal;
+                existsFinalApproval.DiscountPercent = pct;
+                existsFinalApproval.DiscountAmount = discountAmount;
+                existsFinalApproval.GrandTotal = grandTotal;
+
+                _uow.Repository.Update(existsFinalApproval);
                 #endregion
 
                 #region Hareket Kaydı
@@ -2798,43 +2819,7 @@ namespace Business.Services
         }
 
         //----------------------FinalApproval ---------------------------------------------------
-        public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync_(string requestNo)
-        {
-            // HEADER
-            var dto = await _uow.Repository
-                .GetQueryable<FinalApproval>()
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .ProjectToType<FinalApprovalGetDto>(_config)
-                .FirstOrDefaultAsync();
-
-            if (dto is null)
-                return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            // PRODUCTS (RequestNo bazlı)
-            dto.Products = await _uow.Repository
-                .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
-                .AsNoTracking()
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
-                .ToListAsync();
-
-            // REVIEW LOG’lar (APR ile ilgili gelen/giden tüm hareketler)
-            dto.ReviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x =>
-                    x.RequestNo == dto.RequestNo &&
-                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
-                .AsNoTracking()
-                .OrderByDescending(x => x.CreatedDate)
-                .ProjectToType<WorkFlowReviewLogDto>(_config)
-                .ToListAsync();
-
-            return ResponseModel<FinalApprovalGetDto>.Success(dto);
-        }
-
+     
         public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo)
         {
             var qFinal = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
@@ -2853,6 +2838,11 @@ namespace Business.Services
                     Notes = fa.Notes,
                     DecidedBy = fa.DecidedBy,
                     Status = fa.Status,
+
+                    SubTotal =fa.SubTotal,
+                    DiscountPercent =fa.DiscountPercent,
+                    DiscountAmount=fa.DiscountAmount,
+                    GrandTotal=fa.GrandTotal,
 
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
@@ -2950,6 +2940,11 @@ namespace Business.Services
                     Notes = fa.Notes,
                     DecidedBy = fa.DecidedBy,
                     Status = fa.Status,
+
+                    SubTotal = fa.SubTotal,
+                    DiscountPercent = fa.DiscountPercent,
+                    DiscountAmount = fa.DiscountAmount,
+                    GrandTotal = fa.GrandTotal,
 
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
@@ -3862,6 +3857,8 @@ namespace Business.Services
             return (subject, html);
         }
 
+
+        /// Servis Üürnleri 
         private async Task<ResponseModel> EnsurePricesCapturedAsync(string requestNo, bool force = false)
         {
             // Customer + Product navigations lazım → include’ları aç
@@ -3915,12 +3912,44 @@ namespace Business.Services
                 p.CapturedTotal = total;
                 p.CapturedAt = DateTime.Now;
                 p.IsPriceCaptured = true;
-
                 _uow.Repository.Update(p);
             }
 
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
+        }
+
+
+        private static decimal ClampPercent(decimal p)
+        {
+            if (p < 0) return 0;
+            if (p > 100) return 100;
+            return p;
+        }
+
+        private static decimal Round2(decimal v) =>
+            Math.Round(v, 2, MidpointRounding.AwayFromZero);
+
+        private decimal GetDiscountPercentFromDto(FinalApprovalUpdateDto dto)
+        {
+            var percent = dto.DiscountPercent;
+            return ClampPercent(percent);
+        }
+
+        private async Task<(decimal subTotal, decimal discountPercent, decimal discountAmount, decimal grandTotal)>CalculateTotalsAsync(string requestNo, decimal discountPercent)
+        {
+            var lines = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .Select(x => new { x.CapturedTotal })
+                .ToListAsync();
+
+            var sub = Round2(lines.Sum(x => (decimal)x.CapturedTotal));
+            var pct = ClampPercent(discountPercent);
+            var disc = Round2(sub * pct / 100m);
+            var grand = Round2(sub - disc);
+
+            return (sub, pct, disc, grand);
         }
 
         private sealed class ReportRowDto
