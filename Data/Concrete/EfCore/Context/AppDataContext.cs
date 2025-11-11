@@ -43,6 +43,8 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<MailOutbox> MailOutboxes { get; set; } = default!;
         public DbSet<FinalApproval> FinalApprovals { get; set; } = default!;
 
+        public DbSet<Menu> Modules { get; set; }
+        public DbSet<MenuRole> MenuRoles { get; set; }
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -323,6 +325,39 @@ namespace Data.Concrete.EfCore.Context
 
                 e.Property(x => x.TotalAmount)
                     .HasPrecision(18, 2);
+            });
+
+
+            // Module
+            modelBuilder.Entity<Menu>(e =>
+            {
+                e.ToTable("Modules");
+                e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+                e.Property(x => x.Description).HasMaxLength(1000);
+                e.HasIndex(x => x.Name).IsUnique(false);
+            });
+
+            // MenuRole
+            modelBuilder.Entity<MenuRole>(e =>
+            {
+                e.ToTable("MenuRole");
+
+                // (RoleId, ModuleId) tekilleştir -> aynı rol için aynı module bir kez tanımlansın
+                e.HasIndex(x => new { x.RoleId, x.ModuleId }).IsUnique();
+
+                e.Property<long>("ModulId"); // kolon ismi şemadaki gibi
+
+                e.HasOne(x => x.Module)
+                 .WithMany(m => m.MenuRoles)
+                 .HasForeignKey(x => x.ModuleId)
+                 .HasConstraintName("FK_MenuRole_Modules_ModuleId")
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Role)
+                 .WithMany() // Role tarafında koleksiyon şart değil
+                 .HasForeignKey(x => x.RoleId)
+                 .HasConstraintName("FK_MenuRole_Roles_RoleId")
+                 .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

@@ -9,7 +9,6 @@ using Core.Utilities.IoC;
 using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using Model.Concrete;
 using Model.Dtos.MailOutbox;
 
 namespace Business.DependencyResolvers.Autofac
@@ -42,11 +41,13 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IActivationRecordService), typeof(ActivationRecordService));
             services.AddScoped(typeof(IMailPushService), typeof(MailPushService));
             services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddScoped(typeof(IMenuService), typeof(MenuService));
+            services.AddScoped(typeof(IMenuRoleService), typeof(MenuRoleService));
             services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddHostedService<MailOutboxDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı
-            services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+            services.AddScoped<IPasswordHasher<Model.Concrete.User>, PasswordHasher<Model.Concrete.User>>();
 
             // Eğer kendi sarmalayıcını (IPasswordHasherService) da kullanacaksan:
             services.AddScoped(typeof(IPasswordHasherService), typeof(IdentityPasswordHasherService));
@@ -184,6 +185,23 @@ namespace Business.DependencyResolvers.Autofac
                     long>, WorkFlowTransitionService>();
 
 
+            // ICrudService -> Menu
+            services.AddScoped<
+                ICrudService<
+                    Model.Dtos.Menu.MenuCreateDto,
+                    Model.Dtos.Menu.MenuUpdateDto,
+                    Model.Dtos.Menu.MenuGetDto,
+                    long>,
+                MenuService>();
+
+            // ICrudService -> MenuRole
+            services.AddScoped<
+                ICrudService<
+                    Model.Dtos.MenuRole.MenuRoleCreateDto,
+                    Model.Dtos.MenuRole.MenuRoleUpdateDto,
+                    Model.Dtos.MenuRole.MenuRoleGetDto,
+                    long>,
+                MenuRoleService>();
             services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
             services.AddScoped<
                 ICrudService<MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto, long>,

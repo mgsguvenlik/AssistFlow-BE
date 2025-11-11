@@ -21,6 +21,7 @@ using WebAPI.Extensions;
 using WebAPI.Middleware;
 
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");

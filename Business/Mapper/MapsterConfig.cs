@@ -34,7 +34,6 @@ using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
-using System.Globalization;
 
 namespace Business.Mapper
 {
@@ -415,8 +414,8 @@ namespace Business.Mapper
             config.NewConfig<WorkFlowTransitionCreateDto, WorkFlowTransition>();
             config.NewConfig<WorkFlowTransitionUpdateDto, WorkFlowTransition>();
 
-            config.NewConfig<WorkFlowActivityRecorGetDto, WorkFlowActivityRecord>(); 
-            config.NewConfig<WorkFlowReviewLog, WorkFlowReviewLogDto>(); 
+            config.NewConfig<WorkFlowActivityRecorGetDto, WorkFlowActivityRecord>();
+            config.NewConfig<WorkFlowReviewLog, WorkFlowReviewLogDto>();
             config.NewConfig<WorkFlowReviewLogDto, WorkFlowReviewLog>();
 
 
@@ -466,6 +465,34 @@ namespace Business.Mapper
 
             //// CreateDto -> Entity
             //config.NewConfig<FinalApprovalCreateDto, FinalApproval>();
+
+
+
+            // Menu
+            config.NewConfig<Model.Dtos.Menu.MenuCreateDto, Model.Concrete.Menu>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.MenuRoles);
+
+            config.NewConfig<Model.Dtos.Menu.MenuUpdateDto, Model.Concrete.Menu>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.MenuRoles);
+
+            config.NewConfig<Model.Concrete.Menu, Model.Dtos.Menu.MenuGetDto>();
+
+            // MenuRole
+            config.NewConfig<Model.Dtos.MenuRole.MenuRoleCreateDto, Model.Concrete.MenuRole>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Module)
+                  .Ignore(d => d.Role);
+
+            config.NewConfig<Model.Dtos.MenuRole.MenuRoleUpdateDto, Model.Concrete.MenuRole>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Module)
+                  .Ignore(d => d.Role);
+
+            config.NewConfig<Model.Concrete.MenuRole, Model.Dtos.MenuRole.MenuRoleGetDto>()
+                  .Map(d => d.ModuleName, s => s.Module != null ? s.Module.Name : null)
+                  .Map(d => d.RoleName, s => s.Role != null ? s.Role.Name : null);
 
         }
     }
