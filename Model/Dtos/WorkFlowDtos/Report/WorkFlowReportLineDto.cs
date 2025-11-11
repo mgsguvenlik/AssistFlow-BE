@@ -27,6 +27,7 @@
         public string? ContractNo { get; set; }
         public string? CostType { get; set; }
         public string? Description { get; set; }
+        public decimal DiscountPercent { get; set; }
 
         public DateTimeOffset? InstallationDate { get; set; }
     }

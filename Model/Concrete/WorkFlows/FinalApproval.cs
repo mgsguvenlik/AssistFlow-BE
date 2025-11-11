@@ -15,12 +15,7 @@ namespace Model.Concrete.WorkFlows
         // Kim-ne-zaman
         public long? DecidedBy { get; set; }
         public FinalApprovalStatus Status { get; set; } = FinalApprovalStatus.Pending;
-
-
-        // 💡 Yeni alanlar
-        public decimal SubTotal { get; set; }               // indirim öncesi
         public decimal DiscountPercent { get; set; }         // 0..100
-        public decimal DiscountAmount { get; set; }          // TL/para birimi
-        public decimal GrandTotal { get; set; }              // indirim sonrası
+  
     }
 }

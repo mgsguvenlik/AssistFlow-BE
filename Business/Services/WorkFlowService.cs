@@ -1362,11 +1362,7 @@ namespace Business.Services
                 }
                 #endregion
 
-                #region Toplam Hesapla + İndirim Uygula
-                var discountPercent = GetDiscountPercentFromDto(dto);   // 0..100
-                var (subTotal, pct, discountAmount, grandTotal) = await CalculateTotalsAsync(dto.RequestNo, discountPercent);
-                #endregion
-
+               
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
                 existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
@@ -1378,11 +1374,7 @@ namespace Business.Services
                 existsFinalApproval.UpdatedUser = meId;
 
                 // 💡 yeni alanlar
-                existsFinalApproval.SubTotal = subTotal;
-                existsFinalApproval.DiscountPercent = pct;
-                existsFinalApproval.DiscountAmount = discountAmount;
-                existsFinalApproval.GrandTotal = grandTotal;
-
+                existsFinalApproval.DiscountPercent = dto.DiscountPercent;
                 _uow.Repository.Update(existsFinalApproval);
                 #endregion
 
@@ -2839,10 +2831,7 @@ namespace Business.Services
                     DecidedBy = fa.DecidedBy,
                     Status = fa.Status,
 
-                    SubTotal =fa.SubTotal,
                     DiscountPercent =fa.DiscountPercent,
-                    DiscountAmount=fa.DiscountAmount,
-                    GrandTotal=fa.GrandTotal,
 
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
@@ -2940,12 +2929,7 @@ namespace Business.Services
                     Notes = fa.Notes,
                     DecidedBy = fa.DecidedBy,
                     Status = fa.Status,
-
-                    SubTotal = fa.SubTotal,
                     DiscountPercent = fa.DiscountPercent,
-                    DiscountAmount = fa.DiscountAmount,
-                    GrandTotal = fa.GrandTotal,
-
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
                         {
@@ -3679,7 +3663,9 @@ namespace Business.Services
                         CostType = r.CostType,
                         Description = r.Description,
 
-                        InstallationDate = r.InstallationDate
+                        InstallationDate = r.InstallationDate,
+
+                        DiscountPercent = r.DiscountPercent,
                     });
                 }
 
@@ -3920,38 +3906,7 @@ namespace Business.Services
         }
 
 
-        private static decimal ClampPercent(decimal p)
-        {
-            if (p < 0) return 0;
-            if (p > 100) return 100;
-            return p;
-        }
-
-        private static decimal Round2(decimal v) =>
-            Math.Round(v, 2, MidpointRounding.AwayFromZero);
-
-        private decimal GetDiscountPercentFromDto(FinalApprovalUpdateDto dto)
-        {
-            var percent = dto.DiscountPercent;
-            return ClampPercent(percent);
-        }
-
-        private async Task<(decimal subTotal, decimal discountPercent, decimal discountAmount, decimal grandTotal)>CalculateTotalsAsync(string requestNo, decimal discountPercent)
-        {
-            var lines = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .Select(x => new { x.CapturedTotal })
-                .ToListAsync();
-
-            var sub = Round2(lines.Sum(x => (decimal)x.CapturedTotal));
-            var pct = ClampPercent(discountPercent);
-            var disc = Round2(sub * pct / 100m);
-            var grand = Round2(sub - disc);
-
-            return (sub, pct, disc, grand);
-        }
-
+     
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }

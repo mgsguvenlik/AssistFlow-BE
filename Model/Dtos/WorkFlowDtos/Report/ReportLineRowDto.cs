@@ -35,7 +35,7 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public string? Contract_No { get; set; }              // [Contract No]
         public string? CostType { get; set; }
         public string? Description { get; set; }              // boş dönüyor (SP)
-
+        public decimal DiscountPercent { get; set; }   
         public DateTimeOffset? InstallationDate { get; set; } // Customers.InstallationDate
     }
 }
