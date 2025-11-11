@@ -1,5 +1,4 @@
-﻿// Model/Dtos/Module/ModuleUpdateDto.cs
-namespace Model.Dtos.Menu
+﻿namespace Model.Dtos.Menu
 {
     public class MenuUpdateDto
     {

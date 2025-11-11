@@ -32,6 +32,8 @@ namespace Business.Services
         // İlişki include ihtiyacın yoksa base'in IncludeExpression()'ını kullanma; boş bırakmak yeterli
         // Eğer ileride Role -> UserRoles gibi include isterse:
         protected override Func<IQueryable<Role>, IIncludableQueryable<Role, object>>? IncludeExpression()
-            => q => q.Include(r => r.UserRoles).ThenInclude(x => x.User);
+         => q => q
+         .Include(r => r.UserRoles).ThenInclude(ur => ur.User)
+         .Include(r => r.MenuRoles).ThenInclude(mr => mr.Menu); // 👈 önemli
     }
 }

@@ -9,7 +9,7 @@ namespace Business.Interfaces
                       long>
     {
         // İsteğe bağlı: Role’a göre modüller vb. özel sorgular
-        Task<IReadOnlyList<Model.Dtos.MenuRole.MenuRoleGetDto>> GetByRoleIdAsync(long roleId);
-        Task<IReadOnlyList<Model.Dtos.MenuRole.MenuRoleGetDto>> GetByModuleIdAsync(long moduleId);
+        Task<IReadOnlyList<MenuRoleGetDto>> GetByRoleIdAsync(long roleId);
+        Task<IReadOnlyList<MenuRoleGetDto>> GetByMenuIdAsync(long menuId);
     }
 }

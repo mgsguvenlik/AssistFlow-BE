@@ -12,6 +12,7 @@ using Model.Dtos.CustomerGroupProductPrice;
 using Model.Dtos.CustomerProductPrice;
 using Model.Dtos.CustomerType;
 using Model.Dtos.MailOutbox;
+using Model.Dtos.Menu;
 using Model.Dtos.Model;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
@@ -149,10 +150,30 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles);
 
-            config.NewConfig<Role, RoleGetDto>()
-                   .Map(d => d.Users,
-                    s => s.UserRoles.Select(ur => ur.User));
+            // Role -> RoleGetDto
+            config.ForType<Role, RoleGetDto>()
+                // Users: UserRole → User
+                .Map(dest => dest.Users,
+                     src => src.UserRoles.Select(ur => ur.User).Where(u => u != null))
 
+                // Menus: MenuRole → Menu + izinler
+                .Map(dest => dest.Menus,
+                     src => src.MenuRoles.Select(mr => new MenuWithPermissionsDto
+                     {
+                         Id = mr.Menu != null ? mr.Menu.Id : 0,
+                         Name = mr.Menu != null ? mr.Menu.Name : string.Empty,
+                         CanView = mr.HasView,
+                         CanEdit = mr.HasEdit
+                     }));
+
+
+            // MenuRole -> MenuWithPermissionsDto
+            TypeAdapterConfig<Model.Concrete.MenuRole, Model.Dtos.Menu.MenuWithPermissionsDto>
+                .NewConfig()
+                .Map(d => d.Id, s => s.MenuId)          // veya s.Menu!.Id; kolon eşlemesine göre
+                .Map(d => d.Name, s => s.Menu!.Name)
+                .Map(d => d.CanView, s => s.HasView)
+                .Map(d => d.CanEdit, s => s.HasEdit);
             // ---------------- ServiceType ----------------
             config.NewConfig<ServiceTypeCreateDto, ServiceType>()
                   .Ignore(d => d.Id);
@@ -482,16 +503,16 @@ namespace Business.Mapper
             // MenuRole
             config.NewConfig<Model.Dtos.MenuRole.MenuRoleCreateDto, Model.Concrete.MenuRole>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.Module)
+                  .Ignore(d => d.Menu)
                   .Ignore(d => d.Role);
 
             config.NewConfig<Model.Dtos.MenuRole.MenuRoleUpdateDto, Model.Concrete.MenuRole>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.Module)
+                  .Ignore(d => d.Menu)
                   .Ignore(d => d.Role);
 
             config.NewConfig<Model.Concrete.MenuRole, Model.Dtos.MenuRole.MenuRoleGetDto>()
-                  .Map(d => d.ModuleName, s => s.Module != null ? s.Module.Name : null)
+                  .Map(d => d.MenuName, s => s.Menu != null ? s.Menu.Name : null)
                   .Map(d => d.RoleName, s => s.Role != null ? s.Role.Name : null);
 
         }

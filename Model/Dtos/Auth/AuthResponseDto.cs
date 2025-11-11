@@ -1,4 +1,5 @@
-﻿using Model.Dtos.User;
+﻿using Model.Dtos.Menu;
+using Model.Dtos.User;
 
 namespace Model.Dtos.Auth
 {
@@ -8,5 +9,6 @@ namespace Model.Dtos.Auth
         public DateTime Expires { get; set; }
         public required UserGetDto User { get; set; }
         public int Status { get; set; } = 200;
+        public List<MenuWithPermissionsDto> Menus { get; set; } = new();
     }
 }

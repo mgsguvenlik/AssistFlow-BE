@@ -8,7 +8,7 @@ namespace Model.Dtos.MenuRole
 {
     public class MenuRoleCreateDto
     {
-        public long ModuleId { get; set; }
+        public long MenuId { get; set; }
         public long RoleId { get; set; }
         public bool HasView { get; set; }
         public bool HasEdit { get; set; }

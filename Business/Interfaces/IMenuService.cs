@@ -5,5 +5,7 @@
                        Model.Dtos.Menu.MenuUpdateDto,
                        Model.Dtos.Menu.MenuGetDto,
                        long>
-    { }
+    {
+        Task<IReadOnlyList<Model.Dtos.Menu.MenuWithPermissionsDto>> GetByUserIdAsync(long userId);
+    }
 }

@@ -43,7 +43,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<MailOutbox> MailOutboxes { get; set; } = default!;
         public DbSet<FinalApproval> FinalApprovals { get; set; } = default!;
 
-        public DbSet<Menu> Modules { get; set; }
+        public DbSet<Menu> Menus { get; set; }
         public DbSet<MenuRole> MenuRoles { get; set; }
 
         /// <summary>
@@ -328,36 +328,47 @@ namespace Data.Concrete.EfCore.Context
             });
 
 
-            // Module
+            // Menu
             modelBuilder.Entity<Menu>(e =>
             {
-                e.ToTable("Modules");
+                e.ToTable("Menus");
                 e.Property(x => x.Name).HasMaxLength(200).IsRequired();
                 e.Property(x => x.Description).HasMaxLength(1000);
                 e.HasIndex(x => x.Name).IsUnique(false);
             });
 
             // MenuRole
-            modelBuilder.Entity<MenuRole>(e =>
+            //modelBuilder.Entity<MenuRole>(e =>
+            //{
+            //    e.ToTable("MenuRole");
+
+            //    // (RoleId, MenuId) tekilleştir -> aynı rol için aynı Menu bir kez tanımlansın
+            //    e.HasIndex(x => new { x.RoleId, x.MenuId }).IsUnique();
+
+            //    e.Property<long>("MenuId"); // kolon ismi şemadaki gibi
+
+            //    e.HasOne(x => x.Menu)
+            //     .WithMany(m => m.MenuRoles)
+            //     .HasForeignKey(x => x.MenuId)
+            //     .HasConstraintName("FK_MenuRole_Menus_MenuId")
+            //     .OnDelete(DeleteBehavior.Cascade);
+
+            //    e.HasOne(x => x.Role)
+            //     .WithMany() // Role tarafında koleksiyon şart değil
+            //     .HasForeignKey(x => x.RoleId)
+            //     .HasConstraintName("FK_MenuRole_Roles_RoleId")
+            //     .OnDelete(DeleteBehavior.Cascade);
+            //});
+
+
+            modelBuilder.Entity<MenuRole>(b =>
             {
-                e.ToTable("MenuRole");
-
-                // (RoleId, ModuleId) tekilleştir -> aynı rol için aynı module bir kez tanımlansın
-                e.HasIndex(x => new { x.RoleId, x.ModuleId }).IsUnique();
-
-                e.Property<long>("ModulId"); // kolon ismi şemadaki gibi
-
-                e.HasOne(x => x.Module)
+                b.Property(x => x.MenuId).HasColumnName("ModulId");
+                b.HasOne(x => x.Menu)
                  .WithMany(m => m.MenuRoles)
-                 .HasForeignKey(x => x.ModuleId)
-                 .HasConstraintName("FK_MenuRole_Modules_ModuleId")
-                 .OnDelete(DeleteBehavior.Cascade);
-
-                e.HasOne(x => x.Role)
-                 .WithMany() // Role tarafında koleksiyon şart değil
-                 .HasForeignKey(x => x.RoleId)
-                 .HasConstraintName("FK_MenuRole_Roles_RoleId")
-                 .OnDelete(DeleteBehavior.Cascade);
+                 .HasForeignKey(x => x.MenuId)           // MenuId <-> ModulId kolonu
+                 .OnDelete(DeleteBehavior.Cascade)
+                 .HasConstraintName("FK_MenuRole_Menus_ModulId");
             });
         }
     }

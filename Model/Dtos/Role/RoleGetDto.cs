@@ -1,4 +1,5 @@
-﻿using Model.Dtos.User;
+﻿using Model.Dtos.Menu;
+using Model.Dtos.User;
 
 namespace Model.Dtos.Role
 {
@@ -8,5 +9,7 @@ namespace Model.Dtos.Role
         public string Name { get; set; } = string.Empty;
         public string? Code { get; set; }
         public ICollection<UserGetDto> Users { get; set; }
+
+        public ICollection<MenuWithPermissionsDto> Menus { get; set; } = new List<MenuWithPermissionsDto>();
     }
 }

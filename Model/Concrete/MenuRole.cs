@@ -13,14 +13,14 @@ namespace Model.Concrete
 
         // Şemadaki "ModulId" kolon adıyla eşle
         [Column("ModulId")]
-        public long ModuleId { get; set; }
+        public long MenuId { get; set; }
         public long RoleId { get; set; }
 
         public bool HasView { get; set; }
         public bool HasEdit { get; set; }
 
         // Navigations
-        public Menu? Module { get; set; }
+        public Menu? Menu { get; set; }
         public Role? Role { get; set; }
     }
 }

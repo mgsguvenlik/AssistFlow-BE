@@ -26,7 +26,7 @@ public class MenuRoleService
     // >>> HATA: IncludeForGet yoktu, doğru olan IncludeExpression() (CrudServiceBase'te var)
     protected override Func<IQueryable<MenuRole>, IIncludableQueryable<MenuRole, object>>? IncludeExpression()
         => q => q
-            .Include(x => x.Module)
+            .Include(x => x.Menu)
             .Include(x => x.Role);
 
     protected override async Task<MenuRole?> ResolveEntityForUpdateAsync(MenuRoleUpdateDto dto)
@@ -37,7 +37,7 @@ public class MenuRoleService
             asNoTracking: false,
             id: dto.Id,
             includeExpression: q => q
-                .Include(x => x.Module)
+                .Include(x => x.Menu)
                 .Include(x => x.Role)
         );
     }
@@ -46,7 +46,7 @@ public class MenuRoleService
     public override async Task<ResponseModel<MenuRoleGetDto>> CreateAsync(MenuRoleCreateDto dto)
     {
         var exists = await _unitOfWork.Repository.AnyAsync<MenuRole>(
-            x => x.ModuleId == dto.ModuleId && x.RoleId == dto.RoleId);
+            x => x.MenuId == dto.MenuId && x.RoleId == dto.RoleId);
 
         if (exists)
             return ResponseModel<MenuRoleGetDto>.Fail("Bu rol için ilgili modül zaten yetkilendirilmiş.", StatusCode.Conflict);
@@ -65,12 +65,12 @@ public class MenuRoleService
                       .ToListAsync();
     }
 
-    public async Task<IReadOnlyList<MenuRoleGetDto>> GetByModuleIdAsync(long moduleId)
+    public async Task<IReadOnlyList<MenuRoleGetDto>> GetByMenuIdAsync(long menuId)
     {
         var q = _unitOfWork.Repository.GetQueryable<MenuRole>();
         q = IncludeExpression()!(q);
         return await q.AsNoTracking()
-                      .Where(x => x.ModuleId == moduleId)
+                      .Where(x => x.MenuId == menuId)
                       .ProjectToType<MenuRoleGetDto>(_config)
                       .ToListAsync();
     }

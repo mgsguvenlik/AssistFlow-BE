@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251111140957_roleModuleUpdate")]
+    partial class roleModuleUpdate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -494,13 +497,19 @@ namespace Data.Migrations
                     b.Property<long>("RoleId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("RoleId1")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MenuId");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("RoleId1");
 
-                    b.ToTable("MenuRole");
+                    b.HasIndex("RoleId", "MenuId")
+                        .IsUnique();
+
+                    b.ToTable("MenuRole", (string)null);
                 });
 
             modelBuilder.Entity("Model.Concrete.Model", b =>
@@ -1577,13 +1586,18 @@ namespace Data.Migrations
                         .HasForeignKey("MenuId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK_MenuRole_Menus_ModulId");
+                        .HasConstraintName("FK_MenuRole_Menus_MenuId");
 
                     b.HasOne("Model.Concrete.Role", "Role")
-                        .WithMany("MenuRoles")
+                        .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("FK_MenuRole_Roles_RoleId");
+
+                    b.HasOne("Model.Concrete.Role", null)
+                        .WithMany("MenuRoles")
+                        .HasForeignKey("RoleId1");
 
                     b.Navigation("Menu");
 
