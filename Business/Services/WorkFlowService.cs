@@ -648,7 +648,7 @@ namespace Business.Services
                 _logger.LogError(ex, "SendTechnicalServiceAsync");
                 return ResponseModel<TechnicalServiceGetDto>.Fail($"Teknik Servis Gönderim  sırasında hata: {ex.Message}", StatusCode.Error);
             }
-        
+
         }
 
         // 4️ Teknik Servis Servisi Başlatma 
@@ -1362,7 +1362,7 @@ namespace Business.Services
                 }
                 #endregion
 
-               
+
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
                 existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
@@ -1400,7 +1400,7 @@ namespace Business.Services
                 _logger.LogError(ex, "FinalApprovalAsync");
                 return ResponseModel<FinalApprovalGetDto>.Fail($"  Kontrol ve Son Onay sırasında hata: {ex.Message}", StatusCode.Error);
             }
-          
+
         }
 
         //Lokasyon Kontrolü  Ezme Maili 
@@ -2811,7 +2811,7 @@ namespace Business.Services
         }
 
         //----------------------FinalApproval ---------------------------------------------------
-     
+
         public async Task<ResponseModel<FinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo)
         {
             var qFinal = _uow.Repository.GetQueryable<FinalApproval>().AsNoTracking();
@@ -2831,7 +2831,7 @@ namespace Business.Services
                     DecidedBy = fa.DecidedBy,
                     Status = fa.Status,
 
-                    DiscountPercent =fa.DiscountPercent,
+                    DiscountPercent = fa.DiscountPercent,
 
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
@@ -3105,13 +3105,49 @@ namespace Business.Services
 
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
+
+            var me = await _currentUser.GetAsync();
+
+            var roles = me?.Roles.Select(x => x.Code).ToHashSet();
+
+            bool isAdmin = roles?.Contains("ADMIN") ?? false;
+            bool isWarehouse = roles?.Contains("WAREHOUSE")??false;
+            bool isTechnician = roles?.Contains("TECHNICIAN") ?? false;
+            bool isSubcontractor = roles?.Contains("SUBCONTRACTOR") ?? false;
+            bool isProjectEngineer = roles?.Contains("PROJECTENGINEER") ?? false;
+
+            var pendingStatus = WorkFlowStatus.Pending;
+
             var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .Where(x => !x.IsDeleted);
+                 .AsNoTracking()
+                 .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
+
+
+            if (isAdmin || isSubcontractor || isProjectEngineer)
+            {
+                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
+            }
+            else if (isWarehouse)
+            {
+                wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "WH");
+            }
+            else if (isTechnician)
+            {
+                wfBase = wfBase.Where(x =>
+                    x.CurrentStep != null && x.CurrentStep.Code == "TS" &&
+                    x.ApproverTechnicianId == me.Id);
+            }
+            else
+            {
+                // Yetkisi olmayanlar için boş sonuç
+                wfBase = wfBase.Where(x => false);
+            }
 
             if (!string.IsNullOrWhiteSpace(q.Search))
-                // parantez önemli: OR'un kapsamını netleştirir
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(q.Search) || x.RequestTitle.Contains(q.Search));
+            {
+                var term = q.Search.Trim();
+                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
+            }
 
             // LEFT JOIN: WorkFlow.RequestNo == ServicesRequest.RequestNo
             var qJoined =
@@ -3122,6 +3158,7 @@ namespace Business.Services
                 select new { wf, sr };
 
             var total = await qJoined.CountAsync();
+
 
             var items = await qJoined
                 .OrderByDescending(x => x.wf.CreatedDate)
@@ -3175,7 +3212,7 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
         }
 
-      
+
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -3906,7 +3943,7 @@ namespace Business.Services
         }
 
 
-     
+
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
