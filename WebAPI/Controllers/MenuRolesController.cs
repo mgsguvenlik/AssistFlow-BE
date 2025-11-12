@@ -7,10 +7,10 @@ namespace WebAPI.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
-    public class MneuRolesController : CrudControllerBase<MenuRoleCreateDto, MenuRoleUpdateDto, MenuRoleGetDto, long>
+    public class MenuRolesController : CrudControllerBase<MenuRoleCreateDto, MenuRoleUpdateDto, MenuRoleGetDto, long>
     {
-        public MneuRolesController(
+        public MenuRolesController(
             ICrudService<MenuRoleCreateDto, MenuRoleUpdateDto, MenuRoleGetDto, long> service,
-            ILogger<MneuRolesController> logger) : base(service, logger) { }
+            ILogger<MenuRolesController> logger) : base(service, logger) { }
     }
 }
