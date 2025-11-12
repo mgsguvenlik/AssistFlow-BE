@@ -288,6 +288,14 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("report-lines/export")]
+        public async Task<IActionResult> ExportReportLines([FromQuery] ReportQueryParams q)
+        {
+            var (content, fileName, contentType) = await _workFlowService.ExportReportLinesAsync(q);
+            return File(content, contentType, fileName);
+        }
+
+
         // ---------- Helpers ----------
         private IActionResult ToActionResult(ResponseModel resp)
         {

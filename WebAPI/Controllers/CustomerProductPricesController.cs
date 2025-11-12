@@ -1,17 +1,18 @@
 ﻿using Business.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Model.Dtos.Brand;
 using Model.Dtos.CustomerProductPrice;
 
 namespace WebAPI.Controllers
 {
 
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
     public class CustomerProductPricesController : CrudControllerBase<CustomerProductPriceCreateDto, CustomerProductPriceUpdateDto, CustomerProductPriceGetDto, long>
     {
-        private readonly ICustomerProductPriceService  _customerProductPriceService;
+        private readonly ICustomerProductPriceService _customerProductPriceService;
         public CustomerProductPricesController(
             ICrudService<CustomerProductPriceCreateDto, CustomerProductPriceUpdateDto, CustomerProductPriceGetDto, long> service,
             ILogger<CustomerProductPricesController> logger,

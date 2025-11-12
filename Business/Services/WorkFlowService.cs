@@ -1,6 +1,7 @@
 ﻿using Azure.Core;
 using Business.Interfaces;
 using Business.UnitOfWork;
+using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
@@ -3212,7 +3213,6 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
         }
 
-
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -3715,6 +3715,186 @@ namespace Business.Services
             }
         }
 
+        //excel export 
+        public async Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(ReportQueryParams q)
+        {
+            // 🔒 Filtreleri güvenli hale getir (ama sayfalama yok)
+            q.Normalize(500);
+            // Pagination kapatıyoruz
+            var exportPage = 1;
+            var exportPageSize = 1_000_000; // pratik çözüm: çok büyük bir limit
+
+            var conn = _ctx.Database.GetDbConnection();
+            var mustClose = false;
+            if (conn.State == ConnectionState.Closed)
+            {
+                await conn.OpenAsync();
+                mustClose = true;
+            }
+            var efTx = _ctx.Database.CurrentTransaction?.GetDbTransaction();
+
+            try
+            {
+                // Dapper parametreleri (SP ile birebir)
+                var p = new DynamicParameters();
+                p.Add("@Page", exportPage);
+                p.Add("@PageSize", exportPageSize);
+                p.Add("@SortBy", q.SortBy);
+
+                p.Add("@CreatedFrom", q.CreatedFrom);
+                p.Add("@CreatedTo", q.CreatedTo);
+                p.Add("@ServicesDateFrom", q.ServicesDateFrom);
+                p.Add("@ServicesDateTo", q.ServicesDateTo);
+
+                p.Add("@Search", q.Search);
+                p.Add("@RequestNo", q.RequestNo);
+                p.Add("@CustomerId", q.CustomerId);
+                p.Add("@CustomerName", q.CustomerName);
+                p.Add("@TechnicianId", q.TechnicianId);
+                p.Add("@ServiceTypeId", q.ServiceTypeId);
+                p.Add("@StepCode", q.StepCode);
+
+                p.Add("@IsAgreement", q.IsAgreement);
+                p.Add("@IsLocationValid", q.IsLocationValid);
+                p.Add("@HasImages", q.HasImages);
+
+                string? csvWF = (q.WorkFlowStatuses is { Count: > 0 }) ? string.Join(",", q.WorkFlowStatuses.Select(s => (int)s)) : null;
+                string? csvTS = (q.TechnicalStatuses is { Count: > 0 }) ? string.Join(",", q.TechnicalStatuses.Select(s => (int)s)) : null;
+                string? csvPR = (q.PricingStatuses is { Count: > 0 }) ? string.Join(",", q.PricingStatuses.Select(s => (int)s)) : null;
+                string? csvFA = (q.FinalApprovalStatuses is { Count: > 0 }) ? string.Join(",", q.FinalApprovalStatuses.Select(s => (int)s)) : null;
+
+                p.Add("@WorkFlowStatusesCsv", csvWF);
+                p.Add("@TechStatusesCsv", csvTS);
+                p.Add("@PricingStatusesCsv", csvPR);
+                p.Add("@FinalStatusesCsv", csvFA);
+
+                p.Add("@ProductId", q.ProductId);
+                p.Add("@ProductCode", q.ProductCode);
+
+                // SP çağrısı
+                var rows = await conn.QueryAsync<ReportLineRowDto>(new CommandDefinition(
+                    "dbo.usp_ReportSearch_Lines",
+                    p,
+                    transaction: efTx,
+                    commandType: CommandType.StoredProcedure,
+                    commandTimeout: 180 // export uzun sürebilir
+                ));
+
+                // Excel oluştur
+                using var wb = new XLWorkbook();
+                var ws = wb.Worksheets.Add("Report");
+
+                // Başlıklar (TR) + Sıra No ilk sütun
+                var c = 1;
+                ws.Cell(1, c++).Value = "Sıra No";
+                ws.Cell(1, c++).Value = "Talep No";
+                ws.Cell(1, c++).Value = "Şehir";
+                ws.Cell(1, c++).Value = "Lokasyon Adı";
+                ws.Cell(1, c++).Value = "Ürün Kodu";
+                ws.Cell(1, c++).Value = "Lokasyon Kodu";
+                ws.Cell(1, c++).Value = "Ürün Oracle Kodu";
+                ws.Cell(1, c++).Value = "Ürün Tanımı";
+                ws.Cell(1, c++).Value = "Servis Tarihi";
+                ws.Cell(1, c++).Value = "Servis Oracle No";
+                ws.Cell(1, c++).Value = "İş Emri";
+                ws.Cell(1, c++).Value = "Hakediş Adet";
+                ws.Cell(1, c++).Value = "Satır Birim Fiyat (TL)";
+                ws.Cell(1, c++).Value = "Satır Toplam (TL)";
+                ws.Cell(1, c++).Value = "Satır Birim Fiyat (USD)";
+                ws.Cell(1, c++).Value = "Satır Toplam (USD)";
+                ws.Cell(1, c++).Value = "GL Kodu";
+                ws.Cell(1, c++).Value = "MGS Açıklama";
+                ws.Cell(1, c++).Value = "Sözleşme No";
+                ws.Cell(1, c++).Value = "İşlem Tipi";
+                ws.Cell(1, c++).Value = "Açıklama";
+                ws.Cell(1, c++).Value = "Montaj Tarihi";
+                ws.Cell(1, c++).Value = "İndirim Oranı";
+
+                // Stil: header bold
+                ws.Range(1, 1, 1, c - 1).Style.Font.SetBold();
+
+                // Başlık stilini gri yap + yazıyı beyaz/ortala + alt kenarlık
+                var headerRange = ws.Range(1, 1, 1, c - 1);
+                headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+                headerRange.Style.Font.FontColor = XLColor.Black;
+                headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                headerRange.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+                // (İsteğe bağlı) başlık satır yüksekliği ve kalın font
+                ws.Row(1).Height = 22;
+                headerRange.Style.Font.Bold = true;
+
+                // Veri satırları
+                var r = 2;
+                int siraNo = 1;
+                foreach (var x in rows)
+                {
+                    c = 1;
+                    ws.Cell(r, c++).Value = siraNo++;                // Sıra No
+                    ws.Cell(r, c++).Value = x.RequestNo;             // Talep No
+                    ws.Cell(r, c++).Value = x.City;                  // Şehir
+                    ws.Cell(r, c++).Value = x.CustomerName;          // Müşteri Adı
+                    ws.Cell(r, c++).Value = x.ProductCode;           // Ürün Kodu
+                    ws.Cell(r, c++).Value = x.LocationCode;          // Lokasyon Kodu
+                    ws.Cell(r, c++).Value = x.ProductOracleCode;     // Oracle Ürün Kodu
+                    ws.Cell(r, c++).Value = x.ProductDefinition;     // Ürün Tanımı
+
+                    var svcDateCell = ws.Cell(r, c++);               // Servis Tarihi
+                    if (x.ServiceDate.HasValue)
+                    {
+                        //svcDateCell.Value = x.ServiceDate.Value;
+                        svcDateCell.Style.DateFormat.Format = "yyyy-MM-dd HH:mm";
+                    }
+
+                    ws.Cell(r, c++).Value = x.ServiceOracleNo;       // Oracle Servis No
+                    ws.Cell(r, c++).Value = x.WorkOrder;             // İş Emri
+                    ws.Cell(r, c++).Value = x.Quantity;              // Miktar
+
+                    var uTL = ws.Cell(r, c++); uTL.Value = x.LineUnitPriceTL; uTL.Style.NumberFormat.Format = "#,##0.00";
+                    var tTL = ws.Cell(r, c++); tTL.Value = x.LineTotalTL; tTL.Style.NumberFormat.Format = "#,##0.00";
+                    var uUS = ws.Cell(r, c++); uUS.Value = x.LineUnitPriceUSD; uUS.Style.NumberFormat.Format = "#,##0.00";
+                    var tUS = ws.Cell(r, c++); tUS.Value = x.LineTotalUSD; tUS.Style.NumberFormat.Format = "#,##0.00";
+
+                    ws.Cell(r, c++).Value = x.GLCode;               // GL Kodu
+                    ws.Cell(r, c++).Value = x.MGSDescription;       // MGS Açıklama
+                    ws.Cell(r, c++).Value = x.Contract_No;          // Sözleşme No
+                    ws.Cell(r, c++).Value = x.CostType;             // Maliyet Tipi
+                    ws.Cell(r, c++).Value = x.Description;          // Açıklama
+
+                    var instDateCell = ws.Cell(r, c++);             // Montaj Tarihi
+                    if (x.InstallationDate.HasValue)
+                    {
+                        //instDateCell.Value = x.InstallationDate.Value;
+                        instDateCell.Style.DateFormat.Format = "yyyy-MM-dd";
+                    }
+
+                    var disc = ws.Cell(r, c++);                     // İndirim Oranı
+                    disc.Value = x.DiscountPercent;
+                    disc.Style.NumberFormat.Format = "0.00%";
+
+                    r++;
+                }
+
+                // Otomatik kolon genişlikleri
+                ws.Columns().AdjustToContents();
+
+                // Byte[]
+                using var ms = new MemoryStream();
+                wb.SaveAs(ms);
+                var bytes = ms.ToArray();
+
+                var fileName = $"ServisTalepleri_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+                const string contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                return (bytes, fileName, contentType);
+            }
+            finally
+            {
+                if (mustClose && conn.State == ConnectionState.Open)
+                    await conn.CloseAsync();
+            }
+        }
+
         //-------------Private-------------
 
         // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
@@ -3865,7 +4045,6 @@ namespace Business.Services
                 </div>";
             return (subject, html);
         }
-
         private static (string subject, string html) BuildToWarehouse(string requestNo, string fromCode, string toCode, string? customerName)
         {
             var subject = $"[{requestNo}] Depo bilgilendirmesi: {fromCode} → {toCode}";
@@ -3879,7 +4058,6 @@ namespace Business.Services
                  </div>";
             return (subject, html);
         }
-
 
         /// Servis Üürnleri 
         private async Task<ResponseModel> EnsurePricesCapturedAsync(string requestNo, bool force = false)
@@ -3941,9 +4119,6 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
         }
-
-
-
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
@@ -3964,6 +4139,5 @@ namespace Business.Services
             public decimal Subtotal { get; set; }
             public string Currency { get; set; } = "TRY";
         }
-
     }
 }

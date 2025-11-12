@@ -1,12 +1,12 @@
 ﻿using Business.Interfaces;
 using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Menu;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -26,7 +26,6 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("my")]
-        [Authorize]
         public async Task<IActionResult> GetMyMenus(CancellationToken ct)
         {
             var me = await _authService.MeAsync();

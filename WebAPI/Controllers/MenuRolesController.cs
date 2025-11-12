@@ -5,6 +5,7 @@ using Model.Dtos.MenuRole;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

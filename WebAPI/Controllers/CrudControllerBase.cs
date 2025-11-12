@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Core.Utilities.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

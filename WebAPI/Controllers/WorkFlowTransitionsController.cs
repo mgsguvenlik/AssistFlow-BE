@@ -1,11 +1,11 @@
 ﻿using Business.Interfaces;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Model.Dtos.Brand;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WorkFlowTransitionsController : CrudControllerBase<WorkFlowTransitionCreateDto, WorkFlowTransitionUpdateDto, WorkFlowTransitionGetDto, long>

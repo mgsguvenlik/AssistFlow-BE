@@ -1,10 +1,11 @@
-﻿// WebAPI/Controllers/CitiesController.cs
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Core.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.City;
 using Model.Dtos.Region;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]

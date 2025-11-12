@@ -66,5 +66,7 @@ namespace Business.Interfaces
         Task<PagedResult<WorkFlowReportListItemDto>> GetReportsAsync(ReportQueryParams q);
         Task<PagedResult<WorkFlowReportLineDto>> GetReportLinesAsync(ReportQueryParams q);
 
+        Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(ReportQueryParams q);
+
     }
 }

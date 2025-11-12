@@ -1,17 +1,16 @@
 ﻿using Business.Interfaces;
-using Business.Services;
 using Core.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Requests;
-using System.Security.Claims;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize(Roles = "Admin")]
     public class UsersController : CrudControllerBase<UserCreateDto, UserUpdateDto, UserGetDto, long>
     {
         private readonly IUserService _userService;
@@ -114,7 +113,7 @@ namespace WebAPI.Controllers
 
         [HttpGet("get-user-activity-grouped/{userId:int}")]
         [ProducesResponseType(typeof(ResponseModel<PagedResult<WorkFlowActivityGroupDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetUserActivityGroupedByRequestNo( [FromRoute] int userId,    [FromQuery] QueryParams q,   [FromQuery] int perGroupTake = 50)
+        public async Task<IActionResult> GetUserActivityGroupedByRequestNo([FromRoute] int userId, [FromQuery] QueryParams q, [FromQuery] int perGroupTake = 50)
         {
             if (userId <= 0)
                 return BadRequest("Geçersiz kullanıcı kimliği.");
