@@ -43,6 +43,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
             services.AddScoped(typeof(IMenuService), typeof(MenuService));
             services.AddScoped(typeof(IMenuRoleService), typeof(MenuRoleService));
+            services.AddScoped(typeof(INotificationService), typeof(NotificationService));
             services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddHostedService<MailOutboxDispatcher>();
 

@@ -20,6 +20,7 @@ using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
+using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
@@ -47,8 +48,10 @@ namespace Business.Services
         private readonly ILogger<WorkFlowService> _logger;
         private readonly IMailPushService _mailPush;
         private readonly ICurrentUser _currentUser;
+        private readonly INotificationService _notification;
         private readonly AppDataContext _ctx;
-        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord, ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx)
+        public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
+            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification)
         {
             _uow = uow;
             _config = config;
@@ -57,6 +60,7 @@ namespace Business.Services
             _mailPush = mailPush;
             _currentUser = currentUser;
             _ctx = ctx;
+            _notification = notification;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -303,8 +307,31 @@ namespace Business.Services
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
+
+              
+
                 // Commit
                 await _uow.Repository.CompleteAsync();
+
+                #region Notiification Kayıd
+                await _notification.CreateForRoleAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.WorkflowStepChanged,
+                        Title = $"Talep {dto.RequestNo} depoya gönderildi",
+                        Message = $"Akış {"SR"} → {"WH"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "WH",
+                        Payload = new
+                        {
+                            wfId = wf.Id,
+                            deliveryDate = dto.DeliveryDate
+                        }
+                    },
+                    roleCode: "WAREHOUSE" // sizin depocu rol kodunuz (ResolveWarehouseEmailsAsync'teki gibi)
+                );
+                #endregion
 
                 //Güncel talebi döndür
                 return await GetWarehouseByRequestNoAsync(request.RequestNo);
@@ -497,6 +524,7 @@ namespace Business.Services
                 );
                 #endregion
 
+                
                 #region Bilgilendirme Maili
                 await PushTransitionMailsAsync(
                     wf, fromCode: "WH", toCode: "TS",
@@ -507,6 +535,25 @@ namespace Business.Services
 
                 // 🔹 Değişiklikleri kaydet
                 await _uow.Repository.CompleteAsync();
+
+                #region Notification Kaydı 
+                if (wf.ApproverTechnicianId.HasValue)
+                {
+                    await _notification.CreateForUserAsync(
+                        new NotificationCreateDto
+                        {
+                            Type = NotificationType.WorkflowStepChanged,
+                            Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
+                            Message = $"Akış {"SR"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                            RequestNo = dto.RequestNo,
+                            FromStepCode = "SR",
+                            ToStepCode = "TS",
+                            Payload = new { wfId = wf.Id }
+                        },
+                        wf.ApproverTechnicianId.Value
+                    );
+                }
+                #endregion
 
                 // 🔹 Son durumu döndür
                 return await GetWarehouseByIdAsync(warehouse.Id);
@@ -638,9 +685,28 @@ namespace Business.Services
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
+            
                 // 🔹 Değişiklikleri kaydet
                 await _uow.Repository.CompleteAsync();
 
+                #region Notification Kaydı 
+                if (wf.ApproverTechnicianId.HasValue)
+                {
+                    await _notification.CreateForUserAsync(
+                        new NotificationCreateDto
+                        {
+                            Type = NotificationType.WorkflowStepChanged,
+                            Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
+                            Message = $"Akış {"SR"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                            RequestNo = dto.RequestNo,
+                            FromStepCode = "SR",
+                            ToStepCode = "TS",
+                            Payload = new { wfId = wf.Id }
+                        },
+                        wf.ApproverTechnicianId.Value
+                    );
+                }
+                #endregion
                 // 🔹 Son durumu döndür
                 return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
             }
@@ -1059,6 +1125,21 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
+                #region Notification Kaydı 
+                await _notification.CreateForRoleAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.WorkflowStepChanged,
+                        Title = $"Talep {dto.RequestNo} fiyatlamaya gönderildi",
+                        Message = $"Akış {"TS"} → {"PRC"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "TS",
+                        ToStepCode = "PRC",
+                    },
+                    roleCode: "SUBCONTRACTOR" 
+                );
+                #endregion
+
                 return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -1232,6 +1313,22 @@ namespace Business.Services
                 #endregion
 
                 await _uow.Repository.CompleteAsync();
+
+                #region Notification Kaydı 
+                await _notification.CreateForRoleAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.WorkflowStepChanged,
+                        Title = $"Talep {dto.RequestNo} son oanaya  gönderildi",
+                        Message = $"Akış {"PRC"} → {"APR"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "PRC",
+                        ToStepCode = "APR",
+                    },
+                    roleCode: "SUBCONTRACTOR"
+                );
+                #endregion
+
                 return await GetPricingByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -2258,6 +2355,61 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
 
 
+            #region Notification Kaydı
+            // targetStep.Code'ye göre hedefi belirle
+            var dto = new NotificationCreateDto
+            {
+                Type = NotificationType.WorkflowSentBack,
+                Title = $"Talep {requestNo} geri gönderildi",
+                Message = $"Akış {currentStep.Code} → {targetStep.Code} geri alındı.",
+                RequestNo = requestNo,
+                FromStepCode = currentStep.Code,
+                ToStepCode = targetStep.Code,
+                ReviewNotes = reviewNotes,
+                Payload = new { targetStep = targetStep.Name }
+            };
+
+            // 1) Özel durum: TS → teknisyene bildir
+            if (string.Equals(targetStep.Code, "TS", StringComparison.OrdinalIgnoreCase))
+            {
+                if (wf.ApproverTechnicianId.HasValue && wf.ApproverTechnicianId.Value > 0)
+                {
+                    dto.TargetUserIds = new List<long> { wf.ApproverTechnicianId.Value };
+                    dto.TargetRoleCodes = null; // kullanıcıya gidiyor
+                }
+                else
+                {
+                    // güvenli fallback: teknisyen yoksa TS için rol at
+                    dto.TargetUserIds = null;
+                    dto.TargetRoleCodes = new List<string> { "SUBCONTRACTOR" };
+                }
+            }
+            else
+            {
+                // 2) Diğer adımlar: adım kodu → rol kodu haritası
+                var stepToRole = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["WH"] = "WAREHOUSE",
+                    ["TS"] = "SUBCONTRACTOR" // ileride lazım olursa, else içinde de destekler
+                                             // İstersen buraya PRC→"PRICING", SR→"SERVICE_REQUEST" vb. ekleyebilirsin.
+                };
+
+                if (stepToRole.TryGetValue(targetStep.Code ?? string.Empty, out var roleCode))
+                {
+                    dto.TargetUserIds = null;
+                    dto.TargetRoleCodes = new List<string> { roleCode };
+                }
+                else
+                {
+                    // hiç eşleşme yoksa: istersen no-op yapabilir ya da loglayabilirsin
+                    // dto.TargetRoleCodes = new List<string> { "DEFAULT_ROLE" };
+                }
+            }
+
+            // Kayıt
+            await _notification.CreateAsync(dto);
+            #endregion
+
             /// Dönüş tipi WorkFlow GetDto olarak ayarlandı.
             return ResponseModel<WorkFlowGetDto>.Success(
                 wf.Adapt<WorkFlowGetDto>(_config)
@@ -3112,7 +3264,7 @@ namespace Business.Services
             var roles = me?.Roles.Select(x => x.Code).ToHashSet();
 
             bool isAdmin = roles?.Contains("ADMIN") ?? false;
-            bool isWarehouse = roles?.Contains("WAREHOUSE")??false;
+            bool isWarehouse = roles?.Contains("WAREHOUSE") ?? false;
             bool isTechnician = roles?.Contains("TECHNICIAN") ?? false;
             bool isSubcontractor = roles?.Contains("SUBCONTRACTOR") ?? false;
             bool isProjectEngineer = roles?.Contains("PROJECTENGINEER") ?? false;

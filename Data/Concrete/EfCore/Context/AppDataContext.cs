@@ -46,6 +46,8 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Menu> Menus { get; set; }
         public DbSet<MenuRole> MenuRoles { get; set; }
 
+        public DbSet<Notification> Notifications { get; set; } = default!;
+
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
         /// </summary>
@@ -336,29 +338,6 @@ namespace Data.Concrete.EfCore.Context
                 e.Property(x => x.Description).HasMaxLength(1000);
                 e.HasIndex(x => x.Name).IsUnique(false);
             });
-
-            // MenuRole
-            //modelBuilder.Entity<MenuRole>(e =>
-            //{
-            //    e.ToTable("MenuRole");
-
-            //    // (RoleId, MenuId) tekilleştir -> aynı rol için aynı Menu bir kez tanımlansın
-            //    e.HasIndex(x => new { x.RoleId, x.MenuId }).IsUnique();
-
-            //    e.Property<long>("MenuId"); // kolon ismi şemadaki gibi
-
-            //    e.HasOne(x => x.Menu)
-            //     .WithMany(m => m.MenuRoles)
-            //     .HasForeignKey(x => x.MenuId)
-            //     .HasConstraintName("FK_MenuRole_Menus_MenuId")
-            //     .OnDelete(DeleteBehavior.Cascade);
-
-            //    e.HasOne(x => x.Role)
-            //     .WithMany() // Role tarafında koleksiyon şart değil
-            //     .HasForeignKey(x => x.RoleId)
-            //     .HasConstraintName("FK_MenuRole_Roles_RoleId")
-            //     .OnDelete(DeleteBehavior.Cascade);
-            //});
 
 
             modelBuilder.Entity<MenuRole>(b =>

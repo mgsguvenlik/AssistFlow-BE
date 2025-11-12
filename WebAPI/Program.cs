@@ -86,7 +86,8 @@ builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
 
 #endregion
 
-// Seed servislerini kaydet
+
+#region Seed servislerini kaydet
 builder.Services.AddDataSeeding(
     typeof(TurkeyCitiesSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
@@ -99,6 +100,12 @@ builder.Services.AddDataSeeding(
 builder.Services.AddDataSeeding(
     typeof(WorkFlowTransitionSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
+
+builder.Services.AddDataSeeding(
+    typeof(MenuSeed)
+);
+#endregion
+
 
 
 builder.Services.AddDbContext<AppDataContext>(options =>

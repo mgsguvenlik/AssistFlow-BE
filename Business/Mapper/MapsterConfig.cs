@@ -14,6 +14,7 @@ using Model.Dtos.CustomerType;
 using Model.Dtos.MailOutbox;
 using Model.Dtos.Menu;
 using Model.Dtos.Model;
+using Model.Dtos.Notification;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
@@ -484,10 +485,6 @@ namespace Business.Mapper
             // Entity -> GetDto
             config.NewConfig<FinalApproval, FinalApprovalGetDto>();
 
-            //// CreateDto -> Entity
-            //config.NewConfig<FinalApprovalCreateDto, FinalApproval>();
-
-
 
             // Menu
             config.NewConfig<Model.Dtos.Menu.MenuCreateDto, Model.Concrete.Menu>()
@@ -514,6 +511,17 @@ namespace Business.Mapper
             config.NewConfig<Model.Concrete.MenuRole, Model.Dtos.MenuRole.MenuRoleGetDto>()
                   .Map(d => d.MenuName, s => s.Menu != null ? s.Menu.Name : null)
                   .Map(d => d.RoleName, s => s.Role != null ? s.Role.Name : null);
+
+
+
+            config.NewConfig<NotificationCreateDto, Notification>()
+                 .Ignore(d => d.Id)
+                 .Map(d => d.CreatedDate, _ => DateTime.Now)
+                 .Map(d => d.IsRead, _ => false)
+                 .Ignore(d => d.ReadAt);
+
+            config.NewConfig<Notification, NotificationGetDto>()
+                  .Map(d => d.Type, s => (int)s.Type);
 
         }
     }

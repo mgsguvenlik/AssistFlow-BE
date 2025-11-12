@@ -1,6 +1,5 @@
 ﻿using Business.Interfaces;
 using Model.Dtos.Auth;
-using Model.Dtos.User;
 
 namespace Business.Services
 {
