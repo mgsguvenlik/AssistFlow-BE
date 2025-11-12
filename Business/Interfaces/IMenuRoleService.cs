@@ -1,4 +1,5 @@
-﻿using Model.Dtos.MenuRole;
+﻿using Core.Common;
+using Model.Dtos.MenuRole;
 
 namespace Business.Interfaces
 {
@@ -9,7 +10,7 @@ namespace Business.Interfaces
                       long>
     {
         // İsteğe bağlı: Role’a göre modüller vb. özel sorgular
-        Task<IReadOnlyList<MenuRoleGetDto>> GetByRoleIdAsync(long roleId);
+        Task<ResponseModel<List<MenuRoleGetDto>>> GetByRoleIdAsync(long roleId);
         Task<IReadOnlyList<MenuRoleGetDto>> GetByMenuIdAsync(long menuId);
     }
 }

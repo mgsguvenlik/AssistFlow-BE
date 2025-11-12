@@ -55,14 +55,16 @@ public class MenuRoleService
     }
 
     // Kolay filtreler
-    public async Task<IReadOnlyList<MenuRoleGetDto>> GetByRoleIdAsync(long roleId)
+    public async Task<ResponseModel<List<MenuRoleGetDto>>> GetByRoleIdAsync(long roleId)
     {
         var q = _unitOfWork.Repository.GetQueryable<MenuRole>();
         q = IncludeExpression()!(q);
-        return await q.AsNoTracking()
+        var data = await q.AsNoTracking()
                       .Where(x => x.RoleId == roleId)
                       .ProjectToType<MenuRoleGetDto>(_config)
                       .ToListAsync();
+
+        return ResponseModel<List<MenuRoleGetDto>>.Success(data, "", StatusCode.Ok);
     }
 
     public async Task<IReadOnlyList<MenuRoleGetDto>> GetByMenuIdAsync(long menuId)
