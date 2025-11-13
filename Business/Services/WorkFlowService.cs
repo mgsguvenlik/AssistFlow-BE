@@ -1136,7 +1136,7 @@ namespace Business.Services
                         FromStepCode = "TS",
                         ToStepCode = "PRC",
                     },
-                    roleCode: "SUBCONTRACTOR" 
+                    roleCode: "PROJECTENGINEER"
                 );
                 #endregion
 
@@ -1325,7 +1325,7 @@ namespace Business.Services
                         FromStepCode = "PRC",
                         ToStepCode = "APR",
                     },
-                    roleCode: "SUBCONTRACTOR"
+                    roleCode: "PROJECTENGINEER"
                 );
                 #endregion
 
@@ -3276,7 +3276,7 @@ namespace Business.Services
                  .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
 
 
-            if (isAdmin || isSubcontractor || isProjectEngineer)
+            if (isAdmin  || isProjectEngineer)
             {
                 // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
             }
