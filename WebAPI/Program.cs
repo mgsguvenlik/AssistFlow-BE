@@ -24,6 +24,9 @@ using WebAPI.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+
+
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 
 builder.Services.Configure<AppSettings>(appSettingsSection);
@@ -41,13 +44,18 @@ builder.Services.AddHttpClient("CustomClient")
 
 builder.Services.AddControllers();
 
-var logger = new LoggerConfiguration()
-  .ReadFrom.Configuration(builder.Configuration)
-  .Enrich.FromLogContext()
-  .CreateLogger();
 
-builder.Logging.ClearProviders();
-builder.Logging.AddSerilog(logger);
+
+#region Serilog
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration) 
+    .Enrich.FromLogContext()
+    .WriteTo.Seq("http://192.168.1.46:5441")       
+    .CreateLogger();
+builder.Host.UseSerilog();
+
+#endregion
 
 builder.Services.AddCors(options =>
 {
