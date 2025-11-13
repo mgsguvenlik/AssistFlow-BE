@@ -27,6 +27,15 @@ namespace WebAPI.Controllers
             
             return Ok(data);
         }
+
+        [HttpGet("get-by-userId/{userId:long}")]
+        [Authorize]
+        public async Task<IActionResult> GetMyMenusByUserId(long userId)
+        {
+            var data = await _menuRoleService.GetByUserIdAsync(userId);
+
+            return Ok(data);
+        }
     }
 
 

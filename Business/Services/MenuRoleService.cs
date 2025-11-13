@@ -76,4 +76,27 @@ public class MenuRoleService
                       .ProjectToType<MenuRoleGetDto>(_config)
                       .ToListAsync();
     }
+
+    public async Task<ResponseModel<List<MenuRoleGetDto>>> GetByUserIdAsync(long userId)
+    {
+        var userRoleIds = await _unitOfWork.Repository
+            .GetQueryable<UserRole>()
+            .Where(ur => ur.UserId == userId)
+            .Select(ur => ur.RoleId)
+            .ToListAsync();
+
+        if (!userRoleIds.Any())
+            return ResponseModel<List<MenuRoleGetDto>>.Success(new List<MenuRoleGetDto>());
+
+        var q = _unitOfWork.Repository.GetQueryable<MenuRole>();
+        q = IncludeExpression()!(q);
+
+        var menuRoles = await q
+            .AsNoTracking()
+            .Where(mr => userRoleIds.Contains(mr.RoleId))
+            .ProjectToType<MenuRoleGetDto>(_config)
+            .ToListAsync();
+
+        return ResponseModel<List<MenuRoleGetDto>>.Success(menuRoles, "", StatusCode.Ok);
+    }
 }

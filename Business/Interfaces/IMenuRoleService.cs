@@ -11,6 +11,7 @@ namespace Business.Interfaces
     {
         // İsteğe bağlı: Role’a göre modüller vb. özel sorgular
         Task<ResponseModel<List<MenuRoleGetDto>>> GetByRoleIdAsync(long roleId);
+        Task<ResponseModel<List<MenuRoleGetDto>>> GetByUserIdAsync(long userId);
         Task<IReadOnlyList<MenuRoleGetDto>> GetByMenuIdAsync(long menuId);
     }
 }
