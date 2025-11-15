@@ -1692,16 +1692,74 @@ namespace Business.Services
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.WorkFlowStep);
 
+
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
+            // 🔐 1. Giriş yapan kullanıcı + roller
+            var me = await _currentUser.GetAsync();
+
+            var roles = me?.Roles
+                .Select(x => x.Code)
+                .ToHashSet() ?? new HashSet<string>();
+
+            bool isAdmin = roles.Contains("ADMIN");
+            bool isWarehouse = roles.Contains("WAREHOUSE");
+            bool isTechnician = roles.Contains("TECHNICIAN")|| roles.Contains("SUBCONTRACTOR");
+            bool isProjectEngineer = roles.Contains("PROJECTENGINEER");
+
+            var pendingStatus = WorkFlowStatus.Pending;
+
+            // 🧱 2. Role göre filtrelenmiş WorkFlow sorgusu
+            var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted );
+
+            if (isAdmin || isProjectEngineer)
+            {
+                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
+            }
+            else if (isWarehouse)
+            {
+                wfBase = wfBase.Where(x =>
+                    x.CurrentStep != null &&
+                    x.CurrentStep.Code == "WH");
+            }
+            else if (isTechnician)
+            {
+                wfBase = wfBase.Where(x =>
+                    x.CurrentStep != null &&
+                    x.CurrentStep.Code == "TS" &&
+                    x.ApproverTechnicianId == me.Id);
+            }
+            else
+            {
+                // Yetkisi olmayanlar için boş WF seti
+                wfBase = wfBase.Where(x => false);
+            }
+
+            // Bu kullanıcının görebileceği RequestNo’lar
+            var allowedRequestNos = wfBase.Select(x => x.RequestNo);
+
+            // 🧱 3. ServicesRequest base query + include'lar
             var query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
 
-            // basit filtre/sıralama örneği
-            if (!string.IsNullOrWhiteSpace(q.Search))
-                query = query.Where(x => x.RequestNo.Contains(q.Search) || x.Description!.Contains(q.Search));
 
+            // WorkFlow ile ilişkiye göre filtre:
+            query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
+
+            // 🔍 4. Search filtresi
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+                query = query.Where(x =>
+                    x.RequestNo.Contains(term) ||
+                    (x.Description != null && x.Description.Contains(term)));
+            }
+
+            // 📄 5. Toplam kayıt + paging + Mapster
             var total = await query.CountAsync();
+
             var items = await query
                 .OrderByDescending(x => x.CreatedDate)
                 .Skip((q.Page - 1) * q.PageSize)
@@ -2230,29 +2288,29 @@ namespace Business.Services
                     if (technicalService != null)
                     {
                         //Ürün var ise depoya geri gönder
-                        if (servicesRequest.IsProductRequirement)
-                        {
-                            //Depo Adımına Geri
-                            targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
-                               .AsNoTracking()
-                               .FirstOrDefaultAsync(s => s.Code == "WH");
-                            if (targetStep is null)
-                                return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (WH) tanımlı değil.", StatusCode.BadRequest);
+                        //if (servicesRequest.IsProductRequirement)
+                        //{
+                        //    //Depo Adımına Geri
+                        //    targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                        //       .AsNoTracking()
+                        //       .FirstOrDefaultAsync(s => s.Code == "WH");
+                        //    if (targetStep is null)
+                        //        return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (WH) tanımlı değil.", StatusCode.BadRequest);
 
-                            warehouse = await _uow.Repository
-                           .GetQueryable<Warehouse>()
-                           .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                            if (warehouse is null)
-                                return ResponseModel<WorkFlowGetDto>.Fail("Depo Kaydı Bulunamadı.", StatusCode.BadRequest);
+                        //    warehouse = await _uow.Repository
+                        //   .GetQueryable<Warehouse>()
+                        //   .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                        //    if (warehouse is null)
+                        //        return ResponseModel<WorkFlowGetDto>.Fail("Depo Kaydı Bulunamadı.", StatusCode.BadRequest);
 
-                            warehouse.WarehouseStatus = WarehouseStatus.Pending;
-                            warehouse.UpdatedDate = DateTime.Now;
-                            warehouse.UpdatedUser = meId;
-                            _uow.Repository.Update(warehouse);
-                        }
-                        //Ürün yok ise direkt servis talebine geri gönder
-                        else
-                        {
+                        //    warehouse.WarehouseStatus = WarehouseStatus.Pending;
+                        //    warehouse.UpdatedDate = DateTime.Now;
+                        //    warehouse.UpdatedUser = meId;
+                        //    _uow.Repository.Update(warehouse);
+                        //}
+                        ////Ürün yok ise direkt servis talebine geri gönder
+                        //else
+                        //{
                             targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
                            .AsNoTracking()
                            .FirstOrDefaultAsync(s => s.Code == "SR");
@@ -2264,7 +2322,7 @@ namespace Business.Services
                             servicesRequest.UpdatedDate = DateTime.Now;
                             servicesRequest.UpdatedUser = meId;
                             _uow.Repository.Update(servicesRequest);
-                        }
+                        //}
 
                         technicalService.ServicesStatus = TechnicalServiceStatus.AwaitingReview;
 
