@@ -99,6 +99,8 @@ namespace Model.Concrete
         public int? WarrantyYears { get; set; }
 
 
+        public string? Note {  get; set; }
+
         /// <summary>
         /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
         /// </summary>

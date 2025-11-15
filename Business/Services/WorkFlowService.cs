@@ -1846,6 +1846,7 @@ namespace Business.Services
                         WarrantyYears = sr.Customer.WarrantyYears,
                         CustomerGroupId = sr.Customer.CustomerGroupId,
                         CustomerTypeId = sr.Customer.CustomerTypeId,
+                        Note = sr.Customer.Note,
 
                          // ✅ Müşteri sistemleri direkt içeride
                          Systems = sr.Customer.CustomerSystems
@@ -1995,7 +1996,7 @@ namespace Business.Services
                         WarrantyYears = sr.Customer.WarrantyYears,
                         CustomerGroupId = sr.Customer.CustomerGroupId,
                         CustomerTypeId = sr.Customer.CustomerTypeId,
-                        // ✅ Müşteri sistemleri direkt içeride
+                        Note = sr.Customer.Note,
                         Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2567,7 +2568,7 @@ namespace Business.Services
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
-
+                            Note = sr.Customer.Note,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2718,7 +2719,7 @@ namespace Business.Services
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
-
+                            Note = sr.Customer.Note,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2849,14 +2850,11 @@ namespace Business.Services
                     CorporateLocationId = sr.Customer.CorporateLocationId,
                     Longitude = sr.Customer.Longitude,
                     Latitude = sr.Customer.Latitude,
-
-                    // garanti: sadece süreyi geçiriyoruz (türetilmiş alan yok)
                     InstallationDate = sr.Customer.InstallationDate,
                     WarrantyYears = sr.Customer.WarrantyYears,
-
                     CustomerGroupId = sr.Customer.CustomerGroupId,
                     CustomerTypeId = sr.Customer.CustomerTypeId,
-
+                    Note = sr.Customer.Note,
                     Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2960,7 +2958,7 @@ namespace Business.Services
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
-
+                            Note = sr.Customer.Note,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -3071,7 +3069,7 @@ namespace Business.Services
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
-
+                            Note = sr.Customer.Note,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -3177,6 +3175,7 @@ namespace Business.Services
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
+                            Note = sr.Customer.Note,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {

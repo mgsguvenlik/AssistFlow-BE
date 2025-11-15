@@ -22,6 +22,7 @@ namespace Model.Dtos.Customer
         public long? CustomerTypeId { get; set; }
         public string? Longitude { get; set; }
         public string? Latitude { get; set; }
+        public string? Note { get; set; }
         public DateTimeOffset? InstallationDate { get; set; }
         public int? WarrantyYears { get; set; }
         public long? CustomerGroupId { get; set; } = new();

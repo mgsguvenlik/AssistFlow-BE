@@ -68,7 +68,7 @@ namespace Model.Dtos.Customer
         public long? CustomerGroupId { get; set; }
         public DateTimeOffset? InstallationDate { get; set; }
         public int? WarrantyYears { get; set; }
-
+        public string? Note { get; set; }
         public List<long> SystemIds { get; set; } = new();
     }
 
