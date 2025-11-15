@@ -231,8 +231,30 @@ namespace Data.Concrete.EfCore.Context
                 .OnDelete(DeleteBehavior.Cascade);
 
 
+            // Customer – CustomerSystem many-to-many
+            modelBuilder.Entity<Customer>()
+                .HasMany(c => c.CustomerSystems)
+                .WithMany(s => s.Customers)
+                .UsingEntity<Dictionary<string, object>>(
+                    "CustomerCustomerSystem", // Join tablo adı
+                    j => j
+                        .HasOne<CustomerSystem>()
+                        .WithMany()
+                        .HasForeignKey("CustomerSystemId")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j => j
+                        .HasOne<Customer>()
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j =>
+                    {
+                        j.ToTable("CustomerCustomerSystems");
+                        j.HasKey("CustomerId", "CustomerSystemId");
+                    });
 
-            modelBuilder.Entity<WorkFlowTransition>()
+
+        modelBuilder.Entity<WorkFlowTransition>()
                 .HasOne(t => t.FromStep)
                 .WithMany(s => s.OutgoingTransitions)
                 .HasForeignKey(t => t.FromStepId)

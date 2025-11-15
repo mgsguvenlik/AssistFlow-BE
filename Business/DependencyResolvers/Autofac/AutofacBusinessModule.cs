@@ -9,6 +9,7 @@ using Core.Utilities.IoC;
 using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Model.Dtos.CustomerSystem;
 using Model.Dtos.MailOutbox;
 
 namespace Business.DependencyResolvers.Autofac
@@ -44,6 +45,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IMenuService), typeof(MenuService));
             services.AddScoped(typeof(IMenuRoleService), typeof(MenuRoleService));
             services.AddScoped(typeof(INotificationService), typeof(NotificationService));
+            services.AddScoped(typeof(ICustomerSystemService), typeof(CustomerSystemService));
             services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddHostedService<MailOutboxDispatcher>();
 
@@ -207,6 +209,15 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<
                 ICrudService<MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto, long>,
                 MailOutboxService>();
+
+            services.AddScoped<
+                    ICrudService<
+                       CustomerSystemCreateDto,
+                       CustomerSystemUpdateDto,
+                       CustomerSystemGetDto,
+                        long>,
+                    CustomerSystemService>();
+
         }
         protected override void Load(ContainerBuilder builder)
         {

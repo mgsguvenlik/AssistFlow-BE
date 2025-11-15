@@ -68,6 +68,8 @@ namespace Model.Dtos.Customer
         public long? CustomerGroupId { get; set; }
         public DateTimeOffset? InstallationDate { get; set; }
         public int? WarrantyYears { get; set; }
+
+        public List<long> SystemIds { get; set; } = new();
     }
 
     /// ---- Yardımcı Attribute'lar ----

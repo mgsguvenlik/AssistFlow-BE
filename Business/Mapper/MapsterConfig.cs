@@ -10,6 +10,7 @@ using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerGroupProductPrice;
 using Model.Dtos.CustomerProductPrice;
+using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerType;
 using Model.Dtos.MailOutbox;
 using Model.Dtos.Menu;
@@ -121,13 +122,34 @@ namespace Business.Mapper
             // ---------------- Customer ----------------
             config.NewConfig<CustomerCreateDto, Customer>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.CustomerType);
+                  .Ignore(d => d.CustomerType)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.CustomerProductPrices)
+                  .Ignore(d => d.CustomerSystems);  // 🔹 many-to-many nav
 
             config.NewConfig<CustomerUpdateDto, Customer>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.CustomerType);
+                  .Ignore(d => d.CustomerType)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.CustomerProductPrices)
+                  .Ignore(d => d.CustomerSystems);  // 🔹 many-to-many nav
 
-            config.NewConfig<Customer, CustomerGetDto>();
+            config.NewConfig<Customer, CustomerGetDto>()
+                  .Map(d => d.Systems, s => s.CustomerSystems);
+            // ---------------- CustomerSystem ----------------
+            config.NewConfig<CustomerSystemCreateDto, CustomerSystem>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customers);   // many-to-many nav
+
+            config.NewConfig<CustomerSystemUpdateDto, CustomerSystem>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Customers);   // many-to-many nav
+
+            config.NewConfig<CustomerSystem, CustomerSystemGetDto>();
+
+            // Entity -> GetDto (sistemler dahil)
+
+
 
             // ---------------- ProgressApprover ----------------
             config.NewConfig<ProgressApproverCreateDto, ProgressApprover>()

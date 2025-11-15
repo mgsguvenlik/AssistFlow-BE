@@ -26,5 +26,7 @@ namespace Model.Dtos.Customer
         public int? WarrantyYears { get; set; }
         public long? CustomerGroupId { get; set; } = new();
         public CustomerGroupGetDto CustomerGroup { get; set; } = new();
+
+        public List<CustomerSystem.CustomerSystemGetDto> Systems { get; set; } = new();
     }
 }
