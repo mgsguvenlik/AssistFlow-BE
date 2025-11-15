@@ -20,6 +20,7 @@ using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
+using Model.Dtos.CustomerSystem;
 using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
@@ -1844,7 +1845,17 @@ namespace Business.Services
                         InstallationDate = sr.Customer.InstallationDate,
                         WarrantyYears = sr.Customer.WarrantyYears,
                         CustomerGroupId = sr.Customer.CustomerGroupId,
-                        CustomerTypeId = sr.Customer.CustomerTypeId
+                        CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                         // ✅ Müşteri sistemleri direkt içeride
+                         Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name= cs.Name,
+                                 Code=cs.Code
+                             })
+                             .ToList()
                     }
                 }
             ).FirstOrDefaultAsync();
@@ -1983,7 +1994,16 @@ namespace Business.Services
                         InstallationDate = sr.Customer.InstallationDate,
                         WarrantyYears = sr.Customer.WarrantyYears,
                         CustomerGroupId = sr.Customer.CustomerGroupId,
-                        CustomerTypeId = sr.Customer.CustomerTypeId
+                        CustomerTypeId = sr.Customer.CustomerTypeId,
+                        // ✅ Müşteri sistemleri direkt içeride
+                        Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                     }
                 }
             ).FirstOrDefaultAsync();
@@ -2482,66 +2502,6 @@ namespace Business.Services
         }
 
         // -------------------- Warehouse --------------------
-        public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync_(long id)
-        {
-            var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
-            var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking();
-            var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
-
-            // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest
-            var dto = await (
-                from w in qWarehouse
-                where w.Id == id
-                join wf0 in qWorkFlow on w.RequestNo equals wf0.RequestNo into wfj
-                from wf in wfj.DefaultIfEmpty()
-                join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new WarehouseGetDto
-                {
-                    Id = w.Id,
-                    RequestNo = w.RequestNo,
-                    DeliveryDate = w.DeliveryDate,
-                    Description = w.Description,
-                    WarehouseStatus = w.WarehouseStatus,
-
-                    // WorkFlow
-                    WorkFlowRequestTitle = wf != null ? wf.RequestTitle : null,
-                    WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
-
-                    // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null
-                }
-            ).FirstOrDefaultAsync();
-
-            if (dto is null)
-                return ResponseModel<WarehouseGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            // ÜRÜNLER
-            var products = await _uow.Repository
-                .GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.Customer).ThenInclude(z => z.CustomerProductPrices)
-                .AsNoTracking()
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ProjectToType<ServicesRequestProductGetDto>(_config)
-                .ToListAsync();
-
-            // REVIEW LOG’LARI
-            var reviewLogs = await _uow.Repository
-                .GetQueryable<WorkFlowReviewLog>(x =>
-                    x.RequestNo == dto.RequestNo &&
-                    (x.FromStepCode == "WH" || x.ToStepCode == "WH"))
-                .AsNoTracking()
-                .OrderByDescending(x => x.CreatedDate)
-                .ProjectToType<WorkFlowReviewLogDto>(_config)
-                .ToListAsync();
-
-            dto.WarehouseProducts = products;
-            dto.ReviewLogs = reviewLogs;
-
-            return ResponseModel<WarehouseGetDto>.Success(dto);
-        }
         public async Task<ResponseModel<WarehouseGetDto>> GetWarehouseByIdAsync(long id)
         {
             var qWarehouse = _uow.Repository.GetQueryable<Warehouse>().AsNoTracking();
@@ -2606,7 +2566,16 @@ namespace Business.Services
                             InstallationDate = sr.Customer.InstallationDate,
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
-                            CustomerTypeId = sr.Customer.CustomerTypeId
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                            Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                         }
                         : null,
 
@@ -2748,7 +2717,16 @@ namespace Business.Services
                             InstallationDate = sr.Customer.InstallationDate,
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
-                            CustomerTypeId = sr.Customer.CustomerTypeId
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                            Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                         }
                         : null,
 
@@ -2878,6 +2856,15 @@ namespace Business.Services
 
                     CustomerGroupId = sr.Customer.CustomerGroupId,
                     CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                    Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                 })
                 .FirstOrDefaultAsync();
 
@@ -2972,7 +2959,16 @@ namespace Business.Services
                             InstallationDate = sr.Customer.InstallationDate,
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
-                            CustomerTypeId = sr.Customer.CustomerTypeId
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                            Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                         }
                         : null
                 }
@@ -3074,7 +3070,16 @@ namespace Business.Services
                             InstallationDate = sr.Customer.InstallationDate,
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
-                            CustomerTypeId = sr.Customer.CustomerTypeId
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+
+                            Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                         }
                         : null
                 }
@@ -3171,7 +3176,15 @@ namespace Business.Services
                             InstallationDate = sr.Customer.InstallationDate,
                             WarrantyYears = sr.Customer.WarrantyYears,
                             CustomerGroupId = sr.Customer.CustomerGroupId,
-                            CustomerTypeId = sr.Customer.CustomerTypeId
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+                            Systems = sr.Customer.CustomerSystems
+                             .Select(cs => new CustomerSystemGetDto
+                             {
+                                 Id = cs.Id,
+                                 Name = cs.Name,
+                                 Code = cs.Code
+                             })
+                             .ToList()
                         }
                         : null
                 }
