@@ -1370,11 +1370,13 @@ namespace Business.Services
                     return ResponseModel<FinalApprovalGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
 
-                var statusCode = dto.WorkFlowStatus == WorkFlowStatus.Cancelled
-                                 ? "CNC"
-                                 : dto.WorkFlowStatus == WorkFlowStatus.Complated
-                                     ? "CMP"
-                                     : "APR";
+                var statusCode = dto.WorkFlowStatus switch
+                {
+                    WorkFlowStatus.Cancelled => "CNC",
+                    WorkFlowStatus.Complated => "CMP",
+                    _ => "APR"
+                };
+
                 // 2) Hedef adım: APR (Approval / Final Approval)
                 var targetStep = await _uow.Repository
                     .GetQueryable<WorkFlowStep>()
