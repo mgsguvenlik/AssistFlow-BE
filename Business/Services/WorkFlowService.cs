@@ -308,7 +308,7 @@ namespace Business.Services
                 );
                 #endregion
 
-              
+
 
                 // Commit
                 await _uow.Repository.CompleteAsync();
@@ -524,7 +524,7 @@ namespace Business.Services
                 );
                 #endregion
 
-                
+
                 #region Bilgilendirme Maili
                 await PushTransitionMailsAsync(
                     wf, fromCode: "WH", toCode: "TS",
@@ -685,7 +685,7 @@ namespace Business.Services
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
-            
+
                 // 🔹 Değişiklikleri kaydet
                 await _uow.Repository.CompleteAsync();
 
@@ -1369,14 +1369,20 @@ namespace Business.Services
                 if (request is null)
                     return ResponseModel<FinalApprovalGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
+
+                var statusCode = dto.WorkFlowStatus == WorkFlowStatus.Cancelled
+                                 ? "CNC"
+                                 : dto.WorkFlowStatus == WorkFlowStatus.Complated
+                                     ? "CMP"
+                                     : "APR";
                 // 2) Hedef adım: APR (Approval / Final Approval)
                 var targetStep = await _uow.Repository
                     .GetQueryable<WorkFlowStep>()
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.Code == "APR");
+                    .FirstOrDefaultAsync(s => s.Code == statusCode);
 
                 if (targetStep is null)
-                    return ResponseModel<FinalApprovalGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
+                    return ResponseModel<FinalApprovalGetDto>.Fail($"Hedef iş akışı adımı {statusCode} tanımlı değil.", StatusCode.BadRequest);
 
 
 
@@ -1459,7 +1465,6 @@ namespace Business.Services
                     await EnsurePricesCapturedAsync(dto.RequestNo, force: false);
                 }
                 #endregion
-
 
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
@@ -3276,7 +3281,7 @@ namespace Business.Services
                  .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
 
 
-            if (isAdmin  || isProjectEngineer)
+            if (isAdmin || isProjectEngineer)
             {
                 // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
             }
