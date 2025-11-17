@@ -17,7 +17,7 @@ namespace Data.Seeding.Seeds
         public string Key => "WorkFlowSteps"; // SeedHistory için benzersiz anahtar
         public int Order => 11; // ConfigSeed'den sonra çalışması için 10'dan büyük bir değer
 
-        public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
+        public async Task RunAsync_(DbContext db, IServiceProvider sp, CancellationToken ct)
         {
             var workFlowSteps = new List<WorkFlowStep>
             {
@@ -76,6 +76,71 @@ namespace Data.Seeding.Seeds
             await db.SaveChangesAsync(ct);
             _logger.LogInformation("WorkFlowStep Seed Completed. Added/Ensured {Count} steps.", workFlowSteps.Count);
         }
+
+
+        public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
+        {
+            var workFlowSteps = new List<WorkFlowStep>
+            {
+                new() {
+            Name = "Servis Talebi Oluşturma",
+            Code = "SR", // Services Request
+            Order = 1,
+        },
+                new() {
+            Name = "Depo Sevkiyatı",
+            Code = "WH", // Warehouse
+            Order = 2,
+        },
+                new() {
+            Name = "Teknik Servis İşlemleri",
+            Code = "TS", // Technical Service
+            Order = 3,
+        },
+                new() {
+            Name = "Fiyatlandırma",
+            Code = "PRC", // Pricing
+            Order = 4,
+        },
+                new() {
+            Name = "Onaylama",
+            Code = "APR", // Approval
+            Order = 5,
+        },
+                new() {
+            Name = "İptal Edildi",
+            Code = "CNC", // Cancelled
+            Order = 99,
+        },
+                new() {
+            Name = "Tamamlandı",
+            Code = "CMP", // Completed
+            Order = 100,
+        }
+            };
+
+            var existingNames = await db.Set<WorkFlowStep>()
+                .Select(w => w.Name)
+                .ToListAsync(ct);
+
+            var existingNameSet = new HashSet<string>(existingNames);
+
+            foreach (var step in workFlowSteps)
+            {
+                // Name'e göre kontrol
+                if (!existingNameSet.Contains(step.Name))
+                {
+                    await db.Set<WorkFlowStep>().AddAsync(step, ct);
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+            _logger.LogInformation(
+                "WorkFlowStep Seed Completed. Ensured {Count} steps (only missing names were added).",
+                workFlowSteps.Count
+            );
+        }
+
 
         // Sadece tabloda hiç veri yoksa çalıştır
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)
