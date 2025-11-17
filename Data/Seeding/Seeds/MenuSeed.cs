@@ -85,7 +85,7 @@ namespace Data.Seeding.Seeds
                 "ServiceRequestWarehouse","ServiceRequestTechnicalService","ServiceRequestPricing",
                 "ServiceRequestFinalApproval","ServiceRequestList","ProductList","ProductTypeList",
                 "SystemTypeList","CurrencyTypeList","BrandList","ModelList","ServiceReportsList",
-                "ConfigurationList","ServiceTypeList","MenuList","FlowStatusList","Mailbox"
+                "ConfigurationList","ServiceTypeList","MenuList","FlowStatusList","Mailbox","CustomerSystemList"
             };
 
             var existing = await db.Set<Menu>()
