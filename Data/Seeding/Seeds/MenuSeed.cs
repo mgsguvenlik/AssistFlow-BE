@@ -43,7 +43,8 @@ namespace Data.Seeding.Seeds
                 ["ServiceTypeList"] = "Servis Tipi Listesi",
                 ["MenuList"] = "Menü Listesi",
                 ["FlowStatusList"] = "Akış Durum Listesi",
-                ["Mailbox"] = "Posta Kutusu"
+                ["Mailbox"] = "Posta Kutusu",
+                ["CustomerSystemList"] = "Müşteri Sistem Listesi"
             };
 
             var set = db.Set<Menu>();
