@@ -14,7 +14,7 @@ using System.Net;
 namespace WebAPI.Controllers
 {
 
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WorkFlowsController : ControllerBase
