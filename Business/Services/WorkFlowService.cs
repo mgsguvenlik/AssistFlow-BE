@@ -1340,19 +1340,29 @@ namespace Business.Services
 
                 #region Hareket Kaydı
                 await _activationRecord.LogAsync(
-                     WorkFlowActionType.PricingApproved,
-                     dto.RequestNo,
-                     wf.Id,
-                     "PRC",
-                     "APR",
-                     "Fiyatlama tamamlandı ve onay aşamasına geçildi",
-                     new
-                     {
-                         dto.Notes,
-                         dto.Currency,
-                         Products = dto.Products?.Select(p => new { p.ProductId, p.Quantity })
-                     }
-                 );
+                   WorkFlowActionType.PricingApproved,
+                   dto.RequestNo,
+                   wf.Id,
+                   "PRC",
+                   "APR",
+                   "Fiyatlama tamamlandı ve onay aşamasına geçildi",
+                   new
+                   {
+                       dto.Notes,
+                       TotalAmount = dto.Products?.Sum(x => x.Price),
+                       dto.Status, 
+                       meId,
+                       DateTime.Now,
+                       Products = dto.Products?.Select(p => new
+
+                       {
+                           p.ProductId,
+                           p.Quantity,
+                           p.Price       
+                       }),
+
+                   }
+               );
 
                 #endregion
 
@@ -1557,15 +1567,31 @@ namespace Business.Services
                 #endregion
 
                 #region Hareket Kaydı
+             
+
                 await _activationRecord.LogAsync(
-                  WorkFlowActionType.FinalApprovalUpdated,
-                  dto.RequestNo,
-                  wf?.Id,
-                  fromStepCode: wf?.CurrentStep?.Code ?? "APR",
-                  toStepCode: "APR",
-                   "Kontrol ve Son Onay kaydı güncellendi.",
-                  new { dto.Notes, dto.WorkFlowStatus, meId, DateTime.Now }
-              );
+                    WorkFlowActionType.FinalApprovalUpdated,
+                    dto.RequestNo,
+                    wf?.Id,
+                    fromStepCode: wf?.CurrentStep?.Code ?? "APR",
+                    toStepCode: "APR",
+                    "Kontrol ve Son Onay kaydı güncellendi.",
+                    new
+                    {
+                        dto.Notes,
+                        dto.WorkFlowStatus,
+                        meId,
+                        TotalAmount = dto.Products?.Sum(x => x.Price),
+                        DateTime.Now,
+                        Products = dto.Products?.Select(p => new
+                        {
+                            p.ProductId,
+                            p.Quantity,
+                            p.Price    
+                        })
+                    }
+                );
+
 
                 #endregion
 
