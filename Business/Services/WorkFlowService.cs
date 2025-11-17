@@ -719,7 +719,7 @@ namespace Business.Services
 
         }
 
-        // 4️ Teknik Servis Servisi Başlatma 
+        // 3 Teknik Servis Servisi Başlatma 
         public async Task<ResponseModel<TechnicalServiceGetDto>> StartService(StartTechnicalServiceDto dto)
         {
 
@@ -842,7 +842,7 @@ namespace Business.Services
 
         }
 
-        // 5 Teknik Servis Servisi Tamamlama  ve Fiyatlamaya gönderimi
+        // 3.1 Teknik Servis Servisi Tamamlama  ve Fiyatlamaya gönderimi
         public async Task<ResponseModel<TechnicalServiceGetDto>> FinishService(FinishTechnicalServiceDto dto)
         {
             try
@@ -1152,7 +1152,7 @@ namespace Business.Services
 
         }
 
-        // 6 Fiyatlama onay ve kontrole gönderim.
+        // 4 Fiyatlama onay ve kontrole gönderim.
         public async Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto)
         {
             try
@@ -1226,6 +1226,50 @@ namespace Business.Services
                 _uow.Repository.Update(servicesRequest);
                 #endregion
 
+                //#region Ürünler Güncellemesi
+                //// 🔹 ServicesRequestProduct senkronizasyonu
+                //var existingProducts = await _uow.Repository
+                //    .GetMultipleAsync<ServicesRequestProduct>(
+                //        asNoTracking: false,
+                //        whereExpression: x => x.RequestNo == dto.RequestNo
+                //    );
+
+                //// Dictionary ile hızlı karşılaştırma
+                //var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+                //// 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+                //foreach (var existing in existingProducts)
+                //{
+                //    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                //    {
+                //        // Güncelle
+                //        existing.Quantity = delivered.Quantity;
+                //        _uow.Repository.Update(existing);
+
+                //        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+                //        deliveredDict.Remove(existing.ProductId);
+                //    }
+                //    else
+                //    {
+                //        //  listede yok → Sil
+                //        _uow.Repository.HardDelete(existing);
+                //    }
+                //}
+
+                //// 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
+                //foreach (var newItem in deliveredDict.Values)
+                //{
+                //    var newEntity = new ServicesRequestProduct
+                //    {
+                //        CustomerId = request.CustomerId,
+                //        RequestNo = request.RequestNo,
+                //        ProductId = newItem.ProductId,
+                //        Quantity = newItem.Quantity,
+                //    };
+                //    _uow.Repository.Add(newEntity);
+                //}
+
+                //#endregion
+
                 #region Ürünler Güncellemesi
                 // 🔹 ServicesRequestProduct senkronizasyonu
                 var existingProducts = await _uow.Repository
@@ -1234,28 +1278,23 @@ namespace Business.Services
                         whereExpression: x => x.RequestNo == dto.RequestNo
                     );
 
-                // Dictionary ile hızlı karşılaştırma
-                var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
-                // 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+                var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x)
+                                    ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+
                 foreach (var existing in existingProducts)
                 {
                     if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
                     {
-                        // Güncelle
                         existing.Quantity = delivered.Quantity;
                         _uow.Repository.Update(existing);
-
-                        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
                         deliveredDict.Remove(existing.ProductId);
                     }
                     else
                     {
-                        //  listede yok → Sil
                         _uow.Repository.HardDelete(existing);
                     }
                 }
 
-                // 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
                 foreach (var newItem in deliveredDict.Values)
                 {
                     var newEntity = new ServicesRequestProduct
@@ -1267,7 +1306,11 @@ namespace Business.Services
                     };
                     _uow.Repository.Add(newEntity);
                 }
+                #endregion
 
+                #region Ürün Fiyat Sabitleme (4. Adım)
+                // 🔹 Artık fiyatı dto.Products listesinden alıyoruz
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
                 #endregion
 
                 #region Son Onaya Gönderim 
@@ -1340,7 +1383,8 @@ namespace Business.Services
         }
 
 
-        // 7) Kontrol ve Son Onay (FinalApproval) — CREATE
+
+        // 5  Kontrol ve Son Onay (FinalApproval) — CREATE
         public async Task<ResponseModel<FinalApprovalGetDto>> FinalApprovalAsync(FinalApprovalUpdateDto dto)
         {
             try
@@ -1412,36 +1456,74 @@ namespace Business.Services
                 }
                 #endregion
 
+                //#region Ürünler Güncellemesi
+                //// 🔹 ServicesRequestProduct senkronizasyonu
+                //var existingProducts = await _uow.Repository
+                //    .GetMultipleAsync<ServicesRequestProduct>(
+                //        asNoTracking: false,
+                //        whereExpression: x => x.RequestNo == dto.RequestNo
+                //    );
+
+                //// Dictionary ile hızlı karşılaştırma
+                //var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+                //// 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+                //foreach (var existing in existingProducts)
+                //{
+                //    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                //    {
+                //        // Güncelle
+                //        existing.Quantity = delivered.Quantity;
+                //        _uow.Repository.Update(existing);
+
+                //        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
+                //        deliveredDict.Remove(existing.ProductId);
+                //    }
+                //    else
+                //    {
+                //        //  listede yok → Sil
+                //        _uow.Repository.HardDelete(existing);
+                //    }
+                //}
+
+                //// 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
+                //foreach (var newItem in deliveredDict.Values)
+                //{
+                //    var newEntity = new ServicesRequestProduct
+                //    {
+                //        CustomerId = request.CustomerId,
+                //        RequestNo = request.RequestNo,
+                //        ProductId = newItem.ProductId,
+                //        Quantity = newItem.Quantity,
+                //    };
+                //    _uow.Repository.Add(newEntity);
+                //}
+
+                //#endregion
+
                 #region Ürünler Güncellemesi
-                // 🔹 ServicesRequestProduct senkronizasyonu
                 var existingProducts = await _uow.Repository
                     .GetMultipleAsync<ServicesRequestProduct>(
                         asNoTracking: false,
                         whereExpression: x => x.RequestNo == dto.RequestNo
                     );
 
-                // Dictionary ile hızlı karşılaştırma
-                var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
-                // 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
+                var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x)
+                                    ?? new Dictionary<long, ServicesRequestProductCreateDto>();
+
                 foreach (var existing in existingProducts)
                 {
                     if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
                     {
-                        // Güncelle
                         existing.Quantity = delivered.Quantity;
                         _uow.Repository.Update(existing);
-
-                        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
                         deliveredDict.Remove(existing.ProductId);
                     }
                     else
                     {
-                        //  listede yok → Sil
                         _uow.Repository.HardDelete(existing);
                     }
                 }
 
-                // 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
                 foreach (var newItem in deliveredDict.Values)
                 {
                     var newEntity = new ServicesRequestProduct
@@ -1453,20 +1535,10 @@ namespace Business.Services
                     };
                     _uow.Repository.Add(newEntity);
                 }
-
                 #endregion
 
-                #region Ürün Fiyat Sabitleme
-                // Tamamlama/İptal anında zorunlu fiyat capture; diğer durumlarda da çalıştırmak istersen force=true verebilirsin
-                if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
-                {
-                    await EnsurePricesCapturedAsync(dto.RequestNo);
-                }
-                else
-                {
-                    // İsteğe bağlı: satırlar capture edilmemişse, toplam hesap doğru olsun diye tetikleyebilirsin
-                    await EnsurePricesCapturedAsync(dto.RequestNo, force: false);
-                }
+                #region Ürün Fiyat Sabitleme (5. Adım)
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
                 #endregion
 
                 #region Fiyatlama Güncelleme (FinalApproval)
@@ -1705,7 +1777,7 @@ namespace Business.Services
 
             bool isAdmin = roles.Contains("ADMIN");
             bool isWarehouse = roles.Contains("WAREHOUSE");
-            bool isTechnician = roles.Contains("TECHNICIAN")|| roles.Contains("SUBCONTRACTOR");
+            bool isTechnician = roles.Contains("TECHNICIAN") || roles.Contains("SUBCONTRACTOR");
             bool isProjectEngineer = roles.Contains("PROJECTENGINEER");
 
             var pendingStatus = WorkFlowStatus.Pending;
@@ -1713,7 +1785,7 @@ namespace Business.Services
             // 🧱 2. Role göre filtrelenmiş WorkFlow sorgusu
             var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .Where(x => !x.IsDeleted );
+                .Where(x => !x.IsDeleted);
 
             if (isAdmin || isProjectEngineer)
             {
@@ -1848,13 +1920,13 @@ namespace Business.Services
                         CustomerTypeId = sr.Customer.CustomerTypeId,
                         Note = sr.Customer.Note,
 
-                         // ✅ Müşteri sistemleri direkt içeride
-                         Systems = sr.Customer.CustomerSystems
+                        // ✅ Müşteri sistemleri direkt içeride
+                        Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
                                  Id = cs.Id,
-                                 Name= cs.Name,
-                                 Code=cs.Code
+                                 Name = cs.Name,
+                                 Code = cs.Code
                              })
                              .ToList()
                     }
@@ -2332,17 +2404,17 @@ namespace Business.Services
                         ////Ürün yok ise direkt servis talebine geri gönder
                         //else
                         //{
-                            targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
-                           .AsNoTracking()
-                           .FirstOrDefaultAsync(s => s.Code == "SR");
-                            if (targetStep is null)
-                                return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
+                        targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                       .AsNoTracking()
+                       .FirstOrDefaultAsync(s => s.Code == "SR");
+                        if (targetStep is null)
+                            return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (SR) tanımlı değil.", StatusCode.BadRequest);
 
-                            servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                        servicesRequest.ServicesRequestStatus = ServicesRequestStatus.Draft;
 
-                            servicesRequest.UpdatedDate = DateTime.Now;
-                            servicesRequest.UpdatedUser = meId;
-                            _uow.Repository.Update(servicesRequest);
+                        servicesRequest.UpdatedDate = DateTime.Now;
+                        servicesRequest.UpdatedUser = meId;
+                        _uow.Repository.Update(servicesRequest);
                         //}
 
                         technicalService.ServicesStatus = TechnicalServiceStatus.AwaitingReview;
@@ -4288,7 +4360,7 @@ namespace Business.Services
             return (subject, html);
         }
 
-        /// Servis Üürnleri 
+        /// Servis Ürünleri Fiyat savbitleme
         private async Task<ResponseModel> EnsurePricesCapturedAsync(string requestNo, bool force = false)
         {
             // Customer + Product navigations lazım → include’ları aç
@@ -4348,6 +4420,60 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
         }
+
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
+            string requestNo,
+            IEnumerable<ServicesRequestProductCreateDto>? productsDto
+        )
+        {
+            // DTO boş ise iş yapma
+            var dtoDict = (productsDto ?? Enumerable.Empty<ServicesRequestProductCreateDto>())
+                .ToDictionary(x => x.ProductId, x => x);
+
+            if (!dtoDict.Any())
+                return ResponseModel.Success();
+
+            // İlgili request’in ürünlerini çek
+            var list = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product) // Para birimi vs için
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync();
+
+            if (list.Count == 0)
+                return ResponseModel.Success();
+
+            foreach (var p in list)
+            {
+                // DTO’da karşılığı yoksa o satırı atla (istersen burada 0 fiyat da yazabilirsin)
+                if (!dtoDict.TryGetValue(p.ProductId, out var dtoItem))
+                    continue;
+
+                // 1) Birim fiyat: artık DTO’dan geliyor
+                var unit = dtoItem.Price; // ← DTO’daki Price
+
+                // 2) Para birimi: eskisi gibi ürün tablosundan
+                var currency = p.Product?.PriceCurrency ?? "TRY";
+
+                var total = unit * p.Quantity;
+
+                // İstersen CapturedSource için yeni enum (Manual) ekleyebilirsin,
+                // şimdilik mevcut enum’lardan birini kullanıyorum.
+                p.CapturedSource = CapturedPriceSource.Standard; // veya CapturedPriceSource.CustomerGroupPriceManual vs
+                p.CapturedUnitPrice = unit;
+                p.CapturedCurrency = currency;
+                p.CapturedTotal = total;
+                p.CapturedAt = DateTime.Now;
+                p.IsPriceCaptured = true;
+
+                _uow.Repository.Update(p);
+            }
+
+            await _uow.Repository.CompleteAsync();
+            return ResponseModel.Success();
+        }
+
+
+
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
