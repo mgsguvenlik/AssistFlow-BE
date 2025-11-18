@@ -70,7 +70,9 @@ builder.Services.AddCors(options =>
             "http://192.168.1.46:5173",
             "https://192.168.1.46:5174",
             "https://localhost:5174",
-            "http://localhost:8081") // React frontend URL'si
+            "http://localhost:8081",
+            "http://flowassist.mgs.com.tr",
+            "https://flowassist.mgs.com.tr") // React frontend URL'si
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials() // Bunu kullanýyorsan WithOrigins zorunlu!

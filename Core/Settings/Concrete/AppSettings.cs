@@ -13,5 +13,6 @@ namespace Core.Settings.Concrete
         public required string DbProvider { get; set; }
         public int AccessTokenMinutes { get; set; }
         public required string AppUrl { get; set; }
+        public required string FrontUrl { get; set; }
     }
 }
