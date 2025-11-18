@@ -1226,50 +1226,6 @@ namespace Business.Services
                 _uow.Repository.Update(servicesRequest);
                 #endregion
 
-                //#region Ürünler Güncellemesi
-                //// 🔹 ServicesRequestProduct senkronizasyonu
-                //var existingProducts = await _uow.Repository
-                //    .GetMultipleAsync<ServicesRequestProduct>(
-                //        asNoTracking: false,
-                //        whereExpression: x => x.RequestNo == dto.RequestNo
-                //    );
-
-                //// Dictionary ile hızlı karşılaştırma
-                //var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
-                //// 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
-                //foreach (var existing in existingProducts)
-                //{
-                //    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
-                //    {
-                //        // Güncelle
-                //        existing.Quantity = delivered.Quantity;
-                //        _uow.Repository.Update(existing);
-
-                //        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
-                //        deliveredDict.Remove(existing.ProductId);
-                //    }
-                //    else
-                //    {
-                //        //  listede yok → Sil
-                //        _uow.Repository.HardDelete(existing);
-                //    }
-                //}
-
-                //// 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
-                //foreach (var newItem in deliveredDict.Values)
-                //{
-                //    var newEntity = new ServicesRequestProduct
-                //    {
-                //        CustomerId = request.CustomerId,
-                //        RequestNo = request.RequestNo,
-                //        ProductId = newItem.ProductId,
-                //        Quantity = newItem.Quantity,
-                //    };
-                //    _uow.Repository.Add(newEntity);
-                //}
-
-                //#endregion
-
                 #region Ürünler Güncellemesi
                 // 🔹 ServicesRequestProduct senkronizasyonu
                 var existingProducts = await _uow.Repository
@@ -1466,50 +1422,6 @@ namespace Business.Services
                 }
                 #endregion
 
-                //#region Ürünler Güncellemesi
-                //// 🔹 ServicesRequestProduct senkronizasyonu
-                //var existingProducts = await _uow.Repository
-                //    .GetMultipleAsync<ServicesRequestProduct>(
-                //        asNoTracking: false,
-                //        whereExpression: x => x.RequestNo == dto.RequestNo
-                //    );
-
-                //// Dictionary ile hızlı karşılaştırma
-                //var deliveredDict = dto?.Products?.ToDictionary(x => x.ProductId, x => x) ?? new Dictionary<long, ServicesRequestProductCreateDto>();
-                //// 1️ Güncelle veya Sil (mevcut ürünler üzerinden)
-                //foreach (var existing in existingProducts)
-                //{
-                //    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
-                //    {
-                //        // Güncelle
-                //        existing.Quantity = delivered.Quantity;
-                //        _uow.Repository.Update(existing);
-
-                //        // Güncellenen ürünü işaretle (artık yeniden eklenmeyecek)
-                //        deliveredDict.Remove(existing.ProductId);
-                //    }
-                //    else
-                //    {
-                //        //  listede yok → Sil
-                //        _uow.Repository.HardDelete(existing);
-                //    }
-                //}
-
-                //// 2️ Yeni ürünleri ekle (Listede olup DB'de olmayanlar)
-                //foreach (var newItem in deliveredDict.Values)
-                //{
-                //    var newEntity = new ServicesRequestProduct
-                //    {
-                //        CustomerId = request.CustomerId,
-                //        RequestNo = request.RequestNo,
-                //        ProductId = newItem.ProductId,
-                //        Quantity = newItem.Quantity,
-                //    };
-                //    _uow.Repository.Add(newEntity);
-                //}
-
-                //#endregion
-
                 #region Ürünler Güncellemesi
                 var existingProducts = await _uow.Repository
                     .GetMultipleAsync<ServicesRequestProduct>(
@@ -1568,8 +1480,6 @@ namespace Business.Services
                 #endregion
 
                 #region Hareket Kaydı
-             
-
                 await _activationRecord.LogAsync(
                     WorkFlowActionType.FinalApprovalUpdated,
                     dto.RequestNo,
@@ -1592,8 +1502,6 @@ namespace Business.Services
                         })
                     }
                 );
-
-
                 #endregion
 
                 await _uow.Repository.CompleteAsync();
