@@ -101,10 +101,12 @@ namespace Model.Concrete
 
         public string? Note {  get; set; }
 
+        // 🔹 Yeni kolonlar
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
+
         /// <summary>
-        /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
         /// </summary>
-        /// 
         [ForeignKey(nameof(CustomerGroup))]
         public long? CustomerGroupId { get; set; }
         public CustomerGroup? CustomerGroup { get; set; }
@@ -113,6 +115,7 @@ namespace Model.Concrete
         [ForeignKey(nameof(CustomerType))]
         public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
+
 
 
         // Navigations (fiyatlar)

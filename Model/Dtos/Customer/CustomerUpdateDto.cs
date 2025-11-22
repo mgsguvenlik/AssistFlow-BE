@@ -69,6 +69,9 @@ namespace Model.Dtos.Customer
         public string? Note { get; set; }
 
         public List<long> SystemIds { get; set; } = new();
+
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
     }
 
 }

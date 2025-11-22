@@ -14,5 +14,6 @@ namespace Core.Settings.Concrete
         public int AccessTokenMinutes { get; set; }
         public required string AppUrl { get; set; }
         public required string FrontUrl { get; set; }
+        public  string? FileUrl { get; set; }
     }
 }

@@ -26,6 +26,9 @@ namespace Model.Dtos.Customer
         public DateTimeOffset? InstallationDate { get; set; }
         public int? WarrantyYears { get; set; }
         public long? CustomerGroupId { get; set; } = new();
+
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
         public CustomerGroupGetDto CustomerGroup { get; set; } = new();
 
         public List<CustomerSystem.CustomerSystemGetDto> Systems { get; set; } = new();

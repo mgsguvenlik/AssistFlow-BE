@@ -51,6 +51,8 @@ namespace Business.Services
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
         private readonly AppDataContext _ctx;
+       
+       
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
             ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification)
         {
@@ -62,6 +64,7 @@ namespace Business.Services
             _currentUser = currentUser;
             _ctx = ctx;
             _notification = notification;
+          
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -971,8 +974,9 @@ namespace Business.Services
 
                 #region Dosya Ekleme/Güncelleme işlemleri
                 var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
-                var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/') ?? "";
-                var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                //var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");
                 Directory.CreateDirectory(uploadRoot);
 
                 static bool IsAllowed(string fileName, string? contentType)
@@ -998,12 +1002,18 @@ namespace Business.Services
                     var path = Path.Combine(uploadRoot, name);
 
                     await using var read = file.OpenReadStream();
-                    await using var write = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None,
-                                                           bufferSize: 1024 * 64,
-                                                           options: FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    await read.CopyToAsync(write, 1024 * 64, CancellationToken.None);
+                    await using var write = new FileStream(
+                        path,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None,
+                        bufferSize: 1024 * 64,
+                        options: FileOptions.Asynchronous | FileOptions.SequentialScan
+                    );
+                    await read.CopyToAsync(write, 1024 * 64, ct);
 
-                    return string.IsNullOrEmpty(baseUrl) ? $"/uploads/{name}" : $"{baseUrl}/uploads/{name}";
+                    // DB’de sadece dosya adını tutalım (URL hesaplamasını dışarıda yaparız)
+                    return name;
                 }
 
                 var toAddImages = new List<TechnicalServiceImage>();
@@ -1686,7 +1696,7 @@ namespace Business.Services
             return ResponseModel.Success("Lokasyon kontrolü devre dışı bırakma talebi iletildi ve ilgili yöneticilere e-posta gönderildi.");
         }
 
-        ///-----------------------------
+        ///----------------------------- 
 
         // -------------------- Services Request --------------------
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
@@ -1805,7 +1815,7 @@ namespace Business.Services
                     IsProductRequirement = sr.IsProductRequirement,
 
                     IsMailSended = sr.IsMailSended,
-                    CustomerApproverId = sr.CustomerApproverId,
+                    CustomerApproverId = sr.CustomerApproverId, 
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
 
                     CustomerId = sr.CustomerId,
@@ -1852,6 +1862,8 @@ namespace Business.Services
                         CustomerGroupId = sr.Customer.CustomerGroupId,
                         CustomerTypeId = sr.Customer.CustomerTypeId,
                         Note = sr.Customer.Note,
+                        CashCenter = sr.Customer.CashCenter,
+                        LockType = sr.Customer.LockType,
 
                         // ✅ Müşteri sistemleri direkt içeride
                         Systems = sr.Customer.CustomerSystems
@@ -2002,6 +2014,8 @@ namespace Business.Services
                         CustomerGroupId = sr.Customer.CustomerGroupId,
                         CustomerTypeId = sr.Customer.CustomerTypeId,
                         Note = sr.Customer.Note,
+                        CashCenter = sr.Customer.CashCenter,
+                        LockType = sr.Customer.LockType,
                         Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2574,6 +2588,8 @@ namespace Business.Services
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
                             Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2725,6 +2741,8 @@ namespace Business.Services
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
                             Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2860,6 +2878,8 @@ namespace Business.Services
                     CustomerGroupId = sr.Customer.CustomerGroupId,
                     CustomerTypeId = sr.Customer.CustomerTypeId,
                     Note = sr.Customer.Note,
+                    CashCenter = sr.Customer.CashCenter,
+                    LockType = sr.Customer.LockType,
                     Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -2913,6 +2933,59 @@ namespace Business.Services
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
                 .ToListAsync();
+
+
+
+            // --------------------------------------------------------------------
+            //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
+            // --------------------------------------------------------------------
+            var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+            var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+            string? NormalizeImageUrl(string? urlOrFileName)
+            {
+                if (string.IsNullOrWhiteSpace(urlOrFileName))
+                    return urlOrFileName;
+
+                // 1) Zaten tam URL ise (http/https) → hiç dokunma
+                if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    return urlOrFileName;
+                }
+
+                // 2) /uploads/xxx.png gibi relative path ise
+                if (urlOrFileName.StartsWith("/"))
+                {
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? urlOrFileName
+                        : $"{baseUrl}{urlOrFileName}";
+                }
+
+                // 3) Sadece dosya adı ise (Guid.ext)
+                var relative = $"/uploads/{urlOrFileName}";
+                return string.IsNullOrEmpty(baseUrl)
+                    ? relative
+                    : $"{baseUrl}{relative}";
+            }
+
+            // Service resimleri
+            if (dto.ServicesImages != null)
+            {
+                foreach (var img in dto.ServicesImages)
+                {
+                    img.Url = NormalizeImageUrl(img.Url);
+                }
+            }
+
+            // Form resimleri
+            if (dto.ServiceRequestFormImages != null)
+            {
+                foreach (var img in dto.ServiceRequestFormImages)
+                {
+                    img.Url = NormalizeImageUrl(img.Url);
+                }
+            }
+            // --------------------------------------------------------------------
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
@@ -2974,6 +3047,8 @@ namespace Business.Services
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
                             Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -3084,6 +3159,8 @@ namespace Business.Services
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
                             Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
@@ -3189,6 +3266,8 @@ namespace Business.Services
                             CustomerGroupId = sr.Customer.CustomerGroupId,
                             CustomerTypeId = sr.Customer.CustomerTypeId,
                             Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
                             Systems = sr.Customer.CustomerSystems
                              .Select(cs => new CustomerSystemGetDto
                              {
