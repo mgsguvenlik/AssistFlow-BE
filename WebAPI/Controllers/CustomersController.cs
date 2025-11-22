@@ -20,5 +20,24 @@ namespace WebAPI.Controllers
             _customerService = customerService;
         }
 
+
+        /// <summary>
+        /// Müşteri listesini bir json dosyasınadn import etmek için bu metot kullanılır
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        [HttpPost("import-from-file")]
+        public async Task<IActionResult> ImportFromFile([FromQuery] string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                return BadRequest("filePath parametresi boş olamaz.");
+
+            var result = await _customerService.ImportFromFileAsync(filePath);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
     }
 }
