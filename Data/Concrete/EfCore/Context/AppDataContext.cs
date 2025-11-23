@@ -48,6 +48,8 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<Notification> Notifications { get; set; } = default!;
 
+        public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
+
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
         /// </summary>
@@ -231,28 +233,6 @@ namespace Data.Concrete.EfCore.Context
                 .OnDelete(DeleteBehavior.Cascade);
 
 
-            // Customer – CustomerSystem many-to-many
-            modelBuilder.Entity<Customer>()
-                .HasMany(c => c.CustomerSystems)
-                .WithMany(s => s.Customers)
-                .UsingEntity<Dictionary<string, object>>(
-                    "CustomerCustomerSystem", // Join tablo adı
-                    j => j
-                        .HasOne<CustomerSystem>()
-                        .WithMany()
-                        .HasForeignKey("CustomerSystemId")
-                        .OnDelete(DeleteBehavior.Cascade),
-                    j => j
-                        .HasOne<Customer>()
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade),
-                    j =>
-                    {
-                        j.ToTable("CustomerCustomerSystems");
-                        j.HasKey("CustomerId", "CustomerSystemId");
-                    });
-
 
         modelBuilder.Entity<WorkFlowTransition>()
                 .HasOne(t => t.FromStep)
@@ -370,6 +350,18 @@ namespace Data.Concrete.EfCore.Context
                  .HasForeignKey(x => x.MenuId)           // MenuId <-> ModulId kolonu
                  .OnDelete(DeleteBehavior.Cascade)
                  .HasConstraintName("FK_MenuRole_Menus_ModulId");
+            });
+
+
+            modelBuilder.Entity<CustomerSystemAssignment>(entity =>
+            {
+                entity.HasOne(x => x.Customer)
+                      .WithMany(c => c.CustomerSystemAssignments)
+                      .HasForeignKey(x => x.CustomerId);
+
+                entity.HasOne(x => x.CustomerSystem)
+                      .WithMany(cs => cs.CustomerSystemAssignments)
+                      .HasForeignKey(x => x.CustomerSystemId);
             });
         }
     }

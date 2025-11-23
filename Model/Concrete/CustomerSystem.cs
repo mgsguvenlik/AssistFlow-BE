@@ -22,9 +22,8 @@ namespace Model.Concrete
         [MaxLength(50)]
         public string Code { get; set; } = null!;
 
-        // Many-to-many navigation
-        public ICollection<Customer> Customers { get; set; } = new List<Customer>();
+        // Müşteri-sistem ilişkileri + bakım anlaşması
+        public ICollection<CustomerSystemAssignment> CustomerSystemAssignments { get; set; } = new List<CustomerSystemAssignment>();
 
-   
     }
 }

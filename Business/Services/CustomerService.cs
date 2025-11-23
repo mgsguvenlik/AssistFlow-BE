@@ -28,7 +28,8 @@ namespace Business.Services
             => q => q
           .Include(c => c.CustomerType)
           .Include(c => c.CustomerGroup)
-          .Include(c => c.CustomerSystems);
+          .Include(c => c.CustomerSystemAssignments)
+            .ThenInclude(a => a.CustomerSystem);
 
         protected override Task<Customer?> ResolveEntityForUpdateAsync(CustomerUpdateDto dto)
           => _unitOfWork.Repository.GetSingleAsync<Customer>(
@@ -37,7 +38,8 @@ namespace Business.Services
             includeExpression: q => q
                 .Include(c => c.CustomerType)
                 .Include(c => c.CustomerGroup)
-                .Include(c => c.CustomerSystems) // 🔹 Update’te ilişkiyi yönetebilmek için
+                .Include(c => c.CustomerSystemAssignments)
+                    .ThenInclude(a => a.CustomerSystem)  // 🔹 yeni
         );
 
         public override async Task<ResponseModel<CustomerGetDto>> UpdateAsync(CustomerUpdateDto dto)
@@ -56,21 +58,49 @@ namespace Business.Services
             // 2) Scalar alanları map et (CustomerSystems Mapster config’inde ignore)
             _mapper.Map(dto, entity);
 
-            // 3) SystemIds varsa many-to-many ilişkisini güncelle
+            // 3) SystemIds varsa müşteri-sistem ilişkilerini (CustomerSystemAssignment) güncelle
             if (dto.SystemIds != null)
             {
-                var systemsQuery = _unitOfWork.Repository.GetQueryable<CustomerSystem>();
+                var systemIds = dto.SystemIds.Distinct().ToList();
 
-                var systems = await systemsQuery
-                    .Where(s => dto.SystemIds.Contains(s.Id))
+                var systems = await _unitOfWork.Repository
+                    .GetQueryable<CustomerSystem>()
+                    .Where(s => systemIds.Contains(s.Id))
                     .ToListAsync();
 
-                entity.CustomerSystems ??= new List<CustomerSystem>();
+                entity.CustomerSystemAssignments ??= new List<CustomerSystemAssignment>();
 
-                entity.CustomerSystems.Clear();
-                foreach (var sys in systems)
+                // Mevcut assignment’ları listele
+                var existingAssignments = entity.CustomerSystemAssignments.ToList();
+
+                // DTO’da artık olmayan sistemler için assignment’ları sil
+                foreach (var assignment in existingAssignments)
                 {
-                    entity.CustomerSystems.Add(sys);
+                    if (!systemIds.Contains(assignment.CustomerSystemId))
+                    {
+                        entity.CustomerSystemAssignments.Remove(assignment);
+                    }
+                }
+
+                // DTO’da gelen sistemler için eksik assignment’ları ekle
+                var existingSystemIds = entity.CustomerSystemAssignments
+                    .Select(a => a.CustomerSystemId)
+                    .ToHashSet();
+
+                foreach (var system in systems)
+                {
+                    if (!existingSystemIds.Contains(system.Id))
+                    {
+                        entity.CustomerSystemAssignments.Add(new CustomerSystemAssignment
+                        {
+                            CustomerId = entity.Id,
+                            CustomerSystemId = system.Id,
+
+                            // 🔹 Şimdilik “seçili sistemler” = “bakım anlaşması var” şeklinde yorumladım.
+                            // İleride ayrı bir DTO ile HasMaintenanceContract bilgisini de dışarı açabiliriz.
+                            HasMaintenanceContract = true
+                        });
+                    }
                 }
             }
 
@@ -93,15 +123,24 @@ namespace Business.Services
 
             var entity = _mapper.Map<Customer>(dto);
 
-            // Create sırasında da sistem ataması yap
+            // Create sırasında da sistem ataması yap (CustomerSystemAssignment)
             if (dto.SystemIds != null && dto.SystemIds.Any())
             {
+                var systemIds = dto.SystemIds.Distinct().ToList();
+
                 var systems = await _unitOfWork.Repository
                     .GetQueryable<CustomerSystem>()
-                    .Where(s => dto.SystemIds.Contains(s.Id))
+                    .Where(s => systemIds.Contains(s.Id))
                     .ToListAsync();
 
-                entity.CustomerSystems = systems;
+                entity.CustomerSystemAssignments = systems
+                    .Select(s => new CustomerSystemAssignment
+                    {
+                        Customer = entity,
+                        CustomerSystem = s,
+                        HasMaintenanceContract = true   // 🔹 varsayılan: seçili sistemler için bakım var
+                    })
+                    .ToList();
             }
 
             await _unitOfWork.Repository.AddAsync(entity);

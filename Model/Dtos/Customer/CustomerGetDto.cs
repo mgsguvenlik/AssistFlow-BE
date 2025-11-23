@@ -1,4 +1,5 @@
 ﻿using Model.Dtos.CustomerGroup;
+using Model.Dtos.CustomerSystemAssignment;
 
 namespace Model.Dtos.Customer
 {
@@ -31,6 +32,6 @@ namespace Model.Dtos.Customer
         public string? CashCenter { get; set; }
         public CustomerGroupGetDto CustomerGroup { get; set; } = new();
 
-        public List<CustomerSystem.CustomerSystemGetDto> Systems { get; set; } = new();
+        public ICollection<CustomerSystemAssignmentGetDto> Systems { get; set; } = new List<CustomerSystemAssignmentGetDto>();
     }
 }

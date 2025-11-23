@@ -10,6 +10,7 @@ using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Model.Dtos.CustomerSystem;
+using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.MailOutbox;
 
 namespace Business.DependencyResolvers.Autofac
@@ -46,6 +47,8 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IMenuRoleService), typeof(MenuRoleService));
             services.AddScoped(typeof(INotificationService), typeof(NotificationService));
             services.AddScoped(typeof(ICustomerSystemService), typeof(CustomerSystemService));
+            services.AddScoped(typeof(ICustomerSystemAssignmentService), typeof(CustomerSystemAssignmentService));
+
             services.AddScoped<ICurrentUser, CurrentUser>();
             services.AddHostedService<MailOutboxDispatcher>();
 
@@ -205,6 +208,7 @@ namespace Business.DependencyResolvers.Autofac
                     Model.Dtos.MenuRole.MenuRoleGetDto,
                     long>,
                 MenuRoleService>();
+
             services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
             services.AddScoped<
                 ICrudService<MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto, long>,
@@ -217,6 +221,13 @@ namespace Business.DependencyResolvers.Autofac
                        CustomerSystemGetDto,
                         long>,
                     CustomerSystemService>();
+
+            services.AddScoped<
+              ICrudService<CustomerSystemAssignmentCreateDto,
+                   CustomerSystemAssignmentUpdateDto,
+                   CustomerSystemAssignmentGetDto,
+                   long>
+             >(sp => sp.GetRequiredService<ICustomerSystemAssignmentService>());
 
         }
         protected override void Load(ContainerBuilder builder)

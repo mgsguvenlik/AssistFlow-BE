@@ -121,7 +121,7 @@ namespace Model.Concrete
         // Navigations (fiyatlar)
         public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
 
-        public ICollection<CustomerSystem> CustomerSystems { get; set; } = new List<CustomerSystem>();
+        public ICollection<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }  = new List<CustomerSystemAssignment>();
 
 
 

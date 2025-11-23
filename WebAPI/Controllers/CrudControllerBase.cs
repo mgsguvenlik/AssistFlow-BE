@@ -7,7 +7,7 @@ using System.Reflection;
 
 namespace WebAPI.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

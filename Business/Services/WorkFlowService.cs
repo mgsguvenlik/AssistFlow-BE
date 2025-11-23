@@ -21,6 +21,7 @@ using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystem;
+using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
@@ -51,8 +52,8 @@ namespace Business.Services
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
         private readonly AppDataContext _ctx;
-       
-       
+
+
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
             ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification)
         {
@@ -64,7 +65,7 @@ namespace Business.Services
             _currentUser = currentUser;
             _ctx = ctx;
             _notification = notification;
-          
+
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -1316,7 +1317,7 @@ namespace Business.Services
                    {
                        dto.Notes,
                        TotalAmount = dto.Products?.Sum(x => x.Price),
-                       dto.Status, 
+                       dto.Status,
                        meId,
                        DateTime.Now,
                        Products = dto.Products?.Select(p => new
@@ -1324,7 +1325,7 @@ namespace Business.Services
                        {
                            p.ProductId,
                            p.Quantity,
-                           p.Price       
+                           p.Price
                        }),
 
                    }
@@ -1506,7 +1507,7 @@ namespace Business.Services
                         {
                             p.ProductId,
                             p.Quantity,
-                            p.Price    
+                            p.Price
                         })
                     }
                 );
@@ -1815,7 +1816,7 @@ namespace Business.Services
                     IsProductRequirement = sr.IsProductRequirement,
 
                     IsMailSended = sr.IsMailSended,
-                    CustomerApproverId = sr.CustomerApproverId, 
+                    CustomerApproverId = sr.CustomerApproverId,
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
 
                     CustomerId = sr.CustomerId,
@@ -1865,15 +1866,23 @@ namespace Business.Services
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
 
-                        // ✅ Müşteri sistemleri direkt içeride
-                        Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                        Systems = sr.Customer.CustomerSystemAssignments
+                         .Select(a => new CustomerSystemAssignmentGetDto
+                         {
+                             Id = a.Id,
+                             CustomerId = a.CustomerId,
+                             CustomerSystemId = a.CustomerSystemId,
+                             HasMaintenanceContract = a.HasMaintenanceContract,
+
+                             // Ekranda göstermek için:
+                             SystemName = a.CustomerSystem.Name,
+                             SystemCode = a.CustomerSystem.Code,
+
+                             // İstersen müşteri bilgilerini de doldurabiliriz:
+                             CustomerName = a.Customer.SubscriberCompany,
+                             CustomerShortCode = a.Customer.CustomerShortCode
+                         })
+                      .ToList()
                     }
                 }
             ).FirstOrDefaultAsync();
@@ -2016,14 +2025,23 @@ namespace Business.Services
                         Note = sr.Customer.Note,
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
-                        Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                        Systems = sr.Customer.CustomerSystemAssignments
+                         .Select(a => new CustomerSystemAssignmentGetDto
+                         {
+                             Id = a.Id,
+                             CustomerId = a.CustomerId,
+                             CustomerSystemId = a.CustomerSystemId,
+                             HasMaintenanceContract = a.HasMaintenanceContract,
+
+                             // Ekranda göstermek için:
+                             SystemName = a.CustomerSystem.Name,
+                             SystemCode = a.CustomerSystem.Code,
+
+                             // İstersen müşteri bilgilerini de doldurabiliriz:
+                             CustomerName = a.Customer.SubscriberCompany,
+                             CustomerShortCode = a.Customer.CustomerShortCode
+                         })
+                      .ToList()
                     }
                 }
             ).FirstOrDefaultAsync();
@@ -2590,14 +2608,23 @@ namespace Business.Services
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
-                            Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                         }
                         : null,
 
@@ -2743,14 +2770,23 @@ namespace Business.Services
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
-                            Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                         }
                         : null,
 
@@ -2880,14 +2916,23 @@ namespace Business.Services
                     Note = sr.Customer.Note,
                     CashCenter = sr.Customer.CashCenter,
                     LockType = sr.Customer.LockType,
-                    Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                    Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                 })
                 .FirstOrDefaultAsync();
 
@@ -3049,14 +3094,23 @@ namespace Business.Services
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
-                            Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                         }
                         : null
                 }
@@ -3161,14 +3215,23 @@ namespace Business.Services
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
-                            Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                         }
                         : null
                 }
@@ -3268,14 +3331,23 @@ namespace Business.Services
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
-                            Systems = sr.Customer.CustomerSystems
-                             .Select(cs => new CustomerSystemGetDto
-                             {
-                                 Id = cs.Id,
-                                 Name = cs.Name,
-                                 Code = cs.Code
-                             })
-                             .ToList()
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
                         }
                         : null
                 }

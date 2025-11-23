@@ -11,6 +11,7 @@ using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerGroupProductPrice;
 using Model.Dtos.CustomerProductPrice;
 using Model.Dtos.CustomerSystem;
+using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.CustomerType;
 using Model.Dtos.MailOutbox;
 using Model.Dtos.Menu;
@@ -119,35 +120,55 @@ namespace Business.Mapper
 
             config.NewConfig<CustomerGroup, CustomerGroupGetDto>();
 
+
             // ---------------- Customer ----------------
             config.NewConfig<CustomerCreateDto, Customer>()
                   .Ignore(d => d.Id)
                   .Ignore(d => d.CustomerType)
                   .Ignore(d => d.CustomerGroup)
                   .Ignore(d => d.CustomerProductPrices)
-                  .Ignore(d => d.CustomerSystems);  // 🔹 many-to-many nav
+                  // eski: .Ignore(d => d.CustomerSystems)
+                  .Ignore(d => d.CustomerSystemAssignments);  // 🔹 yeni ara tablo nav
 
             config.NewConfig<CustomerUpdateDto, Customer>()
                   .IgnoreNullValues(true)
                   .Ignore(d => d.CustomerType)
                   .Ignore(d => d.CustomerGroup)
                   .Ignore(d => d.CustomerProductPrices)
-                  .Ignore(d => d.CustomerSystems);  // 🔹 many-to-many nav
+                  // eski: .Ignore(d => d.CustomerSystems)
+                  .Ignore(d => d.CustomerSystemAssignments);  // 🔹 yeni ara tablo nav
 
+            // Burada CustomerGetDto.Systems’in tipine göre mapping yapıyoruz.
+            // Eğer Systems = List<CustomerSystemAssignmentGetDto> ise:
             config.NewConfig<Customer, CustomerGetDto>()
-                  .Map(d => d.Systems, s => s.CustomerSystems);
+                  .Map(d => d.Systems, s => s.CustomerSystemAssignments);
+
             // ---------------- CustomerSystem ----------------
             config.NewConfig<CustomerSystemCreateDto, CustomerSystem>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.Customers);   // many-to-many nav
+                  // eski: .Ignore(d => d.Customers)
+                  .Ignore(d => d.CustomerSystemAssignments);   // 🔹 yeni ara tablo nav
 
             config.NewConfig<CustomerSystemUpdateDto, CustomerSystem>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.Customers);   // many-to-many nav
+                  // eski: .Ignore(d => d.Customers)
+                  .Ignore(d => d.CustomerSystemAssignments);   // 🔹 yeni ara tablo nav
 
             config.NewConfig<CustomerSystem, CustomerSystemGetDto>();
 
-            // Entity -> GetDto (sistemler dahil)
+            // ---------------- CustomerSystemAssignment ----------------
+            // Entity -> GetDto
+            config.NewConfig<CustomerSystemAssignment, CustomerSystemAssignmentGetDto>()
+                  .Map(d => d.CustomerName, s => s.Customer.SubscriberCompany)
+                  .Map(d => d.CustomerShortCode, s => s.Customer.CustomerShortCode)
+                  .Map(d => d.SystemName, s => s.CustomerSystem.Name)
+                  .Map(d => d.SystemCode, s => s.CustomerSystem.Code);
+
+            // Create / Update DTO -> Entity
+            config.NewConfig<CustomerSystemAssignmentCreateDto, CustomerSystemAssignment>();
+            config.NewConfig<CustomerSystemAssignmentUpdateDto, CustomerSystemAssignment>()
+                  .IgnoreNullValues(true);
+
 
 
 
