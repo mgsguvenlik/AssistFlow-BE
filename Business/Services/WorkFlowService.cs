@@ -1524,8 +1524,6 @@ namespace Business.Services
                 }
                 #endregion
 
-
-
                 await _uow.Repository.CompleteAsync();
 
                 return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
