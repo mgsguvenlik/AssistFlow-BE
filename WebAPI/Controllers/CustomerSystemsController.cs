@@ -5,7 +5,7 @@ using Model.Dtos.CustomerSystem;
 
 namespace WebAPI.Controllers
 {
-    //[Authorize]
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

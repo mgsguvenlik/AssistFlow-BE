@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.CustomerSystemAssignment;
 using WebAPI.Controllers;
 
-//[Authorize]
+[Authorize]
 [Route("api/[controller]")]
 [ApiController]
 [Produces("application/json")]
