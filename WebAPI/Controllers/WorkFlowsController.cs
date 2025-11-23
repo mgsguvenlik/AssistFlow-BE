@@ -296,7 +296,7 @@ namespace WebAPI.Controllers
         }
 
 
-        // -----------images  ---------------
+        //---------Arşiv---------------
 
 
         // ---------- Helpers ----------

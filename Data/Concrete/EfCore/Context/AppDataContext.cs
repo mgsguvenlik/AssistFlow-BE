@@ -49,6 +49,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Notification> Notifications { get; set; } = default!;
 
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
+        public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -362,6 +363,36 @@ namespace Data.Concrete.EfCore.Context
                 entity.HasOne(x => x.CustomerSystem)
                       .WithMany(cs => cs.CustomerSystemAssignments)
                       .HasForeignKey(x => x.CustomerSystemId);
+            });
+
+
+            modelBuilder.Entity<WorkFlowArchive>(e =>
+            {
+                e.ToTable("WorkFlowArchives", "dbo"); // şema istersen değiştir
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.RequestNo)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                e.Property(x => x.ArchiveReason)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                // JSON kolonlarını NVARCHAR(MAX) / TEXT vs.
+                e.Property(x => x.ServicesRequestJson).IsRequired();
+                e.Property(x => x.ServicesRequestProductsJson).IsRequired();
+                e.Property(x => x.CustomerJson).IsRequired();
+                e.Property(x => x.ApproverTechnicianJson).IsRequired();
+                e.Property(x => x.CustomerApproverJson).IsRequired();
+                e.Property(x => x.WorkFlowJson).IsRequired();
+                e.Property(x => x.WorkFlowReviewLogsJson).IsRequired();
+                e.Property(x => x.TechnicalServiceJson).IsRequired();
+                e.Property(x => x.TechnicalServiceImagesJson).IsRequired();
+                e.Property(x => x.TechnicalServiceFormImagesJson).IsRequired();
+                e.Property(x => x.WarehouseJson).IsRequired();
+                e.Property(x => x.PricingJson).IsRequired();
+                e.Property(x => x.FinalApprovalJson).IsRequired();
             });
         }
     }

@@ -34,8 +34,10 @@ using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -1512,6 +1514,17 @@ namespace Business.Services
                     }
                 );
                 #endregion
+
+                #region Aeşivleme
+                // 🔹 Eğer süreç tamamlandıysa arşive at
+                if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                {
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed": "Cancelled";
+                    await ArchiveWorkflowAsync(dto.RequestNo, reason);
+                }
+                #endregion
+
+
 
                 await _uow.Repository.CompleteAsync();
 
@@ -3120,38 +3133,52 @@ namespace Business.Services
                 return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
+            var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
+                .Include(p => p.Product)
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .Select(p => new ServicesRequestProductGetDto
-                {
-                    Id = p.Id,
-                    RequestNo = p.RequestNo,
-                    ProductId = p.ProductId,
-                    Quantity = p.Quantity,
-
-                    // ürün temel alanları
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                    PriceCurrency = p.CapturedCurrency
-                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                    ProductPrice = p.CapturedUnitPrice
-                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                       ?? 0m,
-
-                    // 🔹 EffectivePrice: artık runtime hesap yok,
-                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                    EffectivePrice = p.CapturedUnitPrice
-                         ?? 0m,
-                })
                 .ToListAsync();
 
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
+
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
+
+                    // 3) DTO doldur
+                    return new ServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+                    };
+                })
+                .ToList();
+          
             // REVIEW LOG’LARI (Pricing adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>
@@ -4287,6 +4314,208 @@ namespace Business.Services
             }
         }
 
+        //Arşiv 
+        public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
+        {
+            try
+            {
+                var q = _uow.Repository
+                    .GetQueryable<WorkFlowArchive>()
+                    .AsNoTracking();
+
+                // --- DB taraflı filtreler ---
+                if (!string.IsNullOrWhiteSpace(filter.RequestNo))
+                {
+                    var rn = filter.RequestNo.Trim();
+                    q = q.Where(x => x.RequestNo.Contains(rn));
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.ArchiveReason))
+                {
+                    var reason = filter.ArchiveReason.Trim();
+                    q = q.Where(x => x.ArchiveReason == reason);
+                }
+
+                if (filter.ArchivedFrom.HasValue)
+                {
+                    q = q.Where(x => x.ArchivedAt >= filter.ArchivedFrom.Value);
+                }
+
+                if (filter.ArchivedTo.HasValue)
+                {
+                    q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
+                }
+
+                // En son arşivler üstte
+                q = q.OrderByDescending(x => x.ArchivedAt);
+
+                var entities = await q.ToListAsync();
+
+                var list = new List<WorkFlowArchiveListDto>();
+
+                foreach (var a in entities)
+                {
+                    string? customerName = null;
+                    string? technicianName = null;
+                    string? wfStatus = null;
+
+                    // Müşteri adı
+                    try
+                    {
+                        var customer = JsonConvert.DeserializeObject<Customer>(a.CustomerJson);
+                        customerName = customer?.ContactName1 ?? customer?.SubscriberCompany;
+                    }
+                    catch { }
+
+                    // Teknisyen adı (ApproverTechnicianJson → ApproverTechnician)
+                    try
+                    {
+                        var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
+                        technicianName = tech?.TechnicianName;
+                    }
+                    catch { }
+
+                    // WorkFlow durumu
+                    try
+                    {
+                        var wf = JsonConvert.DeserializeObject<WorkFlow>(a.WorkFlowJson);
+                        wfStatus = wf?.WorkFlowStatus.ToString();
+                    }
+                    catch { }
+
+                    list.Add(new WorkFlowArchiveListDto
+                    {
+                        Id = a.Id,
+                        RequestNo = a.RequestNo,
+                        ArchiveReason = a.ArchiveReason,
+                        ArchivedAt = a.ArchivedAt,
+                        CustomerName = customerName,
+                        TechnicianName = technicianName,
+                        WorkFlowStatus = wfStatus
+                    });
+                }
+
+                // --- JSON içi filtreler (in-memory) ---
+                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+                {
+                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
+                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
+                {
+                    var tn = filter.TechnicianName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
+                                    x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .ToList();
+                }
+
+                // --- Pagination ---
+                var totalCount = list.Count;
+                var page = filter.Page;
+                var pageSize = filter.PageSize;
+
+                var items = list
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList(); // List<T> zaten IReadOnlyList<T> implement ediyor
+
+                var paged = new PagedResult<WorkFlowArchiveListDto>(
+                    Items: items,
+                    TotalCount: totalCount,
+                    Page: page,
+                    PageSize: pageSize
+                );
+
+                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Success(paged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetArchiveListAsync");
+                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Fail(
+                    $"Arşiv kayıtları getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
+
+        public async Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id)
+        {
+            try
+            {
+                var archive = await _uow.Repository
+                    .GetQueryable<WorkFlowArchive>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == id);
+
+                if (archive is null)
+                {
+                    return ResponseModel<WorkFlowArchiveDetailDto>.Fail(
+                        "Arşiv kaydı bulunamadı.",
+                        StatusCode.NotFound
+                    );
+                }
+
+                var dto = BuildArchiveDetailDto(archive);
+                return ResponseModel<WorkFlowArchiveDetailDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetArchiveDetailByIdAsync");
+                return ResponseModel<WorkFlowArchiveDetailDto>.Fail(
+                    $"Arşiv detayı getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
+
+        public async Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requestNo))
+                {
+                    return ResponseModel<WorkFlowArchiveDetailDto>.Fail(
+                        "RequestNo boş olamaz.",
+                        StatusCode.BadRequest
+                    );
+                }
+
+                var rn = requestNo.Trim();
+
+                var archive = await _uow.Repository
+                    .GetQueryable<WorkFlowArchive>()
+                    .AsNoTracking()
+                    .Where(x => x.RequestNo == rn)
+                    .OrderByDescending(x => x.ArchivedAt)
+                    .FirstOrDefaultAsync();
+
+                if (archive is null)
+                {
+                    return ResponseModel<WorkFlowArchiveDetailDto>.Fail(
+                        "Arşiv kaydı bulunamadı.",
+                        StatusCode.NotFound
+                    );
+                }
+
+                var dto = BuildArchiveDetailDto(archive);
+                return ResponseModel<WorkFlowArchiveDetailDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetArchiveDetailByRequestNoAsync");
+                return ResponseModel<WorkFlowArchiveDetailDto>.Fail(
+                    $"Arşiv detayı getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
+
+
         //-------------Private-------------
 
         // Tek noktadan güvenli parse (boş, " ", virgül/nokta farkı vb.)
@@ -4451,67 +4680,66 @@ namespace Business.Services
             return (subject, html);
         }
 
-        /// Servis Ürünleri Fiyat savbitleme
-        private async Task<ResponseModel> EnsurePricesCapturedAsync(string requestNo, bool force = false)
+
+
+        private WorkFlowArchiveDetailDto BuildArchiveDetailDto(WorkFlowArchive archive)
         {
-            // Customer + Product navigations lazım → include’ları aç
-            var q = _uow.Repository.GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product)
-                .Include(x => x.Customer)
-                    .ThenInclude(c => c.CustomerGroup).ThenInclude(g => g.GroupProductPrices)
-                .Include(x => x.Customer)
-                    .ThenInclude(c => c.CustomerProductPrices)
-                .Where(x => x.RequestNo == requestNo);
+            ServicesRequest? servicesRequest = null;
+            List<ServicesRequestProduct> products = new();
+            Customer? customer = null;
+            User? approverTechnician = null;
+            ProgressApprover? customerApprover = null;
+            WorkFlow? wf = null;
+            List<WorkFlowReviewLog> reviewLogs = new();
+            TechnicalService? technicalService = null;
+            List<ArchiveImageDto> serviceImages = new();
+            List<ArchiveImageDto> formImages = new();
+            Warehouse? warehouse = null;
+            Pricing? pricing = null;
+            FinalApproval? finalApproval = null;
 
-            if (!force)
-                q = q.Where(x => !x.IsPriceCaptured);
+            try { servicesRequest = JsonConvert.DeserializeObject<ServicesRequest>(archive.ServicesRequestJson); } catch { }
+            try { products = JsonConvert.DeserializeObject<List<ServicesRequestProduct>>(archive.ServicesRequestProductsJson) ?? new(); } catch { }
+            try { customer = JsonConvert.DeserializeObject<Customer>(archive.CustomerJson); } catch { }
+            try { approverTechnician = JsonConvert.DeserializeObject<User>(archive.ApproverTechnicianJson); } catch { }
+            try { customerApprover = JsonConvert.DeserializeObject<ProgressApprover>(archive.CustomerApproverJson); } catch { }
+            try { wf = JsonConvert.DeserializeObject<WorkFlow>(archive.WorkFlowJson); } catch { }
+            try { reviewLogs = JsonConvert.DeserializeObject<List<WorkFlowReviewLog>>(archive.WorkFlowReviewLogsJson) ?? new(); } catch { }
+            try { technicalService = JsonConvert.DeserializeObject<TechnicalService>(archive.TechnicalServiceJson); } catch { }
+            try { serviceImages = JsonConvert.DeserializeObject<List<ArchiveImageDto>>(archive.TechnicalServiceImagesJson) ?? new(); } catch { }
+            try { formImages = JsonConvert.DeserializeObject<List<ArchiveImageDto>>(archive.TechnicalServiceFormImagesJson) ?? new(); } catch { }
+            try { warehouse = JsonConvert.DeserializeObject<Warehouse>(archive.WarehouseJson); } catch { }
+            try { pricing = JsonConvert.DeserializeObject<Pricing>(archive.PricingJson); } catch { }
+            try { finalApproval = JsonConvert.DeserializeObject<FinalApproval>(archive.FinalApprovalJson); } catch { }
 
-            var list = await q.ToListAsync();
-            if (list.Count == 0) return ResponseModel.Success();
-
-            foreach (var p in list)
+            var snapshot = new WorkFlowArchiveSnapshotDto
             {
-                // Kaynak ve birim fiyatı belirle
-                CapturedPriceSource src;
-                decimal unit;
+                ServicesRequest = servicesRequest,
+                Products = products,
+                Customer = customer,
+                ApproverTechnician = approverTechnician,
+                CustomerApprover = customerApprover,
+                WorkFlow = wf,
+                WorkFlowReviewLogs = reviewLogs,
+                TechnicalService = technicalService,
+                ServiceImages = serviceImages,
+                FormImages = formImages,
+                Warehouse = warehouse,
+                Pricing = pricing,
+                FinalApproval = finalApproval
+            };
 
-                var grp = p.Customer?.CustomerGroup?.GroupProductPrices?.FirstOrDefault(g => g.ProductId == p.ProductId);
-                if (grp is not null)
-                {
-                    src = CapturedPriceSource.Group;
-                    unit = grp.Price;
-                }
-                else
-                {
-                    var cust = p.Customer?.CustomerProductPrices?.FirstOrDefault(c => c.ProductId == p.ProductId);
-                    if (cust is not null)
-                    {
-                        src = CapturedPriceSource.Customer;
-                        unit = cust.Price;
-                    }
-                    else
-                    {
-                        src = CapturedPriceSource.Standard;
-                        unit = p.Product?.Price ?? 0m;
-                    }
-                }
-
-                var currency = p.Product?.PriceCurrency ?? "TRY";
-                var total = unit * p.Quantity;
-
-                p.CapturedSource = src;
-                p.CapturedUnitPrice = unit;
-                p.CapturedCurrency = currency;
-                p.CapturedTotal = total;
-                p.CapturedAt = DateTime.Now;
-                p.IsPriceCaptured = true;
-                _uow.Repository.Update(p);
-            }
-
-            await _uow.Repository.CompleteAsync();
-            return ResponseModel.Success();
+            return new WorkFlowArchiveDetailDto
+            {
+                Id = archive.Id,
+                RequestNo = archive.RequestNo,
+                ArchivedAt = archive.ArchivedAt,
+                ArchiveReason = archive.ArchiveReason,
+                Snapshot = snapshot
+            };
         }
 
+        /// Servis Ürünleri Fiyat savbitleme
         private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
             string requestNo,
             IEnumerable<ServicesRequestProductCreateDto>? productsDto
@@ -4564,7 +4792,167 @@ namespace Business.Services
         }
 
 
+        /// --------------------- Arşivleme  ---------------------
+        private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
+        {
+            // 1) Ana kayıtlar
+            var servicesRequest = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.Customer)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
 
+            if (servicesRequest is null)
+                return; // veya exception/log
+
+            var customer = servicesRequest.Customer;
+
+            var workFlow = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
+
+            var products = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(ct);
+
+            // CustomerApprover
+            ProgressApprover? customerApprover = null;
+            if (servicesRequest.CustomerApproverId.HasValue)
+            {
+                customerApprover = await _uow.Repository
+                    .GetQueryable<ProgressApprover>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == servicesRequest.CustomerApproverId.Value, ct);
+            }
+
+            // Teknik servis + resimler
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            var serviceImages = await _uow.Repository
+                .GetQueryable<TechnicalServiceImage>()
+                .AsNoTracking()
+                .Where(x => x.TechnicalServiceId == technicalService.Id)
+                .ToListAsync(ct);
+
+            var formImages = await _uow.Repository
+                .GetQueryable<TechnicalServiceFormImage>()
+                .AsNoTracking()
+                .Where(x => x.TechnicalServiceId == technicalService.Id)
+                .ToListAsync(ct);
+
+            // Depo
+            var warehouse = await _uow.Repository
+                .GetQueryable<Warehouse>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // Pricing
+            var pricing = await _uow.Repository
+                .GetQueryable<Pricing>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // FinalApproval
+            var finalApproval = await _uow.Repository
+                .GetQueryable<FinalApproval>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // ReviewLog
+            var reviewLogs = await _uow.Repository
+                .GetQueryable<WorkFlowReviewLog>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .OrderBy(x => x.CreatedDate)
+                .ToListAsync(ct);
+
+            // 2) Resimleri base64'e çevir
+            var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");
+
+            async Task<string?> ReadBase64Async(string url)
+            {
+                if (string.IsNullOrWhiteSpace(url))
+                    return null;
+
+                var path = Path.Combine(uploadRoot, url);
+                if (!File.Exists(path))
+                    return null;
+
+                var bytes = await File.ReadAllBytesAsync(path, ct);
+                return Convert.ToBase64String(bytes);
+            }
+
+            var serviceImageDtos = new List<ArchiveImageDto>();
+            foreach (var img in serviceImages)
+            {
+                serviceImageDtos.Add(new ArchiveImageDto
+                {
+                    Id = img.Id,
+                    Url = img.Url,
+                    Caption = img.Caption,
+                    Base64 = await ReadBase64Async(img.Url)
+                });
+            }
+
+            var formImageDtos = new List<ArchiveImageDto>();
+            foreach (var img in formImages)
+            {
+                formImageDtos.Add(new ArchiveImageDto
+                {
+                    Id = img.Id,
+                    Url = img.Url,
+                    Caption = img.Caption,
+                    Base64 = await ReadBase64Async(img.Url)
+                });
+            }
+
+            // 3) JSON string’leri hazırla
+            var servicesRequestJson = JsonConvert.SerializeObject(servicesRequest);
+            var productsJson = JsonConvert.SerializeObject(products);
+            var customerJson = JsonConvert.SerializeObject(customer);
+            var approverTechnicianJson = JsonConvert.SerializeObject(workFlow?.ApproverTechnician);
+            var customerApproverJson = JsonConvert.SerializeObject(customerApprover);
+            var workFlowJson = JsonConvert.SerializeObject(workFlow);
+            var reviewLogsJson = JsonConvert.SerializeObject(reviewLogs);
+            var technicalServiceJson = JsonConvert.SerializeObject(technicalService);
+            var techServiceImagesJson = JsonConvert.SerializeObject(serviceImageDtos);
+            var techServiceFormImagesJson = JsonConvert.SerializeObject(formImageDtos);
+            var warehouseJson = JsonConvert.SerializeObject(warehouse);
+            var pricingJson = JsonConvert.SerializeObject(pricing);
+            var finalApprovalJson = JsonConvert.SerializeObject(finalApproval);
+
+            // 4) Arşiv kaydı oluştur
+            var archive = new WorkFlowArchive
+            {
+                RequestNo = requestNo,
+                ArchivedAt = DateTime.Now,
+                ArchiveReason = archiveReason,
+
+                ServicesRequestJson = servicesRequestJson,
+                ServicesRequestProductsJson = productsJson,
+                CustomerJson = customerJson,
+                ApproverTechnicianJson = approverTechnicianJson,
+                CustomerApproverJson = customerApproverJson,
+                WorkFlowJson = workFlowJson,
+                WorkFlowReviewLogsJson = reviewLogsJson,
+                TechnicalServiceJson = technicalServiceJson,
+                TechnicalServiceImagesJson = techServiceImagesJson,
+                TechnicalServiceFormImagesJson = techServiceFormImagesJson,
+                WarehouseJson = warehouseJson,
+                PricingJson = pricingJson,
+                FinalApprovalJson = finalApprovalJson
+            };
+
+            await _uow.Repository.AddAsync(archive);
+            // Commit’i dışarıda (çağıran methodda) yapacağız.
+        }
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
