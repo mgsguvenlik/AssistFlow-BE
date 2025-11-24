@@ -394,6 +394,16 @@ namespace Data.Concrete.EfCore.Context
                 e.Property(x => x.PricingJson).IsRequired();
                 e.Property(x => x.FinalApprovalJson).IsRequired();
             });
+
+
+
+            modelBuilder.Entity<WorkFlowActivityRecord>(entity =>
+            {
+                entity.HasOne(w => w.Customer)
+                      .WithMany(c => c.WorkFlowActivityRecords)
+                      .HasForeignKey(w => w.CustomerId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
         }
     }
 }

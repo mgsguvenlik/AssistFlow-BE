@@ -1,4 +1,5 @@
 ﻿using Model.Abstractions;
+using Model.Concrete.WorkFlows;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -122,6 +123,8 @@ namespace Model.Concrete
         public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
 
         public ICollection<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }  = new List<CustomerSystemAssignment>();
+        public ICollection<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }    = new List<WorkFlowActivityRecord>();
+
 
 
 

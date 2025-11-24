@@ -8,6 +8,7 @@ using Core.Settings.Concrete;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
+using DocumentFormat.OpenXml.Office2016.Excel;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -165,7 +166,8 @@ namespace Business.Services
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
-                      null,
+                      dto.CustomerId,
+                      initialStep.Code,
                       "SR",
                       "Servis talebi oluşturuldu",
                       new
@@ -294,6 +296,7 @@ namespace Business.Services
                      WorkFlowActionType.WarehouseSent,
                      request.RequestNo,
                      wf.Id,
+                     request.CustomerId,
                      "SR",
                      "WH",
                      "Talep depoya gönderildi",
@@ -518,6 +521,7 @@ namespace Business.Services
                         WorkFlowActionType.WorkFlowStepChanged,
                         dto.RequestNo,
                         wf.Id,
+                        request.CustomerId,
                         "WH",
                         "TS",
                         "Depo teslimatı tamamlandı, Teknik Servise geçildi",
@@ -674,6 +678,7 @@ namespace Business.Services
                         WorkFlowActionType.WorkFlowStepChanged,
                         dto.RequestNo,
                         wf.Id,
+                        request.CustomerId,
                         "SR",
                         "TS",
                         "Teknik servise gönderildi (ürün yok)",
@@ -799,6 +804,7 @@ namespace Business.Services
                                WorkFlowActionType.LocationCheckFailed,
                                dto.RequestNo,
                                wf.Id,
+                               request.CustomerId,
                                "TS",
                                "TS",
                                "Lokasyon kontrolü başarısız",
@@ -829,6 +835,7 @@ namespace Business.Services
                     WorkFlowActionType.TechnicalServiceStarted,
                     dto.RequestNo,
                     wf.Id,
+                    request.CustomerId,
                     "TS",
                     "TS",
                     "Teknik servis başlatıldı",
@@ -1117,6 +1124,7 @@ namespace Business.Services
                      WorkFlowActionType.TechnicalServiceFinished,
                      dto.RequestNo,
                      wf.Id,
+                     request.CustomerId,
                      "TS",
                      "PRC",
                      "Teknik servis tamamlandı ve fiyatlama aşamasına geçildi",
@@ -1312,6 +1320,7 @@ namespace Business.Services
                    WorkFlowActionType.PricingApproved,
                    dto.RequestNo,
                    wf.Id,
+                   request.CustomerId,
                    "PRC",
                    "APR",
                    "Fiyatlama tamamlandı ve onay aşamasına geçildi",
@@ -1495,6 +1504,7 @@ namespace Business.Services
                     WorkFlowActionType.FinalApprovalUpdated,
                     dto.RequestNo,
                     wf?.Id,
+                    request.CustomerId,
                     fromStepCode: wf?.CurrentStep?.Code ?? "APR",
                     toStepCode: "APR",
                     "Kontrol ve Son Onay kaydı güncellendi.",
@@ -2456,6 +2466,7 @@ namespace Business.Services
                 WorkFlowActionType.WorkFlowStepChanged,
                 requestNo,
                 wf.Id,
+                servicesRequest.CustomerId,
                 currentStep.Code,
                 targetStep.Code,
                 "Akış geri gönderildi",
@@ -4343,7 +4354,6 @@ namespace Business.Services
                 {
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
                 }
-
                 // En son arşivler üstte
                 q = q.OrderByDescending(x => x.ArchivedAt);
 

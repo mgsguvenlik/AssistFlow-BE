@@ -111,7 +111,7 @@ namespace Business.Services
 
                             // GÖNDER
                             MailService.SendMail(
-                                from:_cfg.From, // MailService iç config From/FromName kullansın isterseniz oradan çekebilirsiniz
+                                from: _cfg.From, // MailService iç config From/FromName kullansın isterseniz oradan çekebilirsiniz
                                 tos: m.ToRecipients,
                                 ccs: m.CcRecipients ?? "",
                                 subject: m.Subject,
@@ -123,13 +123,19 @@ namespace Business.Services
                                 useCredential: false,
                                 user: _cfg.User,
                                 pass: _cfg.Pass,
-                                domain:_cfg.Domain, 
+                                domain: _cfg.Domain,
                                 fromName: _cfg.FromName
                             );
 
                             m.Status = MailOutboxStatus.Sent;
                             m.UpdatedDate = DateTime.Now;
                             uow.Repository.Update(m);
+
+
+                            var request = await uow.Repository
+                                .GetQueryable<ServicesRequest>()
+                                .Include(x => x.Customer)
+                                .FirstOrDefaultAsync(x => x.RequestNo == m.RequestNo);
 
                             await uow.Repository.AddAsync(new WorkFlowActivityRecord
                             {
@@ -138,7 +144,8 @@ namespace Business.Services
                                 ToStepCode = m.ToStepCode,
                                 ActionType = WorkFlowActionType.MailSent,
                                 Summary = $"Mail gönderildi: {m.Subject}",
-                                OccurredAtUtc = DateTime.Now
+                                OccurredAtUtc = DateTime.Now,
+                                CustomerId = request?.CustomerId ?? null
                             });
 
                             await uow.Repository.CompleteAsync();

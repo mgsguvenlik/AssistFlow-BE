@@ -69,6 +69,7 @@ namespace Business.Services
             WorkFlowActionType type,
             string? requestNo,
             long? workFlowId,
+            long? customerId,
             string? fromStepCode,
             string? toStepCode,
             string? summary,
@@ -83,6 +84,7 @@ namespace Business.Services
                 FromStepCode = fromStepCode,
                 ToStepCode = toStepCode,
                 Summary = summary,
+                CustomerId =customerId,
                 PayloadJson = payload is null ? null : JsonSerializer.Serialize(payload, JsonOpts)
             };
 
@@ -114,27 +116,6 @@ namespace Business.Services
 
             return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Success(items, "", StatusCode.Ok);
         }
-
-        //public async Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId, QueryParams q)
-        //{
-        //    if (userId==0)
-        //        return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Fail("userId boş olamaz.", StatusCode.BadRequest);
-
-        //    var entities = await _uow.Repository.GetQueryable<WorkFlowActivityRecord>()
-        //        .AsNoTracking()
-        //        .Where(a => a.PerformedByUserId ==userId)
-        //        .OrderByDescending(a => a.OccurredAtUtc)
-        //        .ThenByDescending(a => a.Id)
-        //        .ToListAsync();
-
-        //    if (entities.Count == 0)
-        //        return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-        //    // EF translation riskini kaldırmak için bellekte map’le
-        //    var items = entities.Adapt<List<WorkFlowActivityRecorGetDto>>(_config);
-
-        //    return ResponseModel<List<WorkFlowActivityRecorGetDto>>.Success(items, "", StatusCode.Ok);
-        //}
         public async Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetUserActivity(  int userId, QueryParams q)
         {
             if (userId <= 0)
@@ -148,6 +129,83 @@ namespace Business.Services
                 .GetQueryable<WorkFlowActivityRecord>()
                 .AsNoTracking()
                 .Where(a => a.PerformedByUserId == userId);
+
+            // ---- Search (RequestNo, From/ToStepCode, PerformedByUserName, Summary, CorrelationId, ClientIp, UserAgent)
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var s = q.Search.Trim();
+
+                // Provider-agnostic fallback:
+                s = s.ToLowerInvariant();
+                query = query.Where(a =>
+                    (a.RequestNo ?? "").ToLower().Contains(s) ||
+                    (a.FromStepCode ?? "").ToLower().Contains(s) ||
+                    (a.ToStepCode ?? "").ToLower().Contains(s) ||
+                    (a.PerformedByUserName ?? "").ToLower().Contains(s) ||
+                    (a.Summary ?? "").ToLower().Contains(s) ||
+                    (a.CorrelationId ?? "").ToLower().Contains(s) ||
+                    (a.ClientIp ?? "").ToLower().Contains(s) ||
+                    (a.UserAgent ?? "").ToLower().Contains(s)
+                );
+            }
+
+            // ---- Sorting (güvenli map)
+            var sort = (q.Sort ?? "").Trim().ToLowerInvariant();
+            var desc = q.Desc;
+
+            query = sort switch
+            {
+                "id" => desc ? query.OrderByDescending(a => a.Id) : query.OrderBy(a => a.Id),
+                "requestno" => desc ? query.OrderByDescending(a => a.RequestNo).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.RequestNo).ThenBy(a => a.Id),
+                "fromstepcode" => desc ? query.OrderByDescending(a => a.FromStepCode).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.FromStepCode).ThenBy(a => a.Id),
+                "tostepcode" => desc ? query.OrderByDescending(a => a.ToStepCode).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.ToStepCode).ThenBy(a => a.Id),
+                "actiontype" => desc ? query.OrderByDescending(a => a.ActionType).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.ActionType).ThenBy(a => a.Id),
+                "performedbyuserid" => desc ? query.OrderByDescending(a => a.PerformedByUserId).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.PerformedByUserId).ThenBy(a => a.Id),
+                "performedbyusername" => desc ? query.OrderByDescending(a => a.PerformedByUserName).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.PerformedByUserName).ThenBy(a => a.Id),
+                "occurredatutc" => desc ? query.OrderByDescending(a => a.OccurredAtUtc).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.OccurredAtUtc).ThenBy(a => a.Id),
+                "correlationid" => desc ? query.OrderByDescending(a => a.CorrelationId).ThenByDescending(a => a.Id)
+                                              : query.OrderBy(a => a.CorrelationId).ThenBy(a => a.Id),
+                _ => query.OrderByDescending(a => a.OccurredAtUtc).ThenByDescending(a => a.Id)
+            };
+
+            // ---- Count
+            var total = await query.CountAsync();
+            if (total == 0)
+                return ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>
+                    .Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // ---- Page slice
+            var skip = (page - 1) * pageSize;
+            var pageEntities = await query
+                .Skip(skip)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var items = pageEntities.Adapt<List<WorkFlowActivityRecorGetDto>>(_config);
+
+            var result = new PagedResult<WorkFlowActivityRecorGetDto>(items, total, page, pageSize);
+            return ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>.Success(result, "", StatusCode.Ok);
+        }
+        public async Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetCustomerActivity(int customerId, QueryParams q)
+        {
+            if (customerId <= 0)
+                return ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>
+                    .Fail("customerId boş olamaz.", StatusCode.BadRequest);
+
+            var page = q.Page <= 0 ? 1 : q.Page;
+            var pageSize = q.PageSize <= 0 ? 20 : Math.Min(q.PageSize, 200);
+
+            IQueryable<WorkFlowActivityRecord> query = _uow.Repository
+                .GetQueryable<WorkFlowActivityRecord>()
+                .AsNoTracking()
+                .Where(a => a.CustomerId == customerId);
 
             // ---- Search (RequestNo, From/ToStepCode, PerformedByUserName, Summary, CorrelationId, ClientIp, UserAgent)
             if (!string.IsNullOrWhiteSpace(q.Search))
@@ -325,7 +383,6 @@ namespace Business.Services
             var result = new PagedResult<WorkFlowActivityGroupDto>(groupedDtos, totalGroups, page, pageSize);
             return ResponseModel<PagedResult<WorkFlowActivityGroupDto>>.Success(result, "", StatusCode.Ok);
         }
-
 
     }
 }

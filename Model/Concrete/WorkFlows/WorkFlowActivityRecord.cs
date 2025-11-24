@@ -12,7 +12,6 @@ namespace Model.Concrete.WorkFlows
     {
         [Key] public long Id { get; set; }
 
-        public long? WorkFlowId { get; set; }
         [MaxLength(64)] public string? RequestNo { get; set; }
 
         public WorkFlowActionType ActionType { get; set; }
@@ -33,7 +32,14 @@ namespace Model.Concrete.WorkFlows
 
         [MaxLength(64)] public string? CorrelationId { get; set; }
 
+        public long? WorkFlowId { get; set; }
+
         [ForeignKey(nameof(WorkFlowId))]
         public WorkFlow? WorkFlow { get; set; }
+
+        public long? CustomerId { get; set; }
+
+        [ForeignKey(nameof(CustomerId))]
+        public Customer? Customer { get; set; }
     }
 }

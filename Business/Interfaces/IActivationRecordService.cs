@@ -2,11 +2,6 @@
 using Core.Enums;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Business.Interfaces
 {
@@ -18,13 +13,16 @@ namespace Business.Interfaces
             WorkFlowActionType type,
             string? requestNo,
             long? workFlowId,
+            long? customerId,
             string? fromStepCode,
             string? toStepCode,
             string? summary,
             object? payload,
+
             CancellationToken ct = default);
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestActivityRecordByRequestNoAsync(string requestNo);
         Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId, QueryParams q);
         Task<ResponseModel<PagedResult<WorkFlowActivityGroupDto>>> GetUserActivityGroupedByRequestNo(int userId, QueryParams q, int perGroupTake = 50);
+        Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetCustomerActivity(int customerId, QueryParams q);
     }
 }
