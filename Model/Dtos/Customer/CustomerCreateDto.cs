@@ -39,7 +39,8 @@ namespace Model.Dtos.Customer
         public string? ContactName1 { get; set; }
 
         // Telefon: +905551112233 veya 05551112233 gibi (7-15 rakam, isteğe bağlı +)
-        [RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
+        //[RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
+        [Required]
         public string? Phone1 { get; set; }
 
         [EmailAddress(ErrorMessage = Messages.EnterValidEmail)]
