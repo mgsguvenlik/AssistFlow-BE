@@ -153,6 +153,9 @@ namespace Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("CashCenter")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("City")
                         .HasColumnType("nvarchar(max)");
 
@@ -171,8 +174,8 @@ namespace Data.Migrations
                     b.Property<long>("CreatedUser")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("CustomerMainGroupName")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<long?>("CustomerGroupId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("CustomerShortCode")
                         .HasColumnType("nvarchar(max)");
@@ -180,19 +183,34 @@ namespace Data.Migrations
                     b.Property<long?>("CustomerTypeId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("District")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Email1")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email2")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("InstallationDate")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
+
+                    b.Property<string>("Latitude")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("LocationCode")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("OracleCode")
+                    b.Property<string>("LockType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Longitude")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Note")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Phone1")
@@ -213,10 +231,15 @@ namespace Data.Migrations
                     b.Property<DateTimeOffset?>("UpdatedDate")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<long>("UpdatedUser")
+                    b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
 
+                    b.Property<int?>("WarrantyYears")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("CustomerGroupId");
 
                     b.HasIndex("CustomerTypeId");
 
@@ -241,9 +264,191 @@ namespace Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<long?>("ParentGroupId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("ParentGroupId");
+
                     b.ToTable("CustomerGroups");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerGroupProductPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<long>("CustomerGroupId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("CustomerGroupId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerGroupProductPrices");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerProductPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("CustomerId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerProductPrices");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerSystem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerSystem");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerSystemAssignment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerSystemId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("HasMaintenanceContract")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("CustomerSystemId");
+
+                    b.ToTable("CustomerSystemAssignments");
                 });
 
             modelBuilder.Entity("Model.Concrete.CustomerType", b =>
@@ -265,6 +470,125 @@ namespace Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CustomerType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.MailOutbox", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CcRecipients")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MaxTry")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToRecipients")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToStepCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TryCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MailOutboxes");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Menu", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("Menus", (string)null);
+                });
+
+            modelBuilder.Entity("Model.Concrete.MenuRole", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("HasEdit")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("HasView")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("MenuId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ModulId");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MenuId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("MenuRole");
                 });
 
             modelBuilder.Entity("Model.Concrete.Model", b =>
@@ -295,6 +619,66 @@ namespace Data.Migrations
                     b.ToTable("Model", (string)null);
                 });
 
+            modelBuilder.Entity("Model.Concrete.Notification", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RequestNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetRoleCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("TargetUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToStepCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("Model.Concrete.Product", b =>
                 {
                     b.Property<long>("Id")
@@ -305,9 +689,6 @@ namespace Data.Migrations
 
                     b.Property<long?>("BrandId")
                         .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset?>("ConnectionDate")
-                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("CorporateCustomerShortCode")
                         .HasMaxLength(50)
@@ -325,9 +706,6 @@ namespace Data.Migrations
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTimeOffset?>("InstallationDate")
-                        .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -365,7 +743,7 @@ namespace Data.Migrations
                     b.Property<DateTimeOffset?>("UpdatedDate")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<long>("UpdatedUser")
+                    b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
@@ -417,7 +795,7 @@ namespace Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("CustomerId")
+                    b.Property<long>("CustomerGroupId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Email")
@@ -430,12 +808,13 @@ namespace Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("CustomerId", "Email")
-                        .IsUnique();
+                    b.HasIndex("CustomerGroupId");
 
                     b.ToTable("ProgressApprovers");
                 });
@@ -604,7 +983,7 @@ namespace Data.Migrations
                     b.Property<DateTimeOffset?>("UpdatedDate")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<long>("UpdatedUser")
+                    b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
@@ -636,13 +1015,829 @@ namespace Data.Migrations
                     b.ToTable("UserRole", (string)null);
                 });
 
+            modelBuilder.Entity("Model.Concrete.WorkFlows.FinalApproval", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DecidedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestNo")
+                        .IsUnique();
+
+                    b.ToTable("FinalApprovals");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.Pricing", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestNo")
+                        .IsUnique();
+
+                    b.ToTable("Pricing", (string)null);
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CustomerApproverId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsMailSended")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsProductRequirement")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OracleNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("PlannedCompletionDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<long>("ServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ServicesCostStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("ServicesDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ServicesRequestStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("WorkFlowStepId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerApproverId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("RequestNo")
+                        .IsUnique();
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.HasIndex("WorkFlowStepId");
+
+                    b.ToTable("ServicesRequests");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequestProduct", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("CapturedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CapturedCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<int?>("CapturedSource")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("CapturedTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("CapturedUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsPriceCaptured")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ServicesRequestProducts");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalService", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EndLocation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("EndTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocationCheckRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Latitude")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Longitude")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProblemDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ResolutionAndActions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("ServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ServicesCostStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServicesStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StartLocation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("StartTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.ToTable("TechnicalServices");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalServiceFormImage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TechnicalServiceId");
+
+                    b.ToTable("TechnicalServiceFormImages");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalServiceImage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TechnicalServiceId");
+
+                    b.ToTable("TechnicalServiceImages");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.Warehouse", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("DeliveryDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("WarehouseStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Warehouses");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApproverTechnicianId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CurrentStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CustomerApproverName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("IsAgreement")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocationValid")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RequestTitle")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("WorkFlowStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApproverTechnicianId");
+
+                    b.HasIndex("CurrentStepId");
+
+                    b.HasIndex("RequestNo")
+                        .IsUnique();
+
+                    b.ToTable("WorkFlows");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowActivityRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<short>("ActionType")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("PerformedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PerformedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RequestNo")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ToStepCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long?>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("RequestNo");
+
+                    b.HasIndex("WorkFlowId");
+
+                    b.ToTable("WorkFlowActivityRecords");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowArchive", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ApproverTechnicianJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ArchiveReason")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("ArchivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerApproverJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FinalApprovalJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PricingJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ServicesRequestJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ServicesRequestProductsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TechnicalServiceFormImagesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TechnicalServiceImagesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TechnicalServiceJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WarehouseJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WorkFlowJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WorkFlowReviewLogsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkFlowArchives", "dbo");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowReviewLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long?>("FromStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ReviewNotes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ToStepCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long?>("ToStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestNo");
+
+                    b.HasIndex("WorkFlowId", "CreatedDate");
+
+                    b.ToTable("WorkFlowReviewLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkFlowSteps");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowTransition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Condition")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("FromStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ToStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TransitionName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromStepId");
+
+                    b.HasIndex("ToStepId");
+
+                    b.ToTable("WorkFlowTransitions");
+                });
+
             modelBuilder.Entity("Model.Concrete.Customer", b =>
                 {
+                    b.HasOne("Model.Concrete.CustomerGroup", "CustomerGroup")
+                        .WithMany()
+                        .HasForeignKey("CustomerGroupId");
+
                     b.HasOne("Model.Concrete.CustomerType", "CustomerType")
                         .WithMany()
                         .HasForeignKey("CustomerTypeId");
 
+                    b.Navigation("CustomerGroup");
+
                     b.Navigation("CustomerType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerGroup", b =>
+                {
+                    b.HasOne("Model.Concrete.CustomerGroup", "ParentGroup")
+                        .WithMany("SubGroups")
+                        .HasForeignKey("ParentGroupId");
+
+                    b.Navigation("ParentGroup");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerGroupProductPrice", b =>
+                {
+                    b.HasOne("Model.Concrete.CustomerGroup", "CustomerGroup")
+                        .WithMany("GroupProductPrices")
+                        .HasForeignKey("CustomerGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Product", "Product")
+                        .WithMany("GroupProductPrices")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CustomerGroup");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerProductPrice", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany("CustomerProductPrices")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Product", "Product")
+                        .WithMany("CustomerProductPrices")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerSystemAssignment", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany("CustomerSystemAssignments")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.CustomerSystem", "CustomerSystem")
+                        .WithMany("CustomerSystemAssignments")
+                        .HasForeignKey("CustomerSystemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("CustomerSystem");
+                });
+
+            modelBuilder.Entity("Model.Concrete.MenuRole", b =>
+                {
+                    b.HasOne("Model.Concrete.Menu", "Menu")
+                        .WithMany("MenuRoles")
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_MenuRole_Menus_ModulId");
+
+                    b.HasOne("Model.Concrete.Role", "Role")
+                        .WithMany("MenuRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Menu");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Model.Concrete.Model", b =>
@@ -689,13 +1884,13 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.ProgressApprover", b =>
                 {
-                    b.HasOne("Model.Concrete.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
+                    b.HasOne("Model.Concrete.CustomerGroup", "CustomerGroup")
+                        .WithMany("ProgressApprovers")
+                        .HasForeignKey("CustomerGroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Customer");
+                    b.Navigation("CustomerGroup");
                 });
 
             modelBuilder.Entity("Model.Concrete.Region", b =>
@@ -728,6 +1923,137 @@ namespace Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequest", b =>
+                {
+                    b.HasOne("Model.Concrete.ProgressApprover", "CustomerApprover")
+                        .WithMany()
+                        .HasForeignKey("CustomerApproverId");
+
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.ServiceType", "ServiceType")
+                        .WithMany()
+                        .HasForeignKey("ServiceTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlowStep", "WorkFlowStep")
+                        .WithMany()
+                        .HasForeignKey("WorkFlowStepId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("CustomerApprover");
+
+                    b.Navigation("ServiceType");
+
+                    b.Navigation("WorkFlowStep");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.ServicesRequestProduct", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalService", b =>
+                {
+                    b.HasOne("Model.Concrete.ServiceType", "ServiceType")
+                        .WithMany()
+                        .HasForeignKey("ServiceTypeId");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalServiceFormImage", b =>
+                {
+                    b.HasOne("Model.Concrete.WorkFlows.TechnicalService", "TechnicalService")
+                        .WithMany("ServiceRequestFormImages")
+                        .HasForeignKey("TechnicalServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TechnicalService");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalServiceImage", b =>
+                {
+                    b.HasOne("Model.Concrete.WorkFlows.TechnicalService", "TechnicalService")
+                        .WithMany("ServicesImages")
+                        .HasForeignKey("TechnicalServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TechnicalService");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlow", b =>
+                {
+                    b.HasOne("Model.Concrete.User", "ApproverTechnician")
+                        .WithMany()
+                        .HasForeignKey("ApproverTechnicianId");
+
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlowStep", "CurrentStep")
+                        .WithMany()
+                        .HasForeignKey("CurrentStepId");
+
+                    b.Navigation("ApproverTechnician");
+
+                    b.Navigation("CurrentStep");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowActivityRecord", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany("WorkFlowActivityRecords")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlow", "WorkFlow")
+                        .WithMany()
+                        .HasForeignKey("WorkFlowId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("WorkFlow");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowTransition", b =>
+                {
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlowStep", "FromStep")
+                        .WithMany("OutgoingTransitions")
+                        .HasForeignKey("FromStepId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkFlows.WorkFlowStep", "ToStep")
+                        .WithMany("IncomingTransitions")
+                        .HasForeignKey("ToStepId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromStep");
+
+                    b.Navigation("ToStep");
+                });
+
             modelBuilder.Entity("Model.Concrete.Brand", b =>
                 {
                     b.Navigation("Models");
@@ -745,9 +2071,44 @@ namespace Data.Migrations
                     b.Navigation("Products");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Customer", b =>
+                {
+                    b.Navigation("CustomerProductPrices");
+
+                    b.Navigation("CustomerSystemAssignments");
+
+                    b.Navigation("WorkFlowActivityRecords");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerGroup", b =>
+                {
+                    b.Navigation("GroupProductPrices");
+
+                    b.Navigation("ProgressApprovers");
+
+                    b.Navigation("SubGroups");
+                });
+
+            modelBuilder.Entity("Model.Concrete.CustomerSystem", b =>
+                {
+                    b.Navigation("CustomerSystemAssignments");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Menu", b =>
+                {
+                    b.Navigation("MenuRoles");
+                });
+
             modelBuilder.Entity("Model.Concrete.Model", b =>
                 {
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Product", b =>
+                {
+                    b.Navigation("CustomerProductPrices");
+
+                    b.Navigation("GroupProductPrices");
                 });
 
             modelBuilder.Entity("Model.Concrete.ProductType", b =>
@@ -757,12 +2118,28 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.Role", b =>
                 {
+                    b.Navigation("MenuRoles");
+
                     b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("Model.Concrete.User", b =>
                 {
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalService", b =>
+                {
+                    b.Navigation("ServiceRequestFormImages");
+
+                    b.Navigation("ServicesImages");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.WorkFlowStep", b =>
+                {
+                    b.Navigation("IncomingTransitions");
+
+                    b.Navigation("OutgoingTransitions");
                 });
 #pragma warning restore 612, 618
         }

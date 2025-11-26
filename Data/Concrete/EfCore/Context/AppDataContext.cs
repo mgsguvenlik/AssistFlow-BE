@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
+using Model.Concrete.WorkFlows;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -25,6 +26,30 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Region> Regions { get; set; }
         public DbSet<Configuration> Configurations { get; set; }
         public DbSet<Seeding.Infrastructure.SeedHistory> SeedHistories { get; set; } = null!;
+        public DbSet<WorkFlow> WorkFlows { get; set; }
+        public DbSet<WorkFlowStep> WorkFlowSteps { get; set; }
+        public DbSet<ServicesRequest> ServicesRequests { get; set; }
+        public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
+        public DbSet<CustomerProductPrice> CustomerProductPrices { get; set; }
+        public DbSet<CustomerGroupProductPrice> CustomerGroupProductPrices { get; set; }
+        public DbSet<Warehouse> Warehouses { get; set; }
+        public DbSet<TechnicalService> TechnicalServices { get; set; }
+        public DbSet<TechnicalServiceImage> TechnicalServiceImages { get; set; }
+        public DbSet<TechnicalServiceFormImage> TechnicalServiceFormImages { get; set; }
+        public DbSet<WorkFlowTransition> WorkFlowTransitions { get; set; }
+        public DbSet<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }
+        public DbSet<WorkFlowReviewLog> WorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<Pricing> Pricings { get; set; } = default!;
+        public DbSet<MailOutbox> MailOutboxes { get; set; } = default!;
+        public DbSet<FinalApproval> FinalApprovals { get; set; } = default!;
+
+        public DbSet<Menu> Menus { get; set; }
+        public DbSet<MenuRole> MenuRoles { get; set; }
+
+        public DbSet<Notification> Notifications { get; set; } = default!;
+
+        public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
+        public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -37,13 +62,10 @@ namespace Data.Concrete.EfCore.Context
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
             {
-                b.HasIndex(x => x.CustomerId);
-                b.HasIndex(x => new { x.CustomerId, x.Email }).IsUnique();
-
-                b.HasOne(x => x.Customer)
-                 .WithMany()              // eğer Customer tarafında koleksiyon ekleyeceksen .WithMany(c => c.ProgressApprovers)
-                 .HasForeignKey(x => x.CustomerId)
-                 .OnDelete(DeleteBehavior.Cascade);
+                b.HasOne(x => x.CustomerGroup)
+                .WithMany(c => c.ProgressApprovers)
+                .HasForeignKey(x => x.CustomerGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
             });
 
             /// User Entity Configuration
@@ -168,6 +190,220 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<Data.Seeding.Infrastructure.SeedHistory>()
                         .HasIndex(x => x.Key)
                         .IsUnique();
+
+            ///WorkFlow Entity Configuration 
+            modelBuilder.Entity<WorkFlow>(b =>
+           {
+               b.Property(x => x.RequestNo).IsRequired().HasMaxLength(100);
+               b.HasIndex(x => x.RequestNo).IsUnique();
+           });
+
+
+            // CustomerProductPrice: Customer + Product tekil olsun
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasIndex(x => new { x.CustomerId, x.ProductId })
+                .IsUnique();
+
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasOne(x => x.Customer)
+                .WithMany(c => c.CustomerProductPrices)
+                .HasForeignKey(x => x.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerProductPrice>()
+                .HasOne(x => x.Product)
+                .WithMany(p => p.CustomerProductPrices)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // CustomerGroupProductPrice: Group + Product tekil olsun
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasIndex(x => new { x.CustomerGroupId, x.ProductId })
+                .IsUnique();
+
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasOne(x => x.CustomerGroup)
+                .WithMany(g => g.GroupProductPrices)
+                .HasForeignKey(x => x.CustomerGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CustomerGroupProductPrice>()
+                .HasOne(x => x.Product)
+                .WithMany(p => p.GroupProductPrices)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+
+        modelBuilder.Entity<WorkFlowTransition>()
+                .HasOne(t => t.FromStep)
+                .WithMany(s => s.OutgoingTransitions)
+                .HasForeignKey(t => t.FromStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<WorkFlowTransition>()
+                .HasOne(t => t.ToStep)
+                .WithMany(s => s.IncomingTransitions)
+                .HasForeignKey(t => t.ToStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+
+            modelBuilder.Entity<WorkFlowTransition>(entity =>
+            {
+                // FromStep (Başlangıç Adımı) İlişkisi:
+                // WorkFlowStep'teki OutgoingTransitions koleksiyonuna bağlanır.
+                entity.HasOne(t => t.FromStep)
+                      .WithMany(s => s.OutgoingTransitions)
+                      .HasForeignKey(t => t.FromStepId)
+                      .OnDelete(DeleteBehavior.Restrict); // Silme davranışını ayarlayın
+
+                // ToStep (Hedef Adım) İlişkisi:
+                // WorkFlowStep'teki IncomingTransitions koleksiyonuna bağlanır.
+                entity.HasOne(t => t.ToStep)
+                      .WithMany(s => s.IncomingTransitions)
+                      .HasForeignKey(t => t.ToStepId)
+                      .OnDelete(DeleteBehavior.Restrict); // Silme davranışını ayarlayın
+            });
+
+            modelBuilder.Entity<WorkFlowReviewLog>(b =>
+            {
+                b.ToTable("WorkFlowReviewLogs");
+
+                b.HasKey(x => x.Id);
+
+                // Zorunlu alanlar & uzunluklar
+                b.Property(x => x.RequestNo)
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                b.Property(x => x.FromStepCode)
+                    .HasMaxLength(16)
+                    .IsRequired();
+
+                b.Property(x => x.ToStepCode)
+                    .HasMaxLength(16)
+                    .IsRequired();
+
+                b.Property(x => x.ReviewNotes)
+                    .HasMaxLength(2000)
+                    .IsRequired();
+
+                b.Property(x => x.CreatedUser)
+                    .IsRequired();
+
+                b.Property(x => x.CreatedDate)
+                    .IsRequired();
+                // İstersen provider'a göre default value:
+                // SQL Server: .HasDefaultValueSql("GETUTCDATE()")
+                // PostgreSQL: .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'")
+
+                // Nullable FK-id alanları (isteğe bağlı; navigation yoksa sadece id tutacağız)
+                b.Property(x => x.FromStepId);
+                b.Property(x => x.ToStepId);
+
+                // Indexler
+                b.HasIndex(x => x.RequestNo);
+                b.HasIndex(x => new { x.WorkFlowId, x.CreatedDate });
+            });
+
+
+
+            // ---------------- Pricing ----------------
+            modelBuilder.Entity<Pricing>(e =>
+            {
+                e.ToTable("Pricing");
+
+                e.Property(x => x.RequestNo)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                // Attribute ile de var ama burada da garanti altına alıyoruz
+                e.HasIndex(x => x.RequestNo)
+                    .IsUnique();
+
+                e.Property(x => x.Currency)
+                    .HasMaxLength(3)
+                    .IsRequired();
+
+                e.Property(x => x.Notes)
+                    .HasMaxLength(1000);
+
+                e.Property(x => x.TotalAmount)
+                    .HasPrecision(18, 2);
+            });
+
+
+            // Menu
+            modelBuilder.Entity<Menu>(e =>
+            {
+                e.ToTable("Menus");
+                e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+                e.Property(x => x.Description).HasMaxLength(1000);
+                e.HasIndex(x => x.Name).IsUnique(false);
+            });
+
+
+            modelBuilder.Entity<MenuRole>(b =>
+            {
+                b.Property(x => x.MenuId).HasColumnName("ModulId");
+                b.HasOne(x => x.Menu)
+                 .WithMany(m => m.MenuRoles)
+                 .HasForeignKey(x => x.MenuId)           // MenuId <-> ModulId kolonu
+                 .OnDelete(DeleteBehavior.Cascade)
+                 .HasConstraintName("FK_MenuRole_Menus_ModulId");
+            });
+
+
+            modelBuilder.Entity<CustomerSystemAssignment>(entity =>
+            {
+                entity.HasOne(x => x.Customer)
+                      .WithMany(c => c.CustomerSystemAssignments)
+                      .HasForeignKey(x => x.CustomerId);
+
+                entity.HasOne(x => x.CustomerSystem)
+                      .WithMany(cs => cs.CustomerSystemAssignments)
+                      .HasForeignKey(x => x.CustomerSystemId);
+            });
+
+
+            modelBuilder.Entity<WorkFlowArchive>(e =>
+            {
+                e.ToTable("WorkFlowArchives", "dbo"); // şema istersen değiştir
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.RequestNo)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                e.Property(x => x.ArchiveReason)
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                // JSON kolonlarını NVARCHAR(MAX) / TEXT vs.
+                e.Property(x => x.ServicesRequestJson).IsRequired();
+                e.Property(x => x.ServicesRequestProductsJson).IsRequired();
+                e.Property(x => x.CustomerJson).IsRequired();
+                e.Property(x => x.ApproverTechnicianJson).IsRequired();
+                e.Property(x => x.CustomerApproverJson).IsRequired();
+                e.Property(x => x.WorkFlowJson).IsRequired();
+                e.Property(x => x.WorkFlowReviewLogsJson).IsRequired();
+                e.Property(x => x.TechnicalServiceJson).IsRequired();
+                e.Property(x => x.TechnicalServiceImagesJson).IsRequired();
+                e.Property(x => x.TechnicalServiceFormImagesJson).IsRequired();
+                e.Property(x => x.WarehouseJson).IsRequired();
+                e.Property(x => x.PricingJson).IsRequired();
+                e.Property(x => x.FinalApprovalJson).IsRequired();
+            });
+
+
+
+            modelBuilder.Entity<WorkFlowActivityRecord>(entity =>
+            {
+                entity.HasOne(w => w.Customer)
+                      .WithMany(c => c.WorkFlowActivityRecords)
+                      .HasForeignKey(w => w.CustomerId)
+                      .OnDelete(DeleteBehavior.SetNull);
+            });
         }
     }
 }

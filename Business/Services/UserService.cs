@@ -228,6 +228,7 @@ public class UserService
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
+
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
@@ -245,7 +246,6 @@ public class UserService
                 Message = Messages.InvalidEmailOrPassword
             };
         }
-
 
         var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (vr == PasswordVerificationResult.Failed)
@@ -512,14 +512,59 @@ public class UserService
     /// </summary>
     private static string? ValidatePasswordStrength(string password)
     {
-        if (password.Length < 8) return "Şifre en az 8 karakter olmalıdır.";
+        if (password.Length < 6) return "Şifre en az 6 karakter olmalıdır.";
         if (!password.Any(char.IsDigit)) return "Şifre en az bir rakam içermelidir.";
         if (!password.Any(char.IsLower)) return "Şifre en az bir küçük harf içermelidir.";
         if (!password.Any(char.IsUpper)) return "Şifre en az bir büyük harf içermelidir.";
-        // if (!password.Any(ch => !char.IsLetterOrDigit(ch))) return "Şifre en az bir özel karakter içermelidir.";
         return null;
     }
 
+
+    public async Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long roleId)
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Bu role ait kullanıcı bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
+
+    public async Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync()
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.Role != null && ur.Role.Code == "TECHNICIAN"))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Teknisyen bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
 
 
 }

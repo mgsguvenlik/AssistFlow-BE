@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Core.Common;
 using Core.Utilities.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -13,6 +15,7 @@ namespace WebAPI.Controllers
     {
         protected readonly ICrudService<TCreateDto, TUpdateDto, TGetDto, TKey> _service;
         protected readonly ILogger _logger;
+        private ICustomerProductPriceService service;
 
         protected CrudControllerBase(
             ICrudService<TCreateDto, TUpdateDto, TGetDto, TKey> service,
@@ -24,7 +27,6 @@ namespace WebAPI.Controllers
 
         /// <summary>GET /api/[controller]  -> Paged list</summary>
         [HttpGet]
-        //[Microsoft.AspNetCore.Mvc.ProducesResponseType(typeof(ResponseModel<PagedResult<TGetDto>>), 200)]
         public virtual async Task<Microsoft.AspNetCore.Mvc.IActionResult> GetPaged([FromQuery] QueryParams q)
         {
             var resp = await _service.GetPagedAsync(q);
@@ -33,7 +35,6 @@ namespace WebAPI.Controllers
 
         /// <summary>GET /api/[controller]/{id} -> By Id</summary>
         [HttpGet("{id}")]
-        //[ProducesResponseType(typeof(ResponseModel<TGetDto>), 200)]
         [ProducesResponseType(404)]
         public virtual async Task<IActionResult> GetById([FromRoute] TKey id)
         {
@@ -43,7 +44,6 @@ namespace WebAPI.Controllers
 
         /// <summary>POST /api/[controller] -> Create</summary>
         [HttpPost]
-        //[ProducesResponseType(typeof(ResponseModel<TGetDto>), 201)]
         [ProducesResponseType(400)]
         public virtual async Task<IActionResult> Create([FromBody] TCreateDto dto)
         {
@@ -60,7 +60,6 @@ namespace WebAPI.Controllers
 
         /// <summary>PUT /api/[controller]/{id} -> Update</summary>
         [HttpPost("update")]
-        //[ProducesResponseType(typeof(ResponseModel<TGetDto>), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(404)]
         public virtual async Task<IActionResult> Update([FromBody] TUpdateDto dto)

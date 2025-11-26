@@ -1,0 +1,27 @@
+﻿using Core.Enums;
+using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
+
+namespace Model.Dtos.WorkFlowDtos.FinalApproval
+{
+    public class FinalApprovalGetDto
+    {
+        public long Id { get; set; }
+        public string RequestNo { get; set; } = default!;
+        public string? Notes { get; set; }
+
+        public long? DecidedBy { get; set; }
+        public FinalApprovalStatus Status { get; set; } = FinalApprovalStatus.Pending;
+        public decimal DiscountPercent { get; set; }         // 0..100
+
+
+        // Review loglar (APR adımı için)
+        public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
+
+        // Ürünler
+        public List<ServicesRequestProductGetDto> Products { get; set; } = new();
+
+        public CustomerGetDto? Customer { get; set; }
+    }
+}

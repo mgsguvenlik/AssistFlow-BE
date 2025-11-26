@@ -1,4 +1,5 @@
 ﻿using Model.Abstractions;
+using Model.Concrete.WorkFlows;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -22,10 +23,6 @@ namespace Model.Concrete
         /// </summary>
         public string? SubscriberCompany { get; set; }
 
-        /// <summary>
-        /// Müşterinin bağlı olduğu ana grup adı (segment/kategori).
-        /// </summary>
-        public string? CustomerMainGroupName { get; set; }
 
         /// <summary>
         /// Abonenin açık adresi (cadde, mahalle, no vb.).
@@ -37,15 +34,16 @@ namespace Model.Concrete
         /// </summary>
         public string? City { get; set; }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public string? District { get; set; }
+
         /// <summary>
         /// Lokasyon tanımlayıcı kodu (iç sistemlerdeki Lokasyon ID/Code).
         /// </summary>
         public string? LocationCode { get; set; }
-
-        /// <summary>
-        /// Oracle sistemindeki karşılık gelen kod (varsa).
-        /// </summary>
-        public string? OracleCode { get; set; }
 
         /// <summary>
         /// Birincil iletişim kişisinin adı-soyadı.
@@ -87,11 +85,48 @@ namespace Model.Concrete
         /// </summary>
         public string? CorporateLocationId { get; set; }
 
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+
         /// <summary>
-        /// Müşteri tipi kimliği (örn. B2B, B2C, bayi vb. türleri için referans ID).
+        /// Kurulum tarihi 
         /// </summary>
+        public DateTimeOffset? InstallationDate { get; set; }
+
+        /// <summary>
+        /// Garanti süresi (yıl). Null ise garanti takibi yok kabul edilir.
+        /// Örn: 1, 2, 3...
+        /// </summary>
+        public int? WarrantyYears { get; set; }
+
+
+        public string? Note {  get; set; }
+
+        // 🔹 Yeni kolonlar
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
+
+        /// <summary>
+        /// </summary>
+        [ForeignKey(nameof(CustomerGroup))]
+        public long? CustomerGroupId { get; set; }
+        public CustomerGroup? CustomerGroup { get; set; }
+    
+
         [ForeignKey(nameof(CustomerType))]
         public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
+
+
+
+        // Navigations (fiyatlar)
+        public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
+
+        public ICollection<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }  = new List<CustomerSystemAssignment>();
+        public ICollection<WorkFlowActivityRecord> WorkFlowActivityRecords { get; set; }    = new List<WorkFlowActivityRecord>();
+
+
+
+
     }
 }

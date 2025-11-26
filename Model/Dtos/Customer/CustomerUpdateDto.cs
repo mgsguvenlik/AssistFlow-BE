@@ -1,4 +1,5 @@
 ﻿using Core.Utilities.Constants;
+using Model.Dtos.ProgressApprover;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Customer
@@ -17,29 +18,27 @@ namespace Model.Dtos.Customer
         [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.SubscriberCompanyCannotBeWhitespace)]
         public string? SubscriberCompany { get; set; }
 
-        [StringLength(120, ErrorMessage = Messages.CustomerMainGroupNameMaxLength)]
-        public string? CustomerMainGroupName { get; set; }
-
         [StringLength(500, ErrorMessage = Messages.AddressMaxLength)]
         public string? SubscriberAddress { get; set; }
 
         [StringLength(100, ErrorMessage = Messages.CityMaxLength)]
         public string? City { get; set; }
 
+        [StringLength(100, ErrorMessage = Messages.CityMaxLength)]
+        public string? District { get; set; }
+
         [StringLength(64, ErrorMessage = Messages.LocationCodeMaxLength)]
         [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.LocationCodeInvalidChars)]
         public string? LocationCode { get; set; }
 
-        [StringLength(64, ErrorMessage = Messages.OracleCodeMaxLength)]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCodeInvalidChars)]
-        public string? OracleCode { get; set; }
-
+  
         [StringLength(120, ErrorMessage = Messages.FirstPersonNameMaxLength)]
         [NotWhitespaceIfNotEmpty(ErrorMessage = Messages.FirstPersonNameCannotBeWhitespace)]
         public string? ContactName1 { get; set; }
 
         // Telefon: +905551112233 veya 05551112233 gibi (7-15 rakam, isteğe bağlı +)
-        [RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
+        //[RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
+        [Required]
         public string? Phone1 { get; set; }
 
         [EmailAddress(ErrorMessage = Messages.EnterValidEmail)]
@@ -63,9 +62,17 @@ namespace Model.Dtos.Customer
         // Nullable olduğu için boş geçilebilir; değer girilirse 1 ve üzeri olmalı
         [Range(1, long.MaxValue, ErrorMessage = Messages.CustomerTypeInvalid)]
         public long? CustomerTypeId { get; set; }
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+        public DateTimeOffset? InstallationDate { get; set; }
+        public int? WarrantyYears { get; set; }
+        public long? CustomerGroupId { get; set; }
+        public string? Note { get; set; }
+
+        public List<long> SystemIds { get; set; } = new();
+
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
     }
-
-
-
 
 }

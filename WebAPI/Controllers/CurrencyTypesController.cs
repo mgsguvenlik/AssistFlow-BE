@@ -1,10 +1,11 @@
-﻿// WebAPI/Controllers/CurrencyTypesController.cs
-using Business.Interfaces;
+﻿using Business.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.CurrencyType;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

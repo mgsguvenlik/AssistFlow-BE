@@ -1,5 +1,6 @@
 ﻿using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Model.Concrete
 {
@@ -26,15 +27,19 @@ namespace Model.Concrete
         [Required, MaxLength(254), EmailAddress]
         public string Email { get; set; } = string.Empty;
 
+        [Required] 
+        public string Phone { get; set; } = string.Empty;
+
         /// <summary>
         /// Bağlı olduğu müşteri kaydının kimliği (Customer.Id).
         /// </summary>
         [Required]
-        public long CustomerId { get; set; }
+        [ForeignKey(nameof(CustomerGroupId))]
+        public long CustomerGroupId { get; set; }
 
         /// <summary>
         /// İlişkisel navigasyon: Yetkilinin bağlı olduğu müşteri.
         /// </summary>
-        public Customer? Customer { get; set; }
+        public CustomerGroup? CustomerGroup { get; set; }
     }
 }

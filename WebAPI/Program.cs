@@ -21,7 +21,11 @@ using WebAPI.Extensions;
 using WebAPI.Middleware;
 
 
+
 var builder = WebApplication.CreateBuilder(args);
+
+
+
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 
@@ -40,13 +44,18 @@ builder.Services.AddHttpClient("CustomClient")
 
 builder.Services.AddControllers();
 
-var logger = new LoggerConfiguration()
-  .ReadFrom.Configuration(builder.Configuration)
-  .Enrich.FromLogContext()
-  .CreateLogger();
 
-builder.Logging.ClearProviders();
-builder.Logging.AddSerilog(logger);
+
+#region Serilog
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration) 
+    .Enrich.FromLogContext()
+    .WriteTo.Seq("http://192.168.1.46:5441")       
+    .CreateLogger();
+builder.Host.UseSerilog();
+
+#endregion
 
 builder.Services.AddCors(options =>
 {
@@ -56,7 +65,14 @@ builder.Services.AddCors(options =>
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:5173",
-            "http://localhost:8081") // React frontend URL'si
+            "http://localhost:8084",
+            "http://192.168.1.46:300",
+            "http://192.168.1.46:5173",
+            "https://192.168.1.46:5174",
+            "https://localhost:5174",
+            "http://localhost:8081",
+            "http://flowassist.mgs.com.tr",
+            "https://flowassist.mgs.com.tr") // React frontend URL'si
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials() // Bunu kullanýyorsan WithOrigins zorunlu!
@@ -80,10 +96,26 @@ builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
 
 #endregion
 
-// Seed servislerini kaydet
+
+#region Seed servislerini kaydet
 builder.Services.AddDataSeeding(
     typeof(TurkeyCitiesSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
+builder.Services.AddDataSeeding(
+    typeof(ConfigSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
+builder.Services.AddDataSeeding(
+    typeof(WorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
+builder.Services.AddDataSeeding(
+    typeof(WorkFlowTransitionSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
+
+builder.Services.AddDataSeeding(
+    typeof(MenuSeed)
+);
+#endregion
+
 
 
 builder.Services.AddDbContext<AppDataContext>(options =>
@@ -178,11 +210,12 @@ app.UseMiddleware<ErrorHandlerMiddleware>();
 // Configure the HTTP request pipeline.
 
 #region OpenAPI
-app.MapScalarApiReference(o =>
-    o.WithTheme(ScalarTheme.BluePlanet)
-);
-
 app.MapOpenApi();
+app.MapScalarApiReference(o =>
+{
+    o.WithOpenApiRoutePattern("/openapi/{documentName}.json");
+    o.WithTheme(ScalarTheme.BluePlanet);
+});
 
 
 #endregion

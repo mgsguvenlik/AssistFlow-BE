@@ -22,13 +22,6 @@ namespace Data.Seeding.Infrastructure
         {
             foreach (var seed in _seeds)
             {
-                var already = await db.Set<SeedHistory>().AnyAsync(x => x.Key == seed.Key, ct);
-                if (already)
-                {
-                    _logger.LogInformation(Messages.SeedAlreadyApplied, seed.Key);
-                    continue;
-                }
-
                 var should = await seed.ShouldRunAsync(db, ct);
                 if (!should)
                 {
@@ -42,7 +35,6 @@ namespace Data.Seeding.Infrastructure
                 {
                     await seed.RunAsync(db, _sp, ct);
 
-                    db.Set<SeedHistory>().Add(new SeedHistory { Key = seed.Key });
                     await db.SaveChangesAsync(ct);
 
                     await tx.CommitAsync(ct);

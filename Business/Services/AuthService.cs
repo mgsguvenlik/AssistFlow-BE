@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Model.Dtos.Auth;
+using Model.Dtos.Menu;
 using Model.Dtos.Role;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,18 +18,87 @@ public class AuthService : IAuthService
     private readonly IUserService _userService;
     private readonly IOptionsSnapshot<AppSettings> _appSettings;
 
+    private readonly IMenuService _menuService;
     public AuthService(
         IHttpContextAccessor http,
         IUserService userService,
         IOptionsSnapshot<AppSettings> appSettings
-    )
+,
+        IMenuService menuService)
     {
         _http = http;
         _userService = userService;
         _appSettings = appSettings;
+        _menuService = menuService;
     }
 
     public async Task<ResponseModel<AuthResponseDto>> LoginAsync(LoginRequestDto loginRequest, CancellationToken ct = default)
+    {
+        // 1) Kullanıcı doğrulama
+        var result = await _userService.SignInAsync(loginRequest.Identifier, loginRequest.Password);
+        if (!result.IsSuccess || result.Data == null || !result.Data.IsActive)
+            return ResponseModel<AuthResponseDto>.Fail(Messages.Unauthorized, Core.Enums.StatusCode.Unauthorized);
+
+        var user = result.Data;
+
+        // 2) Menüleri çek (user.Id ile)
+        var menus = await _menuService.GetByUserIdAsync(user.Id);
+
+        // 3) Token üret
+        var issuer = _appSettings.Value.Issuer;
+        var audience = _appSettings.Value.Audience;
+        var key = _appSettings.Value.Key;
+
+        // İstersen RememberMe’ye göre süreyi uzat:
+        var minutes = _appSettings.Value.AccessTokenMinutes > 0 ? _appSettings.Value.AccessTokenMinutes : 60;
+        if (loginRequest.RememberMe)
+            minutes = 15000;
+
+        var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new Claim(ClaimTypes.Name, user.TechnicianName ?? string.Empty),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+        if (!string.IsNullOrWhiteSpace(user.TechnicianEmail))
+            claims.Add(new Claim(ClaimTypes.Email, user.TechnicianEmail));
+        if (user.Roles != null)
+        {
+            foreach (var role in user.Roles)
+            {
+                var roleName = role?.Name ?? role?.ToString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(roleName))
+                    claims.Add(new Claim(ClaimTypes.Role, roleName));
+            }
+        }
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        var expires = DateTime.UtcNow.AddMinutes(minutes);
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            expires: expires,
+            signingCredentials: creds
+        );
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+        // 4) Cevap DTO
+        var dto = new AuthResponseDto
+        {
+            Token = tokenString,
+            Expires = expires,
+            User = user,
+            Status = 200,
+            Menus = menus?.ToList() ?? new List<MenuWithPermissionsDto>() // 👈 menüler burada
+        };
+
+        return ResponseModel<AuthResponseDto>.Success(dto);
+    }
+    public async Task<ResponseModel<AuthResponseDto>> LoginAsync_(LoginRequestDto loginRequest, CancellationToken ct = default)
     {
         // Kullanıcı doğrulama
         var result = await _userService.SignInAsync(loginRequest.Identifier, loginRequest.Password);

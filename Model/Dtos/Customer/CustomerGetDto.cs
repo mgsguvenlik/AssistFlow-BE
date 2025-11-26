@@ -1,15 +1,17 @@
-﻿namespace Model.Dtos.Customer
+﻿using Model.Dtos.CustomerGroup;
+using Model.Dtos.CustomerSystemAssignment;
+
+namespace Model.Dtos.Customer
 {
     public class CustomerGetDto
     {
         public long Id { get; set; }
         public string? SubscriberCode { get; set; }
         public string? SubscriberCompany { get; set; }
-        public string? CustomerMainGroupName { get; set; }
         public string? SubscriberAddress { get; set; }
         public string? City { get; set; }
+        public string? District { get; set; }
         public string? LocationCode { get; set; }
-        public string? OracleCode { get; set; }
         public string? ContactName1 { get; set; }
         public string? Phone1 { get; set; }
         public string? Email1 { get; set; }
@@ -19,5 +21,17 @@
         public string? CustomerShortCode { get; set; }
         public string? CorporateLocationId { get; set; }
         public long? CustomerTypeId { get; set; }
+        public string? Longitude { get; set; }
+        public string? Latitude { get; set; }
+        public string? Note { get; set; }
+        public DateTimeOffset? InstallationDate { get; set; }
+        public int? WarrantyYears { get; set; }
+        public long? CustomerGroupId { get; set; } = new();
+
+        public string? LockType { get; set; }
+        public string? CashCenter { get; set; }
+        public CustomerGroupGetDto CustomerGroup { get; set; } = new();
+
+        public ICollection<CustomerSystemAssignmentGetDto> Systems { get; set; } = new List<CustomerSystemAssignmentGetDto>();
     }
 }
