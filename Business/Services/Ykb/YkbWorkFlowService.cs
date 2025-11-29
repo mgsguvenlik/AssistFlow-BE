@@ -1702,13 +1702,15 @@ namespace Business.Services.Ykb
                 if (request is null)
                     return ResponseModel<YkbFinalApprovalGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
+                var statusCode = dto.FinalApprovalStatus == FinalApprovalStatus.CustomerApproval
+                    ? "CAPR"
+                    : dto.WorkFlowStatus switch
+                    {
+                        WorkFlowStatus.Cancelled => "CNC",
+                        WorkFlowStatus.Complated => "CMP",
+                        _ => "APR"
+                    };
 
-                var statusCode = dto.WorkFlowStatus switch
-                {
-                    WorkFlowStatus.Cancelled => "CNC",
-                    WorkFlowStatus.Complated => "CMP",
-                    _ => "APR"
-                };
 
                 // 2) Hedef adım: APR (Approval / Final Approval)
                 var targetStep = await _uow.Repository
@@ -1801,6 +1803,9 @@ namespace Business.Services.Ykb
 
                 // 💡 yeni alanlar
                 existsFinalApproval.DiscountPercent = dto.DiscountPercent;
+                existsFinalApproval.Status = dto.FinalApprovalStatus;
+
+
                 _uow.Repository.Update(existsFinalApproval);
                 #endregion
 
@@ -1889,7 +1894,7 @@ namespace Business.Services.Ykb
                 var meId = me?.Id ?? 0;
 
                 #endregion
-              
+
                 if (dto.IsAgreed)
                 {
                     // 🔹 Mutabık Kalındı: akış tamamlanır
@@ -3942,7 +3947,7 @@ namespace Business.Services.Ykb
             // HEADER: FinalApproval + (left) ServicesRequest -> Customer
             var dto = await (
                 from fa in qFinal
-                where fa.RequestNo == requestNo && fa.Status==FinalApprovalStatus.CustomerApproval
+                where fa.RequestNo == requestNo && fa.Status == FinalApprovalStatus.CustomerApproval
                 join sr0 in qRequest on fa.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
                 select new YkbFinalApprovalGetDto
