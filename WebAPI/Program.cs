@@ -107,6 +107,10 @@ builder.Services.AddDataSeeding(
 builder.Services.AddDataSeeding(
     typeof(WorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );
+
+builder.Services.AddDataSeeding(
+    typeof(YkbWorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+);
 builder.Services.AddDataSeeding(
     typeof(WorkFlowTransitionSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
 );

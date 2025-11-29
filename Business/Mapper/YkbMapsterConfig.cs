@@ -57,6 +57,21 @@ namespace Business.Mapper
                   .Map(dest => dest.WorkFlowStepCode, src => src.YkbWorkFlowStep != null ? src.YkbWorkFlowStep.Code : null)
                   .Map(dest => dest.CustomerApproverName, src => src.CustomerApprover != null ? src.CustomerApprover.FullName : null);
 
+
+            config.NewConfig<YkbServicesRequest, YkbCustomerForm>()
+                  .Ignore(dest => dest.Id)
+                  .Ignore(dest => dest.CreatedUser)
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.UpdatedUser)
+                  .Ignore(dest => dest.UpdatedDate);
+
+            config.NewConfig<YkbCustomerForm, YkbServicesRequest>()
+                  .Ignore(dest => dest.Id)
+                  .Ignore(dest => dest.CreatedUser)
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.UpdatedUser)
+                  .Ignore(dest => dest.UpdatedDate);
+
             // YkbServicesRequestProduct
             config.NewConfig<YkbServicesRequestProductCreateDto, YkbServicesRequestProduct>()
                   .Ignore(dest => dest.Id)

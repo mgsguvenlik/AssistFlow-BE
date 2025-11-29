@@ -72,7 +72,7 @@ namespace Business.Services.Ykb
         }
 
         /// -------------------- ServicesRequest --------------------
-        //0 Müşteri kendi formunu oluşturulması (Taslak). 
+        //0 Müşteri kendi formunu oluşturulması (Taslak).  
         public async Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto)
         {
             try
@@ -95,7 +95,11 @@ namespace Business.Services.Ykb
                     dto.RequestNo = rn.Data!;
                 }
 
-                bool exists = await _uow.Repository.GetQueryable<YkbWorkFlow>().Include(x => x.ApproverTechnician).AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+                bool exists = await _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .Include(x => x.ApproverTechnician)
+                    .AsNoTracking()
+                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
                 if (exists)
                     return ResponseModel<YkbCustomerFormGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
@@ -124,7 +128,7 @@ namespace Business.Services.Ykb
                 var wf = new YkbWorkFlow
                 {
                     RequestNo = request.RequestNo,
-                    RequestTitle = "Servis Talebi",
+                    RequestTitle =dto.Title??"",
                     Priority = dto.Priority,
                     CurrentStepId = initialStep.Id,
                     CreatedDate = DateTime.Now,
@@ -156,19 +160,24 @@ namespace Business.Services.Ykb
             }
             catch (Exception ex)
             {
-
                 _logger.LogError(ex, "CreateCustomerForm");
                 return ResponseModel<YkbCustomerFormGetDto>.Fail($"CreateCustomerForm Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
 
         //0.1 Müşteri Formunun Servis talebine gönderilmesi. 
-        public async  Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormCreateDto dto)
+        public async  Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto)
         {
             try
             {
                 #region Validasyon/Kontroller
-                // Başlangıç WorkFlowStep'i Bul
+                 var customerForm = await _uow.Repository.GetQueryable<YkbCustomerForm>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.RequestNo == dto.RequestNo);
+                if (customerForm is null)
+                    return ResponseModel<YkbServicesRequestGetDto>.Fail("Müşteri formu bulunamadı.", StatusCode.Conflict);
+
+                // Hedef WorkFlowStep'i Bul
                 var targetStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
                     .AsNoTracking()
                     .FirstOrDefaultAsync(s => s.Code == "SR"); // Örn: 'SR' (Services Request) kodu ile başlangıç adımı
@@ -185,19 +194,6 @@ namespace Business.Services.Ykb
                     dto.RequestNo = rn.Data!;
                 }
 
-                bool exists = await _uow.Repository.GetQueryable<YkbWorkFlow>().Include(x => x.ApproverTechnician).AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-                if (exists)
-                    return ResponseModel<YkbServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
-
-                var customerExist = await _uow.Repository.GetQueryable<Customer>().AsNoTracking().AnyAsync(c => c.Id == dto.CustomerId);
-                if (!customerExist)
-                    return ResponseModel<YkbServicesRequestGetDto>.Fail("Müşteri bulunamadı.", StatusCode.Conflict);
-
-                var customerApproverExist = dto.CustomerApproverId.HasValue ? await _uow.Repository.GetQueryable<ProgressApprover>().AsNoTracking().AnyAsync(ca => ca.Id == dto.CustomerApproverId.Value) : true;
-                if (!customerApproverExist)
-                    return ResponseModel<YkbServicesRequestGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
-
                 //WorkFlow getir
                 var wf = await _uow.Repository
                     .GetQueryable<YkbWorkFlow>()
@@ -206,7 +202,7 @@ namespace Business.Services.Ykb
                     .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
 
                 if (wf is null)
-                    return ResponseModel<YkbServicesRequestGetDto>.Fail("İlg  kaydı bulunamadı.", StatusCode.NotFound);
+                    return ResponseModel<YkbServicesRequestGetDto>.Fail("İlgili akış  kaydı bulunamadı.", StatusCode.NotFound);
 
                 if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
                     return ResponseModel<YkbServicesRequestGetDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.NotFound);
@@ -218,11 +214,13 @@ namespace Business.Services.Ykb
                 var meId = me?.Id ?? 0;
                 #endregion
 
-                #region Servis talebi güncelleme 
-                var request = dto.Adapt<YkbServicesRequest>(_config);
+                #region Servis talebi oluşturma 
+                var request = customerForm.Adapt<YkbServicesRequest>(_config);
+
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                request.Id = 0;
                 await _uow.Repository.AddAsync(request);
                 #endregion
 
@@ -231,7 +229,7 @@ namespace Business.Services.Ykb
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
-                      dto.CustomerId,
+                      request.CustomerId,
                       targetStep.Code,
                       "SR",
                       "Müşteriden servis talebine form gönderildi",
@@ -262,8 +260,120 @@ namespace Business.Services.Ykb
             }
         }
 
+        //1 Servis Talebi güncelleme adımı :
+        public async Task<ResponseModel<YkbServicesRequestGetDto>> UpdateServiceRequestAsync(YkbServicesRequestUpdateDto dto)
+        {
+            var entity = await _uow.Repository.GetSingleAsync<YkbServicesRequest>(
+                false,
+                x => x.RequestNo == dto.RequestNo,
+                includeExpression: RequestIncludes());
 
-        //1 Servis Talebi oluşturma akışı:
+            if (entity is null)
+                return ResponseModel<YkbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var wf = await _uow.Repository
+            .GetQueryable<YkbWorkFlow>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<YkbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
+            // Ana talep bilgilerini güncelle
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = meId;
+            wf.IsLocationValid = dto.IsLocationValid;
+            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
+            wf.CustomerApproverName = dto.CustomerApproverName;
+            _uow.Repository.Update(wf);
+
+
+            dto.Adapt(entity, _config);
+            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            // Mevcut ürünleri çek (RequestNo bazlı)
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<YkbServicesRequestProduct>(
+                    asNoTracking: false, // track etsin ki güncelleme/silmede kullanılabilsin
+                    whereExpression: x => x.RequestNo == dto.RequestNo);
+            // Ürün listesi değişmişse:
+            if (dto.Products is not null)
+            {
+                // Yeni ürün setini dictionary olarak hazırla (ProductId bazlı)
+                var updatedProducts = dto.Products
+                    .GroupBy(p => p.ProductId)
+                    .Select(g => g.First()) // Aynı ürün tekrar varsa tek al
+                    .ToDictionary(p => p.ProductId, p => p);
+
+
+
+                // Koleksiyonlar null olabilir, önlem al
+                existingProducts ??= new List<YkbServicesRequestProduct>();
+
+                // Silinecek ürünler (DB'de var ama DTO'da yok)
+                var toRemove = existingProducts
+                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // Eklenecek ürünler (DTO'da var ama DB'de yok)
+                var toAdd = updatedProducts
+                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
+                    .Select(p => p.Value)
+                    .ToList();
+
+                // Güncellenecek ürünler (hem var hem değişmiş)
+                var toUpdate = existingProducts
+                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // ❌ Sil
+                foreach (var prod in toRemove)
+                    await _uow.Repository.HardDeleteAsync(prod);
+
+                // ➕ Ekle
+                foreach (var prod in toAdd)
+                {
+                    var entityProd = new YkbServicesRequestProduct
+                    {
+                        RequestNo = dto.RequestNo,
+                        ProductId = prod.ProductId,
+                        Quantity = prod.Quantity,
+                        CustomerId = dto.CustomerId,
+                    };
+                    await _uow.Repository.AddAsync(entityProd);
+                }
+
+                // 🔁 Güncelle
+                foreach (var prod in toUpdate)
+                {
+                    var dtoProd = updatedProducts[prod.ProductId];
+                    prod.Quantity = dtoProd.Quantity;
+                    prod.CustomerId = dto.CustomerId;
+                    prod.RequestNo = dto.RequestNo;
+                    prod.ProductId = dtoProd.ProductId;
+                    _uow.Repository.Update(prod);
+
+
+                }
+            }
+            else
+            {
+                foreach (var item in existingProducts)
+                {
+                    await _uow.Repository.HardDeleteAsync(item);
+
+                }
+            }
+            await _uow.Repository.UpdateAsync(entity);
+            await _uow.Repository.CompleteAsync();
+            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
+        }
+
+        //1.1 Servis Talebi oluşturma adımı:  MZK Buna gerek yok aslında. 
         public async Task<ResponseModel<YkbServicesRequestGetDto>> CreateRequestAsync(YkbServicesRequestCreateDto dto)
         {
             try
@@ -380,7 +490,7 @@ namespace Business.Services.Ykb
                 return ResponseModel<YkbServicesRequestGetDto>.Fail($"Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
-
+     
         //2.1 Depoya Gönderim  (Ürün var ise)
         public async Task<ResponseModel<YkbWarehouseGetDto>> SendWarehouseAsync(YkbSendWarehouseDto dto)
         {
@@ -2322,7 +2432,7 @@ namespace Business.Services.Ykb
                 {
                     Id = sr.Id,
                     RequestNo = sr.RequestNo,
-                    OracleNo = sr.OracleNo,
+                    OracleNo = sr.YkbServiceTrackNo,
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
@@ -2482,7 +2592,7 @@ namespace Business.Services.Ykb
                 {
                     Id = sr.Id,
                     RequestNo = sr.RequestNo,
-                    OracleNo = sr.OracleNo,
+                    OracleNo = sr.YkbServiceTrackNo,
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
@@ -2651,117 +2761,7 @@ namespace Business.Services.Ykb
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
 
-        public async Task<ResponseModel<YkbServicesRequestGetDto>> UpdateServiceRequestAsync(YkbServicesRequestUpdateDto dto)
-        {
-            var entity = await _uow.Repository.GetSingleAsync<YkbServicesRequest>(
-                false,
-                x => x.RequestNo == dto.RequestNo,
-                includeExpression: RequestIncludes());
-
-            if (entity is null)
-                return ResponseModel<YkbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            var wf = await _uow.Repository
-            .GetQueryable<YkbWorkFlow>()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-
-            if (wf is null)
-                return ResponseModel<YkbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
-
-
-            var me = await _currentUser.GetAsync();
-            var meId = me?.Id ?? 0;
-
-            // Ana talep bilgilerini güncelle
-            wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = meId;
-            wf.IsLocationValid = dto.IsLocationValid;
-            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
-            wf.CustomerApproverName = dto.CustomerApproverName;
-            _uow.Repository.Update(wf);
-
-
-            dto.Adapt(entity, _config);
-            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
-
-            // Mevcut ürünleri çek (RequestNo bazlı)
-            var existingProducts = await _uow.Repository
-                .GetMultipleAsync<YkbServicesRequestProduct>(
-                    asNoTracking: false, // track etsin ki güncelleme/silmede kullanılabilsin
-                    whereExpression: x => x.RequestNo == dto.RequestNo);
-            // Ürün listesi değişmişse:
-            if (dto.Products is not null)
-            {
-                // Yeni ürün setini dictionary olarak hazırla (ProductId bazlı)
-                var updatedProducts = dto.Products
-                    .GroupBy(p => p.ProductId)
-                    .Select(g => g.First()) // Aynı ürün tekrar varsa tek al
-                    .ToDictionary(p => p.ProductId, p => p);
-
-
-
-                // Koleksiyonlar null olabilir, önlem al
-                existingProducts ??= new List<YkbServicesRequestProduct>();
-
-                // Silinecek ürünler (DB'de var ama DTO'da yok)
-                var toRemove = existingProducts
-                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
-
-                // Eklenecek ürünler (DTO'da var ama DB'de yok)
-                var toAdd = updatedProducts
-                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
-                    .Select(p => p.Value)
-                    .ToList();
-
-                // Güncellenecek ürünler (hem var hem değişmiş)
-                var toUpdate = existingProducts
-                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
-
-                // ❌ Sil
-                foreach (var prod in toRemove)
-                    await _uow.Repository.HardDeleteAsync(prod);
-
-                // ➕ Ekle
-                foreach (var prod in toAdd)
-                {
-                    var entityProd = new YkbServicesRequestProduct
-                    {
-                        RequestNo = dto.RequestNo,
-                        ProductId = prod.ProductId,
-                        Quantity = prod.Quantity,
-                        CustomerId = dto.CustomerId,
-                    };
-                    await _uow.Repository.AddAsync(entityProd);
-                }
-
-                // 🔁 Güncelle
-                foreach (var prod in toUpdate)
-                {
-                    var dtoProd = updatedProducts[prod.ProductId];
-                    prod.Quantity = dtoProd.Quantity;
-                    prod.CustomerId = dto.CustomerId;
-                    prod.RequestNo = dto.RequestNo;
-                    prod.ProductId = dtoProd.ProductId;
-                    _uow.Repository.Update(prod);
-
-
-                }
-            }
-            else
-            {
-                foreach (var item in existingProducts)
-                {
-                    await _uow.Repository.HardDeleteAsync(item);
-
-                }
-            }
-            await _uow.Repository.UpdateAsync(entity);
-            await _uow.Repository.CompleteAsync();
-            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
-        }
+      
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
 
@@ -3578,7 +3578,7 @@ namespace Business.Services.Ykb
                     UpdatedUser = pr.UpdatedUser,
 
                     // ServicesRequest
-                    OracleNo = sr != null ? sr.OracleNo : null,
+                    OracleNo = sr != null ? sr.YkbServiceTrackNo : null,
                     ServicesCostStatus = sr != null ? sr.ServicesCostStatus : ServicesCostStatus.Unknown,
 
                     // Customer (yalnızca gerekli alanlar + WarrantyYears)
@@ -4223,7 +4223,7 @@ namespace Business.Services.Ykb
                 dto.ServiceRequest = new ServiceRequestSectionDto
                 {
                     Id = sr.Id,
-                    OracleNo = sr.OracleNo,
+                    OracleNo = sr.YkbServiceTrackNo,
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus.ToString(),

@@ -2,23 +2,30 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 
 namespace Data.Seeding.Seeds
 {
     // Bu, WorkFlow adımlarını (Steps) veritabanına ekleyen Seed sınıfıdır.
-    public class WorkFlowStepSeed : IDataSeed
+    public class YkbWorkFlowStepSeed : IDataSeed
     {
-        private readonly ILogger<WorkFlowStepSeed> _logger;
-        public WorkFlowStepSeed(ILogger<WorkFlowStepSeed> logger)
+        private readonly ILogger<YkbWorkFlowStepSeed> _logger;
+
+        public YkbWorkFlowStepSeed(ILogger<YkbWorkFlowStepSeed> logger)
         {
             _logger = logger;
-        }
-        public string Key => "WorkFlowSteps"; // SeedHistory için benzersiz anahtar
+        } 
+        public string Key => "YkbWorkFlowSteps"; // SeedHistory için benzersiz anahtar
         public int Order => 11; // ConfigSeed'den sonra çalışması için 10'dan büyük bir değer
         public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
         {
-            var workFlowSteps = new List<WorkFlowStep>
+            var workFlowSteps = new List<YkbWorkFlowStep>
             {
+                new() {
+                     Name = "Müşteri Formu Oluşturma",
+                     Code = "CF", // Services Request
+                     Order = 1,
+                 },
                 new() {
                      Name = "Servis Talebi Oluşturma",
                      Code = "SR", // Services Request
@@ -56,7 +63,7 @@ namespace Data.Seeding.Seeds
                  }
             };
 
-            var existingNames = await db.Set<WorkFlowStep>()
+            var existingNames = await db.Set<YkbWorkFlowStep>()
                 .Select(w => w.Code)
                 .ToListAsync(ct);
 
@@ -64,10 +71,10 @@ namespace Data.Seeding.Seeds
 
             foreach (var step in workFlowSteps)
             {
-                // Name'e göre kontrol
+                // Code'e göre kontrol
                 if (!existingNameSet.Contains(step.Code))
                 {
-                    await db.Set<WorkFlowStep>().AddAsync(step, ct);
+                    await db.Set<YkbWorkFlowStep>().AddAsync(step, ct);
                 }
             }
 
@@ -77,10 +84,12 @@ namespace Data.Seeding.Seeds
                 workFlowSteps.Count
             );
         }
+
+        // Sadece tabloda hiç veri yoksa çalıştır
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)
         {
             // Eğer tabloda hiç WorkFlowStep yoksa çalıştır.
-            return !await db.Set<WorkFlowStep>().AnyAsync(ct);
+            return !await db.Set<YkbWorkFlowStep>().AnyAsync(ct);
         }
     }
 }

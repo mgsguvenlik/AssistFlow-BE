@@ -146,7 +146,7 @@ namespace Business.Services
                 var wf = new WorkFlow
                 {
                     RequestNo = request.RequestNo,
-                    RequestTitle = "Servis Talebi",
+                    RequestTitle = dto.Title ?? "",
                     Priority = dto.Priority,
                     CurrentStepId = initialStep.Id,
                     CreatedDate = DateTime.Now,
@@ -1529,7 +1529,7 @@ namespace Business.Services
                 // 🔹 Eğer süreç tamamlandıysa arşive at
                 if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 {
-                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed": "Cancelled";
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed" : "Cancelled";
                     await ArchiveWorkflowAsync(dto.RequestNo, reason);
                 }
                 #endregion
@@ -3187,7 +3187,7 @@ namespace Business.Services
                     };
                 })
                 .ToList();
-          
+
             // REVIEW LOG’LARI (Pricing adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>

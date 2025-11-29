@@ -1,5 +1,4 @@
 ﻿using Core.Enums;
-using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 using System.ComponentModel.DataAnnotations;
 
@@ -12,6 +11,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public DateTimeOffset ServicesDate { get; set; }
         public DateTimeOffset? PlannedCompletionDate { get; set; }
         public ServicesCostStatus ServicesCostStatus { get; set; }
+        public string? Title { get; set; }
         public string? Description { get; set; }
         public bool IsProductRequirement { get; set; }
         public long? WorkFlowStepId { get; set; }

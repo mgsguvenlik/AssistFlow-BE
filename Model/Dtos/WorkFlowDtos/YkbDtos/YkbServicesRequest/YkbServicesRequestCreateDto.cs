@@ -13,6 +13,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public DateTimeOffset? PlannedCompletionDate { get; set; }
 
         public ServicesCostStatus ServicesCostStatus { get; set; }
+        public string? Title { get; set; }
         public string? Description { get; set; }
 
         public bool IsMailSended { get; set; }

@@ -42,7 +42,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-customer-form")]
-        public async Task<IActionResult> SendCustomerForm([FromBody] YkbCustomerFormCreateDto dto)
+        public async Task<IActionResult> SendCustomerForm([FromBody] YkbCustomerFormSendDto dto)
         {
             var result = await _workFlowService.SendCustomerFormToService(dto);
             return Ok(result);

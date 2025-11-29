@@ -26,6 +26,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         [Required]
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
+        public string? Title { get; set; }
         public string? Description { get; set; }
         public bool IsProductRequirement { get; set; }
 

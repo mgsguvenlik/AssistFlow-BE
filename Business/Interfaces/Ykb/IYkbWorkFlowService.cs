@@ -14,8 +14,8 @@ namespace Business.Interfaces.Ykb
 {
     public interface IYkbWorkFlowService
     {
-        Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormCreateDto dto);
         Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto);
+        Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto);
         Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
 

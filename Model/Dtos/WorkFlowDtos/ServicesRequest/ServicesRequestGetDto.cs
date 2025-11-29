@@ -18,7 +18,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         public ServicesCostStatus ServicesCostStatus { get; set; }
         public string ServicesCostStatusText => ServicesCostStatus.ToString();
-
+        public string? Title { get; set; }
         public string? Description { get; set; }
 
         /// <summary>Ürün/Parça ihtiyacı var mı?</summary>

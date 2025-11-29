@@ -21,7 +21,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm
 
         public long? CustomerApproverId { get; set; }
         public string? CustomerApproverName { get; set; }
-
+        public string? Title { get; set; }
         public string? Description { get; set; }
         public YkbCustomerFormStatus Status { get; set; }
         public WorkFlowPriority Priority { get; set; }

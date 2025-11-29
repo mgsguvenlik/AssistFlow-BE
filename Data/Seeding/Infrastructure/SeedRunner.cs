@@ -22,13 +22,6 @@ namespace Data.Seeding.Infrastructure
         {
             foreach (var seed in _seeds)
             {
-                var should = await seed.ShouldRunAsync(db, ct);
-                if (!should)
-                {
-                    _logger.LogInformation(Messages.SeedAlreadyApplied, seed.Key);
-                    continue;
-                }
-
                 _logger.LogInformation(Messages.SeedStarting, seed.Key);
                 using var tx = await db.Database.BeginTransactionAsync(ct);
                 try

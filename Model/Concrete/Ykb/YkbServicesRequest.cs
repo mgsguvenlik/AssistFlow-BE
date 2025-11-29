@@ -14,7 +14,7 @@ namespace Model.Concrete.Ykb
         public string RequestNo { get; set; } = string.Empty;
 
         [MaxLength(100)]
-        public string? OracleNo { get; set; }
+        public string? YkbServiceTrackNo { get; set; }
 
         public DateTimeOffset ServicesDate { get; set; }          // zorunlu
         public DateTimeOffset? PlannedCompletionDate { get; set; } // opsiyonel - Planlanan Tamamlanma Tarihi
