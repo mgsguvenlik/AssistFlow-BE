@@ -1,5 +1,6 @@
 ﻿using Core.Common;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
@@ -13,6 +14,8 @@ namespace Business.Interfaces.Ykb
 {
     public interface IYkbWorkFlowService
     {
+        Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormCreateDto dto);
+        Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto);
         Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
 

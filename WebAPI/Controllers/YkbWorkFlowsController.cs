@@ -3,6 +3,7 @@ using Business.Interfaces.Ykb;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
@@ -33,6 +34,20 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.GetRequestNoAsync(prfeix);
             return Ok(result);
         }
+        [HttpPost("create-customer-form")]
+        public async Task<IActionResult> CreateCustomerForm([FromBody] YkbCustomerFormCreateDto dto)
+        {
+            var result = await _workFlowService.CreateCustomerForm(dto);
+            return Ok(result);
+        }
+
+        [HttpPost("send-customer-form")]
+        public async Task<IActionResult> SendCustomerForm([FromBody] YkbCustomerFormCreateDto dto)
+        {
+            var result = await _workFlowService.SendCustomerFormToService(dto);
+            return Ok(result);
+        }
+
 
         [HttpPost("create-services-request")]
         public async Task<IActionResult> CreateRequest([FromBody] YkbServicesRequestCreateDto dto)

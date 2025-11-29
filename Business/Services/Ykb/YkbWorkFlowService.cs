@@ -112,7 +112,6 @@ namespace Business.Services.Ykb
                 var meId = me?.Id ?? 0;
                 #endregion
 
-
                 #region Müşteri formu Oluşturma 
                 var request = dto.Adapt<YkbCustomerForm>(_config);
                 request.CreatedDate = DateTime.Now;
@@ -120,7 +119,6 @@ namespace Business.Services.Ykb
                 request.Status = Core.Enums.Ykb.YkbCustomerFormStatus.Draft;
                 await _uow.Repository.AddAsync(request);
                 #endregion
-
 
                 #region  WorkFlow oluştur (aynı RequestNo ile)
                 var wf = new YkbWorkFlow
@@ -162,9 +160,6 @@ namespace Business.Services.Ykb
                 _logger.LogError(ex, "CreateCustomerForm");
                 return ResponseModel<YkbCustomerFormGetDto>.Fail($"CreateCustomerForm Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
-
-          
-
         }
 
         //0.1 Müşteri Formunun Servis talebine gönderilmesi. 
