@@ -16,6 +16,11 @@ namespace Model.Dtos.Auth
         public string TechnicianName { get; set; } = string.Empty;
         public string? TechnicianPhone { get; set; }
         public string? TechnicianEmail { get; set; }
+
+        // 🔹 Tenant alanları
+        public long? TenantId { get; set; }
+        public string? TenantCode { get; set; }
+        public string? TenantName { get; set; }
         public List<RoleGetDto> Roles { get; set; } = new();
     }
 }

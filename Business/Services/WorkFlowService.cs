@@ -1833,30 +1833,25 @@ namespace Business.Services
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
+                    Title = wf != null ? wf.RequestTitle : null,
                     Description = sr.Description,
                     IsProductRequirement = sr.IsProductRequirement,
-
                     IsMailSended = sr.IsMailSended,
                     CustomerApproverId = sr.CustomerApproverId,
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
-
                     CustomerId = sr.CustomerId,
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
-
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
-
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
                     CreatedUser = sr.CreatedUser,
                     UpdatedUser = sr.UpdatedUser,
                     IsDeleted = sr.IsDeleted,
-
                     ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
                     IsLocationValid = wf != null && wf.IsLocationValid,
                     Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
-
                     ServicesRequestStatus = sr.ServicesRequestStatus,
 
                     // 🔹 Customer alt DTO + warranty türetmeleri
@@ -1994,25 +1989,21 @@ namespace Business.Services
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
                     Description = sr.Description,
+                    Title = wf != null ? wf.RequestTitle : null,
                     IsProductRequirement = sr.IsProductRequirement,
-
                     IsMailSended = sr.IsMailSended,
                     CustomerApproverId = sr.CustomerApproverId,
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
-
                     CustomerId = sr.CustomerId,
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
-
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
-
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
                     CreatedUser = sr.CreatedUser,
                     UpdatedUser = sr.UpdatedUser,
                     IsDeleted = sr.IsDeleted,
-
                     ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
                     IsLocationValid = wf != null && wf.IsLocationValid,
                     Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,

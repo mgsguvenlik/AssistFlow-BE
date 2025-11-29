@@ -51,6 +51,7 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
+        public DbSet<Tenant> Tenants { get; set; } = null!;
 
 
         #region YKB
@@ -79,10 +80,7 @@ namespace Data.Concrete.EfCore.Context
         {
             base.OnModelCreating(modelBuilder);
             #region YKB
-            // YKB tarafında DataAnnotation ile şema/isim verdiğin için,
-            // burada ekstra ToTable yazman şart değil.
-            // Sadece ufak ince ayarlar gerekiyorsa buraya ekleyebilirsin.
-
+           
             modelBuilder.Entity<YkbServicesRequestProduct>()
                         .Property(x => x.CapturedUnitPrice)
                         .HasPrecision(18, 2);
@@ -454,6 +452,33 @@ namespace Data.Concrete.EfCore.Context
                       .WithMany(c => c.WorkFlowActivityRecords)
                       .HasForeignKey(w => w.CustomerId)
                       .OnDelete(DeleteBehavior.SetNull);
+            });
+
+
+            modelBuilder.Entity<Tenant>(entity =>
+            {
+                entity.HasIndex(x => x.Code).IsUnique();
+
+                entity.Property(x => x.Name)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.Code)
+                      .IsRequired()
+                      .HasMaxLength(50);
+
+                entity.Property(x => x.LogoUrl)
+                      .HasMaxLength(260);
+
+                entity.HasMany(t => t.Customers)
+                      .WithOne(c => c.Tenant!)
+                      .HasForeignKey(c => c.TenantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasMany(t => t.Users)
+                      .WithOne(u => u.Tenant!)
+                      .HasForeignKey(u => u.TenantId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

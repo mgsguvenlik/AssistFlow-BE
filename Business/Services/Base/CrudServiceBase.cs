@@ -51,6 +51,21 @@ namespace Business.Services.Base
 
             return long.TryParse(idStr, out var id) ? id : 0;
         }
+        protected virtual long? GetCurrentTenantIdOrDefault()
+        {
+            var user = _http?.HttpContext?.User;
+            if (user is null || !user.Identity?.IsAuthenticated == true)
+                return null;
+
+            // Login'de eklediğimiz claim: "tenant_id"
+            var tStr = user.FindFirstValue("tenant_id");
+
+            if (long.TryParse(tStr, out var tid) && tid > 0)
+                return tid;
+
+            return null;
+        }
+
 
         // -------------------- AUDIT HELPERS --------------------
         protected virtual void SetCreateAuditIfExists(object? entity)
@@ -333,6 +348,9 @@ namespace Business.Services.Base
             var inc = IncludeExpression();
             if (inc is not null) query = inc(query);
 
+            // 🔹 Tenant filtresi
+            query = ApplyTenantFilterIfNeeded(query);
+
             // 🧹 IsDeleted varsa, soft delete filtrele
             var isDeletedProp = typeof(TEntity).GetProperty(
                 "IsDeleted",
@@ -482,6 +500,51 @@ namespace Business.Services.Base
                 new PagedResult<TGetDto>(items, total, q.Page, q.PageSize));
         }
 
+        /// <summary>
+        /// Eğer TEntity içinde TenantId kolonu varsa ve current user'ın TenantId'si varsa,
+        /// query'ye "x => x.TenantId == currentTenantId" filtresini uygular.
+        /// </summary>
+        protected IQueryable<TEntity> ApplyTenantFilterIfNeeded(IQueryable<TEntity> query)
+        {
+            // Entity'de TenantId property'si var mı?
+            var tenantProp = typeof(TEntity).GetProperty(
+                "TenantId",
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
+            if (tenantProp == null)
+                return query; // TenantId yoksa dokunma
+
+            if (tenantProp.PropertyType != typeof(long) &&
+                tenantProp.PropertyType != typeof(long?))
+                return query; // Tip uymuyorsa da dokunma
+
+            // Kullanıcının tenant'ını claim'den oku
+            var currentTenantId = GetCurrentTenantIdOrDefault();
+            if (!currentTenantId.HasValue)
+                return query; // Kullanıcının tenant'ı yoksa filtreleme yapma
+
+            // x => x.TenantId == currentTenantId
+            var parameter = Expression.Parameter(typeof(TEntity), "x");
+            var member = Expression.Property(parameter, tenantProp);
+
+            Expression body;
+            if (tenantProp.PropertyType == typeof(long))
+            {
+                body = Expression.Equal(
+                    member,
+                    Expression.Constant(currentTenantId.Value, typeof(long)));
+            }
+            else // long?
+            {
+                body = Expression.Equal(
+                    member,
+                    Expression.Convert(
+                        Expression.Constant(currentTenantId.Value),
+                        typeof(long?)));
+            }
+
+            var lambda = Expression.Lambda<Func<TEntity, bool>>(body, parameter);
+            return query.Where(lambda);
+        }
     }
 }

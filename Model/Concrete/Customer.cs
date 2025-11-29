@@ -117,6 +117,10 @@ namespace Model.Concrete
         public long? CustomerTypeId { get; set; }
         public CustomerType? CustomerType { get; set; }
 
+        public long? TenantId { get; set; }
+        public Tenant? Tenant { get; set; }
+
+
 
 
         // Navigations (fiyatlar)

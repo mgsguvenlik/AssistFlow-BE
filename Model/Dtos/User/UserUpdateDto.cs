@@ -15,7 +15,7 @@ namespace Model.Dtos.User
         public bool IsActive { get; set; }
         // Şifre değiştirme opsiyonel
         public string? NewPassword { get; set; }
-
+        public long? TenantId { get; set; }
         public List<long>? RoleIds { get; set; }
     }
 }

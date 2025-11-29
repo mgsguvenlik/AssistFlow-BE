@@ -28,6 +28,7 @@ namespace Model.Dtos.User
 
         [MaxLength(254), EmailAddress]
         public string? TechnicianEmail { get; set; }
+        public long? TenantId { get; set; }
 
         // Şifre: min 8, en az 1 büyük, 1 küçük harf ve 1 rakam
         [Required, MinLength(8)]
