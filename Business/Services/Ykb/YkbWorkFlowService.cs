@@ -1805,7 +1805,6 @@ namespace Business.Services.Ykb
                 existsFinalApproval.DiscountPercent = dto.DiscountPercent;
                 existsFinalApproval.Status = dto.FinalApprovalStatus;
 
-
                 _uow.Repository.Update(existsFinalApproval);
                 #endregion
 
