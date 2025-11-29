@@ -131,6 +131,12 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
             return Ok(result);
         }
+        [HttpGet("get-customerform-byrequestno")]
+        public async Task<IActionResult> GetCustomerFormByRequestNoAsync([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetCustomerFormByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
 
         [HttpPost("update-services-request/{id:long}")]
         public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] YkbServicesRequestUpdateDto dto)

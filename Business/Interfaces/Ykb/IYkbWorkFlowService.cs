@@ -37,6 +37,8 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<YkbFinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id);
         Task<ResponseModel<YkbFinalApprovalGetDto>> CustomerAgreementAsync(YkbCustomerAgreementDto dto);
 
+
+        Task<ResponseModel<YkbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo);
         // WorkFlowStep
         Task<ResponseModel<PagedResult<YkbWorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
         Task<ResponseModel<YkbWorkFlowStepGetDto>> GetStepByIdAsync(long id);
