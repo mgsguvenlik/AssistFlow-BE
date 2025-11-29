@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -51,6 +52,25 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
 
+
+        #region YKB
+        public DbSet<YkbCustomerForm> YkbCustomerForms { get; set; } = default!;
+        public DbSet<YkbServicesRequest> YkbServicesRequests { get; set; } = default!;
+        public DbSet<YkbServicesRequestProduct> YkbServicesRequestProducts { get; set; } = default!;
+        public DbSet<YkbTechnicalService> YkbTechnicalServices { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceImage> YkbTechnicalServiceImages { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceFormImage> YkbTechnicalServiceFormImages { get; set; } = default!;
+        public DbSet<YkbPricing> YkbPricings { get; set; } = default!;
+        public DbSet<YkbFinalApproval> YkbFinalApprovals { get; set; } = default!;
+        public DbSet<YkbWarehouse> YkbWarehouses { get; set; } = default!;
+        public DbSet<YkbWorkFlow> YkbWorkFlows { get; set; } = default!;
+        public DbSet<YkbWorkFlowStep> YkbWorkFlowSteps { get; set; } = default!;
+        public DbSet<YkbWorkFlowActivityRecord> YkbWorkFlowActivityRecords { get; set; } = default!;
+        public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
+        public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
+
+        #endregion
+
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
         /// </summary>
@@ -58,6 +78,37 @@ namespace Data.Concrete.EfCore.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            #region YKB
+            // YKB tarafında DataAnnotation ile şema/isim verdiğin için,
+            // burada ekstra ToTable yazman şart değil.
+            // Sadece ufak ince ayarlar gerekiyorsa buraya ekleyebilirsin.
+
+            modelBuilder.Entity<YkbServicesRequestProduct>()
+                        .Property(x => x.CapturedUnitPrice)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<YkbServicesRequestProduct>()
+                        .Property(x => x.CapturedTotal)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<YkbTechnicalService>()
+                        .Property(x => x.StartTime)
+                        .HasConversion(
+                            v => v,
+                            v => v.HasValue ? DateTime.SpecifyKind(v.Value.DateTime, DateTimeKind.Utc) : v
+                        );
+
+            // Gerek görürsen YKB için özel index’ler:
+            modelBuilder.Entity<YkbWorkFlow>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbServicesRequest>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbCustomerForm>()
+                        .HasIndex(x => x.RequestNo);
+            #endregion
+
 
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>

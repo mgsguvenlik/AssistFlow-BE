@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20251127195542_Ykb_Init")]
+    partial class Ykb_Init
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1816,15 +1819,6 @@ namespace Data.Migrations
                     b.Property<long>("CreatedUser")
                         .HasColumnType("bigint");
 
-                    b.Property<DateTime?>("CustomerApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<long?>("CustomerApprovedBy")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("CustomerNote")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<long?>("DecidedBy")
                         .HasColumnType("bigint");
 
@@ -1921,7 +1915,7 @@ namespace Data.Migrations
                     b.Property<long?>("CustomerApproverId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("CustomerId")
+                    b.Property<long>("CustomerId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Description")
@@ -1951,7 +1945,7 @@ namespace Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<long?>("ServiceTypeId")
+                    b.Property<long>("ServiceTypeId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("ServicesCostStatus")
@@ -2016,7 +2010,7 @@ namespace Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<long?>("CustomerId")
+                    b.Property<long>("CustomerId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("IsPriceCaptured")
@@ -2825,11 +2819,15 @@ namespace Data.Migrations
 
                     b.HasOne("Model.Concrete.Customer", "Customer")
                         .WithMany()
-                        .HasForeignKey("CustomerId");
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Model.Concrete.ServiceType", "ServiceType")
                         .WithMany()
-                        .HasForeignKey("ServiceTypeId");
+                        .HasForeignKey("ServiceTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Model.Concrete.Ykb.YkbWorkFlowStep", "YkbWorkFlowStep")
                         .WithMany()
@@ -2848,7 +2846,9 @@ namespace Data.Migrations
                 {
                     b.HasOne("Model.Concrete.Customer", "Customer")
                         .WithMany()
-                        .HasForeignKey("CustomerId");
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Model.Concrete.Product", "Product")
                         .WithMany()
@@ -2873,7 +2873,7 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalServiceFormImage", b =>
                 {
                     b.HasOne("Model.Concrete.Ykb.YkbTechnicalService", "YkbTechnicalService")
-                        .WithMany("YkbServiceRequestFormImages")
+                        .WithMany("YkbTechnicalServiceFormImages")
                         .HasForeignKey("YkbTechnicalServiceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2884,7 +2884,7 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalServiceImage", b =>
                 {
                     b.HasOne("Model.Concrete.Ykb.YkbTechnicalService", "YkbTechnicalService")
-                        .WithMany("YkbServicesImages")
+                        .WithMany("YkbTechnicalServiceImages")
                         .HasForeignKey("YkbTechnicalServiceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -3012,9 +3012,9 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalService", b =>
                 {
-                    b.Navigation("YkbServiceRequestFormImages");
+                    b.Navigation("YkbTechnicalServiceFormImages");
 
-                    b.Navigation("YkbServicesImages");
+                    b.Navigation("YkbTechnicalServiceImages");
                 });
 #pragma warning restore 612, 618
         }

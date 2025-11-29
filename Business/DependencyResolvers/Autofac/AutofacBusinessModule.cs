@@ -1,7 +1,9 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Ykb;
 using Business.Utilities.Security;
 using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
@@ -37,6 +39,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
             services.AddScoped(typeof(IMailService), typeof(MailService));
             services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
+            services.AddScoped(typeof(IYkbWorkFlowService), typeof(YkbWorkFlowService));
             services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
             services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));

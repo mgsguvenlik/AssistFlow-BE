@@ -83,40 +83,46 @@ namespace Data.Seeding.Seeds
             var workFlowSteps = new List<WorkFlowStep>
             {
                 new() {
-            Name = "Servis Talebi Oluşturma",
-            Code = "SR", // Services Request
-            Order = 1,
-        },
-                new() {
-            Name = "Depo Sevkiyatı",
-            Code = "WH", // Warehouse
-            Order = 2,
-        },
-                new() {
-            Name = "Teknik Servis İşlemleri",
-            Code = "TS", // Technical Service
-            Order = 3,
-        },
-                new() {
-            Name = "Fiyatlandırma",
-            Code = "PRC", // Pricing
-            Order = 4,
-        },
-                new() {
-            Name = "Onaylama",
-            Code = "APR", // Approval
-            Order = 5,
-        },
-                new() {
-            Name = "İptal Edildi",
-            Code = "CNC", // Cancelled
-            Order = 99,
-        },
-                new() {
-            Name = "Tamamlandı",
-            Code = "CMP", // Completed
-            Order = 100,
-        }
+                     Name = "Müşteri Formu Oluşturma",
+                     Code = "CF", // Services Request
+                     Order = 1,
+                 },
+
+                     new() {
+                     Name = "Servis Talebi Oluşturma",
+                     Code = "SR", // Services Request
+                     Order = 2,
+                 },
+                         new() {
+                     Name = "Depo Sevkiyatı",
+                     Code = "WH", // Warehouse
+                     Order = 3,
+                 },
+                         new() {
+                     Name = "Teknik Servis İşlemleri",
+                     Code = "TS", // Technical Service
+                     Order = 4,
+                 },
+                         new() {
+                     Name = "Fiyatlandırma",
+                     Code = "PRC", // Pricing
+                     Order = 5,
+                 },
+                         new() {
+                     Name = "Onaylama",
+                     Code = "APR", // Approval
+                     Order = 6,
+                 },
+                         new() {
+                     Name = "İptal Edildi",
+                     Code = "CNC", // Cancelled
+                     Order = 99,
+                 },
+                         new() {
+                     Name = "Tamamlandı",
+                     Code = "CMP", // Completed
+                     Order = 100,
+                 }
             };
 
             var existingNames = await db.Set<WorkFlowStep>()
