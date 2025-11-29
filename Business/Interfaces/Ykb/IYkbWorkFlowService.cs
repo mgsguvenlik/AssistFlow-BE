@@ -35,6 +35,7 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<YkbFinalApprovalGetDto>> FinalApprovalAsync(YkbFinalApprovalUpdateDto dto);
         Task<ResponseModel<YkbFinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo);
         Task<ResponseModel<YkbFinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id);
+        Task<ResponseModel<YkbFinalApprovalGetDto>> CustomerAgreementAsync(YkbCustomerAgreementDto dto);
 
         // WorkFlowStep
         Task<ResponseModel<PagedResult<YkbWorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
@@ -59,6 +60,8 @@ namespace Business.Interfaces.Ykb
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<YkbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
 
+        // Müşteri Onayı 
+        Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo);
 
         // Report 
 

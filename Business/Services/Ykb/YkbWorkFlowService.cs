@@ -4,6 +4,7 @@ using Business.UnitOfWork;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
+using Core.Enums.Ykb;
 using Core.Settings.Concrete;
 using Core.Utilities.IoC;
 using Dapper;
@@ -128,7 +129,7 @@ namespace Business.Services.Ykb
                 var wf = new YkbWorkFlow
                 {
                     RequestNo = request.RequestNo,
-                    RequestTitle =dto.Title??"",
+                    RequestTitle = dto.Title ?? "",
                     Priority = dto.Priority,
                     CurrentStepId = initialStep.Id,
                     CreatedDate = DateTime.Now,
@@ -166,14 +167,14 @@ namespace Business.Services.Ykb
         }
 
         //0.1 Müşteri Formunun Servis talebine gönderilmesi. 
-        public async  Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto)
+        public async Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto)
         {
             try
             {
                 #region Validasyon/Kontroller
-                 var customerForm = await _uow.Repository.GetQueryable<YkbCustomerForm>()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.RequestNo == dto.RequestNo);
+                var customerForm = await _uow.Repository.GetQueryable<YkbCustomerForm>()
+                   .AsNoTracking()
+                   .FirstOrDefaultAsync(s => s.RequestNo == dto.RequestNo);
                 if (customerForm is null)
                     return ResponseModel<YkbServicesRequestGetDto>.Fail("Müşteri formu bulunamadı.", StatusCode.Conflict);
 
@@ -490,7 +491,7 @@ namespace Business.Services.Ykb
                 return ResponseModel<YkbServicesRequestGetDto>.Fail($"Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
-     
+
         //2.1 Depoya Gönderim  (Ürün var ise)
         public async Task<ResponseModel<YkbWarehouseGetDto>> SendWarehouseAsync(YkbSendWarehouseDto dto)
         {
@@ -1728,6 +1729,9 @@ namespace Business.Services.Ykb
                 if (existsFinalApproval is null)
                     return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.BadRequest);
 
+                if (existsFinalApproval.Status == FinalApprovalStatus.CustomerApproval)
+                    return ResponseModel<YkbFinalApprovalGetDto>.Fail($"Hedef iş akışı müşteri onayında.", StatusCode.BadRequest);
+
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
                 #endregion
@@ -1863,7 +1867,7 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbFinalApprovalGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                if (wf.CurrentStep?.Code != "CST")
+                if (wf.CurrentStep?.Code != "CAPR")
                     return ResponseModel<YkbFinalApprovalGetDto>.Fail("Bu işlem sadece YKB müşteri onay adımında yapılabilir.", StatusCode.BadRequest);
 
                 var request = await _uow.Repository
@@ -1885,42 +1889,8 @@ namespace Business.Services.Ykb
                 var meId = me?.Id ?? 0;
 
                 #endregion
-
-                if (!dto.IsAgreed)
-                {
-                    // 🔹 Geri gönder: 6. adım → 5. adıma dön
-                    finalApproval.CustomerNote = dto.CustomerNote;
-                    finalApproval.CustomerApprovedBy = meId;
-                    finalApproval.CustomerApprovedAt = DateTime.Now;
-                    _uow.Repository.Update(finalApproval);
-
-                    var aprStep = await _uow.Repository
-                        .GetQueryable<YkbWorkFlowStep>()
-                        .AsNoTracking()
-                        .FirstAsync(s => s.Code == "APR");
-
-                    wf.CurrentStepId = aprStep.Id;
-                    wf.IsAgreement = null; // tekrar teknik servis müdürünün kararı beklenecek
-                    wf.WorkFlowStatus = WorkFlowStatus.Pending;
-                    wf.UpdatedDate = DateTime.Now;
-                    wf.UpdatedUser = meId;
-                    _uow.Repository.Update(wf);
-
-                    await _activationRecord.LogAsync(
-                        WorkFlowActionType.FinalApprovalUpdated,
-                        dto.RequestNo,
-                        wf.Id,
-                        request.CustomerId,
-                        fromStepCode: "CST",
-                        toStepCode: "APR",
-                        "YKB tarafından geri gönderildi.",
-                        new { dto.CustomerNote }
-                    );
-
-                    // Notification: teknik servis müdürüne
-                    // await _notification.CreateForRoleAsync(...);
-                }
-                else
+              
+                if (dto.IsAgreed)
                 {
                     // 🔹 Mutabık Kalındı: akış tamamlanır
                     finalApproval.CustomerNote = dto.CustomerNote;
@@ -1940,7 +1910,7 @@ namespace Business.Services.Ykb
                         dto.RequestNo,
                         wf.Id,
                         request.CustomerId,
-                        fromStepCode: "CST",
+                        fromStepCode: "CAPR",
                         toStepCode: "APR",
                         "YKB tarafından Mutabık Kalındı ve süreç tamamlandı.",
                         new { dto.CustomerNote }
@@ -1955,7 +1925,7 @@ namespace Business.Services.Ykb
                             Title = $"Talep {dto.RequestNo} tamamlandı",
                             Message = $"YKB son onayı alındı. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
                             RequestNo = dto.RequestNo,
-                            FromStepCode = "CST",
+                            FromStepCode = "CAPR",
                             ToStepCode = "APR",
                         },
                         roleCode: "READ-ONLY" // veya ilgili rol/grup kimse
@@ -1963,7 +1933,7 @@ namespace Business.Services.Ykb
                 }
 
                 await _uow.Repository.CompleteAsync();
-                return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
+                return await GetCustomerAgreementByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
             {
@@ -2761,7 +2731,7 @@ namespace Business.Services.Ykb
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
 
-      
+
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
 
@@ -2942,6 +2912,37 @@ namespace Business.Services.Ykb
                         _uow.Repository.Update(serviceRequest);
                     }
                     break;
+
+                case "CAPR": // Servis Talebi Adımı (ServicesRequest)
+                    var customerForm = await _uow.Repository
+                        .GetQueryable<YkbCustomerForm>()
+                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                    if (customerForm != null)
+                    {
+
+                        targetStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.Code == "APR");
+                        if (targetStep is null)
+                            return ResponseModel<YkbWorkFlowGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
+                        customerForm.UpdatedDate = DateTime.Now;
+                        customerForm.UpdatedUser = meId;
+                        customerForm.Status = YkbCustomerFormStatus.AwaitingReview;
+                        _uow.Repository.Update(customerForm);
+
+
+                        var approval = await _uow.Repository.GetQueryable<YkbFinalApproval>().FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                        if (approval is null)
+                            return ResponseModel<YkbWorkFlowGetDto>.Fail("Hedef iş akışı (APR) bulunamadı", StatusCode.BadRequest);
+
+                        approval.Status = FinalApprovalStatus.Pending;
+                        approval.UpdatedDate = DateTime.Now;
+                        approval.UpdatedUser = meId;
+
+
+                    }
+                    break;
+
 
                 default:
                     break;
@@ -3917,6 +3918,127 @@ namespace Business.Services.Ykb
                           ?? 0m,
                  })
                  .ToListAsync();
+
+            // REVIEW LOG’ları (APR adımı)
+            dto.ReviewLogs = await _uow.Repository
+                .GetQueryable<YkbWorkFlowReviewLog>(x =>
+                    x.RequestNo == dto.RequestNo &&
+                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
+                .AsNoTracking()
+                .OrderByDescending(x => x.CreatedDate)
+                .ProjectToType<YkbWorkFlowReviewLogDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<YkbFinalApprovalGetDto>.Success(dto);
+        }
+
+
+        //-----------------------Customer Agreement ---------------------------------------------------
+        public async Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo)
+        {
+            var qFinal = _uow.Repository.GetQueryable<YkbFinalApproval>().AsNoTracking();
+            var qRequest = _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking();
+
+            // HEADER: FinalApproval + (left) ServicesRequest -> Customer
+            var dto = await (
+                from fa in qFinal
+                where fa.RequestNo == requestNo && fa.Status==FinalApprovalStatus.CustomerApproval
+                join sr0 in qRequest on fa.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new YkbFinalApprovalGetDto
+                {
+                    Id = fa.Id,
+                    RequestNo = fa.RequestNo,
+                    Notes = fa.Notes,
+                    DecidedBy = fa.DecidedBy,
+                    Status = fa.Status,
+
+                    DiscountPercent = fa.DiscountPercent,
+
+                    Customer = sr != null && sr.Customer != null
+                        ? new CustomerGetDto
+                        {
+                            Id = sr.Customer.Id,
+                            SubscriberCode = sr.Customer.SubscriberCode,
+                            SubscriberCompany = sr.Customer.SubscriberCompany,
+                            SubscriberAddress = sr.Customer.SubscriberAddress,
+                            City = sr.Customer.City,
+                            District = sr.Customer.District,
+                            LocationCode = sr.Customer.LocationCode,
+                            ContactName1 = sr.Customer.ContactName1,
+                            Phone1 = sr.Customer.Phone1,
+                            Email1 = sr.Customer.Email1,
+                            ContactName2 = sr.Customer.ContactName2,
+                            Phone2 = sr.Customer.Phone2,
+                            Email2 = sr.Customer.Email2,
+                            CustomerShortCode = sr.Customer.CustomerShortCode,
+                            CorporateLocationId = sr.Customer.CorporateLocationId,
+                            Longitude = sr.Customer.Longitude,
+                            Latitude = sr.Customer.Latitude,
+                            InstallationDate = sr.Customer.InstallationDate,
+                            WarrantyYears = sr.Customer.WarrantyYears,
+                            CustomerGroupId = sr.Customer.CustomerGroupId,
+                            CustomerTypeId = sr.Customer.CustomerTypeId,
+                            Note = sr.Customer.Note,
+                            CashCenter = sr.Customer.CashCenter,
+                            LockType = sr.Customer.LockType,
+                            Systems = sr.Customer.CustomerSystemAssignments
+                                 .Select(a => new CustomerSystemAssignmentGetDto
+                                 {
+                                     Id = a.Id,
+                                     CustomerId = a.CustomerId,
+                                     CustomerSystemId = a.CustomerSystemId,
+                                     HasMaintenanceContract = a.HasMaintenanceContract,
+
+                                     // Ekranda göstermek için:
+                                     SystemName = a.CustomerSystem.Name,
+                                     SystemCode = a.CustomerSystem.Code,
+
+                                     // İstersen müşteri bilgilerini de doldurabiliriz:
+                                     CustomerName = a.Customer.SubscriberCompany,
+                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                 })
+                                .ToList()
+                        }
+                        : null
+                }
+            ).FirstOrDefaultAsync();
+
+            if (dto is null)
+                return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
+            dto.Products = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new YkbServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
+
+                    // ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
+
+                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
+                    PriceCurrency = p.CapturedCurrency
+                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
+
+                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
+                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
+                    ProductPrice = p.CapturedUnitPrice
+                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
+                       ?? 0m,
+
+                    // 🔹 EffectivePrice: artık runtime hesap yok,
+                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
+                    EffectivePrice = p.CapturedUnitPrice
+                         ?? 0m,
+                })
+                .ToListAsync();
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository

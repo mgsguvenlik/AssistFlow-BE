@@ -19,30 +19,31 @@ namespace Data.Seeding.Seeds
         {
             var workFlowSteps = new List<WorkFlowStep>
             {
+
                 new() {
                      Name = "Servis Talebi Oluşturma",
                      Code = "SR", // Services Request
-                     Order = 2,
+                     Order = 1,
                  },
                 new() {
                      Name = "Depo Sevkiyatı",
                      Code = "WH", // Warehouse
-                     Order = 3,
+                     Order = 2,
                  },
                 new() {
                      Name = "Teknik Servis İşlemleri",
                      Code = "TS", // Technical Service
-                     Order = 4,
+                     Order = 3,
                  },
                 new() {
                      Name = "Fiyatlandırma",
                      Code = "PRC", // Pricing
-                     Order = 5,
+                     Order = 4,
                  },
                 new() {
                      Name = "Onaylama",
                      Code = "APR", // Approval
-                     Order = 6,
+                     Order = 5,
                  },
                 new() {
                      Name = "İptal Edildi",

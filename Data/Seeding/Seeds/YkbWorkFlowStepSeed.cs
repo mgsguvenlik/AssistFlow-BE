@@ -49,7 +49,13 @@ namespace Data.Seeding.Seeds
                 new() {
                      Name = "Onaylama",
                      Code = "APR", // Approval
-                     Order = 6,
+                     Order = 6 
+                },
+
+                 new() {
+                     Name = "Müşteri Onayında",
+                     Code = "CAPR", //Customer Approval
+                     Order = 7,
                  },
                 new() {
                      Name = "İptal Edildi",

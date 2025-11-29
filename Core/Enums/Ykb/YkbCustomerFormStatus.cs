@@ -10,7 +10,7 @@ namespace Core.Enums.Ykb
     {
         Draft = 0,
         Submitted = 1,
-        ConvertedToRequest = 2,
-        Cancelled = 3
+        AwaitingReview = 2,
+        Cancelled = 3,
     }
 }

@@ -198,10 +198,29 @@ namespace WebAPI.Controllers
         }
 
 
+        [HttpPost("customer-agreement")]
+        public async Task<IActionResult> CustomerAgreementAsync([FromBody] YkbCustomerAgreementDto dto)
+        {
+            var result = await _workFlowService.CustomerAgreementAsync(dto);
+            return Ok(result);
+        }
+
+
+
+
         [HttpGet("get-finalapproval-by-requestno")]
         public async Task<IActionResult> GetFinalApprovalByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetFinalApprovalByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+
+
+        [HttpGet("get-customeragreement-by-requestno")]
+        public async Task<IActionResult> GetCustomerAgreementByRequestNoAsync([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetCustomerAgreementByRequestNoAsync(requestNo);
             return Ok(result);
         }
 

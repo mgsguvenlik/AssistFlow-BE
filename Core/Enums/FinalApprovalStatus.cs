@@ -6,5 +6,6 @@
         Approved = 2,
         Rejected = 3,
         AwaitingReview = 4,
+        CustomerApproval = 5,
     }
 }
