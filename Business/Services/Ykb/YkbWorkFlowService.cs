@@ -74,7 +74,7 @@ namespace Business.Services.Ykb
         }
 
         /// -------------------- ServicesRequest --------------------
-        //0 Müşteri kendi formunu oluşturulması (Taslak).  
+        //0 Müşteri kendi formunu oluşturulması ve Servis talebine gönderim.  
         public async Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto)
         {
             try
@@ -158,7 +158,7 @@ namespace Business.Services.Ykb
                       dto.CustomerId,
                       targetStep.Code,
                       "CF",
-                      "Müşteri talap formu oluşturuldu",
+                      "Müşteri talap formu oluşturuldu ve servis talebine gönderildi",
                       new
                       {
                           dto,
@@ -176,7 +176,7 @@ namespace Business.Services.Ykb
             }
         }
 
-        //0.1 Müşteri Formunun Servis talebine gönderilmesi. 
+        //0.1 Müşteri Formunun Servis talebine gönderilmesi.  Şimdilik Kullanılmıyor
         public async Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto)
         {
             try
