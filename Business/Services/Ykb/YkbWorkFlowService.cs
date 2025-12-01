@@ -9,6 +9,7 @@ using Core.Settings.Concrete;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -80,12 +81,12 @@ namespace Business.Services.Ykb
             {
                 #region Validasyon/Kontroller
                 // Başlangıç WorkFlowStep'i Bul
-                var initialStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                var targetStep= await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.Code == "CF"); // Örn: 'SR' (Services Request) kodu ile başlangıç adımı
+                    .FirstOrDefaultAsync(s => s.Code == "SR"); // Örn: 'SR' (Services Request) kodu ile başlangıç adımı
 
-                if (initialStep is null)
-                    return ResponseModel<YkbCustomerFormGetDto>.Fail("İş akışı başlangıç adımı (CF) tanımlı değil.", StatusCode.BadRequest);
+                if (targetStep is null)
+                    return ResponseModel<YkbCustomerFormGetDto>.Fail("İş akışı hedef adımı (SR) tanımlı değil.", StatusCode.BadRequest);
 
                 // RequestNo yoksa üret
                 if (string.IsNullOrWhiteSpace(dto.RequestNo))
@@ -118,20 +119,20 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Müşteri formu Oluşturma 
-                var request = dto.Adapt<YkbCustomerForm>(_config);
-                request.CreatedDate = DateTime.Now;
-                request.CreatedUser = meId;
-                request.Status = Core.Enums.Ykb.YkbCustomerFormStatus.Draft;
-                await _uow.Repository.AddAsync(request);
+                var customerForm = dto.Adapt<YkbCustomerForm>(_config);
+                customerForm.CreatedDate = DateTime.Now;
+                customerForm.CreatedUser = meId;
+                customerForm.Status = Core.Enums.Ykb.YkbCustomerFormStatus.Draft;
+                await _uow.Repository.AddAsync(customerForm);
                 #endregion
 
                 #region  WorkFlow oluştur (aynı RequestNo ile)
                 var wf = new YkbWorkFlow
                 {
-                    RequestNo = request.RequestNo,
+                    RequestNo = customerForm.RequestNo,
                     RequestTitle = dto.Title ?? "",
                     Priority = dto.Priority,
-                    CurrentStepId = initialStep.Id,
+                    CurrentStepId = targetStep.Id,
                     CreatedDate = DateTime.Now,
                     CreatedUser = meId,
                     WorkFlowStatus = WorkFlowStatus.Pending,
@@ -140,15 +141,24 @@ namespace Business.Services.Ykb
                 await _uow.Repository.AddAsync(wf);
                 #endregion
 
+                #region Servis talebi oluşturma 
+                var request = customerForm.Adapt<YkbServicesRequest>(_config);
+                request.CreatedDate = DateTime.Now;
+                request.CreatedUser = meId;
+                request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                request.Id = 0;
+                await _uow.Repository.AddAsync(request);
+                #endregion
+
                 #region Hareket Kaydı
                 await _activationRecord.LogAsync(
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
                       dto.CustomerId,
-                      initialStep.Code,
+                      targetStep.Code,
                       "CF",
-                      "Müşteri talpe formu oluşturuldu",
+                      "Müşteri talap formu oluşturuldu",
                       new
                       {
                           dto,
@@ -594,20 +604,20 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı 
-                await _activationRecord.LogAsync(
-                     WorkFlowActionType.WarehouseSent,
-                     request.RequestNo,
-                     wf.Id,
-                     request.CustomerId,
-                     "SR",
-                     "WH",
-                     "Talep depoya gönderildi",
-                     new
-                     {
-                         DeliveryDate = dto.DeliveryDate,
-                         Products = product.Select(x => new { x.ProductId, x.Quantity })
-                     }
-                );
+                //await _activationRecord.LogAsync(
+                //     WorkFlowActionType.WarehouseSent,
+                //     request.RequestNo,
+                //     wf.Id,
+                //     request.CustomerId,
+                //     "SR",
+                //     "WH",
+                //     "Talep depoya gönderildi",
+                //     new
+                //     {
+                //         DeliveryDate = dto.DeliveryDate,
+                //         Products = product.Select(x => new { x.ProductId, x.Quantity })
+                //     }
+                //);
                 #endregion
 
                 #region Bilgilendirme Maili
@@ -2294,8 +2304,7 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbCustomerFormGetDto>.Success(baseDto);
         }
-
-
+     
         // -------------------- Services Request --------------------
         private static Func<IQueryable<YkbServicesRequest>, IIncludableQueryable<YkbServicesRequest, object>>? RequestIncludes()
             => q => q
