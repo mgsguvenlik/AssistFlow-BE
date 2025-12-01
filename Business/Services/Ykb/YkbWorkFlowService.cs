@@ -1947,7 +1947,7 @@ namespace Business.Services.Ykb
                 }
 
                 await _uow.Repository.CompleteAsync();
-                return await GetCustomerAgreementByRequestNoAsync(dto.RequestNo);
+                return await GetCustomerAgreementByRequestNoAsync(dto.RequestNo, FinalApprovalStatus.Approved);
             }
             catch (Exception ex)
             {
@@ -3937,7 +3937,7 @@ namespace Business.Services.Ykb
 
 
         //-----------------------Customer Agreement ---------------------------------------------------
-        public async Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo)
+        public async Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo, FinalApprovalStatus status = FinalApprovalStatus.CustomerApproval)
         {
             var qFinal = _uow.Repository.GetQueryable<YkbFinalApproval>().AsNoTracking();
             var qRequest = _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking();
@@ -3945,7 +3945,7 @@ namespace Business.Services.Ykb
             // HEADER: FinalApproval + (left) ServicesRequest -> Customer
             var dto = await (
                 from fa in qFinal
-                where fa.RequestNo == requestNo && fa.Status == FinalApprovalStatus.CustomerApproval
+                where fa.RequestNo == requestNo && fa.Status == status
                 join sr0 in qRequest on fa.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
                 select new YkbFinalApprovalGetDto

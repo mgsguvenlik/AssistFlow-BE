@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Core.Enums;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
@@ -63,7 +64,7 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<YkbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
 
         // Müşteri Onayı 
-        Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo);
+        Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo, FinalApprovalStatus staqtus = FinalApprovalStatus.CustomerApproval);
 
         // Report 
 
