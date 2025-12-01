@@ -34,7 +34,7 @@ namespace Model.Concrete.Ykb
         public long? WorkFlowId { get; set; }
 
         [ForeignKey(nameof(WorkFlowId))]
-        public WorkFlow? WorkFlow { get; set; }
+        public YkbWorkFlow? WorkFlow { get; set; }
 
         public long? CustomerId { get; set; }
 
