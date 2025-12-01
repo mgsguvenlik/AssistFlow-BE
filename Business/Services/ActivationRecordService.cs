@@ -6,7 +6,9 @@ using Core.Enums;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Model.Abstractions;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using System;
@@ -42,7 +44,7 @@ namespace Business.Services
             _config = config;
         }
 
-        public async Task LogAsync(WorkFlowActivityRecord entry, CancellationToken ct = default)
+        public async Task LogAsync_(WorkFlowActivityRecord entry, CancellationToken ct = default)
         {
             // Kim?
             var me = (await _auth.MeAsync())?.Data;
@@ -65,6 +67,10 @@ namespace Business.Services
             // CompleteAsync çağrısını dışarıya bırakıyoruz (aynı transaction'da kalsın)
         }
 
+        public async Task LogAsync(WorkFlowActivityRecord entry, CancellationToken ct = default)
+        {
+            await LogCoreAsync(entry, ct);
+        }
         public Task LogAsync(
             WorkFlowActionType type,
             string? requestNo,
@@ -89,6 +95,37 @@ namespace Business.Services
             };
 
             return LogAsync(entry, ct);
+        }
+
+        public async Task LogYkbAsync(YkbWorkFlowActivityRecord entry, CancellationToken ct = default)
+        {
+            await LogCoreAsync(entry, ct);
+        }
+
+        public Task LogYkbAsync(
+                WorkFlowActionType type,
+                string? requestNo,
+                long? workFlowId,
+                long? customerId,
+                string? fromStepCode,
+                string? toStepCode,
+                string? summary,
+                object? payload,
+                CancellationToken ct = default)
+                    {
+            var entry = new YkbWorkFlowActivityRecord
+            {
+                ActionType = type,
+                RequestNo = requestNo,
+                WorkFlowId = workFlowId,
+                FromStepCode = fromStepCode,
+                ToStepCode = toStepCode,
+                Summary = summary,
+                CustomerId = customerId,
+                PayloadJson = payload is null ? null : JsonSerializer.Serialize(payload, JsonOpts)
+            };
+
+            return LogYkbAsync(entry, ct);
         }
 
         public async Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestActivityRecordByRequestNoAsync(string requestNo)
@@ -330,5 +367,33 @@ namespace Business.Services
             var result = new PagedResult<WorkFlowActivityRecorGetDto>(items, total, page, pageSize);
             return ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>.Success(result, "", StatusCode.Ok);
         }
+
+
+
+        private async Task LogCoreAsync<TEntity>(TEntity entry, CancellationToken ct = default)
+             where TEntity : class, IActivityRecordEntity
+        {
+            // Kim?
+            var me = (await _auth.MeAsync())?.Data;
+            entry.PerformedByUserId = me?.Id;
+            entry.PerformedByUserName = me?.TechnicianName ?? me?.Email;
+
+            // İstemci
+            var http = _httpCtx.HttpContext;
+            entry.ClientIp = http?.Connection?.RemoteIpAddress?.ToString();
+            var ua = http?.Request?.Headers["User-Agent"].ToString();
+            entry.UserAgent = string.IsNullOrEmpty(ua) ? null : (ua.Length > 200 ? ua[..200] : ua);
+
+            // Zaman
+            entry.OccurredAtUtc = DateTime.UtcNow;
+
+            // İzleme
+            entry.CorrelationId = http?.TraceIdentifier;
+
+            await _uow.Repository.AddAsync(entry, ct);
+            // CompleteAsync dışarıda
+        }
+
+
     }
 }

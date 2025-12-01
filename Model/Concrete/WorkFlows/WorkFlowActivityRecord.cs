@@ -1,5 +1,6 @@
 ﻿using Core.Enums;
 using Microsoft.EntityFrameworkCore;
+using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -8,7 +9,7 @@ namespace Model.Concrete.WorkFlows
     [Index(nameof(RequestNo))]
     [Index(nameof(WorkFlowId))]
     [Index(nameof(OccurredAtUtc))]
-    public class WorkFlowActivityRecord
+    public class WorkFlowActivityRecord: IActivityRecordEntity
     {
         [Key] public long Id { get; set; }
 

@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Abstractions;
 using Model.Concrete.WorkFlows;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -6,7 +7,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace Model.Concrete.Ykb
 {
     [Table("YkbWorkFlowActivityRecord", Schema = "ykb")]
-    public class YkbWorkFlowActivityRecord
+    public class YkbWorkFlowActivityRecord: IActivityRecordEntity
     {
         [Key] public long Id { get; set; }
 

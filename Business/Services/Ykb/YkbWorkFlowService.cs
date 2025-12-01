@@ -151,7 +151,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
@@ -236,7 +236,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
@@ -474,7 +474,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                       WorkFlowActionType.ServiceRequestCreated,
                       request.RequestNo,
                       null,
@@ -604,20 +604,20 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı 
-                //await _activationRecord.LogAsync(
-                //     WorkFlowActionType.WarehouseSent,
-                //     request.RequestNo,
-                //     wf.Id,
-                //     request.CustomerId,
-                //     "SR",
-                //     "WH",
-                //     "Talep depoya gönderildi",
-                //     new
-                //     {
-                //         DeliveryDate = dto.DeliveryDate,
-                //         Products = product.Select(x => new { x.ProductId, x.Quantity })
-                //     }
-                //);
+                await _activationRecord.LogYkbAsync(
+                     WorkFlowActionType.WarehouseSent,
+                     request.RequestNo,
+                     wf.Id,
+                     request.CustomerId,
+                     "SR",
+                     "WH",
+                     "Talep depoya gönderildi",
+                     new
+                     {
+                         DeliveryDate = dto.DeliveryDate,
+                         Products = product.Select(x => new { x.ProductId, x.Quantity })
+                     }
+                );
                 #endregion
 
                 #region Bilgilendirme Maili
@@ -829,7 +829,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                         WorkFlowActionType.WorkFlowStepChanged,
                         dto.RequestNo,
                         wf.Id,
@@ -986,7 +986,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                         WorkFlowActionType.WorkFlowStepChanged,
                         dto.RequestNo,
                         wf.Id,
@@ -1112,7 +1112,7 @@ namespace Business.Services.Ykb
                         if (!locationResult.IsSuccess)
                         {
                             #region Hareket Loglama
-                            await _activationRecord.LogAsync(
+                            await _activationRecord.LogYkbAsync(
                                WorkFlowActionType.LocationCheckFailed,
                                dto.RequestNo,
                                wf.Id,
@@ -1143,7 +1143,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                     WorkFlowActionType.TechnicalServiceStarted,
                     dto.RequestNo,
                     wf.Id,
@@ -1432,7 +1432,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                      WorkFlowActionType.TechnicalServiceFinished,
                      dto.RequestNo,
                      wf.Id,
@@ -1628,7 +1628,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                    WorkFlowActionType.PricingApproved,
                    dto.RequestNo,
                    wf.Id,
@@ -1819,7 +1819,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Hareket Kaydı
-                await _activationRecord.LogAsync(
+                await _activationRecord.LogYkbAsync(
                     WorkFlowActionType.FinalApprovalUpdated,
                     dto.RequestNo,
                     wf?.Id,
@@ -1919,7 +1919,7 @@ namespace Business.Services.Ykb
                     wf.UpdatedUser = meId;
                     _uow.Repository.Update(wf);
 
-                    await _activationRecord.LogAsync(
+                    await _activationRecord.LogYkbAsync(
                         WorkFlowActionType.FinalApprovalUpdated,
                         dto.RequestNo,
                         wf.Id,
@@ -2959,7 +2959,7 @@ namespace Business.Services.Ykb
             _uow.Repository.Update(wf);
 
             ///Aktivite Kaydı Yaz
-            await _activationRecord.LogAsync(
+            await _activationRecord.LogYkbAsync(
                 WorkFlowActionType.WorkFlowStepChanged,
                 requestNo,
                 wf.Id,
