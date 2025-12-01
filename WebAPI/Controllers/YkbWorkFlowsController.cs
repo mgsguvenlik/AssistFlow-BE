@@ -256,7 +256,7 @@ namespace WebAPI.Controllers
         [HttpGet("activity-records/{requestNo}")]
         public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)
         {
-            var result = await _activationRecordService.GetLatestActivityRecordByRequestNoAsync(requestNo);
+            var result = await _activationRecordService.GetLatestYkbActivityRecordByRequestNoAsync(requestNo);
             return ToActionResult(result);
         }
 

@@ -21,7 +21,7 @@ namespace Business.Interfaces
 
             CancellationToken ct = default);
 
-   
+
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestActivityRecordByRequestNoAsync(string requestNo);
         Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId, QueryParams q);
         Task<ResponseModel<PagedResult<WorkFlowActivityGroupDto>>> GetUserActivityGroupedByRequestNo(int userId, QueryParams q, int perGroupTake = 50);
@@ -40,6 +40,16 @@ namespace Business.Interfaces
            string? summary,
            object? payload,
            CancellationToken ct = default);
+
+
+        Task<ResponseModel<PagedResult<WorkFlowActivityGroupDto>>> GetYkbUserActivityGroupedByRequestNo(
+        int userId, QueryParams q, int perGroupTake = 50);
+
+        Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetYkbUserActivity(int userId, QueryParams q);
+
+        Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetYkbCustomerActivity(int customerId, QueryParams q);
+
+        Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestYkbActivityRecordByRequestNoAsync(string requestNo);
         #endregion
     }
 }
