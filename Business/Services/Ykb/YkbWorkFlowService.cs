@@ -37,9 +37,11 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
@@ -3226,7 +3228,7 @@ namespace Business.Services.Ykb
             var qWarehouse = _uow.Repository.GetQueryable<YkbWarehouse>().AsNoTracking();
             var qWorkFlow = _uow.Repository.GetQueryable<YkbWorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking();
-            var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+            var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking();
 
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
@@ -3941,6 +3943,7 @@ namespace Business.Services.Ykb
         {
             var qFinal = _uow.Repository.GetQueryable<YkbFinalApproval>().AsNoTracking();
             var qRequest = _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking();
+            var qTechnicalService = _uow.Repository.GetQueryable<YkbTechnicalService>().AsNoTracking();
 
             // HEADER: FinalApproval + (left) ServicesRequest -> Customer
             var dto = await (
@@ -4052,6 +4055,76 @@ namespace Business.Services.Ykb
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<YkbWorkFlowReviewLogDto>(_config)
                 .ToListAsync();
+
+            // RESİMLER: TechnicalService üzerinden form ve service resimlerini çek
+            var techService = await qTechnicalService
+                .Where(ts => ts.RequestNo == dto.RequestNo)
+                .Include(ts => ts.YkbServiceRequestFormImages)
+                .Include(ts => ts.YkbServicesImages)
+                .FirstOrDefaultAsync();
+
+            // --------------------------------------------------------------------
+            //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
+            // --------------------------------------------------------------------
+            var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+            var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+            string? NormalizeImageUrl(string? urlOrFileName)
+            {
+                if (string.IsNullOrWhiteSpace(urlOrFileName))
+                    return urlOrFileName;
+
+                // 1) Zaten tam URL ise (http/https) → hiç dokunma
+                if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    return urlOrFileName;
+                }
+
+                // 2) /uploads/xxx.png gibi relative path ise
+                if (urlOrFileName.StartsWith("/"))
+                {
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? urlOrFileName
+                        : $"{baseUrl}{urlOrFileName}";
+                }
+
+                // 3) Sadece dosya adı ise (Guid.ext)
+                var relative = $"/uploads/{urlOrFileName}";
+                return string.IsNullOrEmpty(baseUrl)
+                    ? relative
+                    : $"{baseUrl}{relative}";
+            }
+
+            if (techService != null)
+            {
+                // Service resimleri
+                if (techService.YkbServicesImages != null && techService.YkbServicesImages.Any())
+                {
+                    dto.ServicesImages = techService.YkbServicesImages
+                        .Select(img => new YkbTechnicalServiceImageGetDto
+                        {
+                            Id = img.Id,
+                            YkbTechnicalServiceId = img.YkbTechnicalServiceId,
+                            Url = NormalizeImageUrl(img.Url) ?? string.Empty,
+                            Caption = img.Caption
+                        })
+                        .ToList();
+                }
+
+                // Form resimleri
+                if (techService.YkbServiceRequestFormImages != null && techService.YkbServiceRequestFormImages.Any())
+                {
+                    dto.ServiceRequestFormImages = techService.YkbServiceRequestFormImages
+                        .Select(img => new TechnicalServiceFormImageGetDto
+                        {
+                            Id = img.Id,
+                            Url = NormalizeImageUrl(img.Url) ?? string.Empty,
+                            Caption = img.Caption
+                        })
+                        .ToList();
+                }
+            }
+            // --------------------------------------------------------------------
 
             return ResponseModel<YkbFinalApprovalGetDto>.Success(dto);
         }
