@@ -2739,7 +2739,7 @@ namespace Business.Services.Ykb
         {
 
             // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)
-            var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.ServicesRequest>(
+            var entity = await _uow.Repository.GetSingleAsync<YkbServicesRequest>(
                 asNoTracking: false,
                 x => x.Id == id);
 
@@ -2751,7 +2751,7 @@ namespace Business.Services.Ykb
             entity.UpdatedDate = DateTime.Now; // varsa
 
             // 3) SoftDelete çağrısı -> 2 tip argümanı verin ve entity gönderin
-            await _uow.Repository.SoftDeleteAsync<Model.Concrete.WorkFlows.ServicesRequest, long>(entity);
+            await _uow.Repository.SoftDeleteAsync<YkbServicesRequest, long>(entity);
 
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success(status: StatusCode.NoContent);
@@ -4263,7 +4263,7 @@ namespace Business.Services.Ykb
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
             // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)
-            var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
+            var entity = await _uow.Repository.GetSingleAsync<YkbWorkFlow>(
                 asNoTracking: false,
                 x => x.Id == id);
 
@@ -4284,7 +4284,7 @@ namespace Business.Services.Ykb
         {
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
-            var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
+            var entity = await _uow.Repository.GetSingleAsync<YkbWorkFlow>(
               asNoTracking: false,
               x => x.Id == id);
 
