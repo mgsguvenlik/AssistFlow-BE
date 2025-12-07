@@ -5,6 +5,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
@@ -30,8 +31,8 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<YkbPricingGetDto>> ApprovePricing(YkbPricingUpdateDto dto);
         Task<ResponseModel<YkbPricingGetDto>> GetPricingByRequestNoAsync(string requestNo);
         Task<ResponseModel> RequestLocationOverrideAsync(YkbOverrideLocationCheckDto dto);
-
         Task<ResponseModel<YkbWorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
+        Task<ResponseModel> SendReviewMessage(YkbCustomerReviewMessageDto dto);
 
         Task<ResponseModel<YkbFinalApprovalGetDto>> FinalApprovalAsync(YkbFinalApprovalUpdateDto dto);
         Task<ResponseModel<YkbFinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo);

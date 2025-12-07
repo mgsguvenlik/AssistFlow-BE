@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Azure.Core;
+using Business.Interfaces;
 using Business.Interfaces.Ykb;
 using Business.UnitOfWork;
 using ClosedXML.Excel;
@@ -27,6 +28,7 @@ using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
@@ -41,7 +43,6 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
-using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
@@ -83,7 +84,7 @@ namespace Business.Services.Ykb
             {
                 #region Validasyon/Kontroller
                 // Başlangıç WorkFlowStep'i Bul
-                var targetStep= await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                var targetStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
                     .AsNoTracking()
                     .FirstOrDefaultAsync(s => s.Code == "SR"); // Örn: 'SR' (Services Request) kodu ile başlangıç adımı
 
@@ -2306,7 +2307,7 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbCustomerFormGetDto>.Success(baseDto);
         }
-     
+
         // -------------------- Services Request --------------------
         private static Func<IQueryable<YkbServicesRequest>, IIncludableQueryable<YkbServicesRequest, object>>? RequestIncludes()
             => q => q
@@ -3683,6 +3684,7 @@ namespace Business.Services.Ykb
 
                         // EffectivePrice: her zaman ekranda görünen “esas” fiyat
                         EffectivePrice = effectivePrice,
+                        TotalPrice = effectivePrice * p.Quantity
                     };
                 })
                 .ToList();
@@ -3775,38 +3777,56 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
+
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            var productEntities = await _uow.Repository
                 .GetQueryable<YkbServicesRequestProduct>()
                 .AsNoTracking()
+                .Include(p => p.Product)
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .Select(p => new YkbServicesRequestProductGetDto
-                {
-                    Id = p.Id,
-                    RequestNo = p.RequestNo,
-                    ProductId = p.ProductId,
-                    Quantity = p.Quantity,
-
-                    // ürün temel alanları
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                    PriceCurrency = p.CapturedCurrency
-                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                    ProductPrice = p.CapturedUnitPrice
-                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                       ?? 0m,
-
-                    // 🔹 EffectivePrice: artık runtime hesap yok,
-                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                    EffectivePrice = p.CapturedUnitPrice
-                         ?? 0m,
-                })
                 .ToListAsync();
+
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
+
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
+
+                    // 3) DTO doldur
+                    return new YkbServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+
+                        TotalPrice = effectivePrice * p.Quantity
+                    };
+                })
+                .ToList();
+
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -3891,38 +3911,55 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
-                 .GetQueryable<YkbServicesRequestProduct>()
-                 .AsNoTracking()
-                 .Where(p => p.RequestNo == dto.RequestNo)
-                 .Select(p => new YkbServicesRequestProductGetDto
-                 {
-                     Id = p.Id,
-                     RequestNo = p.RequestNo,
-                     ProductId = p.ProductId,
-                     Quantity = p.Quantity,
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            var productEntities = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .AsNoTracking()
+                .Include(p => p.Product)
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .ToListAsync();
 
-                     // ürün temel alanları
-                     ProductName = p.Product != null ? p.Product.Description : null,
-                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
 
-                     // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                     PriceCurrency = p.CapturedCurrency
-                         ?? (p.Product != null ? p.Product.PriceCurrency : null),
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
 
-                     // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                     // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                     ProductPrice = p.CapturedUnitPrice
-                        ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                        ?? 0m,
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
 
-                     // 🔹 EffectivePrice: artık runtime hesap yok,
-                     // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                     EffectivePrice = p.CapturedUnitPrice
-                          ?? 0m,
-                 })
-                 .ToListAsync();
+                    // 3) DTO doldur
+                    return new YkbServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+
+                        TotalPrice = effectivePrice * p.Quantity
+                    };
+                })
+                .ToList();
+
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -3936,6 +3973,77 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbFinalApprovalGetDto>.Success(dto);
         }
+
+        public async Task<ResponseModel> SendReviewMessage(YkbCustomerReviewMessageDto dto)
+        {
+            try
+            {
+                // 0) Basit validasyonlar
+                if (dto is null)
+                    return ResponseModel.Fail("Gönderilen veri boş olamaz.", StatusCode.BadRequest);
+
+                if (string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel.Fail("Talep numarası boş olamaz.", StatusCode.BadRequest);
+
+                if (string.IsNullOrWhiteSpace(dto.FromStepCode) || string.IsNullOrWhiteSpace(dto.ToStepCode))
+                    return ResponseModel.Fail("Kaynak ve hedef adım kodları boş olamaz.", StatusCode.BadRequest);
+
+                if (string.IsNullOrWhiteSpace(dto.Message))
+                    return ResponseModel.Fail("Gönderilecek mesaj boş olamaz.", StatusCode.BadRequest);
+
+                // 1) İlgili workflow’u bul
+                var wf = await _uow.Repository.GetQueryable<YkbWorkFlow>()
+                    .Where(x => !x.IsDeleted && x.RequestNo == dto.RequestNo)
+                    .FirstOrDefaultAsync();
+
+                if (wf is null)
+                    return ResponseModel.Fail("İlgili akış bulunamadı.", StatusCode.Conflict);
+
+                // 2) Adımları bul
+                var fromStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                    .FirstOrDefaultAsync(x => x.Code == dto.FromStepCode);
+
+                var toStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                    .FirstOrDefaultAsync(x => x.Code == dto.ToStepCode);
+
+                if (fromStep is null || toStep is null)
+                    return ResponseModel.Fail("Hedef adım veya kaynak adım bulunamadı.", StatusCode.Conflict);
+
+                // 3) Kullanıcı bilgisi
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                // 4) Kayıt oluştur
+                var reviewLog = new YkbWorkFlowReviewLog
+                {
+                    YkbWorkFlowId = wf.Id,
+                    RequestNo = dto.RequestNo,
+
+                    FromStepId = fromStep.Id,
+                    FromStepCode = fromStep?.Code??"",
+
+                    ToStepId = toStep.Id,
+                    ToStepCode = toStep?.Code??"",
+
+                    ReviewNotes = dto.Message.Trim(),
+                    CreatedUser = meId,
+                    CreatedDate = DateTime.Now
+                };
+
+                _uow.Repository.Add(reviewLog);
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel.Success("Mesaj gönderildi.", StatusCode.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "SendCustomerReviewMessage hata. RequestNo: {RequestNo}, FromStep: {FromStepCode}, ToStep: {ToStepCode}",
+                    dto?.RequestNo, dto?.FromStepCode, dto?.ToStepCode);
+
+                throw;
+            }
+        }
+
 
 
         //-----------------------Customer Agreement ---------------------------------------------------
@@ -4013,38 +4121,55 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            var productEntities = await _uow.Repository
                 .GetQueryable<YkbServicesRequestProduct>()
                 .AsNoTracking()
+                .Include(p => p.Product)
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .Select(p => new YkbServicesRequestProductGetDto
-                {
-                    Id = p.Id,
-                    RequestNo = p.RequestNo,
-                    ProductId = p.ProductId,
-                    Quantity = p.Quantity,
-
-                    // ürün temel alanları
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                    PriceCurrency = p.CapturedCurrency
-                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                    ProductPrice = p.CapturedUnitPrice
-                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                       ?? 0m,
-
-                    // 🔹 EffectivePrice: artık runtime hesap yok,
-                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                    EffectivePrice = p.CapturedUnitPrice
-                         ?? 0m,
-                })
                 .ToListAsync();
+
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
+
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
+
+                    // 3) DTO doldur
+                    return new YkbServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+
+                        TotalPrice = effectivePrice * p.Quantity
+                    };
+                })
+                .ToList();
+
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -4674,7 +4799,7 @@ namespace Business.Services.Ykb
 
                 // 4) SP çağrısı (tipli DTO ile)
                 var rows = await conn.QueryAsync<ReportRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch",
+                    "ykb.usp_ReportSearchYkb",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,
@@ -4776,7 +4901,7 @@ namespace Business.Services.Ykb
 
                 // Çağrı: yeni SP adı
                 var rows = await conn.QueryAsync<YkbReportLineRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch_Lines",
+                    "ykb.usp_ReportSearch_LinesYkb",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,
@@ -4891,7 +5016,7 @@ namespace Business.Services.Ykb
 
                 // SP çağrısı
                 var rows = await conn.QueryAsync<YkbReportLineRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch_Lines",
+                    "ykb.usp_ReportSearch_LinesYkb",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,

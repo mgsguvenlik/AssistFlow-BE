@@ -7,6 +7,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
@@ -15,7 +16,7 @@ using System.Net;
 
 namespace WebAPI.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class YkbWorkFlowsController : ControllerBase
@@ -252,6 +253,12 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpPost("send-review-message")]
+        public async Task<IActionResult> SendReviewMessage([FromBody] YkbCustomerReviewMessageDto dto )
+        {
+            var result = await _workFlowService.SendReviewMessage(dto);
+            return Ok(result);
+        }
 
         [HttpGet("activity-records/{requestNo}")]
         public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)
