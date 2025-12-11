@@ -47,6 +47,7 @@ namespace Data.Seeding.Seeds
                 ["CustomerSystemList"] = "Müşteri Sistem Listesi",
                 ["ServiceRequestArchive"] = "Akış Arşiv Listesi",
                 ["YkbServiceRequestCreate"] = "Ykb Servis Talebi Oluştur",
+                ["YkbCustomerServiceRequestCreate"] = "Ykb Müşteri Servis Talebi Oluştur",
                 ["YkbServiceRequestList"] = "Ykb Servis Talep Listesi",
                 ["YkbServiceRequestArchive"] = "Ykb Akış Arşiv Listesi",
                 ["YkbServiceRequestWarehouse"] = "Servis Talebi - Depo",
