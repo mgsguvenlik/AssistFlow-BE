@@ -193,7 +193,7 @@ namespace Business.Services
             entry.UserAgent = string.IsNullOrEmpty(ua) ? null : (ua.Length > 200 ? ua[..200] : ua);
 
             // Zaman
-            entry.OccurredAtUtc = DateTime.UtcNow;
+            entry.OccurredAtUtc = DateTime.Now;
 
             // İzleme
             entry.CorrelationId = http?.TraceIdentifier;

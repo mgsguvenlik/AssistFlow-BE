@@ -288,7 +288,7 @@ public class UserService
             issuer: appSettings.Value.Issuer,
             audience: appSettings.Value.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(15),
+            expires: DateTime.Now.AddMinutes(15),
             signingCredentials: creds
         );
 
@@ -361,7 +361,7 @@ public class UserService
             });
         }
 
-        if (jwtToken.ValidTo < DateTime.UtcNow)
+        if (jwtToken.ValidTo < DateTime.Now)
         {
             return Task.FromResult(new ResponseModel<UserGetDto>
             {

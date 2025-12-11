@@ -10,7 +10,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord
         public WorkFlowActionType ActionType { get; set; }
         public string? FromStepCode { get; set; }
         public string? ToStepCode { get; set; }
-        public DateTime OccurredAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime OccurredAtUtc { get; set; } = DateTime.Now;
         public long? PerformedByUserId { get; set; }
         public string? PerformedByUserName { get; set; }
         public string? ClientIp { get; set; }

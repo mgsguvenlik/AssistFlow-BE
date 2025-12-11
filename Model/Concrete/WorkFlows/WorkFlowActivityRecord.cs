@@ -20,7 +20,7 @@ namespace Model.Concrete.WorkFlows
         [MaxLength(32)] public string? FromStepCode { get; set; }
         [MaxLength(32)] public string? ToStepCode { get; set; }
 
-        public DateTime OccurredAtUtc { get; set; } = DateTime.UtcNow;
+        public DateTime OccurredAtUtc { get; set; } = DateTime.Now;
 
         public long? PerformedByUserId { get; set; }
         [MaxLength(200)] public string? PerformedByUserName { get; set; }

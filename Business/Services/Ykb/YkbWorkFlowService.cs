@@ -2137,7 +2137,7 @@ namespace Business.Services.Ykb
         //--------------------- Customer Form ----------------------------
         public async Task<ResponseModel<YkbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -2399,7 +2399,7 @@ namespace Business.Services.Ykb
 
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -2555,7 +2555,7 @@ namespace Business.Services.Ykb
 
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -4326,7 +4326,7 @@ namespace Business.Services.Ykb
         public async Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "YKB")
         {
             prefix ??= "YKB";
-            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
+            var datePart = DateTime.Now.ToString("yyyyMMdd");
 
             // En fazla 10 deneme: çakışma olursa tekrar üret
             for (int i = 0; i < 10; i++)

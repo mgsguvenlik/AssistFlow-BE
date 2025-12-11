@@ -90,7 +90,7 @@ public class AuthService : IAuthService
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.UtcNow.AddMinutes(minutes);
+        var expires = DateTime.Now.AddMinutes(minutes);
 
         var token = new JwtSecurityToken(
             issuer: issuer,

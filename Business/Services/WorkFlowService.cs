@@ -1811,7 +1811,7 @@ namespace Business.Services
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -1966,7 +1966,7 @@ namespace Business.Services
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -3502,7 +3502,7 @@ namespace Business.Services
         public async Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR")
         {
             prefix ??= "SR";
-            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
+            var datePart = DateTime.Now.ToString("yyyyMMdd");
 
             // En fazla 10 deneme: çakışma olursa tekrar üret
             for (int i = 0; i < 10; i++)
@@ -4315,133 +4315,7 @@ namespace Business.Services
         }
 
         //Arşiv 
-        public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync_(WorkFlowArchiveFilterDto filter)
-        {
-            try
-            {
-                var q = _uow.Repository
-                    .GetQueryable<WorkFlowArchive>()
-                    .AsNoTracking();
-
-                // --- DB taraflı filtreler ---
-                if (!string.IsNullOrWhiteSpace(filter.RequestNo))
-                {
-                    var rn = filter.RequestNo.Trim();
-                    q = q.Where(x => x.RequestNo.Contains(rn));
-                }
-
-                if (!string.IsNullOrWhiteSpace(filter.ArchiveReason))
-                {
-                    var reason = filter.ArchiveReason.Trim();
-                    q = q.Where(x => x.ArchiveReason == reason);
-                }
-
-                if (filter.ArchivedFrom.HasValue)
-                {
-                    q = q.Where(x => x.ArchivedAt >= filter.ArchivedFrom.Value);
-                }
-
-                if (filter.ArchivedTo.HasValue)
-                {
-                    q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
-                }
-                // En son arşivler üstte
-                q = q.OrderByDescending(x => x.ArchivedAt);
-
-                var entities = await q.ToListAsync();
-
-                var list = new List<WorkFlowArchiveListDto>();
-
-                foreach (var a in entities)
-                {
-                    string? customerName = null;
-                    string? technicianName = null;
-                    string? wfStatus = null;
-
-                    // Müşteri adı
-                    try
-                    {
-                        var customer = JsonConvert.DeserializeObject<Customer>(a.CustomerJson);
-                        customerName = customer?.ContactName1 ?? customer?.SubscriberCompany;
-                    }
-                    catch { }
-
-                    // Teknisyen adı (ApproverTechnicianJson → ApproverTechnician)
-                    try
-                    {
-                        var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
-                        technicianName = tech?.TechnicianName;
-                    }
-                    catch { }
-
-                    // WorkFlow durumu
-                    try
-                    {
-                        var wf = JsonConvert.DeserializeObject<WorkFlow>(a.WorkFlowJson);
-                        wfStatus = wf?.WorkFlowStatus.ToString();
-                    }
-                    catch { }
-
-                    list.Add(new WorkFlowArchiveListDto
-                    {
-                        Id = a.Id,
-                        RequestNo = a.RequestNo,
-                        ArchiveReason = a.ArchiveReason,
-                        ArchivedAt = a.ArchivedAt,
-                        CustomerName = customerName,
-                        TechnicianName = technicianName,
-                        WorkFlowStatus = wfStatus
-                    });
-                }
-
-                // --- JSON içi filtreler (in-memory) ---
-                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
-                {
-                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
-                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
-                        .ToList();
-                }
-
-                if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
-                {
-                    var tn = filter.TechnicianName.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
-                                    x.TechnicianName!.ToLowerInvariant().Contains(tn))
-                        .ToList();
-                }
-
-                // --- Pagination ---
-                var totalCount = list.Count;
-                var page = filter.Page;
-                var pageSize = filter.PageSize;
-
-                var items = list
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToList(); // List<T> zaten IReadOnlyList<T> implement ediyor
-
-                var paged = new PagedResult<WorkFlowArchiveListDto>(
-                    Items: items,
-                    TotalCount: totalCount,
-                    Page: page,
-                    PageSize: pageSize
-                );
-
-                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Success(paged);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetArchiveListAsync");
-                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Fail(
-                    $"Arşiv kayıtları getirilirken hata oluştu: {ex.Message}",
-                    StatusCode.Error
-                );
-            }
-        }
-
+    
         public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
         {
             try
