@@ -17,8 +17,8 @@ public class MenuRoleService
   : CrudServiceBase<MenuRole, long, MenuRoleCreateDto, MenuRoleUpdateDto, MenuRoleGetDto>,
     IMenuRoleService
 {
-    public MenuRoleService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor? http = null)
-        : base(uow, mapper, config, http) { }
+    public MenuRoleService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
+        : base(uow, mapper, config) { }
 
     protected override long ReadKey(MenuRole e) => e.Id;
     protected override Expression<Func<MenuRole, bool>> KeyPredicate(long id) => x => x.Id == id;

@@ -4359,6 +4359,7 @@ namespace Business.Services.Ykb
             bool isTechnician = roles?.Contains("TECHNICIAN") ?? false;
             bool isSubcontractor = roles?.Contains("SUBCONTRACTOR") ?? false;
             bool isProjectEngineer = roles?.Contains("PROJECTENGINEER") ?? false;
+            bool isCustomer = roles?.Contains("CUSTOMER") ?? false;
 
             var pendingStatus = WorkFlowStatus.Pending;
 
@@ -4381,6 +4382,11 @@ namespace Business.Services.Ykb
                     x.CurrentStep != null && x.CurrentStep.Code == "TS" &&
                     x.ApproverTechnicianId == me.Id);
             }
+            else if (isCustomer)
+            {
+                wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "CF" || x.CurrentStep.Code== "CAPR");
+            }
+
             else
             {
                 // Yetkisi olmayanlar için boş sonuç

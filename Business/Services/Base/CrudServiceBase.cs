@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Business.Services.Base
 {
@@ -21,69 +22,61 @@ namespace Business.Services.Base
     {
         protected readonly IUnitOfWork _unitOfWork;
         protected readonly IRepository _repo;
-        protected readonly IMapper _mapper;           // MapsterMapper.IMapper
+        protected readonly IMapper _mapper;
+        protected readonly ICurrentUser _currentUser;// MapsterMapper.IMapper
         protected readonly TypeAdapterConfig _config; // Mapster config
         // ... sınıf başı alanlar:
-        protected readonly IHttpContextAccessor? _http;
 
-        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor? http = null)
+        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config, ICurrentUser currentUser = null)
         {
             _unitOfWork = unitOfWork;
             _repo = unitOfWork.Repository;
             _mapper = mapper;
             _config = config;
-            _http = http;
+            _currentUser = currentUser;
         }
 
 
         // Zaman & kullanıcı id okuyucu
         protected virtual DateTimeOffset Now() => DateTimeOffset.Now;
 
-        protected virtual long GetCurrentUserIdOrDefault()
+        protected virtual async Task<long> GetCurrentUserIdOrDefault()
         {
-            var user = _http?.HttpContext?.User;
-            if (user is null || !user.Identity?.IsAuthenticated == true) return 0;
+            var user = await _currentUser.GetAsync();
+            if (user is null) return 0;
+            return user.Id;
 
-            // En yaygın claim'ler: NameIdentifier, sub, uid
-            var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier)
-                      ?? user.FindFirstValue(CommonConstants.sub)
-                      ?? user.FindFirstValue(CommonConstants.uid);
-
-            return long.TryParse(idStr, out var id) ? id : 0;
         }
-        protected virtual long? GetCurrentTenantIdOrDefault()
+        protected virtual async Task<long?> GetCurrentTenantIdOrDefault()
         {
-            var user = _http?.HttpContext?.User;
-            if (user is null || !user.Identity?.IsAuthenticated == true)
+            if (_currentUser is null)
                 return null;
-
+            var user = await _currentUser.GetAsync();
+            if (user is null)
+                return null;
             // Login'de eklediğimiz claim: "tenant_id"
-            var tStr = user.FindFirstValue("tenant_id");
-
-            if (long.TryParse(tStr, out var tid) && tid > 0)
-                return tid;
-
-            return null;
+            var tId = user.TenantId;
+            return tId;
         }
 
 
         // -------------------- AUDIT HELPERS --------------------
-        protected virtual void SetCreateAuditIfExists(object? entity)
+        protected virtual async Task SetCreateAuditIfExists(object? entity)
         {
             if (entity is null) return;
             var now = Now();
-            var uid = GetCurrentUserIdOrDefault();
+            var uid = await GetCurrentUserIdOrDefault();
 
             TrySetDate(entity, CommonConstants.CreatedDate, now, onlyIfDefault: true);
             TrySetLong(entity, CommonConstants.CreatedUser, uid, onlyIfDefault: true);
             TrySetBool(entity, CommonConstants.IsDeleted, false, onlyIfDefault: false);
         }
 
-        protected virtual void SetUpdateAuditIfExists(object? entity)
+        protected virtual async Task SetUpdateAuditIfExists(object? entity)
         {
             if (entity is null) return;
             var now = Now();
-            var uid = GetCurrentUserIdOrDefault();
+            var uid = await GetCurrentUserIdOrDefault();
 
             TrySetDate(entity, CommonConstants.UpdatedDate, now, onlyIfDefault: false);
             TrySetLong(entity, CommonConstants.UpdatedUser, uid, onlyIfDefault: false);
@@ -519,8 +512,8 @@ namespace Business.Services.Base
                 return query; // Tip uymuyorsa da dokunma
 
             // Kullanıcının tenant'ını claim'den oku
-            var currentTenantId = GetCurrentTenantIdOrDefault();
-            if (!currentTenantId.HasValue)
+            var currentTenantId = GetCurrentTenantIdOrDefault().GetAwaiter().GetResult();
+            if (currentTenantId == null)
                 return query; // Kullanıcının tenant'ı yoksa filtreleme yapma
 
             // x => x.TenantId == currentTenantId
@@ -532,14 +525,14 @@ namespace Business.Services.Base
             {
                 body = Expression.Equal(
                     member,
-                    Expression.Constant(currentTenantId.Value, typeof(long)));
+                    Expression.Constant(currentTenantId, typeof(long)));
             }
             else // long?
             {
                 body = Expression.Equal(
                     member,
                     Expression.Convert(
-                        Expression.Constant(currentTenantId.Value),
+                        Expression.Constant(currentTenantId),
                         typeof(long?)));
             }
 

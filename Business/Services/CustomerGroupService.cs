@@ -15,8 +15,8 @@ namespace Business.Services
     public class CustomerGroupService
         : CrudServiceBase<CustomerGroup, long, CustomerGroupCreateDto, CustomerGroupUpdateDto, CustomerGroupGetDto>, ICustomerGroupService
     {
-        public CustomerGroupService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor http)
-            : base(uow, mapper, config, http)
+        public CustomerGroupService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
+            : base(uow, mapper, config)
         {
         }
 

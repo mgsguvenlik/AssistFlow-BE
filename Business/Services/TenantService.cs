@@ -25,9 +25,9 @@ namespace Business.Services
         public TenantService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            TypeAdapterConfig config,
-            IHttpContextAccessor? http = null)
-            : base(unitOfWork, mapper, config, http)
+            TypeAdapterConfig config
+            )
+            : base(unitOfWork, mapper, config)
         {
         }
 
