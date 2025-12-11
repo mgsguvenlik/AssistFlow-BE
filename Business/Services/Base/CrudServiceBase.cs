@@ -42,6 +42,8 @@ namespace Business.Services.Base
 
         protected virtual async Task<long> GetCurrentUserIdOrDefault()
         {
+            if (_currentUser is null)
+                return 0;
             var user = await _currentUser.GetAsync();
             if (user is null) return 0;
             return user.Id;

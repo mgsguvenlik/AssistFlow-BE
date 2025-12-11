@@ -1757,7 +1757,7 @@ namespace Business.Services.Ykb
                     wf.CurrentStepId = targetStep.Id;
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
-                    wf.WorkFlowStatus = dto.WorkFlowStatus;
+                    wf.WorkFlowStatus = dto.FinalApprovalStatus == FinalApprovalStatus.CustomerApproval ? WorkFlowStatus.Pending : dto.WorkFlowStatus;
                     _uow.Repository.Update(wf);
                 }
                 #endregion
@@ -4019,10 +4019,10 @@ namespace Business.Services.Ykb
                     RequestNo = dto.RequestNo,
 
                     FromStepId = fromStep.Id,
-                    FromStepCode = fromStep?.Code??"",
+                    FromStepCode = fromStep?.Code ?? "",
 
                     ToStepId = toStep.Id,
-                    ToStepCode = toStep?.Code??"",
+                    ToStepCode = toStep?.Code ?? "",
 
                     ReviewNotes = dto.Message.Trim(),
                     CreatedUser = meId,
@@ -4364,6 +4364,7 @@ namespace Business.Services.Ykb
             var pendingStatus = WorkFlowStatus.Pending;
 
             var wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
+                 .Include(x => x.CurrentStep)
                  .AsNoTracking()
                  .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
 
@@ -4384,7 +4385,7 @@ namespace Business.Services.Ykb
             }
             else if (isCustomer)
             {
-                wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "CF" || x.CurrentStep.Code== "CAPR");
+                wfBase = wfBase.Where(x => x.CurrentStep != null && (x.CurrentStep.Code == "CF" || x.CurrentStep.Code == "CAPR"));
             }
 
             else
@@ -5175,14 +5176,38 @@ namespace Business.Services.Ykb
                 {
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
                 }
-                // En son arşivler üstte
-                q = q.OrderByDescending(x => x.ArchivedAt);
 
-                var entities = await q.ToListAsync();
+                // --- Projection: sadece gereken kolonlar ---
+                var projected = q
+                    .Select(a => new
+                    {
+                        a.Id,
+                        a.RequestNo,
+                        a.ArchiveReason,
+                        a.ArchivedAt,
+                        a.CustomerJson,
+                        a.ApproverTechnicianJson,
+                        a.YkbWorkFlowJson
+                    })
+                    .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
 
-                var list = new List<YkbWorkFlowArchiveListDto>();
+                // --- Sayfalama parametreleri ---
+                var page = filter.Page <= 0 ? 1 : filter.Page;
+                var pageSize = filter.PageSize <= 0 ? 50 : filter.PageSize;
 
-                foreach (var a in entities)
+                // Toplam kayıt sayısı (DB filtrelerine göre)
+                var totalCount = await projected.CountAsync();
+
+                // İlgili sayfadaki satırları çek
+                var pageRows = await projected
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                // --- JSON'dan DTO'ya dönüştürme ---
+                var list = new List<YkbWorkFlowArchiveListDto>(pageRows.Count);
+
+                foreach (var a in pageRows)
                 {
                     string? customerName = null;
                     string? technicianName = null;
@@ -5194,15 +5219,20 @@ namespace Business.Services.Ykb
                         var customer = JsonConvert.DeserializeObject<Customer>(a.CustomerJson);
                         customerName = customer?.ContactName1 ?? customer?.SubscriberCompany;
                     }
-                    catch { }
+                    catch
+                    {
+                        // loglamak istersen buraya ek log yazabilirsin
+                    }
 
-                    // Teknisyen adı (ApproverTechnicianJson → ApproverTechnician)
+                    // Teknisyen adı
                     try
                     {
                         var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
                         technicianName = tech?.TechnicianName;
                     }
-                    catch { }
+                    catch
+                    {
+                    }
 
                     // WorkFlow durumu
                     try
@@ -5210,7 +5240,9 @@ namespace Business.Services.Ykb
                         var wf = JsonConvert.DeserializeObject<YkbWorkFlow>(a.YkbWorkFlowJson);
                         wfStatus = wf?.WorkFlowStatus.ToString();
                     }
-                    catch { }
+                    catch
+                    {
+                    }
 
                     list.Add(new YkbWorkFlowArchiveListDto
                     {
@@ -5224,7 +5256,7 @@ namespace Business.Services.Ykb
                     });
                 }
 
-                // --- JSON içi filtreler (in-memory) ---
+                // (Opsiyonel) CustomerName / TechnicianName filtrelerini sadece bu sayfa üzerinde uygula
                 if (!string.IsNullOrWhiteSpace(filter.CustomerName))
                 {
                     var cn = filter.CustomerName.Trim().ToLowerInvariant();
@@ -5232,6 +5264,7 @@ namespace Business.Services.Ykb
                         .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
                                     x.CustomerName!.ToLowerInvariant().Contains(cn))
                         .ToList();
+                    // Not: totalCount DB'den geldiği için bu filtreyi totalCount'a yansıtmıyoruz.
                 }
 
                 if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
@@ -5243,18 +5276,9 @@ namespace Business.Services.Ykb
                         .ToList();
                 }
 
-                // --- Pagination ---
-                var totalCount = list.Count;
-                var page = filter.Page;
-                var pageSize = filter.PageSize;
-
-                var items = list
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToList(); // List<T> zaten IReadOnlyList<T> implement ediyor
-
+                // --- Sonuç ---
                 var paged = new PagedResult<YkbWorkFlowArchiveListDto>(
-                    Items: items,
+                    Items: list,
                     TotalCount: totalCount,
                     Page: page,
                     PageSize: pageSize
