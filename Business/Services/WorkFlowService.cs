@@ -4315,7 +4315,7 @@ namespace Business.Services
         }
 
         //Arşiv 
-        public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
+        public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync_(WorkFlowArchiveFilterDto filter)
         {
             try
             {
@@ -4426,6 +4426,155 @@ namespace Business.Services
                 var paged = new PagedResult<WorkFlowArchiveListDto>(
                     Items: items,
                     TotalCount: totalCount,
+                    Page: page,
+                    PageSize: pageSize
+                );
+
+                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Success(paged);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetArchiveListAsync");
+                return ResponseModel<PagedResult<WorkFlowArchiveListDto>>.Fail(
+                    $"Arşiv kayıtları getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
+
+        public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
+        {
+            try
+            {
+                var q = _uow.Repository
+                    .GetQueryable<WorkFlowArchive>()
+                    .AsNoTracking();
+
+                // --- DB taraflı filtreler ---
+                if (!string.IsNullOrWhiteSpace(filter.RequestNo))
+                {
+                    var rn = filter.RequestNo.Trim();
+                    q = q.Where(x => x.RequestNo.Contains(rn));
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.ArchiveReason))
+                {
+                    var reason = filter.ArchiveReason.Trim();
+                    q = q.Where(x => x.ArchiveReason == reason);
+                }
+
+                if (filter.ArchivedFrom.HasValue)
+                {
+                    q = q.Where(x => x.ArchivedAt >= filter.ArchivedFrom.Value);
+                }
+
+                if (filter.ArchivedTo.HasValue)
+                {
+                    q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
+                }
+
+                // --- Projection: sadece gereken kolonlar ---
+                var projected = q
+                    .Select(a => new
+                    {
+                        a.Id,
+                        a.RequestNo,
+                        a.ArchiveReason,
+                        a.ArchivedAt,
+                        a.CustomerJson,
+                        a.ApproverTechnicianJson,
+                        a.WorkFlowJson
+                    })
+                    .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
+
+                // --- Sayfalama parametreleri ---
+                var page = filter.Page <= 0 ? 1 : filter.Page;
+                var pageSize = filter.PageSize <= 0 ? 50 : filter.PageSize;
+
+                // Toplam kayıt sayısı (DB filtrelerine göre)
+                var totalCount = await projected.CountAsync();
+
+                // İlgili sayfadaki satırları çek (DB tarafında Skip/Take)
+                var pageRows = await projected
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                // --- JSON'dan DTO'ya dönüştürme ---
+                var list = new List<WorkFlowArchiveListDto>(pageRows.Count);
+
+                foreach (var a in pageRows)
+                {
+                    string? customerName = null;
+                    string? technicianName = null;
+                    string? wfStatus = null;
+
+                    // Müşteri adı
+                    try
+                    {
+                        var customer = JsonConvert.DeserializeObject<Customer>(a.CustomerJson);
+                        customerName = customer?.ContactName1 ?? customer?.SubscriberCompany;
+                    }
+                    catch
+                    {
+                        // İstersen loglayabilirsin
+                    }
+
+                    // Teknisyen adı
+                    try
+                    {
+                        var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
+                        technicianName = tech?.TechnicianName;
+                    }
+                    catch
+                    {
+                    }
+
+                    // WorkFlow durumu
+                    try
+                    {
+                        var wf = JsonConvert.DeserializeObject<WorkFlow>(a.WorkFlowJson);
+                        wfStatus = wf?.WorkFlowStatus.ToString();
+                    }
+                    catch
+                    {
+                    }
+
+                    list.Add(new WorkFlowArchiveListDto
+                    {
+                        Id = a.Id,
+                        RequestNo = a.RequestNo,
+                        ArchiveReason = a.ArchiveReason,
+                        ArchivedAt = a.ArchivedAt,
+                        CustomerName = customerName,
+                        TechnicianName = technicianName,
+                        WorkFlowStatus = wfStatus
+                    });
+                }
+
+                // --- JSON içi filtreler (in-memory, sadece bu sayfa üzerinde) ---
+                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+                {
+                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
+                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
+                {
+                    var tn = filter.TechnicianName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
+                                    x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .ToList();
+                }
+
+                // --- Sonuç ---
+                var paged = new PagedResult<WorkFlowArchiveListDto>(
+                    Items: list,
+                    TotalCount: totalCount, // Not: totalCount JSON filtrelerini içermiyor
                     Page: page,
                     PageSize: pageSize
                 );
