@@ -5368,6 +5368,168 @@ namespace Business.Services.Ykb
             }
         }
 
+        /// --------------------- Arşivleme  ---------------------
+        private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
+        {
+            // 1) Ana kayıtlar
+            var servicesRequest = await _uow.Repository
+                .GetQueryable<YkbServicesRequest>()
+                .Include(x => x.Customer)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            if (servicesRequest is null)
+                return; // veya exception/log
+
+            var customer = servicesRequest.Customer;
+
+            var workFlow = await _uow.Repository
+                .GetQueryable<YkbWorkFlow>()
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
+
+            var products = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(ct);
+
+            // CustomerApprover
+            ProgressApprover? customerApprover = null;
+            if (servicesRequest.CustomerApproverId.HasValue)
+            {
+                customerApprover = await _uow.Repository
+                    .GetQueryable<ProgressApprover>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == servicesRequest.CustomerApproverId.Value, ct);
+            }
+
+            // Teknik servis + resimler
+            var technicalService = await _uow.Repository
+                .GetQueryable<YkbTechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            var serviceImages = await _uow.Repository
+                .GetQueryable<YkbTechnicalServiceImage>()
+                .AsNoTracking()
+                .Where(x => x.YkbTechnicalServiceId == technicalService.Id)
+                .ToListAsync(ct);
+
+            var formImages = await _uow.Repository
+                .GetQueryable<YkbTechnicalServiceFormImage>()
+                .AsNoTracking()
+                .Where(x => x.YkbTechnicalServiceId == technicalService.Id)
+                .ToListAsync(ct);
+
+            // Depo
+            var warehouse = await _uow.Repository
+                .GetQueryable<YkbWarehouse>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // Pricing
+            var pricing = await _uow.Repository
+                .GetQueryable<YkbPricing>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // FinalApproval
+            var finalApproval = await _uow.Repository
+                .GetQueryable<YkbFinalApproval>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+
+            // ReviewLog
+            var reviewLogs = await _uow.Repository
+                .GetQueryable<YkbWorkFlowReviewLog>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .OrderBy(x => x.CreatedDate)
+                .ToListAsync(ct);
+
+            // 2) Resimleri base64'e çevir
+            var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");
+
+            async Task<string?> ReadBase64Async(string url)
+            {
+                if (string.IsNullOrWhiteSpace(url))
+                    return null;
+
+                var path = Path.Combine(uploadRoot, url);
+                if (!File.Exists(path))
+                    return null;
+
+                var bytes = await File.ReadAllBytesAsync(path, ct);
+                return Convert.ToBase64String(bytes);
+            }
+
+            var serviceImageDtos = new List<ArchiveImageDto>();
+            foreach (var img in serviceImages)
+            {
+                serviceImageDtos.Add(new ArchiveImageDto
+                {
+                    Id = img.Id,
+                    Url = img.Url,
+                    Caption = img.Caption,
+                    Base64 = await ReadBase64Async(img.Url)
+                });
+            }
+
+            var formImageDtos = new List<ArchiveImageDto>();
+            foreach (var img in formImages)
+            {
+                formImageDtos.Add(new ArchiveImageDto
+                {
+                    Id = img.Id,
+                    Url = img.Url,
+                    Caption = img.Caption,
+                    Base64 = await ReadBase64Async(img.Url)
+                });
+            }
+
+            // 3) JSON string’leri hazırla
+            var servicesRequestJson = JsonConvert.SerializeObject(servicesRequest);
+            var productsJson = JsonConvert.SerializeObject(products);
+            var customerJson = JsonConvert.SerializeObject(customer);
+            var approverTechnicianJson = JsonConvert.SerializeObject(workFlow?.ApproverTechnician);
+            var customerApproverJson = JsonConvert.SerializeObject(customerApprover);
+            var workFlowJson = JsonConvert.SerializeObject(workFlow);
+            var reviewLogsJson = JsonConvert.SerializeObject(reviewLogs);
+            var technicalServiceJson = JsonConvert.SerializeObject(technicalService);
+            var techServiceImagesJson = JsonConvert.SerializeObject(serviceImageDtos);
+            var techServiceFormImagesJson = JsonConvert.SerializeObject(formImageDtos);
+            var warehouseJson = JsonConvert.SerializeObject(warehouse);
+            var pricingJson = JsonConvert.SerializeObject(pricing);
+            var finalApprovalJson = JsonConvert.SerializeObject(finalApproval);
+
+            // 4) Arşiv kaydı oluştur
+            var archive = new YkbWorkFlowArchive
+            {
+                RequestNo = requestNo,
+                ArchivedAt = DateTime.Now,
+                ArchiveReason = archiveReason,
+
+                YkbServicesRequestJson = servicesRequestJson,
+                YkbServicesRequestProductsJson = productsJson,
+                CustomerJson = customerJson,
+                ApproverTechnicianJson = approverTechnicianJson,
+                CustomerApproverJson = customerApproverJson,
+                YkbWorkFlowJson = workFlowJson,
+                YkbWorkFlowReviewLogsJson = reviewLogsJson,
+                YkbTechnicalServiceJson = technicalServiceJson,
+                YkbTechnicalServiceImagesJson = techServiceImagesJson,
+                YkbTechnicalServiceFormImagesJson = techServiceFormImagesJson,
+                YkbWarehouseJson = warehouseJson,
+                YkbPricingJson = pricingJson,
+                YkbFinalApprovalJson = finalApprovalJson
+            };
+
+            await _uow.Repository.AddAsync(archive);
+            // Commit’i dışarıda (çağıran methodda) yapacağız.
+        }
+
 
         //-------------Private-------------
 
@@ -5644,168 +5806,6 @@ namespace Business.Services.Ykb
             return ResponseModel.Success();
         }
 
-
-        /// --------------------- Arşivleme  ---------------------
-        private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
-        {
-            // 1) Ana kayıtlar
-            var servicesRequest = await _uow.Repository
-                .GetQueryable<YkbServicesRequest>()
-                .Include(x => x.Customer)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
-
-            if (servicesRequest is null)
-                return; // veya exception/log
-
-            var customer = servicesRequest.Customer;
-
-            var workFlow = await _uow.Repository
-                .GetQueryable<YkbWorkFlow>()
-                .Include(x => x.ApproverTechnician)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
-
-            var products = await _uow.Repository
-                .GetQueryable<YkbServicesRequestProduct>()
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .ToListAsync(ct);
-
-            // CustomerApprover
-            ProgressApprover? customerApprover = null;
-            if (servicesRequest.CustomerApproverId.HasValue)
-            {
-                customerApprover = await _uow.Repository
-                    .GetQueryable<ProgressApprover>()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.Id == servicesRequest.CustomerApproverId.Value, ct);
-            }
-
-            // Teknik servis + resimler
-            var technicalService = await _uow.Repository
-                .GetQueryable<YkbTechnicalService>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
-
-            var serviceImages = await _uow.Repository
-                .GetQueryable<YkbTechnicalServiceImage>()
-                .AsNoTracking()
-                .Where(x => x.YkbTechnicalServiceId == technicalService.Id)
-                .ToListAsync(ct);
-
-            var formImages = await _uow.Repository
-                .GetQueryable<YkbTechnicalServiceFormImage>()
-                .AsNoTracking()
-                .Where(x => x.YkbTechnicalServiceId == technicalService.Id)
-                .ToListAsync(ct);
-
-            // Depo
-            var warehouse = await _uow.Repository
-                .GetQueryable<YkbWarehouse>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
-
-            // Pricing
-            var pricing = await _uow.Repository
-                .GetQueryable<YkbPricing>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
-
-            // FinalApproval
-            var finalApproval = await _uow.Repository
-                .GetQueryable<YkbFinalApproval>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
-
-            // ReviewLog
-            var reviewLogs = await _uow.Repository
-                .GetQueryable<YkbWorkFlowReviewLog>()
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .OrderBy(x => x.CreatedDate)
-                .ToListAsync(ct);
-
-            // 2) Resimleri base64'e çevir
-            var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");
-
-            async Task<string?> ReadBase64Async(string url)
-            {
-                if (string.IsNullOrWhiteSpace(url))
-                    return null;
-
-                var path = Path.Combine(uploadRoot, url);
-                if (!File.Exists(path))
-                    return null;
-
-                var bytes = await File.ReadAllBytesAsync(path, ct);
-                return Convert.ToBase64String(bytes);
-            }
-
-            var serviceImageDtos = new List<ArchiveImageDto>();
-            foreach (var img in serviceImages)
-            {
-                serviceImageDtos.Add(new ArchiveImageDto
-                {
-                    Id = img.Id,
-                    Url = img.Url,
-                    Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
-                });
-            }
-
-            var formImageDtos = new List<ArchiveImageDto>();
-            foreach (var img in formImages)
-            {
-                formImageDtos.Add(new ArchiveImageDto
-                {
-                    Id = img.Id,
-                    Url = img.Url,
-                    Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
-                });
-            }
-
-            // 3) JSON string’leri hazırla
-            var servicesRequestJson = JsonConvert.SerializeObject(servicesRequest);
-            var productsJson = JsonConvert.SerializeObject(products);
-            var customerJson = JsonConvert.SerializeObject(customer);
-            var approverTechnicianJson = JsonConvert.SerializeObject(workFlow?.ApproverTechnician);
-            var customerApproverJson = JsonConvert.SerializeObject(customerApprover);
-            var workFlowJson = JsonConvert.SerializeObject(workFlow);
-            var reviewLogsJson = JsonConvert.SerializeObject(reviewLogs);
-            var technicalServiceJson = JsonConvert.SerializeObject(technicalService);
-            var techServiceImagesJson = JsonConvert.SerializeObject(serviceImageDtos);
-            var techServiceFormImagesJson = JsonConvert.SerializeObject(formImageDtos);
-            var warehouseJson = JsonConvert.SerializeObject(warehouse);
-            var pricingJson = JsonConvert.SerializeObject(pricing);
-            var finalApprovalJson = JsonConvert.SerializeObject(finalApproval);
-
-            // 4) Arşiv kaydı oluştur
-            var archive = new YkbWorkFlowArchive
-            {
-                RequestNo = requestNo,
-                ArchivedAt = DateTime.Now,
-                ArchiveReason = archiveReason,
-
-                YkbServicesRequestJson = servicesRequestJson,
-                YkbServicesRequestProductsJson = productsJson,
-                CustomerJson = customerJson,
-                ApproverTechnicianJson = approverTechnicianJson,
-                CustomerApproverJson = customerApproverJson,
-                YkbWorkFlowJson = workFlowJson,
-                YkbWorkFlowReviewLogsJson = reviewLogsJson,
-                YkbTechnicalServiceJson = technicalServiceJson,
-                YkbTechnicalServiceImagesJson = techServiceImagesJson,
-                YkbTechnicalServiceFormImagesJson = techServiceFormImagesJson,
-                YkbWarehouseJson = warehouseJson,
-                YkbPricingJson = pricingJson,
-                YkbFinalApprovalJson = finalApprovalJson
-            };
-
-            await _uow.Repository.AddAsync(archive);
-            // Commit’i dışarıda (çağıran methodda) yapacağız.
-        }
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
