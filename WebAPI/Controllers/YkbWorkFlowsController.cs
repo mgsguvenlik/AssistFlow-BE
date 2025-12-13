@@ -42,21 +42,6 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpPost("send-customer-form")]
-        public async Task<IActionResult> SendCustomerForm([FromBody] YkbCustomerFormSendDto dto)
-        {
-            var result = await _workFlowService.SendCustomerFormToService(dto);
-            return Ok(result);
-        }
-
-
-        [HttpPost("create-services-request")]
-        public async Task<IActionResult> CreateRequest([FromBody] YkbServicesRequestCreateDto dto)
-        {
-            var result = await _workFlowService.CreateRequestAsync(dto);
-            return Ok(result);
-        }
-
         [HttpPost("send-warehouse")]
         public async Task<IActionResult> SendWarehouse([FromBody] YkbSendWarehouseDto dto)
         {

@@ -17,12 +17,10 @@ namespace Business.Interfaces.Ykb
     public interface IYkbWorkFlowService
     {
         Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto);
-        Task<ResponseModel<YkbServicesRequestGetDto>> SendCustomerFormToService(YkbCustomerFormSendDto dto);
         Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
 
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
-        Task<ResponseModel<YkbServicesRequestGetDto>> CreateRequestAsync(YkbServicesRequestCreateDto dto);
         Task<ResponseModel<YkbServicesRequestGetDto>> UpdateServiceRequestAsync(YkbServicesRequestUpdateDto dto);
         Task<ResponseModel> DeleteRequestAsync(long id);
         Task<ResponseModel<YkbTechnicalServiceGetDto>> SendTechnicalServiceAsync(YkbSendTechnicalServiceDto dto);
