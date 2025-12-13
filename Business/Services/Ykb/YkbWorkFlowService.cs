@@ -1523,7 +1523,7 @@ namespace Business.Services.Ykb
                 await _uow.Repository.CompleteAsync();
 
                 #region Notification Kaydı 
-                await _notification.CreateForRoleAsync(
+                await _notification.CreateForRolesAsync(
                     new NotificationCreateDto
                     {
                         Type = NotificationType.WorkflowStepChanged,
@@ -1533,7 +1533,7 @@ namespace Business.Services.Ykb
                         FromStepCode = "PRC",
                         ToStepCode = "APR",
                     },
-                    roleCode: "PROJECTENGINEER"
+                    roleCodes: ["PROJECTENGINEER", "ADMIN"]
                 );
                 #endregion
 
@@ -1719,6 +1719,26 @@ namespace Business.Services.Ykb
 
                 await _uow.Repository.CompleteAsync();
 
+                #region Notification Kaydı 
+
+                if (dto.FinalApprovalStatus == FinalApprovalStatus.CustomerApproval)
+                {
+                    await _notification.CreateForRolesAsync(
+                      new NotificationCreateDto
+                      {
+                          Type = NotificationType.WorkflowStepChanged,
+                          Title = $"Talep {dto.RequestNo} oanaya  gönderildi",
+                          Message = $"Akiş onaya gönderildi",
+                          RequestNo = dto.RequestNo,
+                          FromStepCode = "APR",
+                          ToStepCode = "CAPR",
+                      },
+                      roleCodes: ["CUSTOMER"]
+                  );
+                }
+
+                #endregion
+
                 return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -1809,8 +1829,6 @@ namespace Business.Services.Ykb
                         roleCodes: ["PROJECTENGINEER", "CUSTOMER", "ADMIN"]
                     );
                 }
-
-
 
                 await _uow.Repository.CompleteAsync();
                 return await GetCustomerAgreementByRequestNoAsync(dto.RequestNo, FinalApprovalStatus.Approved);
