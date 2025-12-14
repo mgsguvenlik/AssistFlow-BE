@@ -49,16 +49,13 @@ builder.Services.AddHttpClient("CustomClient")
 builder.Services.AddControllers();
 
 
-
 #region Serilog
-
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration) 
-    .Enrich.FromLogContext()
-    .WriteTo.Seq("http://192.168.1.46:5441")       
-    .CreateLogger();
-builder.Host.UseSerilog();
-
+builder.Host.UseSerilog((ctx, lc) =>
+{
+    lc.ReadFrom.Configuration(ctx.Configuration)
+      .Enrich.FromLogContext()
+      .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
+});
 #endregion
 
 builder.Services.AddCors(options =>
