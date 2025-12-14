@@ -25,7 +25,11 @@ using WebAPI.Middleware;
 var builder = WebApplication.CreateBuilder(args);
 
 
-
+builder.Configuration
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 
@@ -71,6 +75,8 @@ builder.Services.AddCors(options =>
             "https://192.168.1.46:5174",
             "https://localhost:5174",
             "http://localhost:8081",
+            "https://flowassisttest.mgs.com.tr",
+            "http://flowassisttest.mgs.com.tr",
             "http://flowassist.mgs.com.tr",
             "https://flowassist.mgs.com.tr") // React frontend URL'si
             .AllowAnyMethod()
