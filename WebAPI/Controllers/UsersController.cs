@@ -124,5 +124,35 @@ namespace WebAPI.Controllers
             return ToActionResult(result);
         }
 
+
+
+        [HttpPost("update-user-password")]
+        [ProducesResponseType(typeof(ResponseModel<UserGetDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateUserPassword([FromBody] UpdateUserPasswordDto req, CancellationToken ct)
+        {
+            if (req is null)
+                return BadRequest("İstek boş olamaz.");
+
+            if (req.UserId <= 0)
+                return BadRequest("Geçersiz kullanıcı kimliği.");
+
+            if (string.IsNullOrWhiteSpace(req.NewPassword))
+                return BadRequest("Yeni şifre boş olamaz.");
+
+            var result = await _userService.UpdateUserPassword(req.UserId, req.NewPassword, ct);
+
+            return result.StatusCode switch
+            {
+                Core.Enums.StatusCode.Ok => Ok(result),
+                Core.Enums.StatusCode.Created => StatusCode(StatusCodes.Status201Created, result),
+                Core.Enums.StatusCode.BadRequest => BadRequest(result),
+                Core.Enums.StatusCode.NotFound => NotFound(result),
+                Core.Enums.StatusCode.Conflict => Conflict(result),
+                Core.Enums.StatusCode.Unauthorized => Unauthorized(result),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, result)
+            };
+        }
     }
 }

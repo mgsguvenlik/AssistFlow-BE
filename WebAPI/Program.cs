@@ -194,7 +194,7 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Key)),
             ClockSkew = TimeSpan.Zero, // Ýsteðe baðlý: expire anýnda düþsün
             NameClaimType = ClaimTypes.Name,
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = ClaimTypes.Role,
         };
     });
 builder.Services.AddAuthorization();

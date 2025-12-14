@@ -217,13 +217,13 @@ public class UserService
         }
     }
     //  Login (email + şifre ile)
-    public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
+    public async Task<ResponseModel<UserGetDto>> SignInAsync(string identifier, string password)
     {
 
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
-            whereExpression: u => u.TechnicianEmail == email,
+            whereExpression: u => u.TechnicianEmail == identifier || u.TechnicianCode == identifier,
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
         ).FirstOrDefault();
 
@@ -552,5 +552,59 @@ public class UserService
         }
     }
 
+
+    public async Task<ResponseModel<UserGetDto>> UpdateUserPassword(long id, string newPassword, CancellationToken ct = default)
+    {
+        if (id <= 0)
+            return ResponseModel<UserGetDto>.Fail(Messages.UserNotFound, StatusCode.NotFound);
+
+        if (string.IsNullOrWhiteSpace(newPassword))
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordTooShort, StatusCode.BadRequest);
+
+        var pwdPolicyError = ValidatePasswordStrength(newPassword);
+        if (!string.IsNullOrEmpty(pwdPolicyError))
+            return ResponseModel<UserGetDto>.Fail(pwdPolicyError, StatusCode.BadRequest);
+
+        // tracking açık al (update yapacağız)
+        var user = await _unitOfWork.Repository.GetSingleAsync<User>(
+            asNoTracking: false,
+            whereExpression: u => u.Id == id);
+
+        if (user is null)
+            return ResponseModel<UserGetDto>.Fail(Messages.UserNotFound, StatusCode.NotFound);
+
+        // Yeni şifre eskisiyle aynı mı? (doğru kontrol)
+        var sameAsOld = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, newPassword);
+        if (sameAsOld != PasswordVerificationResult.Failed)
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordCannotBeSameAsOld, StatusCode.BadRequest);
+
+        try
+        {
+            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+
+            _unitOfWork.Repository.Update(user);
+            await _unitOfWork.Repository.CompleteAsync();
+
+            // İstersen sadece success dönebilirsin; ben güncel DTO’yu döndürüyorum
+            var query = _unitOfWork.Repository.GetQueryable<User>();
+            var inc = IncludeExpression();
+            if (inc is not null) query = inc(query);
+
+            var dto = await query.AsNoTracking()
+                                 .Where(u => u.Id == id)
+                                 .ProjectToType<UserGetDto>(_config)
+                                 .FirstAsync(ct);
+
+            return ResponseModel<UserGetDto>.Success(dto, Messages.PasswordChangedSuccessfully, StatusCode.Ok);
+        }
+        catch (DbUpdateException ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.DatabaseError}: {ex.Message}", StatusCode.Conflict);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.FailedToChangePassword}: {ex.Message}", StatusCode.Error);
+        }
+    }
 
 }
