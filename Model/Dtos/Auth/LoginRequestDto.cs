@@ -1,4 +1,5 @@
 ﻿using Core.Utilities.Constants;
+using Model.Dtos.Menu;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
@@ -14,6 +15,7 @@ namespace Model.Dtos.Auth
 
         // bool için extra validasyona gerek yok; default true.
         public bool RememberMe { get; set; } = true;
+
     }
 
     /// <summary>

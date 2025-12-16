@@ -17,5 +17,7 @@ namespace Model.Concrete
         [MaxLength(50)]
         public string? Code { get; set; }
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+
+        public ICollection<MenuRole> MenuRoles { get; set; } = new List<MenuRole>();
     }
 }

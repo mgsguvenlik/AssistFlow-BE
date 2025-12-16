@@ -51,6 +51,8 @@ namespace Model.Concrete
         ///     
         /// </summary>
         public bool IsActive { get; set; } = true;
+        public long? TenantId { get; set; }
+        public Tenant? Tenant { get; set; }
 
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }

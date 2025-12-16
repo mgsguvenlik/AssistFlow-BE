@@ -11,8 +11,6 @@
         public string? Description { get; set; }
         public string? PriceCurrency { get; set; }
         public decimal? Price { get; set; }
-        public DateTimeOffset? InstallationDate { get; set; }
-        public DateTimeOffset? ConnectionDate { get; set; }
         public string? CorporateCustomerShortCode { get; set; }
         public string? OracleCustomerCode { get; set; }
         public long? ProductTypeId { get; set; }

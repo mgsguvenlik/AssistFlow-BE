@@ -4,6 +4,6 @@
     public interface IAuditedByUser
     {
         long CreatedUser { get; set; }
-        long UpdatedUser { get; set; }
+        long? UpdatedUser { get; set; }
     }
 }

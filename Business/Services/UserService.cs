@@ -26,21 +26,16 @@ public class UserService
 {
 
     private readonly IMailService _mailService;
-
     private readonly IPasswordHasher<User> _passwordHasher;
-
-    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher, IMailService mailService)
+    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IPasswordHasher<User> passwordHasher, IMailService mailService)
         : base(uow, mapper, config)
     {
         _passwordHasher = passwordHasher;
         _mailService = mailService;
     }
-
     protected override long ReadKey(User entity) => entity.Id;
-
     protected override Expression<Func<User, bool>> KeyPredicate(long id)
         => u => u.Id == id;
-
     public override async Task<ResponseModel<UserGetDto>> CreateAsync(UserCreateDto dto)
     {
         try
@@ -113,7 +108,6 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
         }
     }
-
     // Include'lar (roller)
     protected override Func<IQueryable<User>, IIncludableQueryable<User, object>>? IncludeExpression()
         => q => q.Include(u => u.UserRoles).ThenInclude(ur => ur.Role);
@@ -168,7 +162,6 @@ public class UserService
                 entity.UserRoles.Add(new UserRole { UserId = entity.Id, RoleId = rid });
         }
     }
-
     // ---------- Çoklu Rol Atama (Id listesi) ----------
     public async Task<ResponseModel<UserGetDto>> AssignRolesAsync(long userId, IEnumerable<long> roleIds)
     {
@@ -223,11 +216,10 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError} {ex.Message}", StatusCode.Error);
         }
     }
-
-
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
+
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
@@ -245,7 +237,6 @@ public class UserService
                 Message = Messages.InvalidEmailOrPassword
             };
         }
-
 
         var vr = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (vr == PasswordVerificationResult.Failed)
@@ -268,8 +259,6 @@ public class UserService
             Message = Messages.SignInSuccessful
         };
     }
-
-
     // Şifre Sıfırlama İsteği (email gönderimi)
     public async Task<ResponseModel<UserGetDto>> ResetPasswordRequestAsync(string email, CancellationToken cancellationToken = default)
     {
@@ -299,7 +288,7 @@ public class UserService
             issuer: appSettings.Value.Issuer,
             audience: appSettings.Value.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(15),
+            expires: DateTime.Now.AddMinutes(15),
             signingCredentials: creds
         );
 
@@ -335,7 +324,6 @@ public class UserService
             Message = Messages.ResetPasswordRequestSuccess
         };
     }
-
     public Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -373,7 +361,7 @@ public class UserService
             });
         }
 
-        if (jwtToken.ValidTo < DateTime.UtcNow)
+        if (jwtToken.ValidTo < DateTime.Now)
         {
             return Task.FromResult(new ResponseModel<UserGetDto>
             {
@@ -431,8 +419,6 @@ public class UserService
             Message = Messages.PasswordChangedSuccessfully
         });
     }
-
-
     public async Task<ResponseModel<UserGetDto>> ChangePasswordWithOldAsync(
     long userId,
     string oldPassword,
@@ -512,14 +498,59 @@ public class UserService
     /// </summary>
     private static string? ValidatePasswordStrength(string password)
     {
-        if (password.Length < 8) return "Şifre en az 8 karakter olmalıdır.";
+        if (password.Length < 6) return "Şifre en az 6 karakter olmalıdır.";
         if (!password.Any(char.IsDigit)) return "Şifre en az bir rakam içermelidir.";
         if (!password.Any(char.IsLower)) return "Şifre en az bir küçük harf içermelidir.";
         if (!password.Any(char.IsUpper)) return "Şifre en az bir büyük harf içermelidir.";
-        // if (!password.Any(ch => !char.IsLetterOrDigit(ch))) return "Şifre en az bir özel karakter içermelidir.";
         return null;
     }
 
+
+    public async Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long roleId)
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.RoleId == roleId))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Bu role ait kullanıcı bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
+
+    public async Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync()
+    {
+        try
+        {
+            var users = await _repo.GetQueryable<User>()
+                .Where(u => u.UserRoles.Any(ur => ur.Role != null && ur.Role.Code == "TECHNICIAN"))
+                .AsNoTracking()
+                .ProjectToType<UserGetDto>(_config)
+                .ToListAsync();
+
+            if (users == null || users.Count == 0)
+                return ResponseModel<List<UserGetDto>>.Fail("Teknisyen bulunamadı.", StatusCode.NotFound);
+
+            return ResponseModel<List<UserGetDto>>.Success(users);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<List<UserGetDto>>.Fail(
+                $"Kullanıcılar alınırken hata oluştu: {ex.Message}",
+                StatusCode.Error);
+        }
+    }
 
 
 }

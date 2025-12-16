@@ -17,5 +17,9 @@ namespace Business.Interfaces
                 string newPasswordConfirm,
                 CancellationToken cancellationToken = default
         );
+
+        Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long role);
+
+        Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync();
     }
 }

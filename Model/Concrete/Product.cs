@@ -26,13 +26,14 @@ namespace Model.Concrete
         public long? CurrencyTypeId { get; set; }         // Döviz Türü Id
         public CurrencyType? CurrencyType { get; set; }
 
-        public DateTimeOffset? InstallationDate { get; set; } // Kurulum (varsayım #1)
-        public DateTimeOffset? ConnectionDate { get; set; }   // Bağlantı (varsayım #1)
-
         public string? CorporateCustomerShortCode { get; set; } // Kurumsal Müşteri Kısa Kodu
         public string? OracleCustomerCode { get; set; }          // Oracle Kodu (müşteri, varsayım #2)
 
         public long? ProductTypeId { get; set; }            // Ürün Tipi Id
         public ProductType? ProductType { get; set; }
+
+        // Navigations (fiyatlar)
+        public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
+        public ICollection<CustomerGroupProductPrice> GroupProductPrices { get; set; } = new List<CustomerGroupProductPrice>();
     }
 }

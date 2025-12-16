@@ -1,13 +1,22 @@
-﻿using Mapster;
+﻿using Core.Enums;
+using Mapster;
 using Model.Concrete;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.Brand;
 using Model.Dtos.City;
 using Model.Dtos.Configuration;
 using Model.Dtos.CurrencyType;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
+using Model.Dtos.CustomerGroupProductPrice;
+using Model.Dtos.CustomerProductPrice;
+using Model.Dtos.CustomerSystem;
+using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.CustomerType;
+using Model.Dtos.MailOutbox;
+using Model.Dtos.Menu;
 using Model.Dtos.Model;
+using Model.Dtos.Notification;
 using Model.Dtos.Product;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
@@ -15,8 +24,21 @@ using Model.Dtos.Region;
 using Model.Dtos.Role;
 using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
+using Model.Dtos.Tenant;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
+using Model.Dtos.WorkFlowDtos.FinalApproval;
+using Model.Dtos.WorkFlowDtos.Pricing;
+using Model.Dtos.WorkFlowDtos.ServicesRequest;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.TechnicalService;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Model.Dtos.WorkFlowDtos.Warehouse;
+using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
+using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
+using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
 
 namespace Business.Mapper
 {
@@ -26,6 +48,7 @@ namespace Business.Mapper
         {
 
             config.Default.MaxDepth(2);
+
 
             // ---------------- Brand ----------------
             config.NewConfig<BrandCreateDto, Brand>()
@@ -93,33 +116,74 @@ namespace Business.Mapper
             // ---------------- CustomerGroup ----------------
             config.NewConfig<CustomerGroupCreateDto, CustomerGroup>()
                   .Ignore(d => d.Id);
-
             config.NewConfig<CustomerGroupUpdateDto, CustomerGroup>()
                   .IgnoreNullValues(true);
 
             config.NewConfig<CustomerGroup, CustomerGroupGetDto>();
 
+
             // ---------------- Customer ----------------
             config.NewConfig<CustomerCreateDto, Customer>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.CustomerType);
+                  .Ignore(d => d.CustomerType)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.CustomerProductPrices)
+                  // eski: .Ignore(d => d.CustomerSystems)
+                  .Ignore(d => d.CustomerSystemAssignments);  // 🔹 yeni ara tablo nav
 
             config.NewConfig<CustomerUpdateDto, Customer>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.CustomerType);
+                  .Ignore(d => d.CustomerType)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.CustomerProductPrices)
+                  // eski: .Ignore(d => d.CustomerSystems)
+                  .Ignore(d => d.CustomerSystemAssignments);  // 🔹 yeni ara tablo nav
 
-            config.NewConfig<Customer, CustomerGetDto>();
+            // Burada CustomerGetDto.Systems’in tipine göre mapping yapıyoruz.
+            // Eğer Systems = List<CustomerSystemAssignmentGetDto> ise:
+            config.NewConfig<Customer, CustomerGetDto>()
+                  .Map(d => d.Systems, s => s.CustomerSystemAssignments);
+
+            // ---------------- CustomerSystem ----------------
+            config.NewConfig<CustomerSystemCreateDto, CustomerSystem>()
+                  .Ignore(d => d.Id)
+                  // eski: .Ignore(d => d.Customers)
+                  .Ignore(d => d.CustomerSystemAssignments);   // 🔹 yeni ara tablo nav
+
+            config.NewConfig<CustomerSystemUpdateDto, CustomerSystem>()
+                  .IgnoreNullValues(true)
+                  // eski: .Ignore(d => d.Customers)
+                  .Ignore(d => d.CustomerSystemAssignments);   // 🔹 yeni ara tablo nav
+
+            config.NewConfig<CustomerSystem, CustomerSystemGetDto>();
+
+            // ---------------- CustomerSystemAssignment ----------------
+            // Entity -> GetDto
+            config.NewConfig<CustomerSystemAssignment, CustomerSystemAssignmentGetDto>()
+                  .Map(d => d.CustomerName, s => s.Customer.SubscriberCompany)
+                  .Map(d => d.CustomerShortCode, s => s.Customer.CustomerShortCode)
+                  .Map(d => d.SystemName, s => s.CustomerSystem.Name)
+                  .Map(d => d.SystemCode, s => s.CustomerSystem.Code);
+
+            // Create / Update DTO -> Entity
+            config.NewConfig<CustomerSystemAssignmentCreateDto, CustomerSystemAssignment>();
+            config.NewConfig<CustomerSystemAssignmentUpdateDto, CustomerSystemAssignment>()
+                  .IgnoreNullValues(true);
+
+
+
 
             // ---------------- ProgressApprover ----------------
             config.NewConfig<ProgressApproverCreateDto, ProgressApprover>()
                   .Ignore(d => d.Id)
-                  .Ignore(d => d.Customer);
+                  .Ignore(d => d.CustomerGroup);
 
             config.NewConfig<ProgressApproverUpdateDto, ProgressApprover>()
                   .IgnoreNullValues(true)
-                  .Ignore(d => d.Customer);
+                  .Ignore(d => d.CustomerGroup);
 
-            config.NewConfig<ProgressApprover, ProgressApproverGetDto>();
+            config.NewConfig<ProgressApprover, ProgressApproverGetDto>()
+                   .Map(d => d.CustomerGroupName, s => s.CustomerGroup != null ? s.CustomerGroup.GroupName : null);
 
 
             // ---------------- Role ----------------
@@ -131,10 +195,30 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles);
 
-            config.NewConfig<Role, RoleGetDto>()
-                   .Map(d => d.Users,
-                    s => s.UserRoles.Select(ur => ur.User));
+            // Role -> RoleGetDto
+            config.ForType<Role, RoleGetDto>()
+                // Users: UserRole → User
+                .Map(dest => dest.Users,
+                     src => src.UserRoles.Select(ur => ur.User).Where(u => u != null))
 
+                // Menus: MenuRole → Menu + izinler
+                .Map(dest => dest.Menus,
+                     src => src.MenuRoles.Select(mr => new MenuWithPermissionsDto
+                     {
+                         Id = mr.Menu != null ? mr.Menu.Id : 0,
+                         Name = mr.Menu != null ? mr.Menu.Name : string.Empty,
+                         CanView = mr.HasView,
+                         CanEdit = mr.HasEdit
+                     }));
+
+
+            // MenuRole -> MenuWithPermissionsDto
+            TypeAdapterConfig<Model.Concrete.MenuRole, Model.Dtos.Menu.MenuWithPermissionsDto>
+                .NewConfig()
+                .Map(d => d.Id, s => s.MenuId)          // veya s.Menu!.Id; kolon eşlemesine göre
+                .Map(d => d.Name, s => s.Menu!.Name)
+                .Map(d => d.CanView, s => s.HasView)
+                .Map(d => d.CanEdit, s => s.HasEdit);
             // ---------------- ServiceType ----------------
             config.NewConfig<ServiceTypeCreateDto, ServiceType>()
                   .Ignore(d => d.Id);
@@ -163,15 +247,36 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles)
                   .Ignore(d => d.PasswordHash); // NewPassword serviste hash'lenir
+
             config.NewConfig<User, UserGetDto>()
-                  .Map(d => d.Roles,
-                       s => s.UserRoles.Select(ur => new RoleGetDto
-                       {
-                           Id = ur.RoleId,
-                           Name = ur.Role != null ? ur.Role.Name : null,
-                           Code = ur.Role != null ? ur.Role.Code : null
-                       }).ToList()
-                  );
+                    // 🔹 Tenant alanları
+                    .Map(d => d.TenantId,
+                         s => s.TenantId ?? 0) // DTO long, entity long? olduğu için null gelirse 0 veriyoruz
+                    .Map(d => d.TenantCode,
+                         s => s.Tenant != null ? s.Tenant.Code : string.Empty)
+                    .Map(d => d.TenantName,
+                         s => s.Tenant != null ? s.Tenant.Name : string.Empty)
+                    // 🔹 Diğer basit alanlar (istersen bunları Mapster’a da bırakabilirsin)
+                    .Map(d => d.TechnicianCode, s => s.TechnicianCode)
+                    .Map(d => d.TechnicianCompany, s => s.TechnicianCompany)
+                    .Map(d => d.TechnicianAddress, s => s.TechnicianAddress)
+                    .Map(d => d.City, s => s.City)
+                    .Map(d => d.District, s => s.District)
+                    .Map(d => d.TechnicianName, s => s.TechnicianName)
+                    .Map(d => d.TechnicianPhone, s => s.TechnicianPhone)
+                    .Map(d => d.TechnicianEmail, s => s.TechnicianEmail)
+                    .Map(d => d.IsActive, s => s.IsActive)
+
+                    // 🔹 Roller
+                    .Map(d => d.Roles,
+                         s => s.UserRoles.Select(ur => new RoleGetDto
+                         {
+                             Id = ur.RoleId,
+                             Name = ur.Role != null ? ur.Role.Name : null,
+                             Code = ur.Role != null ? ur.Role.Code : null
+                         }).ToList()
+                    );
+
 
             // ---------------- UserRole ----------------
             config.NewConfig<UserRoleCreateDto, UserRole>()
@@ -226,6 +331,275 @@ namespace Business.Mapper
             config.NewConfig<ServiceType, ConfigurationUpdateDto>();
             config.NewConfig<ConfigurationGetDto, ServiceType>();
             config.NewConfig<ServiceType, ConfigurationGetDto>();
+
+
+            //-------------  WorkFlowStep  ----------------
+            config.NewConfig<WorkFlowStepCreateDto, WorkFlowStep>()
+                    .Ignore(d => d.Id);
+
+            config.NewConfig<WorkFlowStepUpdateDto, WorkFlowStep>()
+                  .IgnoreNullValues(true); // partial update
+
+            config.NewConfig<WorkFlowStep, WorkFlowStepGetDto>();
+
+
+            //-------------  WorkFlow  ----------------
+            config.NewConfig<WorkFlowCreateDto, WorkFlow>()
+            .Ignore(d => d.Id)
+            .Map(d => d.CreatedDate, _ => DateTime.Now)
+            .Ignore(d => d.CurrentStep); // FK set edilecek
+
+            config.NewConfig<WorkFlowUpdateDto, WorkFlow>()
+                  .IgnoreNullValues(true)
+                  .Map(d => d.UpdatedDate, _ => DateTime.Now);
+
+            config.NewConfig<WorkFlow, WorkFlowGetDto>();
+
+
+            //-------------  ServicesRequest  ----------------
+            // --- ServicesRequest: CREATE -> ENTITY ---
+            config.NewConfig<ServicesRequestCreateDto, ServicesRequest>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customer)          // nav
+                  .Ignore(d => d.CustomerApprover)  // nav
+                  .Ignore(d => d.ServiceType)       // nav
+                  .Ignore(d => d.WorkFlowStep);   // nav
+
+            // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
+            config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
+                  .IgnoreNullValues(true)
+                  .Ignore(dest => dest.Id)
+                  .Ignore(d => d.Customer)          // nav
+                  .Ignore(d => d.CustomerApprover)  // nav
+                  .Ignore(d => d.ServiceType)       // nav
+                  .Ignore(d => d.WorkFlowStep);   // nav
+
+            // --- ServicesRequest: ENTITY -> GET DTO ---
+            config.NewConfig<ServicesRequest, ServicesRequestGetDto>()
+                  // düz alanlar otomatik eşleşir
+                  .Map(d => d.ServicesCostStatusText, s => s.ServicesCostStatus.ToString())
+                  .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.ContactName1 : null)
+                  .Map(d => d.CustomerApproverName, s => s.CustomerApprover != null ? s.CustomerApprover.FullName : null)
+                  .Map(d => d.ServiceTypeName, s => s.ServiceType != null ? s.ServiceType.Name : null)
+                  .Map(d => d.WorkFlowStepName, s => s.WorkFlowStep != null ? s.WorkFlowStep.Name : null);
+
+
+            // ---------------- Pricing: CustomerGroupProductPrice ----------------
+            config.NewConfig<CustomerGroupProductPriceCreateDto, CustomerGroupProductPrice>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerGroupProductPriceUpdateDto, CustomerGroupProductPrice>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.CustomerGroup)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerGroupProductPrice, CustomerGroupProductPriceGetDto>()
+                  .Map(d => d.CustomerGroupName, s => s.CustomerGroup != null ? s.CustomerGroup.GroupName : null)
+                  .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
+                  .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
+
+            // ---------------- Pricing: CustomerProductPrice ----------------
+            config.NewConfig<CustomerProductPriceCreateDto, CustomerProductPrice>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerProductPriceUpdateDto, CustomerProductPrice>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<CustomerProductPrice, CustomerProductPriceGetDto>()
+                  .Map(d => d.CustomerName,
+                       s => s.Customer != null
+                            ? (s.Customer.SubscriberCompany ?? s.Customer.ContactName1)
+                            : null)
+                  .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
+                  .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
+
+
+
+            // Warehosue Entity -> GetDto
+            config.NewConfig<Warehouse, WarehouseGetDto>();
+
+            // Warehosue CreateDto -> Entity
+            config.NewConfig<WarehouseCreateDto, Warehouse>(); // koleksiyon başlat
+
+
+            // Warehosue UpdateDto -> Entity
+            config.NewConfig<WarehouseUpdateDto, Warehouse>(); // koleksiyon güncellemesini servis katmanında yapacağız
+
+
+            //ServicesRequestProduct Dto <-> Entity
+            config.NewConfig<ServicesRequestProductCreateDto, ServicesRequestProduct>()
+                  .Ignore(d => d.Product);         // nav
+
+            config.NewConfig<ServicesRequestProduct, ServicesRequestProductGetDto>()
+                .Map(dest => dest.ProductId, src => src.ProductId)
+                .Map(dest => dest.Quantity, src => src.Quantity)
+                .Map(dest => dest.PriceCurrency, src => src.Product.PriceCurrency)
+                .Map(dest => dest.EffectivePrice, src => src.GetEffectivePrice())
+                .Map(dest => dest.ProductPrice, src => src.Product != null ? src.Product.Price : 0m)
+                .Map(dest => dest.ProductName, src => src.Product != null ? src.Product.Description : null)
+                .Map(dest => dest.ProductCode, src => src.Product != null ? src.Product.ProductCode : null)
+                .Map(dest => dest.TotalPrice, src => src.GetTotalEffectivePrice());
+
+            config.NewConfig<ServicesRequestProductUpdateDto, ServicesRequestProduct>();
+
+            // Customer Group 
+            TypeAdapterConfig<CustomerGroup, CustomerGroupGetDto>.NewConfig()
+                .Map(dest => dest.ParentGroupName, src => src.ParentGroup != null ? src.ParentGroup.GroupName : null)
+                .Map(dest => dest.SubGroups, src => src.SubGroups.Adapt<List<CustomerGroupChildDto>>())
+                .Map(dest => dest.GroupProductPrices, src => src.GroupProductPrices.Adapt<List<CustomerGroupProductPriceGetDto>>())
+                .Map(dest => dest.ProgressApprovers, src => src.ProgressApprovers.Adapt<List<ProgressApproverGetDto>>());
+
+
+
+            // ================================
+            // TECHNICAL SERVICE
+            // ================================
+            // Entity -> DTO
+            config.NewConfig<TechnicalService, TechnicalServiceGetDto>()
+                .Map(d => d.ServicesImages, s => s.ServicesImages)
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages);
+
+            // DTO -> Entity (tersi)
+            config.NewConfig<TechnicalServiceGetDto, TechnicalService>()
+                .Map(d => d.ServicesImages, s => s.ServicesImages)
+                .Map(d => d.ServiceRequestFormImages, s => s.ServiceRequestFormImages);
+
+
+
+            config.NewConfig<TechnicalServiceCreateDto, TechnicalService>()
+                .Ignore(dest => dest.Id)
+                .Ignore(dest => dest.ServicesImages)
+                .Ignore(dest => dest.ServiceRequestFormImages);
+
+            config.NewConfig<TechnicalServiceUpdateDto, TechnicalService>()
+                .Ignore(dest => dest.ServicesImages)
+                .Ignore(dest => dest.ServiceRequestFormImages);
+
+            // ================================
+            // TECHNICAL SERVICE IMAGE
+            // ================================
+            config.NewConfig<TechnicalServiceImage, TechnicalServiceImageGetDto>();
+
+            // ================================
+            // TECHNICAL SERVICE FORM IMAGE
+            // ================================
+            config.NewConfig<TechnicalServiceFormImage, TechnicalServiceFormImageGetDto>();
+
+
+
+            // ---------------- WorkFlowTransition  ----------------
+            config.NewConfig<WorkFlowTransition, WorkFlowTransitionGetDto>()
+               .Map(dest => dest.FromStepName, src => src.FromStep.Name)
+               .Map(dest => dest.ToStepName, src => src.ToStep.Name);
+
+            config.NewConfig<WorkFlowTransitionCreateDto, WorkFlowTransition>();
+            config.NewConfig<WorkFlowTransitionUpdateDto, WorkFlowTransition>();
+
+            config.NewConfig<WorkFlowActivityRecorGetDto, WorkFlowActivityRecord>();
+            config.NewConfig<WorkFlowReviewLog, WorkFlowReviewLogDto>();
+            config.NewConfig<WorkFlowReviewLogDto, WorkFlowReviewLog>();
+
+
+            // ---------------- Pricing ----------------
+            config.NewConfig<PricingCreateDto, Pricing>()
+                  .Ignore(d => d.Id);                 // audit alanları serviste set edilecek
+
+            config.NewConfig<PricingUpdateDto, Pricing>()
+                  .IgnoreNullValues(true)             // partial update
+                  .Ignore(d => d.Id);                 // Id dışındaki null olmayanları uygula
+
+            // Entity -> GetDto (detay)
+            config.NewConfig<Pricing, PricingGetDto>()
+                  .Map(d => d.Id, s => s.Id)
+                  .Map(d => d.RequestNo, s => s.RequestNo)
+                  .Map(d => d.Status, s => s.Status)
+                  .Map(d => d.Currency, s => s.Currency)
+                  .Map(d => d.Notes, s => s.Notes)
+                  .Map(d => d.TotalAmount, s => s.TotalAmount)
+                  // audit
+                  .Map(d => d.CreatedDate, s => s.CreatedDate)
+                  .Map(d => d.CreatedUser, s => s.CreatedUser)
+                  .Map(d => d.UpdatedDate, s => s.UpdatedDate)
+                  .Map(d => d.UpdatedUser, s => s.UpdatedUser);
+
+
+
+            // ---------------- MailOutbox ----------------
+            config.NewConfig<MailOutboxCreateDto, MailOutbox>()
+                  .Ignore(d => d.Id)
+                  .Map(d => d.Status, _ => MailOutboxStatus.Pending)
+                  .Map(d => d.TryCount, _ => 0)
+                  .Map(d => d.MaxTry, s => s.MaxTry ?? 5)
+                  .Map(d => d.CreatedDate, _ => DateTime.Now)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser);
+
+            config.NewConfig<MailOutboxUpdateDto, MailOutbox>()
+                  .IgnoreNullValues(true);
+
+            config.NewConfig<MailOutbox, MailOutboxGetDto>()
+                  .Map(d => d.Status, s => (int)s.Status);
+
+
+            // Entity -> GetDto
+            config.NewConfig<FinalApproval, FinalApprovalGetDto>();
+
+
+            // Menu
+            config.NewConfig<Model.Dtos.Menu.MenuCreateDto, Model.Concrete.Menu>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.MenuRoles);
+
+            config.NewConfig<Model.Dtos.Menu.MenuUpdateDto, Model.Concrete.Menu>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.MenuRoles);
+
+            config.NewConfig<Model.Concrete.Menu, Model.Dtos.Menu.MenuGetDto>();
+
+            // MenuRole
+            config.NewConfig<Model.Dtos.MenuRole.MenuRoleCreateDto, Model.Concrete.MenuRole>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Menu)
+                  .Ignore(d => d.Role);
+
+            config.NewConfig<Model.Dtos.MenuRole.MenuRoleUpdateDto, Model.Concrete.MenuRole>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Menu)
+                  .Ignore(d => d.Role);
+
+            config.NewConfig<Model.Concrete.MenuRole, Model.Dtos.MenuRole.MenuRoleGetDto>()
+                  .Map(d => d.MenuName, s => s.Menu != null ? s.Menu.Name : null)
+                  .Map(d => d.RoleName, s => s.Role != null ? s.Role.Name : null);
+
+
+
+            config.NewConfig<NotificationCreateDto, Notification>()
+                 .Ignore(d => d.Id)
+                 .Map(d => d.CreatedDate, _ => DateTime.Now)
+                 .Map(d => d.IsRead, _ => false)
+                 .Ignore(d => d.ReadAt);
+
+            config.NewConfig<Notification, NotificationGetDto>()
+                  .Map(d => d.Type, s => (int)s.Type);
+
+            config.NewConfig<Tenant, TenantGetDto>();
+
+            config.NewConfig<TenantCreateDto, Tenant>()
+                  .Ignore(dest => dest.Id)
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.CreatedUser)
+                  .Ignore(dest => dest.UpdatedDate)
+                  .Ignore(dest => dest.UpdatedUser);
+            config.NewConfig<TenantUpdateDto, Tenant>()
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.CreatedUser);
+
         }
     }
 }

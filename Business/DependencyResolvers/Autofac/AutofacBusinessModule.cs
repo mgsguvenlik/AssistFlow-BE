@@ -1,7 +1,9 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Ykb;
 using Business.Utilities.Security;
 using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
@@ -9,7 +11,10 @@ using Core.Utilities.IoC;
 using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
-using Model.Concrete;
+using Model.Dtos.CustomerSystem;
+using Model.Dtos.CustomerSystemAssignment;
+using Model.Dtos.MailOutbox;
+using Model.Dtos.Tenant;
 
 namespace Business.DependencyResolvers.Autofac
 {
@@ -34,14 +39,29 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IUserService), typeof(UserService));
             services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
             services.AddScoped(typeof(IMailService), typeof(MailService));
+            services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
+            services.AddScoped(typeof(IYkbWorkFlowService), typeof(YkbWorkFlowService));
+            services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
+            services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
+            services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));
+            services.AddScoped(typeof(IActivationRecordService), typeof(ActivationRecordService));
+            services.AddScoped(typeof(IMailPushService), typeof(MailPushService));
+            services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddScoped(typeof(IMenuService), typeof(MenuService));
+            services.AddScoped(typeof(IMenuRoleService), typeof(MenuRoleService));
+            services.AddScoped(typeof(INotificationService), typeof(NotificationService));
+            services.AddScoped(typeof(ICustomerSystemService), typeof(CustomerSystemService));
+            services.AddScoped(typeof(ICustomerSystemAssignmentService), typeof(CustomerSystemAssignmentService));
+            services.AddScoped(typeof(ITenantService), typeof(TenantService));
+
+            services.AddScoped<ICurrentUser, CurrentUser>(); 
+            services.AddHostedService<MailOutboxDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı
-            services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+            services.AddScoped<IPasswordHasher<Model.Concrete.User>, PasswordHasher<Model.Concrete.User>>();
 
             // Eğer kendi sarmalayıcını (IPasswordHasherService) da kullanacaksan:
             services.AddScoped(typeof(IPasswordHasherService), typeof(IdentityPasswordHasherService));
-
-
 
 
             // ---- CRUD generic kayıtlar ----
@@ -138,7 +158,7 @@ namespace Business.DependencyResolvers.Autofac
 
 
             services.AddScoped<
-             ICrudService<Model.Dtos.Role.RoleCreateDto,
+               ICrudService<Model.Dtos.Role.RoleCreateDto,
                           Model.Dtos.Role.RoleUpdateDto,
                           Model.Dtos.Role.RoleGetDto,
                           long>, RoleService>();
@@ -150,10 +170,75 @@ namespace Business.DependencyResolvers.Autofac
                              long>, UserService>();
 
             services.AddScoped<
-              ICrudService<Model.Dtos.Configuration.ConfigurationCreateDto,
+                ICrudService<Model.Dtos.Configuration.ConfigurationCreateDto,
                            Model.Dtos.Configuration.ConfigurationUpdateDto,
                            Model.Dtos.Configuration.ConfigurationGetDto,
                            long>, ConfigurationService>();
+
+
+            services.AddScoped<
+                ICrudService<Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceCreateDto,
+                           Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceUpdateDto,
+                           Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceGetDto,
+                           long>, CustomerGroupProductPriceService>();
+
+
+            services.AddScoped<
+                ICrudService<Model.Dtos.CustomerProductPrice.CustomerProductPriceCreateDto,
+                        Model.Dtos.CustomerProductPrice.CustomerProductPriceUpdateDto,
+                        Model.Dtos.CustomerProductPrice.CustomerProductPriceGetDto,
+                        long>, CustomerProductPriceService>();
+
+            services.AddScoped<
+                ICrudService<Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionCreateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionUpdateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionGetDto,
+                    long>, WorkFlowTransitionService>();
+
+
+            // ICrudService -> Menu
+            services.AddScoped<
+                ICrudService<
+                    Model.Dtos.Menu.MenuCreateDto,
+                    Model.Dtos.Menu.MenuUpdateDto,
+                    Model.Dtos.Menu.MenuGetDto,
+                    long>,
+                MenuService>();
+
+            // ICrudService -> MenuRole
+            services.AddScoped<
+                ICrudService<
+                    Model.Dtos.MenuRole.MenuRoleCreateDto,
+                    Model.Dtos.MenuRole.MenuRoleUpdateDto,
+                    Model.Dtos.MenuRole.MenuRoleGetDto,
+                    long>,
+                MenuRoleService>();
+
+            services.AddScoped(typeof(IMailOutboxService), typeof(MailOutboxService));
+            services.AddScoped<
+                ICrudService<MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto, long>,
+                MailOutboxService>();
+
+            services.AddScoped<
+                    ICrudService<
+                       CustomerSystemCreateDto,
+                       CustomerSystemUpdateDto,
+                       CustomerSystemGetDto,
+                        long>,
+                    CustomerSystemService>();
+
+            services.AddScoped<
+              ICrudService<CustomerSystemAssignmentCreateDto,
+                   CustomerSystemAssignmentUpdateDto,
+                   CustomerSystemAssignmentGetDto,
+                   long>
+             >(sp => sp.GetRequiredService<ICustomerSystemAssignmentService>());
+
+
+            services.AddScoped<
+                   ICrudService<TenantCreateDto, TenantUpdateDto, TenantGetDto, long>,
+                   TenantService>();
+
         }
         protected override void Load(ContainerBuilder builder)
         {
