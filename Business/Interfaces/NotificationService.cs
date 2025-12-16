@@ -133,7 +133,7 @@ namespace Business.Interfaces
 
         // ------------------------ Query (me.Id ∪ roles) ------------------------
         public async Task<ResponseModel<PagedResult<NotificationGetDto>>> GetMyAsync(QueryParams q)
-        {
+            {
             var me = await _currentUser.GetAsync();
             if (me is null) return ResponseModel<PagedResult<NotificationGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 

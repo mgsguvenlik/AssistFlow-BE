@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Query;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace Business.Services.Base
 {
@@ -21,54 +22,63 @@ namespace Business.Services.Base
     {
         protected readonly IUnitOfWork _unitOfWork;
         protected readonly IRepository _repo;
-        protected readonly IMapper _mapper;           // MapsterMapper.IMapper
+        protected readonly IMapper _mapper;
+        protected readonly ICurrentUser _currentUser;// MapsterMapper.IMapper
         protected readonly TypeAdapterConfig _config; // Mapster config
         // ... sınıf başı alanlar:
-        protected readonly IHttpContextAccessor? _http;
 
-        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor? http = null)
+        protected CrudServiceBase(IUnitOfWork unitOfWork, IMapper mapper, TypeAdapterConfig config, ICurrentUser currentUser = null)
         {
             _unitOfWork = unitOfWork;
             _repo = unitOfWork.Repository;
             _mapper = mapper;
             _config = config;
-            _http = http;
+            _currentUser = currentUser;
         }
 
 
         // Zaman & kullanıcı id okuyucu
         protected virtual DateTimeOffset Now() => DateTimeOffset.Now;
 
-        protected virtual long GetCurrentUserIdOrDefault()
+        protected virtual async Task<long> GetCurrentUserIdOrDefault()
         {
-            var user = _http?.HttpContext?.User;
-            if (user is null || !user.Identity?.IsAuthenticated == true) return 0;
+            if (_currentUser is null)
+                return 0;
+            var user = await _currentUser.GetAsync();
+            if (user is null) return 0;
+            return user.Id;
 
-            // En yaygın claim'ler: NameIdentifier, sub, uid
-            var idStr = user.FindFirstValue(ClaimTypes.NameIdentifier)
-                      ?? user.FindFirstValue(CommonConstants.sub)
-                      ?? user.FindFirstValue(CommonConstants.uid);
-
-            return long.TryParse(idStr, out var id) ? id : 0;
+        }
+        protected virtual async Task<long?> GetCurrentTenantIdOrDefault()
+        {
+            if (_currentUser is null)
+                return null;
+            var user = await _currentUser.GetAsync();
+            if (user is null)
+                return null;
+            // Login'de eklediğimiz claim: "tenant_id"
+            var tId = user.TenantId;
+            return tId;
         }
 
+
         // -------------------- AUDIT HELPERS --------------------
-        protected virtual void SetCreateAuditIfExists(object? entity)
+        protected virtual async Task SetCreateAuditIfExists(object? entity)
         {
             if (entity is null) return;
             var now = Now();
-            var uid = GetCurrentUserIdOrDefault();
+            var uid = await GetCurrentUserIdOrDefault();
 
             TrySetDate(entity, CommonConstants.CreatedDate, now, onlyIfDefault: true);
             TrySetLong(entity, CommonConstants.CreatedUser, uid, onlyIfDefault: true);
             TrySetBool(entity, CommonConstants.IsDeleted, false, onlyIfDefault: false);
         }
 
-        protected virtual void SetUpdateAuditIfExists(object? entity)
+        protected virtual async Task SetUpdateAuditIfExists(object? entity)
         {
             if (entity is null) return;
             var now = Now();
-            var uid = GetCurrentUserIdOrDefault();
+            var uid = await GetCurrentUserIdOrDefault();
 
             TrySetDate(entity, CommonConstants.UpdatedDate, now, onlyIfDefault: false);
             TrySetLong(entity, CommonConstants.UpdatedUser, uid, onlyIfDefault: false);
@@ -333,6 +343,9 @@ namespace Business.Services.Base
             var inc = IncludeExpression();
             if (inc is not null) query = inc(query);
 
+            // 🔹 Tenant filtresi
+            query = ApplyTenantFilterIfNeeded(query);
+
             // 🧹 IsDeleted varsa, soft delete filtrele
             var isDeletedProp = typeof(TEntity).GetProperty(
                 "IsDeleted",
@@ -482,6 +495,51 @@ namespace Business.Services.Base
                 new PagedResult<TGetDto>(items, total, q.Page, q.PageSize));
         }
 
+        /// <summary>
+        /// Eğer TEntity içinde TenantId kolonu varsa ve current user'ın TenantId'si varsa,
+        /// query'ye "x => x.TenantId == currentTenantId" filtresini uygular.
+        /// </summary>
+        protected IQueryable<TEntity> ApplyTenantFilterIfNeeded(IQueryable<TEntity> query)
+        {
+            // Entity'de TenantId property'si var mı?
+            var tenantProp = typeof(TEntity).GetProperty(
+                "TenantId",
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
 
+            if (tenantProp == null)
+                return query; // TenantId yoksa dokunma
+
+            if (tenantProp.PropertyType != typeof(long) &&
+                tenantProp.PropertyType != typeof(long?))
+                return query; // Tip uymuyorsa da dokunma
+
+            // Kullanıcının tenant'ını claim'den oku
+            var currentTenantId = GetCurrentTenantIdOrDefault().GetAwaiter().GetResult();
+            if (currentTenantId == null)
+                return query; // Kullanıcının tenant'ı yoksa filtreleme yapma
+
+            // x => x.TenantId == currentTenantId
+            var parameter = Expression.Parameter(typeof(TEntity), "x");
+            var member = Expression.Property(parameter, tenantProp);
+
+            Expression body;
+            if (tenantProp.PropertyType == typeof(long))
+            {
+                body = Expression.Equal(
+                    member,
+                    Expression.Constant(currentTenantId, typeof(long)));
+            }
+            else // long?
+            {
+                body = Expression.Equal(
+                    member,
+                    Expression.Convert(
+                        Expression.Constant(currentTenantId),
+                        typeof(long?)));
+            }
+
+            var lambda = Expression.Lambda<Func<TEntity, bool>>(body, parameter);
+            return query.Where(lambda);
+        }
     }
 }

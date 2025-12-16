@@ -74,6 +74,8 @@ namespace Model.Dtos.Customer
 
         public string? LockType { get; set; }
         public string? CashCenter { get; set; }
+
+        public long? TenantId { get; set; }
     }
 
     /// ---- Yardımcı Attribute'lar ----

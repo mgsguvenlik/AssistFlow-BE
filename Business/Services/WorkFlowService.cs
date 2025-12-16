@@ -146,7 +146,7 @@ namespace Business.Services
                 var wf = new WorkFlow
                 {
                     RequestNo = request.RequestNo,
-                    RequestTitle = "Servis Talebi",
+                    RequestTitle = dto.Title ?? "",
                     Priority = dto.Priority,
                     CurrentStepId = initialStep.Id,
                     CreatedDate = DateTime.Now,
@@ -1529,7 +1529,7 @@ namespace Business.Services
                 // 🔹 Eğer süreç tamamlandıysa arşive at
                 if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 {
-                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed": "Cancelled";
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed" : "Cancelled";
                     await ArchiveWorkflowAsync(dto.RequestNo, reason);
                 }
                 #endregion
@@ -1811,7 +1811,7 @@ namespace Business.Services
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -1833,30 +1833,25 @@ namespace Business.Services
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
+                    Title = wf != null ? wf.RequestTitle : null,
                     Description = sr.Description,
                     IsProductRequirement = sr.IsProductRequirement,
-
                     IsMailSended = sr.IsMailSended,
                     CustomerApproverId = sr.CustomerApproverId,
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
-
                     CustomerId = sr.CustomerId,
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
-
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
-
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
                     CreatedUser = sr.CreatedUser,
                     UpdatedUser = sr.UpdatedUser,
                     IsDeleted = sr.IsDeleted,
-
                     ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
                     IsLocationValid = wf != null && wf.IsLocationValid,
                     Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
-
                     ServicesRequestStatus = sr.ServicesRequestStatus,
 
                     // 🔹 Customer alt DTO + warranty türetmeleri
@@ -1971,7 +1966,7 @@ namespace Business.Services
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.Now;
 
             // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
             var baseDto = await (
@@ -1994,25 +1989,21 @@ namespace Business.Services
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     ServicesCostStatus = sr.ServicesCostStatus,
                     Description = sr.Description,
+                    Title = wf != null ? wf.RequestTitle : null,
                     IsProductRequirement = sr.IsProductRequirement,
-
                     IsMailSended = sr.IsMailSended,
                     CustomerApproverId = sr.CustomerApproverId,
                     CustomerApproverName = sr.CustomerApprover.FullName != null ? sr.CustomerApprover.FullName : wf.CustomerApproverName,
-
                     CustomerId = sr.CustomerId,
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
-
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
-
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
                     CreatedUser = sr.CreatedUser,
                     UpdatedUser = sr.UpdatedUser,
                     IsDeleted = sr.IsDeleted,
-
                     ApproverTechnicianId = wf != null ? wf.ApproverTechnicianId : null,
                     IsLocationValid = wf != null && wf.IsLocationValid,
                     Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
@@ -3187,7 +3178,7 @@ namespace Business.Services
                     };
                 })
                 .ToList();
-          
+
             // REVIEW LOG’LARI (Pricing adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>
@@ -3511,7 +3502,7 @@ namespace Business.Services
         public async Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR")
         {
             prefix ??= "SR";
-            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
+            var datePart = DateTime.Now.ToString("yyyyMMdd");
 
             // En fazla 10 deneme: çakışma olursa tekrar üret
             for (int i = 0; i < 10; i++)
@@ -4324,6 +4315,7 @@ namespace Business.Services
         }
 
         //Arşiv 
+    
         public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
         {
             try
@@ -4354,14 +4346,38 @@ namespace Business.Services
                 {
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
                 }
-                // En son arşivler üstte
-                q = q.OrderByDescending(x => x.ArchivedAt);
 
-                var entities = await q.ToListAsync();
+                // --- Projection: sadece gereken kolonlar ---
+                var projected = q
+                    .Select(a => new
+                    {
+                        a.Id,
+                        a.RequestNo,
+                        a.ArchiveReason,
+                        a.ArchivedAt,
+                        a.CustomerJson,
+                        a.ApproverTechnicianJson,
+                        a.WorkFlowJson
+                    })
+                    .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
 
-                var list = new List<WorkFlowArchiveListDto>();
+                // --- Sayfalama parametreleri ---
+                var page = filter.Page <= 0 ? 1 : filter.Page;
+                var pageSize = filter.PageSize <= 0 ? 50 : filter.PageSize;
 
-                foreach (var a in entities)
+                // Toplam kayıt sayısı (DB filtrelerine göre)
+                var totalCount = await projected.CountAsync();
+
+                // İlgili sayfadaki satırları çek (DB tarafında Skip/Take)
+                var pageRows = await projected
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                // --- JSON'dan DTO'ya dönüştürme ---
+                var list = new List<WorkFlowArchiveListDto>(pageRows.Count);
+
+                foreach (var a in pageRows)
                 {
                     string? customerName = null;
                     string? technicianName = null;
@@ -4373,15 +4389,20 @@ namespace Business.Services
                         var customer = JsonConvert.DeserializeObject<Customer>(a.CustomerJson);
                         customerName = customer?.ContactName1 ?? customer?.SubscriberCompany;
                     }
-                    catch { }
+                    catch
+                    {
+                        // İstersen loglayabilirsin
+                    }
 
-                    // Teknisyen adı (ApproverTechnicianJson → ApproverTechnician)
+                    // Teknisyen adı
                     try
                     {
                         var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
                         technicianName = tech?.TechnicianName;
                     }
-                    catch { }
+                    catch
+                    {
+                    }
 
                     // WorkFlow durumu
                     try
@@ -4389,7 +4410,9 @@ namespace Business.Services
                         var wf = JsonConvert.DeserializeObject<WorkFlow>(a.WorkFlowJson);
                         wfStatus = wf?.WorkFlowStatus.ToString();
                     }
-                    catch { }
+                    catch
+                    {
+                    }
 
                     list.Add(new WorkFlowArchiveListDto
                     {
@@ -4403,7 +4426,7 @@ namespace Business.Services
                     });
                 }
 
-                // --- JSON içi filtreler (in-memory) ---
+                // --- JSON içi filtreler (in-memory, sadece bu sayfa üzerinde) ---
                 if (!string.IsNullOrWhiteSpace(filter.CustomerName))
                 {
                     var cn = filter.CustomerName.Trim().ToLowerInvariant();
@@ -4422,19 +4445,10 @@ namespace Business.Services
                         .ToList();
                 }
 
-                // --- Pagination ---
-                var totalCount = list.Count;
-                var page = filter.Page;
-                var pageSize = filter.PageSize;
-
-                var items = list
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToList(); // List<T> zaten IReadOnlyList<T> implement ediyor
-
+                // --- Sonuç ---
                 var paged = new PagedResult<WorkFlowArchiveListDto>(
-                    Items: items,
-                    TotalCount: totalCount,
+                    Items: list,
+                    TotalCount: totalCount, // Not: totalCount JSON filtrelerini içermiyor
                     Page: page,
                     PageSize: pageSize
                 );

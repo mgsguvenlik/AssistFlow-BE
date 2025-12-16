@@ -9,118 +9,56 @@ namespace Data.Seeding.Seeds
     public class WorkFlowStepSeed : IDataSeed
     {
         private readonly ILogger<WorkFlowStepSeed> _logger;
-
         public WorkFlowStepSeed(ILogger<WorkFlowStepSeed> logger)
         {
             _logger = logger;
         }
         public string Key => "WorkFlowSteps"; // SeedHistory için benzersiz anahtar
         public int Order => 11; // ConfigSeed'den sonra çalışması için 10'dan büyük bir değer
-
-        public async Task RunAsync_(DbContext db, IServiceProvider sp, CancellationToken ct)
-        {
-            var workFlowSteps = new List<WorkFlowStep>
-            {
-                new() {
-                    Name = "Servis Talebi Oluşturma",
-                    Code = "SR", // Services Request
-                    Order = 1,
-                },
-                new() {
-                    Name = "Depo Sevkiyatı",
-                    Code = "WH", // Warehouse
-                    Order = 2,
-                },
-                new() {
-                    Name = "Teknik Servis İşlemleri",
-                    Code = "TS", // Technical Service
-                    Order = 3,
-                },
-                new() {
-                    Name = "Fiyatlandırma",
-                    Code = "PRC", // Pricing / Close (Örn: FinishService'deki PRC)
-                    Order = 4,
-                },
-                  new() {
-                    Name = "Onaylama",
-                    Code = "APR", // Pricing / Close (Örn: FinishService'deki PRC)
-                    Order = 4,
-                },
-                 new() {
-                    Name = "İptal Edildi",
-                    Code = "CNC", // Cancelled
-                    Order = 99, // Yüksek bir sıralama, akışın dışında
-
-                }
-                 ,
-                 new() {
-                    Name = "Tamamlandı",
-                    Code = "CMP", // Cancelled
-                    Order = 100, // Yüksek bir sıralama, akışın dışında
-
-                }
-            };
-
-            // Eklemeden önce mevcut olup olmadığını kontrol et
-            foreach (var step in workFlowSteps)
-            {
-                var exists = await db.Set<WorkFlowStep>()
-                    .AnyAsync(w => w.Code == step.Code, ct);
-
-                if (!exists)
-                {
-                    await db.Set<WorkFlowStep>().AddAsync(step, ct);
-                }
-            }
-
-            await db.SaveChangesAsync(ct);
-            _logger.LogInformation("WorkFlowStep Seed Completed. Added/Ensured {Count} steps.", workFlowSteps.Count);
-        }
-
-
         public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
         {
             var workFlowSteps = new List<WorkFlowStep>
             {
+
                 new() {
-            Name = "Servis Talebi Oluşturma",
-            Code = "SR", // Services Request
-            Order = 1,
-        },
+                     Name = "Servis Talebi Oluşturma",
+                     Code = "SR", // Services Request
+                     Order = 1,
+                 },
                 new() {
-            Name = "Depo Sevkiyatı",
-            Code = "WH", // Warehouse
-            Order = 2,
-        },
+                     Name = "Depo Sevkiyatı",
+                     Code = "WH", // Warehouse
+                     Order = 2,
+                 },
                 new() {
-            Name = "Teknik Servis İşlemleri",
-            Code = "TS", // Technical Service
-            Order = 3,
-        },
+                     Name = "Teknik Servis İşlemleri",
+                     Code = "TS", // Technical Service
+                     Order = 3,
+                 },
                 new() {
-            Name = "Fiyatlandırma",
-            Code = "PRC", // Pricing
-            Order = 4,
-        },
+                     Name = "Fiyatlandırma",
+                     Code = "PRC", // Pricing
+                     Order = 4,
+                 },
                 new() {
-            Name = "Onaylama",
-            Code = "APR", // Approval
-            Order = 5,
-        },
+                     Name = "Onaylama",
+                     Code = "APR", // Approval
+                     Order = 5,
+                 },
                 new() {
-            Name = "İptal Edildi",
-            Code = "CNC", // Cancelled
-            Order = 99,
-        },
+                     Name = "İptal Edildi",
+                     Code = "CNC", // Cancelled
+                     Order = 99,
+                 },
                 new() {
-            Name = "Tamamlandı",
-            Code = "CMP", // Completed
-            Order = 100,
-        }
+                     Name = "Tamamlandı",
+                     Code = "CMP", // Completed
+                     Order = 100,
+                 }
             };
 
             var existingNames = await db.Set<WorkFlowStep>()
-                .Select(w => w.Name)
+                .Select(w => w.Code)
                 .ToListAsync(ct);
 
             var existingNameSet = new HashSet<string>(existingNames);
@@ -128,7 +66,7 @@ namespace Data.Seeding.Seeds
             foreach (var step in workFlowSteps)
             {
                 // Name'e göre kontrol
-                if (!existingNameSet.Contains(step.Name))
+                if (!existingNameSet.Contains(step.Code))
                 {
                     await db.Set<WorkFlowStep>().AddAsync(step, ct);
                 }
@@ -140,9 +78,6 @@ namespace Data.Seeding.Seeds
                 workFlowSteps.Count
             );
         }
-
-
-        // Sadece tabloda hiç veri yoksa çalıştır
         public async Task<bool> ShouldRunAsync(DbContext db, CancellationToken ct)
         {
             // Eğer tabloda hiç WorkFlowStep yoksa çalıştır.

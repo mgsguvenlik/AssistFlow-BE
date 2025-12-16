@@ -1,7 +1,9 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Ykb;
 using Business.Utilities.Security;
 using Castle.DynamicProxy;
 using Core.Utilities.Interceptors;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.MailOutbox;
+using Model.Dtos.Tenant;
 
 namespace Business.DependencyResolvers.Autofac
 {
@@ -37,6 +40,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IConfigurationService), typeof(ConfigurationService));
             services.AddScoped(typeof(IMailService), typeof(MailService));
             services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
+            services.AddScoped(typeof(IYkbWorkFlowService), typeof(YkbWorkFlowService));
             services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
             services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));
@@ -48,8 +52,9 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(INotificationService), typeof(NotificationService));
             services.AddScoped(typeof(ICustomerSystemService), typeof(CustomerSystemService));
             services.AddScoped(typeof(ICustomerSystemAssignmentService), typeof(CustomerSystemAssignmentService));
+            services.AddScoped(typeof(ITenantService), typeof(TenantService));
 
-            services.AddScoped<ICurrentUser, CurrentUser>();
+            services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı
@@ -228,6 +233,11 @@ namespace Business.DependencyResolvers.Autofac
                    CustomerSystemAssignmentGetDto,
                    long>
              >(sp => sp.GetRequiredService<ICustomerSystemAssignmentService>());
+
+
+            services.AddScoped<
+                   ICrudService<TenantCreateDto, TenantUpdateDto, TenantGetDto, long>,
+                   TenantService>();
 
         }
         protected override void Load(ContainerBuilder builder)

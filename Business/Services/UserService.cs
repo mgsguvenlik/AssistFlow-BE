@@ -26,21 +26,16 @@ public class UserService
 {
 
     private readonly IMailService _mailService;
-
     private readonly IPasswordHasher<User> _passwordHasher;
-
-    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, Microsoft.AspNetCore.Identity.IPasswordHasher<User> passwordHasher, IMailService mailService)
+    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IPasswordHasher<User> passwordHasher, IMailService mailService)
         : base(uow, mapper, config)
     {
         _passwordHasher = passwordHasher;
         _mailService = mailService;
     }
-
     protected override long ReadKey(User entity) => entity.Id;
-
     protected override Expression<Func<User, bool>> KeyPredicate(long id)
         => u => u.Id == id;
-
     public override async Task<ResponseModel<UserGetDto>> CreateAsync(UserCreateDto dto)
     {
         try
@@ -113,7 +108,6 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
         }
     }
-
     // Include'lar (roller)
     protected override Func<IQueryable<User>, IIncludableQueryable<User, object>>? IncludeExpression()
         => q => q.Include(u => u.UserRoles).ThenInclude(ur => ur.Role);
@@ -168,7 +162,6 @@ public class UserService
                 entity.UserRoles.Add(new UserRole { UserId = entity.Id, RoleId = rid });
         }
     }
-
     // ---------- Çoklu Rol Atama (Id listesi) ----------
     public async Task<ResponseModel<UserGetDto>> AssignRolesAsync(long userId, IEnumerable<long> roleIds)
     {
@@ -223,8 +216,6 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError} {ex.Message}", StatusCode.Error);
         }
     }
-
-
     //  Login (email + şifre ile)
     public async Task<ResponseModel<UserGetDto>> SignInAsync(string email, string password)
     {
@@ -268,8 +259,6 @@ public class UserService
             Message = Messages.SignInSuccessful
         };
     }
-
-
     // Şifre Sıfırlama İsteği (email gönderimi)
     public async Task<ResponseModel<UserGetDto>> ResetPasswordRequestAsync(string email, CancellationToken cancellationToken = default)
     {
@@ -299,7 +288,7 @@ public class UserService
             issuer: appSettings.Value.Issuer,
             audience: appSettings.Value.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(15),
+            expires: DateTime.Now.AddMinutes(15),
             signingCredentials: creds
         );
 
@@ -335,7 +324,6 @@ public class UserService
             Message = Messages.ResetPasswordRequestSuccess
         };
     }
-
     public Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
         var handler = new JwtSecurityTokenHandler();
@@ -373,7 +361,7 @@ public class UserService
             });
         }
 
-        if (jwtToken.ValidTo < DateTime.UtcNow)
+        if (jwtToken.ValidTo < DateTime.Now)
         {
             return Task.FromResult(new ResponseModel<UserGetDto>
             {
@@ -431,8 +419,6 @@ public class UserService
             Message = Messages.PasswordChangedSuccessfully
         });
     }
-
-
     public async Task<ResponseModel<UserGetDto>> ChangePasswordWithOldAsync(
     long userId,
     string oldPassword,

@@ -30,6 +30,8 @@ namespace Model.Dtos.Customer
 
         public string? LockType { get; set; }
         public string? CashCenter { get; set; }
+
+        public long? TenantId { get; set; }
         public CustomerGroupGetDto CustomerGroup { get; set; } = new();
 
         public ICollection<CustomerSystemAssignmentGetDto> Systems { get; set; } = new List<CustomerSystemAssignmentGetDto>();

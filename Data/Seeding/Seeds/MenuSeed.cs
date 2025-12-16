@@ -44,7 +44,20 @@ namespace Data.Seeding.Seeds
                 ["MenuList"] = "Menü Listesi",
                 ["FlowStatusList"] = "Akış Durum Listesi",
                 ["Mailbox"] = "Posta Kutusu",
-                ["CustomerSystemList"] = "Müşteri Sistem Listesi"
+                ["CustomerSystemList"] = "Müşteri Sistem Listesi",
+                ["ServiceRequestArchive"] = "Akış Arşiv Listesi",
+                ["YkbServiceRequestCreate"] = "Ykb Servis Talebi Oluştur",
+                ["YkbCustomerServiceRequestCreate"] = "Ykb Müşteri Servis Talebi Oluştur",
+                ["YkbServiceRequestList"] = "Ykb Servis Talep Listesi",
+                ["YkbServiceRequestArchive"] = "Ykb Akış Arşiv Listesi",
+                ["YkbServiceRequestWarehouse"] = "Servis Talebi - Depo",
+                ["YkbServiceRequestTechnicalService"] = "Servis Talebi - Teknik Servis",
+                ["YkbServiceRequestPricing"] = "Servis Talebi - Fiyatlandırma",
+                ["YkbServiceRequestFinalApproval"] = "Servis Talebi - Son Onay",
+                ["TenantList"] = "Firma Listesi",
+                ["YkbServiceRequestCustomerAgreement"] = "Ykb Servis Talebi - Müşteri Onayı",
+                ["YkbServiceReportsList"] = "Ykb Servis Rapor Listesi",
+                ["YkbFlowStatusList"] = "Ykb Akış Durum Listesi"
             };
 
             var set = db.Set<Menu>();

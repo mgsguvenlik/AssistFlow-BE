@@ -10,7 +10,7 @@ namespace Data.Seeding.Infrastructure
         [Required, MaxLength(200)]
         public string Key { get; set; } = null!;
 
-        public DateTimeOffset AppliedAt { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset AppliedAt { get; set; } = DateTimeOffset.Now;
 
         [MaxLength(50)]
         public string? Version { get; set; }

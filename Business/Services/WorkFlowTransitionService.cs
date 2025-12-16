@@ -15,8 +15,8 @@ namespace Business.Services
     public class WorkFlowTransitionService
         : CrudServiceBase<WorkFlowTransition, long, WorkFlowTransitionCreateDto, WorkFlowTransitionUpdateDto, WorkFlowTransitionGetDto>, IWorkFlowTransitionService
     {
-        public WorkFlowTransitionService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor http)
-            : base(uow, mapper, config, http)
+        public WorkFlowTransitionService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
+            : base(uow, mapper, config)
         {
         }
 

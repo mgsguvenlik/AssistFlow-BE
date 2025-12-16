@@ -24,6 +24,7 @@ using Model.Dtos.Region;
 using Model.Dtos.Role;
 using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
+using Model.Dtos.Tenant;
 using Model.Dtos.User;
 using Model.Dtos.UserRole;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
@@ -246,15 +247,36 @@ namespace Business.Mapper
                   .IgnoreNullValues(true)
                   .Ignore(d => d.UserRoles)
                   .Ignore(d => d.PasswordHash); // NewPassword serviste hash'lenir
+
             config.NewConfig<User, UserGetDto>()
-                  .Map(d => d.Roles,
-                       s => s.UserRoles.Select(ur => new RoleGetDto
-                       {
-                           Id = ur.RoleId,
-                           Name = ur.Role != null ? ur.Role.Name : null,
-                           Code = ur.Role != null ? ur.Role.Code : null
-                       }).ToList()
-                  );
+                    // 🔹 Tenant alanları
+                    .Map(d => d.TenantId,
+                         s => s.TenantId ?? 0) // DTO long, entity long? olduğu için null gelirse 0 veriyoruz
+                    .Map(d => d.TenantCode,
+                         s => s.Tenant != null ? s.Tenant.Code : string.Empty)
+                    .Map(d => d.TenantName,
+                         s => s.Tenant != null ? s.Tenant.Name : string.Empty)
+                    // 🔹 Diğer basit alanlar (istersen bunları Mapster’a da bırakabilirsin)
+                    .Map(d => d.TechnicianCode, s => s.TechnicianCode)
+                    .Map(d => d.TechnicianCompany, s => s.TechnicianCompany)
+                    .Map(d => d.TechnicianAddress, s => s.TechnicianAddress)
+                    .Map(d => d.City, s => s.City)
+                    .Map(d => d.District, s => s.District)
+                    .Map(d => d.TechnicianName, s => s.TechnicianName)
+                    .Map(d => d.TechnicianPhone, s => s.TechnicianPhone)
+                    .Map(d => d.TechnicianEmail, s => s.TechnicianEmail)
+                    .Map(d => d.IsActive, s => s.IsActive)
+
+                    // 🔹 Roller
+                    .Map(d => d.Roles,
+                         s => s.UserRoles.Select(ur => new RoleGetDto
+                         {
+                             Id = ur.RoleId,
+                             Name = ur.Role != null ? ur.Role.Name : null,
+                             Code = ur.Role != null ? ur.Role.Code : null
+                         }).ToList()
+                    );
+
 
             // ---------------- UserRole ----------------
             config.NewConfig<UserRoleCreateDto, UserRole>()
@@ -565,6 +587,18 @@ namespace Business.Mapper
 
             config.NewConfig<Notification, NotificationGetDto>()
                   .Map(d => d.Type, s => (int)s.Type);
+
+            config.NewConfig<Tenant, TenantGetDto>();
+
+            config.NewConfig<TenantCreateDto, Tenant>()
+                  .Ignore(dest => dest.Id)
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.CreatedUser)
+                  .Ignore(dest => dest.UpdatedDate)
+                  .Ignore(dest => dest.UpdatedUser);
+            config.NewConfig<TenantUpdateDto, Tenant>()
+                  .Ignore(dest => dest.CreatedDate)
+                  .Ignore(dest => dest.CreatedUser);
 
         }
     }

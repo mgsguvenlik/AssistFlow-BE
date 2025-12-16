@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -50,6 +51,26 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
+        public DbSet<Tenant> Tenants { get; set; } = null!;
+
+
+        #region YKB
+        public DbSet<YkbCustomerForm> YkbCustomerForms { get; set; } = default!;
+        public DbSet<YkbServicesRequest> YkbServicesRequests { get; set; } = default!;
+        public DbSet<YkbServicesRequestProduct> YkbServicesRequestProducts { get; set; } = default!;
+        public DbSet<YkbTechnicalService> YkbTechnicalServices { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceImage> YkbTechnicalServiceImages { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceFormImage> YkbTechnicalServiceFormImages { get; set; } = default!;
+        public DbSet<YkbPricing> YkbPricings { get; set; } = default!;
+        public DbSet<YkbFinalApproval> YkbFinalApprovals { get; set; } = default!;
+        public DbSet<YkbWarehouse> YkbWarehouses { get; set; } = default!;
+        public DbSet<YkbWorkFlow> YkbWorkFlows { get; set; } = default!;
+        public DbSet<YkbWorkFlowStep> YkbWorkFlowSteps { get; set; } = default!;
+        public DbSet<YkbWorkFlowActivityRecord> YkbWorkFlowActivityRecords { get; set; } = default!;
+        public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
+        public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
+
+        #endregion
 
         /// <summary>
         ///MZK Not Diğer entity konfigürasyonları daha sonra eklenecek.
@@ -58,6 +79,34 @@ namespace Data.Concrete.EfCore.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            #region YKB
+           
+            modelBuilder.Entity<YkbServicesRequestProduct>()
+                        .Property(x => x.CapturedUnitPrice)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<YkbServicesRequestProduct>()
+                        .Property(x => x.CapturedTotal)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<YkbTechnicalService>()
+                        .Property(x => x.StartTime)
+                        .HasConversion(
+                            v => v,
+                            v => v.HasValue ? DateTime.SpecifyKind(v.Value.DateTime, DateTimeKind.Utc) : v
+                        );
+
+            // Gerek görürsen YKB için özel index’ler:
+            modelBuilder.Entity<YkbWorkFlow>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbServicesRequest>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbCustomerForm>()
+                        .HasIndex(x => x.RequestNo);
+            #endregion
+
 
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
@@ -403,6 +452,33 @@ namespace Data.Concrete.EfCore.Context
                       .WithMany(c => c.WorkFlowActivityRecords)
                       .HasForeignKey(w => w.CustomerId)
                       .OnDelete(DeleteBehavior.SetNull);
+            });
+
+
+            modelBuilder.Entity<Tenant>(entity =>
+            {
+                entity.HasIndex(x => x.Code).IsUnique();
+
+                entity.Property(x => x.Name)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(x => x.Code)
+                      .IsRequired()
+                      .HasMaxLength(50);
+
+                entity.Property(x => x.LogoUrl)
+                      .HasMaxLength(260);
+
+                entity.HasMany(t => t.Customers)
+                      .WithOne(c => c.Tenant!)
+                      .HasForeignKey(c => c.TenantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasMany(t => t.Users)
+                      .WithOne(u => u.Tenant!)
+                      .HasForeignKey(u => u.TenantId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

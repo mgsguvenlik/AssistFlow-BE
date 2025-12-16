@@ -16,8 +16,8 @@ public class MenuService
                       MenuGetDto>,
       IMenuService
 {
-    public MenuService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IHttpContextAccessor? http = null)
-        : base(uow, mapper, config, http) { }
+    public MenuService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
+        : base(uow, mapper, config) { }
 
     protected override long ReadKey(Menu e) => e.Id;
     protected override Expression<Func<Menu, bool>> KeyPredicate(long id) => m => m.Id == id;

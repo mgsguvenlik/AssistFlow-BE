@@ -18,8 +18,8 @@ namespace Business.Services
       : CrudServiceBase<Customer, long, CustomerCreateDto, CustomerUpdateDto, CustomerGetDto>,
         ICustomerService
     {
-        public CustomerService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config)
-            : base(uow, mapper, config) { }
+        public CustomerService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, ICurrentUser currentUser)
+            : base(uow, mapper, config, currentUser) { }
 
         protected override long ReadKey(Customer e) => e.Id;
         protected override Expression<Func<Customer, bool>> KeyPredicate(long id) => x => x.Id == id;
