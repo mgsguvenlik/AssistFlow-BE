@@ -54,11 +54,12 @@ namespace Business.Services
         private readonly IMailPushService _mailPush;
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
+        private readonly IMenuService _menuService;
         private readonly AppDataContext _ctx;
 
 
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
-            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification)
+            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService)
         {
             _uow = uow;
             _config = config;
@@ -68,7 +69,7 @@ namespace Business.Services
             _currentUser = currentUser;
             _ctx = ctx;
             _notification = notification;
-
+            _menuService = menuService;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -1730,8 +1731,7 @@ namespace Business.Services
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.WorkFlowStep);
 
-
-        public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync_(QueryParams q)
         {
             // 🔐 1. Giriş yapan kullanıcı + roller
             var me = await _currentUser.GetAsync();
@@ -1807,6 +1807,79 @@ namespace Business.Services
 
             return ResponseModel<PagedResult<ServicesRequestGetDto>>
                 .Success(new PagedResult<ServicesRequestGetDto>(items, total, q.Page, q.PageSize));
+        }
+        public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
+        {
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<ServicesRequestGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
+
+            var page = q.Page <= 0 ? 1 : q.Page;
+            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
+
+            // Permission step codes (WH, PRC, TS, ...)
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Rol yerine: kullanıcıya atanmış herhangi bir workflow var mı?
+            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+
+            // 1) Filtrelenmiş WorkFlow sorgusu
+            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted);
+
+            if (isTechnicianByData)
+            {
+                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+
+                // Eski davranıştaki TS şartını istersen ekle:
+                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+            }
+            else
+            {
+                if (permittedSet.Count == 0)
+                {
+                    wfBase = wfBase.Where(_ => false);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
+                }
+            }
+
+            var allowedRequestNos = wfBase.Select(x => x.RequestNo);
+
+            // 2) ServicesRequest base query + include'lar
+            IQueryable<ServicesRequest> query = _uow.Repository.GetQueryable<ServicesRequest>();
+            query = RequestIncludes()!(query);
+
+            // WorkFlow ilişkisine göre filtre
+            query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
+
+            // Search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+                query = query.Where(x =>
+                    x.RequestNo.Contains(term) ||
+                    (x.Description != null && x.Description.Contains(term)));
+            }
+
+            var total = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(x => x.CreatedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ProjectToType<ServicesRequestGetDto>(_config)
+                .ToListAsync();
+
+            return ResponseModel<PagedResult<ServicesRequestGetDto>>.Success(
+                new PagedResult<ServicesRequestGetDto>(items, total, page, pageSize)
+            );
         }
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
@@ -3523,7 +3596,7 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
         {
 
             var me = await _currentUser.GetAsync();
@@ -3632,6 +3705,122 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
         }
 
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        {
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
+
+            var page = q.Page <= 0 ? 1 : q.Page;
+            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
+
+            var pendingStatus = WorkFlowStatus.Pending;
+
+            // Permission step codes (WH, PRC, TS, ...)
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // “Teknisyen” rolü yerine: kullanıcıya atanmış herhangi bir workflow var mı?
+            // İstersen Pending ile sınırlama; ben genel baktım (IsDeleted=false)
+            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+
+            // base query
+            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
+
+            // Teknisyen ise sadece kendi akışları
+            if (isTechnicianByData)
+            {
+                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+
+                // Eski davranıştaki gibi sadece TS adımı istiyorsan aç:
+                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+            }
+            else
+            {
+                // permission ile filtrele (yetki yoksa boş)
+                if (permittedSet.Count == 0)
+                {
+                    wfBase = wfBase.Where(_ => false);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
+                }
+            }
+
+            // search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
+            }
+
+            // LEFT JOIN
+            var qJoined =
+                from wf in wfBase
+                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                    on wf.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new { wf, sr };
+
+            var total = await qJoined.CountAsync();
+
+            var items = await qJoined
+                .OrderByDescending(x => x.wf.CreatedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new WorkFlowGetDto
+                {
+                    Id = x.wf.Id,
+                    RequestTitle = x.wf.RequestTitle,
+                    RequestNo = x.wf.RequestNo,
+                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+                    Priority = x.wf.Priority,
+                    WorkFlowStatus = x.wf.WorkFlowStatus,
+                    IsAgreement = x.wf.IsAgreement,
+                    CreatedDate = x.wf.CreatedDate,
+                    UpdatedDate = x.wf.UpdatedDate,
+                    CreatedUser = x.wf.CreatedUser,
+                    UpdatedUser = x.wf.UpdatedUser,
+                    IsDeleted = x.wf.IsDeleted,
+                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
+                    ApproverTechnician = x.wf.ApproverTechnician == null
+                        ? null
+                        : new UserGetDto
+                        {
+                            Id = x.wf.ApproverTechnician.Id,
+                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
+                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
+                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
+                            City = x.wf.ApproverTechnician.City,
+                            District = x.wf.ApproverTechnician.District,
+                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                        },
+
+                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
+                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
+                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+
+                    CurrentStep = x.wf.CurrentStep == null
+                        ? null
+                        : new WorkFlowStepGetDto
+                        {
+                            Id = x.wf.CurrentStep.Id,
+                            Name = x.wf.CurrentStep.Name,
+                            Code = x.wf.CurrentStep.Code
+                        }
+                })
+                .ToListAsync();
+
+            return ResponseModel<PagedResult<WorkFlowGetDto>>
+                .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
+        }
+
+      
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -4701,8 +4890,37 @@ namespace Business.Services
                  </div>";
             return (subject, html);
         }
+        private async Task<List<string>> GetUserStepsByMenuPermission(long userId)
+        {
+            var permissionList = await _menuService.GetByUserIdAsync(userId);
 
+            if (permissionList is null || permissionList.Count == 0)
+                return new List<string>();
 
+            // Name -> StepCode map
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ServiceRequestWarehouse"] = "WH",
+                ["ServiceRequestPricing"] = "PRC",
+                ["CancelledFlows"] = "CNC",
+                ["ServiceRequestFinalApproval"] = "SR",
+                ["ServiceRequestComplate"] = "CMP",
+                ["ServiceRequestTechnicalService"] = "TS",
+            };
+
+            // permissionList içinde Name'i map'te olanlar -> code listesine ekle (unique)
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var p in permissionList)
+            {
+                if (p?.Name is null) continue;
+                if (!(p.CanView || p.CanEdit)) continue;
+                if (map.TryGetValue(p.Name, out var code))
+                    result.Add(code);
+            }
+
+            return result.ToList();
+        }
 
         private WorkFlowArchiveDetailDto BuildArchiveDetailDto(WorkFlowArchive archive)
         {
