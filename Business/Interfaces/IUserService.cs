@@ -22,6 +22,6 @@ namespace Business.Interfaces
 
         Task<ResponseModel<List<UserGetDto>>> GetTechniciansAsync();
 
-        Task<ResponseModel<UserGetDto>> UpdateUserPassword(long id, string newPassword, CancellationToken ct = default)
+        Task<ResponseModel<UserGetDto>> UpdateUserPassword(long id, string newPassword, CancellationToken ct = default);
     }
 }
