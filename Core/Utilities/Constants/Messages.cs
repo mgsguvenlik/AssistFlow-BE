@@ -195,8 +195,7 @@
         public const string Success = "Başarılı";
         public const string NewPasswordAndConfirmationDoNotMatch = "Yeni şifre ile şifre tekrarı eşleşmiyor.";
         public const string RecoveryOldNewRequired = "Eski şifre, yeni şifre ve şifre tekrarı alanları zorunludur.";
-
-
-
+        public const string TechnicianCodeRequired = "Kullanıcı adı  boş olamaz.";
+        public const string TechnicianCodeNoSpaces = "Kullanıcı adı  boşluk içeremez.";
     }
 }

@@ -4903,7 +4903,8 @@ namespace Business.Services
                 ["ServiceRequestWarehouse"] = "WH",
                 ["ServiceRequestPricing"] = "PRC",
                 ["CancelledFlows"] = "CNC",
-                ["ServiceRequestFinalApproval"] = "SR",
+                ["ServiceRequestFinalApproval"] = "APR",
+                ["ServiceRequestCreate"] = "SR",
                 ["ServiceRequestComplate"] = "CMP",
                 ["ServiceRequestTechnicalService"] = "TS",
             };

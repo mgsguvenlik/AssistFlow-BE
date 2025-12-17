@@ -5671,7 +5671,8 @@ namespace Business.Services.Ykb
                 ["YkbCancelledFlows"] = "CNC",
                 ["YkbCustomerServiceRequestCreate"] = "CF",
                 ["YkbServiceRequestCustomerAgreement"] = "CAPR",
-                ["YkbServiceRequestFinalApproval"] = "SR",
+                ["YkbServiceRequestFinalApproval"] = "APR",
+                ["YkbServiceRequestCreate"] = "SR",
                 ["YkbServiceRequestComplate"] = "CMP",
                 ["YkbServiceRequestTechnicalService"] = "TS",
             };

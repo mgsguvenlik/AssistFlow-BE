@@ -49,6 +49,17 @@ public class UserService
 
             entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.Password);
 
+
+
+            var uniqueErr = await EnsureUniqueTechnicianAsync(
+                currentUserId: 0,
+                technicianCode: entity.TechnicianCode,
+                technicianEmail: entity.TechnicianEmail,
+                ct: CancellationToken.None // CreateAsync imzanda ct yoksa None; varsa ct ver
+            );
+
+            if (uniqueErr != null)
+                return uniqueErr;
             // (Opsiyonel) Eğer base'inde SetCreateAuditIfExists varsa çağır:
             // SetCreateAuditIfExists(entity);
 
@@ -108,6 +119,83 @@ public class UserService
             return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
         }
     }
+    public override async Task<ResponseModel<UserGetDto>> UpdateAsync(UserUpdateDto dto)
+    {
+        try
+        {
+            var entity = await ResolveEntityForUpdateAsync(dto);
+            if (entity is null)
+                return ResponseModel<UserGetDto>.Fail(Messages.RecordNotFound, StatusCode.NotFound);
+
+            // dto -> entity map
+            MapUpdate(dto, entity);
+
+
+            // TenantId nullable olabilir: null -> bırak, 0 -> null yap, >0 -> var mı kontrol et
+            if (dto.TenantId.HasValue)
+            {
+                if (dto.TenantId.Value <= 0)
+                {
+                    entity.TenantId = null; // 0 veya negatif geldiyse FK'yi bozmamak için null'a çevir
+                }
+                else
+                {
+                    var tenantExists = await _repo.GetQueryable<Tenant>()
+                        .AsNoTracking()
+                        .AnyAsync(t => t.Id == dto.TenantId.Value);
+
+                    if (!tenantExists)
+                        return ResponseModel<UserGetDto>.Fail("Geçersiz TenantId. Böyle bir tenant yok.", StatusCode.BadRequest);
+
+                    entity.TenantId = dto.TenantId.Value;
+                }
+            }
+            else
+            {
+                entity.TenantId = null;
+            }
+
+
+            // ✅ UNIQUE kontrol (entity.Id hariç)
+            var uniqueErr = await EnsureUniqueTechnicianAsync(
+                currentUserId: entity.Id,
+                technicianCode: entity.TechnicianCode,
+                technicianEmail: entity.TechnicianEmail,
+                ct: CancellationToken.None // imzaya ct eklersen ct ver
+            );
+            if (uniqueErr != null)
+                return uniqueErr;
+
+            // audit + save
+            await SetUpdateAuditIfExists(entity);
+            await _repo.CompleteAsync();
+
+            // DTO dön
+            var q = _repo.GetQueryable<User>();
+            var inc = IncludeExpression();
+            if (inc is not null) q = inc(q);
+
+            var updated = await q.AsNoTracking()
+                                 .Where(u => u.Id == entity.Id)
+                                 .ProjectToType<UserGetDto>(_config)
+                                 .FirstAsync();
+
+            return ResponseModel<UserGetDto>.Success(updated, Messages.Updated);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResponseModel<UserGetDto>.Fail(Messages.ConflictError, StatusCode.Conflict);
+        }
+        catch (DbUpdateException ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.DatabaseError}: {ex.Message}", StatusCode.Conflict);
+        }
+        catch (Exception ex)
+        {
+            return ResponseModel<UserGetDto>.Fail($"{Messages.UnexpectedError}: {ex.Message}", StatusCode.Error);
+        }
+    }
+
     // Include'lar (roller)
     protected override Func<IQueryable<User>, IIncludableQueryable<User, object>>? IncludeExpression()
         => q => q.Include(u => u.UserRoles).ThenInclude(ur => ur.Role);
@@ -605,6 +693,44 @@ public class UserService
         {
             return ResponseModel<UserGetDto>.Fail($"{Messages.FailedToChangePassword}: {ex.Message}", StatusCode.Error);
         }
+    }
+
+    //Ortak kontrol helper’ı
+    private async Task<ResponseModel<UserGetDto>?> EnsureUniqueTechnicianAsync(
+    long currentUserId,
+    string? technicianCode,
+    string? technicianEmail,
+    CancellationToken ct)
+    {
+        var code = technicianCode?.Trim();
+        var email = technicianEmail?.Trim();
+
+        // ikisi de boşsa kontrol etme (istersen zorunlu yaparsın)
+        if (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(email))
+            return null;
+
+        // aynı anda tek sorguda kontrol (IgnoreQueryFilters istersen soft delete için)
+        var exists = await _unitOfWork.Repository.GetQueryable<User>()
+            .AsNoTracking()
+            .Where(u => u.Id != currentUserId && !u.IsDeleted)
+            .Where(u =>
+                (!string.IsNullOrWhiteSpace(code) && u.TechnicianCode == code) ||
+                (!string.IsNullOrWhiteSpace(email) && u.TechnicianEmail == email)
+            )
+            .Select(u => new { u.TechnicianCode, u.TechnicianEmail })
+            .FirstOrDefaultAsync(ct);
+
+        if (exists is null)
+            return null;
+
+        // hangi alan çakıştı?
+        if (!string.IsNullOrWhiteSpace(code) && string.Equals(exists.TechnicianCode, code, StringComparison.OrdinalIgnoreCase))
+            return ResponseModel<UserGetDto>.Fail("Aynı kullanıcı adı mevcut.", StatusCode.BadRequest);
+
+        if (!string.IsNullOrWhiteSpace(email) && string.Equals(exists.TechnicianEmail, email, StringComparison.OrdinalIgnoreCase))
+            return ResponseModel<UserGetDto>.Fail("Aynı email  mevcut.", StatusCode.BadRequest);
+
+        return ResponseModel<UserGetDto>.Fail("Aynı kullanıcı adı veya email mevcut.", StatusCode.BadRequest);
     }
 
 }
