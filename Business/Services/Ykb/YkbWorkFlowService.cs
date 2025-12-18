@@ -501,12 +501,12 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbWarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                var exists = await _uow.Repository
-                    .GetQueryable<YkbTechnicalService>()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-                if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
-                    return ResponseModel<YkbWarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
+                //var exists = await _uow.Repository
+                //    .GetQueryable<YkbTechnicalService>()
+                //    .AsNoTracking()
+                //    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                //if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
+                //    return ResponseModel<YkbWarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
                 var request = await _uow.Repository
                     .GetQueryable<YkbServicesRequest>()
