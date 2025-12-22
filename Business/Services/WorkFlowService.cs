@@ -3279,38 +3279,89 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
+            #region Eski URUNLER KODU
+            //// PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
+            //dto.Products = await _uow.Repository
+            //    .GetQueryable<ServicesRequestProduct>()
+            //    .AsNoTracking()
+            //    .Where(p => p.RequestNo == dto.RequestNo)
+            //    .Select(p => new ServicesRequestProductGetDto
+            //    {
+            //        Id = p.Id,
+            //        RequestNo = p.RequestNo,
+            //        ProductId = p.ProductId,
+            //        Quantity = p.Quantity,
+
+            //        // ürün temel alanları
+            //        ProductName = p.Product != null ? p.Product.Description : null,
+            //        ProductCode = p.Product != null ? p.Product.ProductCode : null,
+
+            //        // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
+            //        PriceCurrency = p.CapturedCurrency
+            //            ?? (p.Product != null ? p.Product.PriceCurrency : null),
+
+            //        // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
+            //        // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
+            //        ProductPrice = p.CapturedUnitPrice
+            //           ?? (p.Product != null ? (decimal?)p.Product.Price : null)
+            //           ?? 0m,
+
+            //        // 🔹 EffectivePrice: artık runtime hesap yok,
+            //        // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
+            //        EffectivePrice = p.CapturedUnitPrice
+            //             ?? 0m,
+            //    })
+            //    .ToListAsync();
+            #endregion
+
+
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
+                .Include(p => p.Product)
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .Select(p => new ServicesRequestProductGetDto
-                {
-                    Id = p.Id,
-                    RequestNo = p.RequestNo,
-                    ProductId = p.ProductId,
-                    Quantity = p.Quantity,
-
-                    // ürün temel alanları
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                    PriceCurrency = p.CapturedCurrency
-                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                    ProductPrice = p.CapturedUnitPrice
-                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                       ?? 0m,
-
-                    // 🔹 EffectivePrice: artık runtime hesap yok,
-                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                    EffectivePrice = p.CapturedUnitPrice
-                         ?? 0m,
-                })
                 .ToListAsync();
+
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
+
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
+
+                    // 3) DTO doldur
+                    return new ServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+                    };
+                })
+                .ToList();
+
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
