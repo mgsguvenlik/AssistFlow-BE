@@ -1,10 +1,18 @@
 ﻿
+using Core.Utilities.Constants;
+using System.ComponentModel.DataAnnotations;
+
 namespace Model.Dtos.User
 {
     public class UserUpdateDto
     {
         public long Id { get; set; }
+
+        [Required(ErrorMessage = Messages.TechnicianCodeRequired)]
+        [MaxLength(50)]
+        [RegularExpression(@"^\S+$", ErrorMessage = Messages.TechnicianCodeNoSpaces)] 
         public string TechnicianCode { get; set; } = string.Empty;
+
         public string? TechnicianCompany { get; set; }
         public string? TechnicianAddress { get; set; }
         public string? City { get; set; }

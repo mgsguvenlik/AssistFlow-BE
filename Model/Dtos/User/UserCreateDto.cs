@@ -5,8 +5,13 @@ namespace Model.Dtos.User
 {
     public class UserCreateDto : IValidatableObject
     {
-        [Required, MaxLength(50)]
+      
+
+        [Required(ErrorMessage = Messages.TechnicianCodeRequired)]
+        [MaxLength(50)]
+        [RegularExpression(@"^\S+$", ErrorMessage = Messages.TechnicianCodeNoSpaces)] // hiç boşluk yok (baş/son/arası)
         public string TechnicianCode { get; set; } = string.Empty;
+
 
         [MaxLength(200)]
         public string? TechnicianCompany { get; set; }

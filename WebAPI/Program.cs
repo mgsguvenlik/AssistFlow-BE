@@ -25,7 +25,11 @@ using WebAPI.Middleware;
 var builder = WebApplication.CreateBuilder(args);
 
 
-
+builder.Configuration
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 
@@ -45,16 +49,13 @@ builder.Services.AddHttpClient("CustomClient")
 builder.Services.AddControllers();
 
 
-
 #region Serilog
-
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration) 
-    .Enrich.FromLogContext()
-    .WriteTo.Seq("http://192.168.1.46:5441")       
-    .CreateLogger();
-builder.Host.UseSerilog();
-
+builder.Host.UseSerilog((ctx, lc) =>
+{
+    lc.ReadFrom.Configuration(ctx.Configuration)
+      .Enrich.FromLogContext()
+      .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
+});
 #endregion
 
 builder.Services.AddCors(options =>
@@ -71,6 +72,8 @@ builder.Services.AddCors(options =>
             "https://192.168.1.46:5174",
             "https://localhost:5174",
             "http://localhost:8081",
+            "https://flowassisttest.mgs.com.tr",
+            "http://flowassisttest.mgs.com.tr",
             "http://flowassist.mgs.com.tr",
             "https://flowassist.mgs.com.tr") // React frontend URL'si
             .AllowAnyMethod()
@@ -191,7 +194,7 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Key)),
             ClockSkew = TimeSpan.Zero, // Ýsteðe baðlý: expire anýnda düþsün
             NameClaimType = ClaimTypes.Name,
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = ClaimTypes.Role,
         };
     });
 builder.Services.AddAuthorization();

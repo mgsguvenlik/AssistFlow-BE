@@ -54,11 +54,12 @@ namespace Business.Services
         private readonly IMailPushService _mailPush;
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
+        private readonly IMenuService _menuService;
         private readonly AppDataContext _ctx;
 
 
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
-            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification)
+            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService)
         {
             _uow = uow;
             _config = config;
@@ -68,7 +69,7 @@ namespace Business.Services
             _currentUser = currentUser;
             _ctx = ctx;
             _notification = notification;
-
+            _menuService = menuService;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -369,12 +370,12 @@ namespace Business.Services
                 if (wf is null)
                     return ResponseModel<WarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                var exists = await _uow.Repository
-                    .GetQueryable<TechnicalService>()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-                if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
-                    return ResponseModel<WarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
+                //var exists = await _uow.Repository
+                //    .GetQueryable<TechnicalService>()
+                //    .AsNoTracking()
+                //    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                //if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
+                //    return ResponseModel<WarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
                 var request = await _uow.Repository
                     .GetQueryable<ServicesRequest>()
@@ -1730,63 +1731,58 @@ namespace Business.Services
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.WorkFlowStep);
 
-
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
-            // 🔐 1. Giriş yapan kullanıcı + roller
             var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<ServicesRequestGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 
-            var roles = me?.Roles
-                .Select(x => x.Code)
-                .ToHashSet() ?? new HashSet<string>();
+            var page = q.Page <= 0 ? 1 : q.Page;
+            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
 
-            bool isAdmin = roles.Contains("ADMIN");
-            bool isWarehouse = roles.Contains("WAREHOUSE");
-            bool isTechnician = roles.Contains("TECHNICIAN") || roles.Contains("SUBCONTRACTOR");
-            bool isProjectEngineer = roles.Contains("PROJECTENGINEER");
+            // Permission step codes (WH, PRC, TS, ...)
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var pendingStatus = WorkFlowStatus.Pending;
+            // Rol yerine: kullanıcıya atanmış herhangi bir workflow var mı?
+            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
 
-            // 🧱 2. Role göre filtrelenmiş WorkFlow sorgusu
-            var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+            // 1) Filtrelenmiş WorkFlow sorgusu
+            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isAdmin || isProjectEngineer)
+            if (isTechnicianByData)
             {
-                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
-            }
-            else if (isWarehouse)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "WH");
-            }
-            else if (isTechnician)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "TS" &&
-                    x.ApproverTechnicianId == me.Id);
+                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+
+                // Eski davranıştaki TS şartını istersen ekle:
+                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
             }
             else
             {
-                // Yetkisi olmayanlar için boş WF seti
-                wfBase = wfBase.Where(x => false);
+                if (permittedSet.Count == 0)
+                {
+                    wfBase = wfBase.Where(_ => false);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
+                }
             }
 
-            // Bu kullanıcının görebileceği RequestNo’lar
             var allowedRequestNos = wfBase.Select(x => x.RequestNo);
 
-            // 🧱 3. ServicesRequest base query + include'lar
-            var query = _uow.Repository.GetQueryable<ServicesRequest>();
+            // 2) ServicesRequest base query + include'lar
+            IQueryable<ServicesRequest> query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
 
-
-            // WorkFlow ile ilişkiye göre filtre:
+            // WorkFlow ilişkisine göre filtre
             query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
 
-            // 🔍 4. Search filtresi
+            // Search
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var term = q.Search.Trim();
@@ -1795,18 +1791,18 @@ namespace Business.Services
                     (x.Description != null && x.Description.Contains(term)));
             }
 
-            // 📄 5. Toplam kayıt + paging + Mapster
             var total = await query.CountAsync();
 
             var items = await query
                 .OrderByDescending(x => x.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ProjectToType<ServicesRequestGetDto>(_config)
                 .ToListAsync();
 
-            return ResponseModel<PagedResult<ServicesRequestGetDto>>
-                .Success(new PagedResult<ServicesRequestGetDto>(items, total, q.Page, q.PageSize));
+            return ResponseModel<PagedResult<ServicesRequestGetDto>>.Success(
+                new PagedResult<ServicesRequestGetDto>(items, total, page, pageSize)
+            );
         }
 
         public async Task<ResponseModel<ServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
@@ -2256,8 +2252,47 @@ namespace Business.Services
 
                 }
             }
+
+            #region Hareket Kaydı
+            await _activationRecord.LogAsync(
+                WorkFlowActionType.ServiceRequestUpdated,            // varsa böyle bir enum ekle
+                entity.RequestNo,
+                null,
+                dto.CustomerId,
+                wf.CurrentStepId != 0 ? null : null,                 // sende step code gerekiyorsa aşağıdaki gibi yap
+                "SR",
+                "Servis talebi güncellendi",
+                new
+                {
+                    dto,
+                    entity.Id,
+                    UpdatedBy = meId,
+                    Products = dto.Products?.Select(p => new { p.ProductId, p.Quantity })
+                });
+            #endregion
             await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
+
+
+            #region Notiification Kayıd
+            await _notification.CreateForRoleAsync(
+                new NotificationCreateDto
+                {
+                    Type = NotificationType.GenericInfo,
+                    Title = $"Talep {dto.RequestNo}",
+                    Message = $"Akış Güncellendi",
+                    RequestNo = dto.RequestNo,
+                    FromStepCode = "SR",
+                    ToStepCode = "SR",
+                    Payload = new
+                    {
+                        wfId = wf.Id,
+                        products= dto.Products.Select(x => new { x.ProductId, x.Quantity })
+                    }
+                },
+                roleCode: "PROJECTENGINEER"
+            );
+            #endregion
             return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
         }
         public async Task<ResponseModel> DeleteRequestAsync(long id)
@@ -2357,30 +2392,7 @@ namespace Business.Services
                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
                     if (technicalService != null)
                     {
-                        //Ürün var ise depoya geri gönder
-                        //if (servicesRequest.IsProductRequirement)
-                        //{
-                        //    //Depo Adımına Geri
-                        //    targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
-                        //       .AsNoTracking()
-                        //       .FirstOrDefaultAsync(s => s.Code == "WH");
-                        //    if (targetStep is null)
-                        //        return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (WH) tanımlı değil.", StatusCode.BadRequest);
-
-                        //    warehouse = await _uow.Repository
-                        //   .GetQueryable<Warehouse>()
-                        //   .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                        //    if (warehouse is null)
-                        //        return ResponseModel<WorkFlowGetDto>.Fail("Depo Kaydı Bulunamadı.", StatusCode.BadRequest);
-
-                        //    warehouse.WarehouseStatus = WarehouseStatus.Pending;
-                        //    warehouse.UpdatedDate = DateTime.Now;
-                        //    warehouse.UpdatedUser = meId;
-                        //    _uow.Repository.Update(warehouse);
-                        //}
-                        ////Ürün yok ise direkt servis talebine geri gönder
-                        //else
-                        //{
+                       
                         targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
                        .AsNoTracking()
                        .FirstOrDefaultAsync(s => s.Code == "SR");
@@ -3267,38 +3279,89 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            dto.Products = await _uow.Repository
+            #region Eski URUNLER KODU
+            //// PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
+            //dto.Products = await _uow.Repository
+            //    .GetQueryable<ServicesRequestProduct>()
+            //    .AsNoTracking()
+            //    .Where(p => p.RequestNo == dto.RequestNo)
+            //    .Select(p => new ServicesRequestProductGetDto
+            //    {
+            //        Id = p.Id,
+            //        RequestNo = p.RequestNo,
+            //        ProductId = p.ProductId,
+            //        Quantity = p.Quantity,
+
+            //        // ürün temel alanları
+            //        ProductName = p.Product != null ? p.Product.Description : null,
+            //        ProductCode = p.Product != null ? p.Product.ProductCode : null,
+
+            //        // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
+            //        PriceCurrency = p.CapturedCurrency
+            //            ?? (p.Product != null ? p.Product.PriceCurrency : null),
+
+            //        // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
+            //        // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
+            //        ProductPrice = p.CapturedUnitPrice
+            //           ?? (p.Product != null ? (decimal?)p.Product.Price : null)
+            //           ?? 0m,
+
+            //        // 🔹 EffectivePrice: artık runtime hesap yok,
+            //        // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
+            //        EffectivePrice = p.CapturedUnitPrice
+            //             ?? 0m,
+            //    })
+            //    .ToListAsync();
+            #endregion
+
+
+            // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
+            var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
+                .Include(p => p.Product)
                 .Where(p => p.RequestNo == dto.RequestNo)
-                .Select(p => new ServicesRequestProductGetDto
-                {
-                    Id = p.Id,
-                    RequestNo = p.RequestNo,
-                    ProductId = p.ProductId,
-                    Quantity = p.Quantity,
-
-                    // ürün temel alanları
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-                    // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                    PriceCurrency = p.CapturedCurrency
-                        ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-                    // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-                    ProductPrice = p.CapturedUnitPrice
-                       ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-                       ?? 0m,
-
-                    // 🔹 EffectivePrice: artık runtime hesap yok,
-                    // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                    EffectivePrice = p.CapturedUnitPrice
-                         ?? 0m,
-                })
                 .ToListAsync();
+
+            dto.Products = productEntities
+                .Select(p =>
+                {
+                    // Fiyat sabitlenmiş mi?
+                    bool captured = p.IsPriceCaptured;
+
+                    // 1) Birim fiyat
+                    decimal effectivePrice = captured
+                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+
+                    // 2) Para birimi
+                    string? currency = captured
+                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                        : p.Product?.PriceCurrency;
+
+                    // 3) DTO doldur
+                    return new ServicesRequestProductGetDto
+                    {
+                        Id = p.Id,
+                        RequestNo = p.RequestNo,
+                        ProductId = p.ProductId,
+                        Quantity = p.Quantity,
+
+                        ProductName = p.Product?.Description,
+                        ProductCode = p.Product?.ProductCode,
+
+                        // Para birimi: sabitse Captured, değilse Product
+                        PriceCurrency = currency,
+
+                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
+                        ProductPrice = effectivePrice,
+
+                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        EffectivePrice = effectivePrice,
+                    };
+                })
+                .ToList();
+
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -3523,7 +3586,7 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
         {
 
             var me = await _currentUser.GetAsync();
@@ -3632,6 +3695,122 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
         }
 
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        {
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
+
+            var page = q.Page <= 0 ? 1 : q.Page;
+            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
+
+            var pendingStatus = WorkFlowStatus.Pending;
+
+            // Permission step codes (WH, PRC, TS, ...)
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // “Teknisyen” rolü yerine: kullanıcıya atanmış herhangi bir workflow var mı?
+            // İstersen Pending ile sınırlama; ben genel baktım (IsDeleted=false)
+            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+
+            // base query
+            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
+
+            // Teknisyen ise sadece kendi akışları
+            if (isTechnicianByData)
+            {
+                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+
+                // Eski davranıştaki gibi sadece TS adımı istiyorsan aç:
+                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+            }
+            else
+            {
+                // permission ile filtrele (yetki yoksa boş)
+                if (permittedSet.Count == 0)
+                {
+                    wfBase = wfBase.Where(_ => false);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
+                }
+            }
+
+            // search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
+            }
+
+            // LEFT JOIN
+            var qJoined =
+                from wf in wfBase
+                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                    on wf.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new { wf, sr };
+
+            var total = await qJoined.CountAsync();
+
+            var items = await qJoined
+                .OrderByDescending(x => x.wf.CreatedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new WorkFlowGetDto
+                {
+                    Id = x.wf.Id,
+                    RequestTitle = x.wf.RequestTitle,
+                    RequestNo = x.wf.RequestNo,
+                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+                    Priority = x.wf.Priority,
+                    WorkFlowStatus = x.wf.WorkFlowStatus,
+                    IsAgreement = x.wf.IsAgreement,
+                    CreatedDate = x.wf.CreatedDate,
+                    UpdatedDate = x.wf.UpdatedDate,
+                    CreatedUser = x.wf.CreatedUser,
+                    UpdatedUser = x.wf.UpdatedUser,
+                    IsDeleted = x.wf.IsDeleted,
+                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
+                    ApproverTechnician = x.wf.ApproverTechnician == null
+                        ? null
+                        : new UserGetDto
+                        {
+                            Id = x.wf.ApproverTechnician.Id,
+                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
+                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
+                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
+                            City = x.wf.ApproverTechnician.City,
+                            District = x.wf.ApproverTechnician.District,
+                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                        },
+
+                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
+                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
+                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+
+                    CurrentStep = x.wf.CurrentStep == null
+                        ? null
+                        : new WorkFlowStepGetDto
+                        {
+                            Id = x.wf.CurrentStep.Id,
+                            Name = x.wf.CurrentStep.Name,
+                            Code = x.wf.CurrentStep.Code
+                        }
+                })
+                .ToListAsync();
+
+            return ResponseModel<PagedResult<WorkFlowGetDto>>
+                .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
+        }
+
+      
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -4701,8 +4880,38 @@ namespace Business.Services
                  </div>";
             return (subject, html);
         }
+        private async Task<List<string>> GetUserStepsByMenuPermission(long userId)
+        {
+            var permissionList = await _menuService.GetByUserIdAsync(userId);
 
+            if (permissionList is null || permissionList.Count == 0)
+                return new List<string>();
 
+            // Name -> StepCode map
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ServiceRequestWarehouse"] = "WH",
+                ["ServiceRequestPricing"] = "PRC",
+                ["CancelledFlows"] = "CNC",
+                ["ServiceRequestFinalApproval"] = "APR",
+                ["ServiceRequestCreate"] = "SR",
+                ["ServiceRequestComplate"] = "CMP",
+                ["ServiceRequestTechnicalService"] = "TS",
+            };
+
+            // permissionList içinde Name'i map'te olanlar -> code listesine ekle (unique)
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var p in permissionList)
+            {
+                if (p?.Name is null) continue;
+                if (!(p.CanView || p.CanEdit)) continue;
+                if (map.TryGetValue(p.Name, out var code))
+                    result.Add(code);
+            }
+
+            return result.ToList();
+        }
 
         private WorkFlowArchiveDetailDto BuildArchiveDetailDto(WorkFlowArchive archive)
         {

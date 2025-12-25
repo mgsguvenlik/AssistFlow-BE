@@ -80,7 +80,7 @@ namespace Data.Concrete.EfCore.Context
         {
             base.OnModelCreating(modelBuilder);
             #region YKB
-           
+
             modelBuilder.Entity<YkbServicesRequestProduct>()
                         .Property(x => x.CapturedUnitPrice)
                         .HasPrecision(18, 2);
@@ -108,6 +108,7 @@ namespace Data.Concrete.EfCore.Context
             #endregion
 
 
+
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
             {
@@ -118,6 +119,13 @@ namespace Data.Concrete.EfCore.Context
             });
 
             /// User Entity Configuration
+            modelBuilder.Entity<User>()
+                .HasIndex(x => x.TechnicianEmail)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(x => x.TechnicianCode)
+                .IsUnique();
             modelBuilder.Entity<UserRole>(e =>
             {
                 e.ToTable("UserRole");
@@ -284,11 +292,11 @@ namespace Data.Concrete.EfCore.Context
 
 
 
-        modelBuilder.Entity<WorkFlowTransition>()
-                .HasOne(t => t.FromStep)
-                .WithMany(s => s.OutgoingTransitions)
-                .HasForeignKey(t => t.FromStepId)
-                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<WorkFlowTransition>()
+                    .HasOne(t => t.FromStep)
+                    .WithMany(s => s.OutgoingTransitions)
+                    .HasForeignKey(t => t.FromStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<WorkFlowTransition>()
                 .HasOne(t => t.ToStep)
