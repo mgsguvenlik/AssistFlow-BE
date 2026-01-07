@@ -914,23 +914,24 @@ namespace Business.Services
                 #endregion
 
                 #region Lokasyon kontrolü
-                if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
-                {
-                    if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
-                    {
-                        return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
-                    }
-                    else
-                    {
-                        var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
-                        if (!locationResult.IsSuccess)
-                        {
-                            return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
-                        }
-                    }
-                }
+                ///MZK NOT: Burak Türk talebi üzerine Servisi tamamlama aşamasında lokasyon kontrolü gerekli bulunmadı.
+                //if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise.
+                //{
+                //    if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
+                //    {
+                //        return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
+                //    }
+                //    else
+                //    {
+                //        var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
+                //        var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
+                //        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
+                //        if (!locationResult.IsSuccess)
+                //        {
+                //            return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
+                //        }
+                //    }
+                //}
                 #endregion
 
                 #region Teknik Servis Kaydı güncelle 
