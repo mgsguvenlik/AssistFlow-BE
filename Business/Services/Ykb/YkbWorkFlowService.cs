@@ -2200,85 +2200,6 @@ namespace Business.Services.Ykb
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.YkbWorkFlowStep);
-
-        public async Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync_(QueryParams q)
-        {
-            // 🔐 1. Giriş yapan kullanıcı + roller
-            var me = await _currentUser.GetAsync();
-
-            var roles = me?.Roles
-                .Select(x => x.Code)
-                .ToHashSet() ?? new HashSet<string>();
-
-            bool isAdmin = roles.Contains("ADMIN");
-            bool isWarehouse = roles.Contains("WAREHOUSE");
-            bool isTechnician = roles.Contains("TECHNICIAN") || roles.Contains("SUBCONTRACTOR");
-            bool isProjectEngineer = roles.Contains("PROJECTENGINEER");
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            // 🧱 2. Role göre filtrelenmiş WorkFlow sorgusu
-            var wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
-                .AsNoTracking()
-                .Where(x => !x.IsDeleted);
-
-            if (isAdmin || isProjectEngineer)
-            {
-                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
-            }
-            else if (isWarehouse)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "WH");
-            }
-            else if (isTechnician)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "TS" &&
-                    x.ApproverTechnicianId == me.Id);
-            }
-            else
-            {
-                // Yetkisi olmayanlar için boş WF seti
-                wfBase = wfBase.Where(x => false);
-            }
-
-            // Bu kullanıcının görebileceği RequestNo’lar
-            var allowedRequestNos = wfBase.Select(x => x.RequestNo);
-
-            // 🧱 3. ServicesRequest base query + include'lar
-            var query = _uow.Repository.GetQueryable<YkbServicesRequest>();
-            query = RequestIncludes()!(query);
-
-
-            // WorkFlow ile ilişkiye göre filtre:
-            query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
-
-            // 🔍 4. Search filtresi
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                query = query.Where(x =>
-                    x.RequestNo.Contains(term) ||
-                    (x.Description != null && x.Description.Contains(term)));
-            }
-
-            // 📄 5. Toplam kayıt + paging + Mapster
-            var total = await query.CountAsync();
-
-            var items = await query
-                .OrderByDescending(x => x.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .ProjectToType<YkbServicesRequestGetDto>(_config)
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<YkbServicesRequestGetDto>>
-                .Success(new PagedResult<YkbServicesRequestGetDto>(items, total, q.Page, q.PageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
             var me = await _currentUser.GetAsync();
@@ -2292,22 +2213,25 @@ namespace Business.Services.Ykb
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // ✅ “Teknisyen” rol yerine: kullanıcıya atanmış herhangi bir WF var mı?
-            var isTechnicianByData = await _uow.Repository.GetQueryable<YkbWorkFlow>()
+            //✅“Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
+            var technicianRole = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+            var isTechnician =
+                !string.IsNullOrWhiteSpace(technicianRole) &&
+                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
 
             // 🧱 1) Role/permission’a göre filtrelenmiş WorkFlow sorgusu
             IQueryable<YkbWorkFlow> wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnicianByData)
+            if (isTechnician)
             {
                 wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
-
-                // Eski davranışta TS step’i de şart koşuyordun; istersen aç:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
             }
             else
             {
@@ -2353,7 +2277,6 @@ namespace Business.Services.Ykb
                 new PagedResult<YkbServicesRequestGetDto>(items, total, page, pageSize)
             );
         }
-
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
             var now = DateTimeOffset.Now;
@@ -2509,7 +2432,6 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
-
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
         {
             var now = DateTimeOffset.Now;
@@ -2693,8 +2615,6 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
-
-
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
 
@@ -4333,7 +4253,13 @@ namespace Business.Services.Ykb
             var roles = me.Roles?.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase)
                         ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var isTechnician = roles.Contains("TECHNICIAN");
+            var technicianRole = await _uow.Repository
+                    .GetQueryable<Configuration>()
+                    .AsNoTracking()
+                    .Where(x => x.Name == "TechnicianRoleCode")
+                    .Select(x => x.Value)
+                    .FirstOrDefaultAsync();
+            var isTechnician = roles.Contains(technicianRole);
 
             // Permission step codes
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();

@@ -1745,22 +1745,27 @@ namespace Business.Services
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // Rol yerine: kullanıcıya atanmış herhangi bir workflow var mı?
-            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+
+            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
+            var technicianRole = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var isTechnician =
+                !string.IsNullOrWhiteSpace(technicianRole) &&
+                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
 
             // 1) Filtrelenmiş WorkFlow sorgusu
             IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnicianByData)
+            if (isTechnician)
             {
                 wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
-
-                // Eski davranıştaki TS şartını istersen ekle:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
             }
             else
             {
@@ -2288,7 +2293,7 @@ namespace Business.Services
                     Payload = new
                     {
                         wfId = wf.Id,
-                        products= dto.Products.Select(x => new { x.ProductId, x.Quantity })
+                        products = dto.Products.Select(x => new { x.ProductId, x.Quantity })
                     }
                 },
                 roleCode: "PROJECTENGINEER"
@@ -2393,7 +2398,7 @@ namespace Business.Services
                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
                     if (technicalService != null)
                     {
-                       
+
                         targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
                        .AsNoTracking()
                        .FirstOrDefaultAsync(s => s.Code == "SR");
@@ -3587,118 +3592,10 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
-        {
-
-            var me = await _currentUser.GetAsync();
-
-            var roles = me?.Roles.Select(x => x.Code).ToHashSet();
-
-            bool isAdmin = roles?.Contains("ADMIN") ?? false;
-            bool isWarehouse = roles?.Contains("WAREHOUSE") ?? false;
-            bool isTechnician = roles?.Contains("TECHNICIAN") ?? false;
-            bool isSubcontractor = roles?.Contains("SUBCONTRACTOR") ?? false;
-            bool isProjectEngineer = roles?.Contains("PROJECTENGINEER") ?? false;
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
-                 .AsNoTracking()
-                 .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
-
-
-            if (isAdmin || isProjectEngineer)
-            {
-                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
-            }
-            else if (isWarehouse)
-            {
-                wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "WH");
-            }
-            else if (isTechnician)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null && x.CurrentStep.Code == "TS" &&
-                    x.ApproverTechnicianId == me.Id);
-            }
-            else
-            {
-                // Yetkisi olmayanlar için boş sonuç
-                wfBase = wfBase.Where(x => false);
-            }
-
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
-            }
-
-            // LEFT JOIN: WorkFlow.RequestNo == ServicesRequest.RequestNo
-            var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                     on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
-
-            var total = await qJoined.CountAsync();
-
-
-            var items = await qJoined
-                .OrderByDescending(x => x.wf.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .Select(x => new WorkFlowGetDto
-                {
-                    // WorkFlow alanları
-                    Id = x.wf.Id,
-                    RequestTitle = x.wf.RequestTitle,
-                    RequestNo = x.wf.RequestNo,
-                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
-                    Priority = x.wf.Priority,
-                    WorkFlowStatus = x.wf.WorkFlowStatus,
-                    IsAgreement = x.wf.IsAgreement,
-                    CreatedDate = x.wf.CreatedDate,
-                    UpdatedDate = x.wf.UpdatedDate,
-                    CreatedUser = x.wf.CreatedUser,
-                    UpdatedUser = x.wf.UpdatedUser,
-                    IsDeleted = x.wf.IsDeleted,
-                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
-                                ? null
-                                : new UserGetDto
-                                {
-                                    Id = x.wf.ApproverTechnician.Id,
-                                    TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                                    TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                                    TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                                    City = x.wf.ApproverTechnician.City,
-                                    District = x.wf.ApproverTechnician.District,
-                                    TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
-
-                                },
-
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
-                    CurrentStep = x.wf.CurrentStep == null
-                                   ? null
-                                   : new WorkFlowStepGetDto
-                                   {
-                                       Id = x.wf.CurrentStep.Id,
-                                       Name = x.wf.CurrentStep.Name,
-                                       Code = x.wf.CurrentStep.Code
-                                   }
-                })
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<WorkFlowGetDto>>
-                .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
             var me = await _currentUser.GetAsync();
+            //var me =  new User { Id=14};
             if (me is null)
                 return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 
@@ -3711,24 +3608,29 @@ namespace Business.Services
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // “Teknisyen” rolü yerine: kullanıcıya atanmış herhangi bir workflow var mı?
-            // İstersen Pending ile sınırlama; ben genel baktım (IsDeleted=false)
-            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
+            var technicianRole = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var isTechnician =
+                !string.IsNullOrWhiteSpace(technicianRole) &&
+                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
 
             // base query
-            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+            var wfBase = _uow.Repository
+                .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
+                .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
 
             // Teknisyen ise sadece kendi akışları
-            if (isTechnicianByData)
+            if (isTechnician)
             {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
-
-                // Eski davranıştaki gibi sadece TS adımı istiyorsan aç:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+                var myId = me.Id; // EF parametrelemesi için (okunabilirlik)
+                wfBase = wfBase.Where(w => w.ApproverTechnicianId == myId);
             }
             else
             {
@@ -3811,7 +3713,7 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
         }
 
-      
+
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -4495,7 +4397,7 @@ namespace Business.Services
         }
 
         //Arşiv 
-    
+
         public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
         {
             try
