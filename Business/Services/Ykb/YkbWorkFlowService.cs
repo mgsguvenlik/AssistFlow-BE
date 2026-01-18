@@ -501,13 +501,7 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbWarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                //var exists = await _uow.Repository
-                //    .GetQueryable<YkbTechnicalService>()
-                //    .AsNoTracking()
-                //    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-                //if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
-                //    return ResponseModel<YkbWarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
+                
                 var request = await _uow.Repository
                     .GetQueryable<YkbServicesRequest>()
                     .Include(x => x.Customer)
@@ -2213,7 +2207,7 @@ namespace Business.Services.Ykb
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            //✅“Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
+            //✅“Teknisyen” rolüne sahip ise sadece kendi üzerindeki ve Teknik Servis adımındaki  akışları görebilir
             var technicianRole = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
@@ -2229,20 +2223,21 @@ namespace Business.Services.Ykb
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnician)
+            
+
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
             {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
             }
 
             // Bu kullanıcının görebileceği RequestNo’lar

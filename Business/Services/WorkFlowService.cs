@@ -1763,21 +1763,21 @@ namespace Business.Services
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnician)
+
+            if (!isTechnician && permittedSet.Count == 0)
             {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == me.Id)
+                );
             }
+
+
 
             var allowedRequestNos = wfBase.Select(x => x.RequestNo);
 
@@ -3626,24 +3626,22 @@ namespace Business.Services
                 .AsNoTracking()
                 .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
 
-            // Teknisyen ise sadece kendi akışları
-            if (isTechnician)
+            // Teknisyen ise sadece kendi üzerindeki ve Teknik Servis adımındaki akışları görebilsin
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
             {
-                var myId = me.Id; // EF parametrelemesi için (okunabilirlik)
-                wfBase = wfBase.Where(w => w.ApproverTechnicianId == myId);
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                // permission ile filtrele (yetki yoksa boş)
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
             }
+           
 
             // search
             if (!string.IsNullOrWhiteSpace(q.Search))
