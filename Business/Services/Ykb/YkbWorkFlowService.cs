@@ -2973,7 +2973,34 @@ namespace Business.Services.Ykb
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new YkbServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1 ??"",
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
 
                     // Customer
                     Customer = sr != null && sr.Customer != null
@@ -3135,7 +3162,34 @@ namespace Business.Services.Ykb
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new YkbServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1 ?? "",
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
 
                     // Customer
                     Customer = sr != null && sr.Customer != null

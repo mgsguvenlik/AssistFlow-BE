@@ -1,6 +1,7 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
@@ -17,7 +18,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         // Yeni alanlar (JOIN ile gelecek)
         public string? WorkFlowRequestTitle { get; set; }        // WorkFlow.RequestTitle
         public WorkFlowPriority WorkFlowPriority { get; set; }   // WorkFlow.Priority
-        public string? ServicesRequestDescription { get; set; }  // ServicesRequest.Description
+        //public string? ServicesRequestDescription { get; set; }  // ServicesRequest.Description
 
 
         // Ekranlar için yalnızca ürün Id listesi
@@ -25,6 +26,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
         public UserGetDto? User { get; set; }
+        public ServicesRequestGetDto? ServicesRequest { get; set; }
     }
 
 }
