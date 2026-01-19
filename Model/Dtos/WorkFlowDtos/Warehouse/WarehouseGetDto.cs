@@ -26,6 +26,7 @@ namespace Model.Dtos.WorkFlowDtos.Warehouse
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
         public UserGetDto? User { get; set; }
+        public UserGetDto? CreatedUser { get; set; }
         public ServicesRequestGetDto? ServicesRequest { get; set; }
     }
 

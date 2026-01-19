@@ -2577,6 +2577,7 @@ namespace Business.Services
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
             var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+            var qCreatedUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
 
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
@@ -2595,6 +2596,10 @@ namespace Business.Services
                     // 🔹 ApproverTechnician (User) join
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
+
+                //CreatedUser
+                join cru  in qCreatedUsers on sr.CreatedUser equals cru.Id into  cruj
+                from cu in cruj.DefaultIfEmpty()
 
                 select new WarehouseGetDto
                 {
@@ -2686,7 +2691,23 @@ namespace Business.Services
                                 .ToList()
                         }
                         : null,
-
+                    //Created User
+                    CreatedUser =
+                    cu == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = cu.Id,
+                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              City = cu.City,
+                              District = cu.District,
+                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = cu.TechnicianPhone,         // tel
+                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              IsActive = cu.IsActive,
+                          },
                     // 🔹 User (WorkFlow.ApproverTechnician)
                     User = u == null
                           ? null
@@ -2713,6 +2734,9 @@ namespace Business.Services
                                   })
                                   .ToList()
                           }
+
+
+
 
                 }
             ).FirstOrDefaultAsync();
@@ -2767,6 +2791,7 @@ namespace Business.Services
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
             var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+            var qCreatedUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
 
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
@@ -2781,6 +2806,10 @@ namespace Business.Services
 
                 join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
+
+                    //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
+                from cu in cruj.DefaultIfEmpty()
 
                     // 🔹 ApproverTechnician (User) join
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
@@ -2876,6 +2905,23 @@ namespace Business.Services
                         }
                         : null,
 
+                    //Created Users
+                    CreatedUser =
+                    cu == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = cu.Id,
+                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              City = cu.City,
+                              District = cu.District,
+                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = cu.TechnicianPhone,         // tel
+                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              IsActive = cu.IsActive,
+                          },
                     // 🔹 User (WorkFlow.ApproverTechnician)
                     User = u == null
                           ? null

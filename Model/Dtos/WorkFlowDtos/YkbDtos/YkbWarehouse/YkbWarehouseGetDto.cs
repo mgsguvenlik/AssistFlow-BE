@@ -29,6 +29,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
         public UserGetDto? User { get; set; }
+        public UserGetDto? CreatedUser { get; set; }
         public YkbServicesRequestGetDto?  ServicesRequest { get; set; }
     }
 }
