@@ -238,6 +238,8 @@ namespace Business.Services.Ykb
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
             wf.CustomerApproverName = dto.CustomerApproverName;
+            wf.Priority = dto.Priority;
+            wf.RequestTitle = dto.Title;
             _uow.Repository.Update(wf);
 
 
