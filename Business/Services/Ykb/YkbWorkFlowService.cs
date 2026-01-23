@@ -5435,7 +5435,7 @@ namespace Business.Services.Ykb
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 
@@ -5447,7 +5447,7 @@ namespace Business.Services.Ykb
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 
