@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
+using Core.Common;
 using Core.Enums;
 using Mapster;
 using MapsterMapper;
 using Model.Dtos.MailOutbox;
 using System.Linq.Expressions;
+using System.Reflection;
 
 public class MailOutboxService
   : CrudServiceBase<Model.Concrete.MailOutbox, long, MailOutboxCreateDto, MailOutboxUpdateDto, MailOutboxGetDto>,
@@ -32,17 +34,24 @@ public class MailOutboxService
         return entity;
     }
 
+    public override Task<ResponseModel<PagedResult<MailOutboxGetDto>>> GetPagedAsync(QueryParams q)
+    {
+        // UI sort göndermediyse default: CreatedDate desc
+        if (string.IsNullOrWhiteSpace(q.Sort))
+        {
+            var q2 = q with { Sort = "CreatedDate", Desc = true };
+            return base.GetPagedAsync(q2);
+        }
+
+        return base.GetPagedAsync(q);
+    }
+
     // Basit manuel retry
     public async Task<bool> RetryAsync(long id, CancellationToken ct = default)
     {
         var entity = await _unitOfWork.Repository.GetByIdAsync<Model.Concrete.MailOutbox>(
             asNoTracking: false, id: id);
         if (entity == null) return false;
-
-        // >>> DÜZELTME: enum ile karşılaştır
-        //if (entity.Status == MailOutboxStatus.Sent ||
-        //    entity.Status == MailOutboxStatus.InProgress)
-        //    return false;
 
         entity.Status = MailOutboxStatus.Pending;     // >>> DÜZELTME: enum atama
         entity.NextAttemptAt = DateTime.Now;
