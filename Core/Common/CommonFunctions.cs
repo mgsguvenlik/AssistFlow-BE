@@ -50,5 +50,16 @@ namespace Core.Common
             return temp;
         }
 
+        public static HashSet<string> ParseRoleCodes(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            return raw
+                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
     }
 }

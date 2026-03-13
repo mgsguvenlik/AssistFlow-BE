@@ -1741,28 +1741,26 @@ namespace Business.Services
             var page = q.Page <= 0 ? 1 : q.Page;
             var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
 
-            // Permission step codes (WH, PRC, TS, ...)
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-
-            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
-            var technicianRole = await _uow.Repository
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
                 .Where(x => x.Name == "TechnicianRoleCode")
                 .Select(x => x.Value)
                 .FirstOrDefaultAsync();
 
-            var isTechnician =
-                !string.IsNullOrWhiteSpace(technicianRole) &&
-                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
 
-            // 1) Filtrelenmiş WorkFlow sorgusu
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
+
             IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
-
 
             if (!isTechnician && permittedSet.Count == 0)
             {
@@ -1777,18 +1775,12 @@ namespace Business.Services
                 );
             }
 
-
-
             var allowedRequestNos = wfBase.Select(x => x.RequestNo);
 
-            // 2) ServicesRequest base query + include'lar
             IQueryable<ServicesRequest> query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
-
-            // WorkFlow ilişkisine göre filtre
             query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
 
-            // Search
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var term = q.Search.Trim();
@@ -3670,7 +3662,6 @@ namespace Business.Services
         }
 
         // -------------------- WorkFlow (tanım) --------------------
-
         public async Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR")
         {
             prefix ??= "SR";
@@ -3712,16 +3703,19 @@ namespace Business.Services
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
-            var technicianRole = await _uow.Repository
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
                 .Where(x => x.Name == "TechnicianRoleCode")
                 .Select(x => x.Value)
                 .FirstOrDefaultAsync();
 
-            var isTechnician =
-                !string.IsNullOrWhiteSpace(technicianRole) &&
-                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // base query
             var wfBase = _uow.Repository
@@ -3813,6 +3807,7 @@ namespace Business.Services
             return ResponseModel<PagedResult<WorkFlowGetDto>>
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
         }
+
 
 
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)

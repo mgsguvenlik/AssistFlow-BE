@@ -628,8 +628,11 @@ public class UserService
               .Select(x => x.Value)
               .FirstOrDefaultAsync();
 
+            var technicianRoles =CommonFunctions.ParseRoleCodes(technicianRole);
+
             var users = await _repo.GetQueryable<User>()
-                .Where(u => u.UserRoles.Any(ur => ur.Role != null && ur.Role.Code == technicianRole))
+                .Where(u => u.UserRoles.Any(ur =>
+                    ur.Role != null && technicianRoles.Contains(ur.Role.Code)))
                 .AsNoTracking()
                 .ProjectToType<UserGetDto>(_config)
                 .ToListAsync();

@@ -39,7 +39,7 @@ namespace Data.Seeding.Seeds
                  new() { Name = "MailPassword",                    Value = "Admin@2018",          Description = "SMTP şifresi" },
                  new() { Name = "TechnicianCustomerMinDistanceKm", Value = "3",                   Description = "Teknisyen müşteri arası minimum mesafe (km)" },
                  new() { Name = "TechnicalServiceManagerEmails",   Value = "karamehmetzeki506@gmail.com",  Description = "Teknisyen lokasyon bildirimi maili" },
-                 new() { Name = "TechnicianRoleCode",   Value = "TECHNICIAN",  Description = "Teknisyenin rol kodu. Akışlarda sadece kendi üzerindeki görevleri görebilmesi için kullanılır" },
+                 new() { Name = "TechnicianRoleCode",   Value = "TECHNICIAN,SUBCONTRACTOR",  Description = "Teknisyenin rol kodu/kodları. Akışlarda sadece kendi üzerindeki görevleri görebilmesi için kullanılır" },
              };
 
             var configSet = db.Set<Configuration>();

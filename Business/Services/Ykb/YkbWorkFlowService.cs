@@ -2210,15 +2210,19 @@ namespace Business.Services.Ykb
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             //✅“Teknisyen” rolüne sahip ise sadece kendi üzerindeki ve Teknik Servis adımındaki  akışları görebilir
-            var technicianRole = await _uow.Repository
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
                 .Where(x => x.Name == "TechnicianRoleCode")
                 .Select(x => x.Value)
                 .FirstOrDefaultAsync();
-            var isTechnician =
-                !string.IsNullOrWhiteSpace(technicianRole) &&
-                (me.Roles?.Any(r => r.Code == technicianRole) ?? false);
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // 🧱 1) Role/permission’a göre filtrelenmiş WorkFlow sorgusu
             IQueryable<YkbWorkFlow> wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
@@ -4325,13 +4329,19 @@ namespace Business.Services.Ykb
             var roles = me.Roles?.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase)
                         ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var technicianRole = await _uow.Repository
-                    .GetQueryable<Configuration>()
-                    .AsNoTracking()
-                    .Where(x => x.Name == "TechnicianRoleCode")
-                    .Select(x => x.Value)
-                    .FirstOrDefaultAsync();
-            var isTechnician = roles.Contains(technicianRole);
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // Permission step codes
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
