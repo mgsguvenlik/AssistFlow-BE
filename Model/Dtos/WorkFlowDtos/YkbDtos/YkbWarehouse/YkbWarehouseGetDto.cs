@@ -4,6 +4,7 @@ using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse
@@ -20,7 +21,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse
         // Yeni alanlar (JOIN ile gelecek)
         public string? WorkFlowRequestTitle { get; set; }        // WorkFlow.RequestTitle
         public WorkFlowPriority WorkFlowPriority { get; set; }   // WorkFlow.Priority
-        public string? ServicesRequestDescription { get; set; }  // ServicesRequest.Description
+        //public string? ServicesRequestDescription { get; set; }  // ServicesRequest.Description
 
 
         // Ekranlar için yalnızca ürün Id listesi
@@ -28,5 +29,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
         public UserGetDto? User { get; set; }
+        public UserGetDto? CreatedUser { get; set; }
+        public YkbServicesRequestGetDto?  ServicesRequest { get; set; }
     }
 }

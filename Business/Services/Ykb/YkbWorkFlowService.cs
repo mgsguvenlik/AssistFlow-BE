@@ -238,6 +238,8 @@ namespace Business.Services.Ykb
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
             wf.CustomerApproverName = dto.CustomerApproverName;
+            wf.Priority = dto.Priority;
+            wf.RequestTitle = dto.Title;
             _uow.Repository.Update(wf);
 
 
@@ -501,13 +503,7 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbWarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                //var exists = await _uow.Repository
-                //    .GetQueryable<YkbTechnicalService>()
-                //    .AsNoTracking()
-                //    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-                //if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
-                //    return ResponseModel<YkbWarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
+                
                 var request = await _uow.Repository
                     .GetQueryable<YkbServicesRequest>()
                     .Include(x => x.Customer)
@@ -2200,85 +2196,6 @@ namespace Business.Services.Ykb
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.CustomerApprover)
                 .Include(x => x.YkbWorkFlowStep);
-
-        public async Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync_(QueryParams q)
-        {
-            // 🔐 1. Giriş yapan kullanıcı + roller
-            var me = await _currentUser.GetAsync();
-
-            var roles = me?.Roles
-                .Select(x => x.Code)
-                .ToHashSet() ?? new HashSet<string>();
-
-            bool isAdmin = roles.Contains("ADMIN");
-            bool isWarehouse = roles.Contains("WAREHOUSE");
-            bool isTechnician = roles.Contains("TECHNICIAN") || roles.Contains("SUBCONTRACTOR");
-            bool isProjectEngineer = roles.Contains("PROJECTENGINEER");
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            // 🧱 2. Role göre filtrelenmiş WorkFlow sorgusu
-            var wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
-                .AsNoTracking()
-                .Where(x => !x.IsDeleted);
-
-            if (isAdmin || isProjectEngineer)
-            {
-                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
-            }
-            else if (isWarehouse)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "WH");
-            }
-            else if (isTechnician)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null &&
-                    x.CurrentStep.Code == "TS" &&
-                    x.ApproverTechnicianId == me.Id);
-            }
-            else
-            {
-                // Yetkisi olmayanlar için boş WF seti
-                wfBase = wfBase.Where(x => false);
-            }
-
-            // Bu kullanıcının görebileceği RequestNo’lar
-            var allowedRequestNos = wfBase.Select(x => x.RequestNo);
-
-            // 🧱 3. ServicesRequest base query + include'lar
-            var query = _uow.Repository.GetQueryable<YkbServicesRequest>();
-            query = RequestIncludes()!(query);
-
-
-            // WorkFlow ile ilişkiye göre filtre:
-            query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
-
-            // 🔍 4. Search filtresi
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                query = query.Where(x =>
-                    x.RequestNo.Contains(term) ||
-                    (x.Description != null && x.Description.Contains(term)));
-            }
-
-            // 📄 5. Toplam kayıt + paging + Mapster
-            var total = await query.CountAsync();
-
-            var items = await query
-                .OrderByDescending(x => x.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .ProjectToType<YkbServicesRequestGetDto>(_config)
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<YkbServicesRequestGetDto>>
-                .Success(new PagedResult<YkbServicesRequestGetDto>(items, total, q.Page, q.PageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
             var me = await _currentUser.GetAsync();
@@ -2292,33 +2209,41 @@ namespace Business.Services.Ykb
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // ✅ “Teknisyen” rol yerine: kullanıcıya atanmış herhangi bir WF var mı?
-            var isTechnicianByData = await _uow.Repository.GetQueryable<YkbWorkFlow>()
+            //✅“Teknisyen” rolüne sahip ise sadece kendi üzerindeki ve Teknik Servis adımındaki  akışları görebilir
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // 🧱 1) Role/permission’a göre filtrelenmiş WorkFlow sorgusu
             IQueryable<YkbWorkFlow> wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnicianByData)
-            {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
+            
 
-                // Eski davranışta TS step’i de şart koşuyordun; istersen aç:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
+            {
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
             }
 
             // Bu kullanıcının görebileceği RequestNo’lar
@@ -2353,7 +2278,6 @@ namespace Business.Services.Ykb
                 new PagedResult<YkbServicesRequestGetDto>(items, total, page, pageSize)
             );
         }
-
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
             var now = DateTimeOffset.Now;
@@ -2509,7 +2433,6 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
-
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
         {
             var now = DateTimeOffset.Now;
@@ -2693,8 +2616,6 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
-
-
         public async Task<ResponseModel> DeleteRequestAsync(long id)
         {
 
@@ -3026,7 +2947,7 @@ namespace Business.Services.Ykb
             var qWorkFlow = _uow.Repository.GetQueryable<YkbWorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking();
             var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
-
+            var qCreatedUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
                 from w in qWarehouse
@@ -3041,6 +2962,9 @@ namespace Business.Services.Ykb
                 join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
 
+                //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
+                from cu in cruj.DefaultIfEmpty()
                     // 🔹 ApproverTechnician (User) join
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
@@ -3058,7 +2982,34 @@ namespace Business.Services.Ykb
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new YkbServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1 ??"",
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
 
                     // Customer
                     Customer = sr != null && sr.Customer != null
@@ -3107,6 +3058,24 @@ namespace Business.Services.Ykb
                                 .ToList()
                         }
                         : null,
+
+                    //Created Users
+                    CreatedUser =
+                    cu == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = cu.Id,
+                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              City = cu.City,
+                              District = cu.District,
+                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = cu.TechnicianPhone,         // tel
+                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              IsActive = cu.IsActive,
+                          },
 
                     // 🔹 User (WorkFlow.ApproverTechnician)
                     User = u == null
@@ -3220,7 +3189,34 @@ namespace Business.Services.Ykb
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new YkbServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1 ?? "",
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
 
                     // Customer
                     Customer = sr != null && sr.Customer != null
@@ -4333,7 +4329,19 @@ namespace Business.Services.Ykb
             var roles = me.Roles?.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase)
                         ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var isTechnician = roles.Contains("TECHNICIAN");
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // Permission step codes
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
@@ -5437,7 +5445,7 @@ namespace Business.Services.Ykb
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 
@@ -5449,7 +5457,7 @@ namespace Business.Services.Ykb
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 

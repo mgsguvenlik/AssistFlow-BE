@@ -1741,49 +1741,46 @@ namespace Business.Services
             var page = q.Page <= 0 ? 1 : q.Page;
             var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
 
-            // Permission step codes (WH, PRC, TS, ...)
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // Rol yerine: kullanıcıya atanmış herhangi bir workflow var mı?
-            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
 
-            // 1) Filtrelenmiş WorkFlow sorgusu
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
+
             IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            if (isTechnicianByData)
+            if (!isTechnician && permittedSet.Count == 0)
             {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
-
-                // Eski davranıştaki TS şartını istersen ekle:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == me.Id)
+                );
             }
 
             var allowedRequestNos = wfBase.Select(x => x.RequestNo);
 
-            // 2) ServicesRequest base query + include'lar
             IQueryable<ServicesRequest> query = _uow.Repository.GetQueryable<ServicesRequest>();
             query = RequestIncludes()!(query);
-
-            // WorkFlow ilişkisine göre filtre
             query = query.Where(sr => allowedRequestNos.Contains(sr.RequestNo));
 
-            // Search
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var term = q.Search.Trim();
@@ -2174,6 +2171,8 @@ namespace Business.Services
             wf.IsLocationValid = dto.IsLocationValid;
             wf.ApproverTechnicianId = dto.ApproverTechnicianId;
             wf.CustomerApproverName = dto.CustomerApproverName;
+            wf.Priority = dto.Priority;
+            wf.RequestTitle = dto.Title;
             _uow.Repository.Update(wf);
 
 
@@ -2288,7 +2287,7 @@ namespace Business.Services
                     Payload = new
                     {
                         wfId = wf.Id,
-                        products= dto.Products.Select(x => new { x.ProductId, x.Quantity })
+                        products = dto.Products.Select(x => new { x.ProductId, x.Quantity })
                     }
                 },
                 roleCode: "PROJECTENGINEER"
@@ -2393,7 +2392,7 @@ namespace Business.Services
                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
                     if (technicalService != null)
                     {
-                       
+
                         targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
                        .AsNoTracking()
                        .FirstOrDefaultAsync(s => s.Code == "SR");
@@ -2572,6 +2571,7 @@ namespace Business.Services
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
             var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+            var qCreatedUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
 
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
@@ -2591,6 +2591,10 @@ namespace Business.Services
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
 
+                //CreatedUser
+                join cru  in qCreatedUsers on sr.CreatedUser equals cru.Id into  cruj
+                from cu in cruj.DefaultIfEmpty()
+
                 select new WarehouseGetDto
                 {
                     Id = w.Id,
@@ -2604,7 +2608,35 @@ namespace Business.Services
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new ServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              OracleNo = sr.OracleNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1,
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
 
                     // Customer
                     Customer = sr != null && sr.Customer != null
@@ -2653,7 +2685,23 @@ namespace Business.Services
                                 .ToList()
                         }
                         : null,
-
+                    //Created User
+                    CreatedUser =
+                    cu == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = cu.Id,
+                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              City = cu.City,
+                              District = cu.District,
+                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = cu.TechnicianPhone,         // tel
+                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              IsActive = cu.IsActive,
+                          },
                     // 🔹 User (WorkFlow.ApproverTechnician)
                     User = u == null
                           ? null
@@ -2680,6 +2728,9 @@ namespace Business.Services
                                   })
                                   .ToList()
                           }
+
+
+
 
                 }
             ).FirstOrDefaultAsync();
@@ -2734,6 +2785,7 @@ namespace Business.Services
             var qWorkFlow = _uow.Repository.GetQueryable<WorkFlow>().AsNoTracking().Where(w => !w.IsDeleted);
             var qServices = _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking();
             var qUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
+            var qCreatedUsers = _uow.Repository.GetQueryable<User>().AsNoTracking(); // <-- eklendi
 
             // HEADER: Warehouse + (left) WorkFlow + (left) ServicesRequest (+ Customer) (+ User)
             var dto = await (
@@ -2748,6 +2800,10 @@ namespace Business.Services
 
                 join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
+
+                    //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
+                from cu in cruj.DefaultIfEmpty()
 
                     // 🔹 ApproverTechnician (User) join
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
@@ -2766,8 +2822,35 @@ namespace Business.Services
                     WorkFlowPriority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
 
                     // ServicesRequest
-                    ServicesRequestDescription = sr != null ? sr.Description : null,
-
+                    //ServicesRequestDescription = sr != null ? sr.Description : null,
+                    ServicesRequest = sr == null
+                          ? null
+                          : new ServicesRequestGetDto
+                          {
+                              Id = sr.Id,
+                              RequestNo = sr.RequestNo,
+                              OracleNo = sr.OracleNo,
+                              ServicesDate = sr.ServicesDate,
+                              PlannedCompletionDate = sr.PlannedCompletionDate,
+                              ServicesCostStatus = sr.ServicesCostStatus,
+                              Title = wf.RequestTitle,
+                              Description = sr.Description,
+                              IsProductRequirement = sr.IsProductRequirement,
+                              IsMailSended = sr.IsMailSended,
+                              IsLocationValid = wf.IsLocationValid,
+                              CustomerApproverId = sr.CustomerApproverId,
+                              CustomerApproverName = wf.CustomerApproverName,
+                              CustomerId = sr.CustomerId,
+                              CustomerName = sr.Customer.ContactName1,
+                              ServiceTypeId = sr.ServiceTypeId,
+                              CreatedDate = sr.CreatedDate,
+                              UpdatedDate = sr.UpdatedDate,
+                              CreatedUser = sr.CreatedUser,
+                              UpdatedUser = sr.UpdatedUser,
+                              IsDeleted = sr.IsDeleted,
+                              Priority = sr.Priority, // sr tarafında varsa
+                              ServicesRequestStatus = sr.ServicesRequestStatus,
+                          },
                     // Customer
                     Customer = sr != null && sr.Customer != null
                         ? new CustomerGetDto
@@ -2816,6 +2899,23 @@ namespace Business.Services
                         }
                         : null,
 
+                    //Created Users
+                    CreatedUser =
+                    cu == null
+                          ? null
+                          : new UserGetDto
+                          {
+                              Id = cu.Id,
+                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
+                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
+                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              City = cu.City,
+                              District = cu.District,
+                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
+                              TechnicianPhone = cu.TechnicianPhone,         // tel
+                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              IsActive = cu.IsActive,
+                          },
                     // 🔹 User (WorkFlow.ApproverTechnician)
                     User = u == null
                           ? null
@@ -3562,7 +3662,6 @@ namespace Business.Services
         }
 
         // -------------------- WorkFlow (tanım) --------------------
-
         public async Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR")
         {
             prefix ??= "SR";
@@ -3587,118 +3686,10 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
-        {
-
-            var me = await _currentUser.GetAsync();
-
-            var roles = me?.Roles.Select(x => x.Code).ToHashSet();
-
-            bool isAdmin = roles?.Contains("ADMIN") ?? false;
-            bool isWarehouse = roles?.Contains("WAREHOUSE") ?? false;
-            bool isTechnician = roles?.Contains("TECHNICIAN") ?? false;
-            bool isSubcontractor = roles?.Contains("SUBCONTRACTOR") ?? false;
-            bool isProjectEngineer = roles?.Contains("PROJECTENGINEER") ?? false;
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            var wfBase = _uow.Repository.GetQueryable<WorkFlow>()
-                 .AsNoTracking()
-                 .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
-
-
-            if (isAdmin || isProjectEngineer)
-            {
-                // Ek filtre yok; Pending + IsDeleted=false zaten uygulandı.
-            }
-            else if (isWarehouse)
-            {
-                wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "WH");
-            }
-            else if (isTechnician)
-            {
-                wfBase = wfBase.Where(x =>
-                    x.CurrentStep != null && x.CurrentStep.Code == "TS" &&
-                    x.ApproverTechnicianId == me.Id);
-            }
-            else
-            {
-                // Yetkisi olmayanlar için boş sonuç
-                wfBase = wfBase.Where(x => false);
-            }
-
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
-            }
-
-            // LEFT JOIN: WorkFlow.RequestNo == ServicesRequest.RequestNo
-            var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                     on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
-
-            var total = await qJoined.CountAsync();
-
-
-            var items = await qJoined
-                .OrderByDescending(x => x.wf.CreatedDate)
-                .Skip((q.Page - 1) * q.PageSize)
-                .Take(q.PageSize)
-                .Select(x => new WorkFlowGetDto
-                {
-                    // WorkFlow alanları
-                    Id = x.wf.Id,
-                    RequestTitle = x.wf.RequestTitle,
-                    RequestNo = x.wf.RequestNo,
-                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
-                    Priority = x.wf.Priority,
-                    WorkFlowStatus = x.wf.WorkFlowStatus,
-                    IsAgreement = x.wf.IsAgreement,
-                    CreatedDate = x.wf.CreatedDate,
-                    UpdatedDate = x.wf.UpdatedDate,
-                    CreatedUser = x.wf.CreatedUser,
-                    UpdatedUser = x.wf.UpdatedUser,
-                    IsDeleted = x.wf.IsDeleted,
-                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
-                                ? null
-                                : new UserGetDto
-                                {
-                                    Id = x.wf.ApproverTechnician.Id,
-                                    TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                                    TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                                    TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                                    City = x.wf.ApproverTechnician.City,
-                                    District = x.wf.ApproverTechnician.District,
-                                    TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
-
-                                },
-
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
-                    CurrentStep = x.wf.CurrentStep == null
-                                   ? null
-                                   : new WorkFlowStepGetDto
-                                   {
-                                       Id = x.wf.CurrentStep.Id,
-                                       Name = x.wf.CurrentStep.Name,
-                                       Code = x.wf.CurrentStep.Code
-                                   }
-                })
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<WorkFlowGetDto>>
-                .Success(new PagedResult<WorkFlowGetDto>(items, total, q.Page, q.PageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
         {
             var me = await _currentUser.GetAsync();
+            //var me =  new User { Id=14};
             if (me is null)
                 return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 
@@ -3711,37 +3702,43 @@ namespace Business.Services
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
             var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // “Teknisyen” rolü yerine: kullanıcıya atanmış herhangi bir workflow var mı?
-            // İstersen Pending ile sınırlama; ben genel baktım (IsDeleted=false)
-            var isTechnicianByData = await _uow.Repository.GetQueryable<WorkFlow>()
+            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
                 .AsNoTracking()
-                .AnyAsync(x => !x.IsDeleted && x.ApproverTechnicianId == me.Id);
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
 
             // base query
-            IQueryable<WorkFlow> wfBase = _uow.Repository.GetQueryable<WorkFlow>()
+            var wfBase = _uow.Repository
+                .GetQueryable<WorkFlow>()
                 .AsNoTracking()
-                .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
+                .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
 
-            // Teknisyen ise sadece kendi akışları
-            if (isTechnicianByData)
+            // Teknisyen ise sadece kendi üzerindeki ve Teknik Servis adımındaki akışları görebilsin
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
             {
-                wfBase = wfBase.Where(x => x.ApproverTechnicianId == me.Id);
-
-                // Eski davranıştaki gibi sadece TS adımı istiyorsan aç:
-                // wfBase = wfBase.Where(x => x.CurrentStep != null && x.CurrentStep.Code == "TS");
+                wfBase = wfBase.Where(_ => false);
             }
             else
             {
-                // permission ile filtrele (yetki yoksa boş)
-                if (permittedSet.Count == 0)
-                {
-                    wfBase = wfBase.Where(_ => false);
-                }
-                else
-                {
-                    wfBase = wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
-                }
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
             }
+           
 
             // search
             if (!string.IsNullOrWhiteSpace(q.Search))
@@ -3811,7 +3808,8 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
         }
 
-      
+
+
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
@@ -4495,7 +4493,7 @@ namespace Business.Services
         }
 
         //Arşiv 
-    
+
         public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
         {
             try
@@ -5129,7 +5127,7 @@ namespace Business.Services
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 
@@ -5141,7 +5139,7 @@ namespace Business.Services
                     Id = img.Id,
                     Url = img.Url,
                     Caption = img.Caption,
-                    Base64 = await ReadBase64Async(img.Url)
+                    //Base64 = await ReadBase64Async(img.Url)
                 });
             }
 
