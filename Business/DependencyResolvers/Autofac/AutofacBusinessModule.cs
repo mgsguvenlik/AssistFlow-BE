@@ -54,6 +54,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(ICustomerSystemAssignmentService), typeof(CustomerSystemAssignmentService));
             services.AddScoped(typeof(ITenantService), typeof(TenantService));
             services.AddScoped(typeof(IWorkFlowDashboardService), typeof(WorkFlowDashboardService));
+            services.AddScoped(typeof(IUserFeedbackService), typeof(UserFeedbackService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();

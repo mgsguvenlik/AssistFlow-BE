@@ -52,6 +52,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
         public DbSet<Tenant> Tenants { get; set; } = null!;
+        public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
 
 
         #region YKB
@@ -487,6 +488,41 @@ namespace Data.Concrete.EfCore.Context
                       .WithOne(u => u.Tenant!)
                       .HasForeignKey(u => u.TenantId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ---------------- UserFeedback ----------------
+            modelBuilder.Entity<UserFeedback>(entity =>
+            {
+                entity.ToTable("UserFeedbacks");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Title)
+                      .IsRequired()
+                      .HasMaxLength(250);
+
+                entity.Property(x => x.Description)
+                      .IsRequired()
+                      .HasMaxLength(5000);
+
+                entity.Property(x => x.AdminResponse)
+                      .HasMaxLength(2000);
+
+                entity.Property(x => x.RelatedUrl)
+                      .HasMaxLength(500);
+
+                entity.Property(x => x.UserAgent)
+                      .HasMaxLength(500);
+
+                entity.Property(x => x.AttachmentUrls)
+                      .HasMaxLength(2000);
+
+                // İndeksler - hızlı arama için
+                entity.HasIndex(x => x.Status);
+                entity.HasIndex(x => x.FeedbackType);
+                entity.HasIndex(x => x.CreatedUser);
+                entity.HasIndex(x => x.CreatedDate);
+                entity.HasIndex(x => new { x.Status, x.FeedbackType });
             });
         }
     }

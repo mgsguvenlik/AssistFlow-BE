@@ -26,6 +26,7 @@ using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
 using Model.Dtos.Tenant;
 using Model.Dtos.User;
+using Model.Dtos.UserFeedbackDtos;
 using Model.Dtos.UserRole;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
@@ -600,6 +601,85 @@ namespace Business.Mapper
                   .Ignore(dest => dest.CreatedDate)
                   .Ignore(dest => dest.CreatedUser);
 
+
+            // ---------------- UserFeedback ----------------
+            config.NewConfig<CreateUserFeedbackDto, UserFeedback>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Status)              // Servis'te Created olarak set edilir
+                  .Ignore(d => d.Priority)            // Servis'te default değer verilir
+                  .Ignore(d => d.AdminResponse)
+                  .Ignore(d => d.ResponseDate)
+                  .Ignore(d => d.RespondedBy)
+                  .Ignore(d => d.CompletedDate)
+                  .Ignore(d => d.UserAgent)           // Servis'te set edilir
+                  .Ignore(d => d.AttachmentUrls)      // Servis'te JSON'a çevrilir
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser)
+                  .Ignore(d => d.IsDeleted);
+
+            config.NewConfig<UpdateFeedbackStatusDto, UserFeedback>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Title)
+                  .Ignore(d => d.Description)
+                  .Ignore(d => d.FeedbackType)
+                  .Ignore(d => d.RelatedUrl)
+                  .Ignore(d => d.UserAgent)
+                  .Ignore(d => d.AttachmentUrls)
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)         // Servis'te set edilir
+                  .Ignore(d => d.UpdatedUser)         // Servis'te set edilir
+                  .Ignore(d => d.IsDeleted);
+
+            config.NewConfig<UserFeedback, UserFeedbackDto>()
+                  .Map(d => d.FeedbackTypeText, s => GetFeedbackTypeText(s.FeedbackType))
+                  .Map(d => d.StatusText, s => GetStatusText(s.Status))
+                  .Map(d => d.AttachmentUrls, s => DeserializeAttachmentUrls(s.AttachmentUrls))
+                  .Map(d => d.CreatedUserName, s => (string?)null)     // Servis'te doldurulur
+                  .Map(d => d.RespondedByName, s => (string?)null);    // Servis'te doldurulur
+
+
+        }
+
+        // Helper metodlar için (MapsterConfig sınıfı içine ekleyin)
+        static string GetFeedbackTypeText(FeedbackType type) => type switch
+        {
+            FeedbackType.Suggestion => "Öneri",
+            FeedbackType.FeatureRequest => "Özellik Talebi",
+            FeedbackType.BugReport => "Hata Bildirimi",
+            FeedbackType.Issue => "Sorun",
+            FeedbackType.Improvement => "İyileştirme",
+            FeedbackType.Other => "Diğer",
+            _ => "Bilinmiyor"
+        };
+
+        static string GetStatusText(FeedbackStatus status) => status switch
+        {
+            FeedbackStatus.Created => "Oluşturuldu",
+            FeedbackStatus.UnderReview => "İnceleniyor",
+            FeedbackStatus.InProgress => "Devam Ediyor",
+            FeedbackStatus.Completed => "Tamamlandı",
+            FeedbackStatus.Rejected => "Reddedildi",
+            FeedbackStatus.Closed => "Kapatıldı",
+            _ => "Bilinmiyor"
+        };
+
+        static List<string>? DeserializeAttachmentUrls(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
