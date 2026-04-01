@@ -1,6 +1,7 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
 namespace Model.Dtos.WorkFlowDtos.FinalApproval
@@ -23,5 +24,8 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
 
         public CustomerGetDto? Customer { get; set; }
+
+        public List<TechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
+        public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
     }
 }
