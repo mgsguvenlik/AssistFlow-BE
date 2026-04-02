@@ -33,6 +33,7 @@ using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
@@ -3380,42 +3381,6 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            #region Eski URUNLER KODU
-            //// PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
-            //dto.Products = await _uow.Repository
-            //    .GetQueryable<ServicesRequestProduct>()
-            //    .AsNoTracking()
-            //    .Where(p => p.RequestNo == dto.RequestNo)
-            //    .Select(p => new ServicesRequestProductGetDto
-            //    {
-            //        Id = p.Id,
-            //        RequestNo = p.RequestNo,
-            //        ProductId = p.ProductId,
-            //        Quantity = p.Quantity,
-
-            //        // ürün temel alanları
-            //        ProductName = p.Product != null ? p.Product.Description : null,
-            //        ProductCode = p.Product != null ? p.Product.ProductCode : null,
-
-            //        // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-            //        PriceCurrency = p.CapturedCurrency
-            //            ?? (p.Product != null ? p.Product.PriceCurrency : null),
-
-            //        // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-            //        // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
-            //        ProductPrice = p.CapturedUnitPrice
-            //           ?? (p.Product != null ? (decimal?)p.Product.Price : null)
-            //           ?? 0m,
-
-            //        // 🔹 EffectivePrice: artık runtime hesap yok,
-            //        // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-            //        EffectivePrice = p.CapturedUnitPrice
-            //             ?? 0m,
-            //    })
-            //    .ToListAsync();
-            #endregion
-
-
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
@@ -3457,14 +3422,13 @@ namespace Business.Services
                         // Ürün fiyatı: ekranda kullanılacak birim fiyat
                         ProductPrice = effectivePrice,
 
-                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        // EffectivePrice: her zaman ekranda görünen "esas" fiyat
                         EffectivePrice = effectivePrice,
                     };
                 })
                 .ToList();
 
-
-            // REVIEW LOG’ları (APR adımı)
+            // REVIEW LOG'ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>
                     x.RequestNo == dto.RequestNo &&
@@ -3473,6 +3437,91 @@ namespace Business.Services
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
                 .ToListAsync();
+
+            // IMAGES: Get technical service images related to this request
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService != null)
+            {
+                // Get Service Images
+                dto.ServicesImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceImageGetDto
+                    {
+                        Id = x.Id,
+                        Url = x.Url,
+                        Caption = x.Caption
+                    })
+                    .ToListAsync();
+
+                // Get Form Images
+                dto.ServiceRequestFormImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceFormImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceFormImageGetDto
+                    {
+                        Id = x.Id,
+                        Url = x.Url,
+                        Caption = x.Caption
+                    })
+                    .ToListAsync();
+
+                // --------------------------------------------------------------------
+                //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı) - same as TechnicalService
+                // --------------------------------------------------------------------
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                string? NormalizeImageUrl(string? urlOrFileName)
+                {
+                    if (string.IsNullOrWhiteSpace(urlOrFileName))
+                        return urlOrFileName;
+
+                    // 1) Zaten tam URL ise (http/https) → hiç dokunma
+                    if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return urlOrFileName;
+                    }
+
+                    // 2) /uploads/xxx.png gibi relative path ise
+                    if (urlOrFileName.StartsWith("/"))
+                    {
+                        return string.IsNullOrEmpty(baseUrl)
+                            ? urlOrFileName
+                            : $"{baseUrl}{urlOrFileName}";
+                    }
+
+                    // 3) Sadece dosya adı ise (Guid.ext)
+                    var relative = $"/uploads/{urlOrFileName}";
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? relative
+                        : $"{baseUrl}{relative}";
+                }
+
+                // Service resimleri
+                if (dto.ServicesImages != null)
+                {
+                    foreach (var img in dto.ServicesImages)
+                    {
+                        img.Url = NormalizeImageUrl(img.Url);
+                    }
+                }
+
+                // Form resimleri
+                if (dto.ServiceRequestFormImages != null)
+                {
+                    foreach (var img in dto.ServiceRequestFormImages)
+                    {
+                        img.Url = NormalizeImageUrl(img.Url);
+                    }
+                }
+            }
 
             return ResponseModel<FinalApprovalGetDto>.Success(dto);
         }
@@ -3580,7 +3629,7 @@ namespace Business.Services
                  })
                  .ToListAsync();
 
-            // REVIEW LOG’ları (APR adımı)
+            // REVIEW LOG'ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<WorkFlowReviewLog>(x =>
                     x.RequestNo == dto.RequestNo &&
@@ -3589,6 +3638,91 @@ namespace Business.Services
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
                 .ToListAsync();
+
+            // IMAGES: Get technical service images related to this request
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService != null)
+            {
+                // Get Service Images
+                dto.ServicesImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceImageGetDto
+                    {
+                        Id = x.Id,
+                        Url = x.Url,
+                        Caption = x.Caption
+                    })
+                    .ToListAsync();
+
+                // Get Form Images
+                dto.ServiceRequestFormImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceFormImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceFormImageGetDto
+                    {
+                        Id = x.Id,
+                        Url = x.Url,
+                        Caption = x.Caption
+                    })
+                    .ToListAsync();
+
+                // --------------------------------------------------------------------
+                //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı) - same as TechnicalService
+                // --------------------------------------------------------------------
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                string? NormalizeImageUrl(string? urlOrFileName)
+                {
+                    if (string.IsNullOrWhiteSpace(urlOrFileName))
+                        return urlOrFileName;
+
+                    // 1) Zaten tam URL ise (http/https) → hiç dokunma
+                    if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return urlOrFileName;
+                    }
+
+                    // 2) /uploads/xxx.png gibi relative path ise
+                    if (urlOrFileName.StartsWith("/"))
+                    {
+                        return string.IsNullOrEmpty(baseUrl)
+                            ? urlOrFileName
+                            : $"{baseUrl}{urlOrFileName}";
+                    }
+
+                    // 3) Sadece dosya adı ise (Guid.ext)
+                    var relative = $"/uploads/{urlOrFileName}";
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? relative
+                        : $"{baseUrl}{relative}";
+                }
+
+                // Service resimleri
+                if (dto.ServicesImages != null)
+                {
+                    foreach (var img in dto.ServicesImages)
+                    {
+                        img.Url = NormalizeImageUrl(img.Url);
+                    }
+                }
+
+                // Form resimleri
+                if (dto.ServiceRequestFormImages != null)
+                {
+                    foreach (var img in dto.ServiceRequestFormImages)
+                    {
+                        img.Url = NormalizeImageUrl(img.Url);
+                    }
+                }
+            }
 
             return ResponseModel<FinalApprovalGetDto>.Success(dto);
         }

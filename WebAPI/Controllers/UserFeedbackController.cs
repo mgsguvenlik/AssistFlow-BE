@@ -1,0 +1,132 @@
+﻿using Business.Interfaces;
+using Core.Common;
+using Core.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.UserFeedbackDtos;
+
+namespace WebAPI.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class UserFeedbackController : ControllerBase
+    {
+        private readonly IUserFeedbackService _feedbackService;
+        private readonly ILogger<UserFeedbackController> _logger;
+
+        public UserFeedbackController(
+            IUserFeedbackService feedbackService,
+            ILogger<UserFeedbackController> logger)
+        {
+            _feedbackService = feedbackService;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Yeni geri bildirim oluşturur (öneri, talep, hata vb.)
+        /// </summary>
+        /// <param name="dto">Geri bildirim bilgileri</param>
+        /// <returns>Oluşturulan geri bildirim</returns>
+        [HttpPost]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> CreateFeedback([FromBody] CreateUserFeedbackDto dto)
+        {
+            var userAgent = Request.Headers["User-Agent"].ToString();
+            var result = await _feedbackService.CreateFeedbackAsync(dto, userAgent);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirim listesini getirir (sayfalama ve filtreleme ile)
+        /// </summary>
+        /// <param name="page">Sayfa numarası</param>
+        /// <param name="pageSize">Sayfa boyutu</param>
+        /// <param name="search">Arama terimi</param>
+        /// <param name="status">Durum filtresi</param>
+        /// <param name="type">Tip filtresi</param>
+        /// <returns>Geri bildirim listesi</returns>
+        [HttpGet]
+        [ProducesResponseType(typeof(ResponseModel<PaginatedList<UserFeedbackDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetFeedbacks(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null,
+            [FromQuery] FeedbackStatus? status = null,
+            [FromQuery] FeedbackType? type = null)
+        {
+            var result = await _feedbackService.GetFeedbacksAsync(page, pageSize, search, status, type);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Belirli bir geri bildirimi getirir
+        /// </summary>
+        /// <param name="id">Geri bildirim ID</param>
+        /// <returns>Geri bildirim detayı</returns>
+        [HttpGet("{id}")]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetFeedbackById(long id)
+        {
+            var result = await _feedbackService.GetFeedbackByIdAsync(id);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirim durumunu günceller (Admin)
+        /// </summary>
+        /// <param name="id">Geri bildirim ID</param>
+        /// <param name="dto">Güncelleme bilgileri</param>
+        /// <returns>Güncellenmiş geri bildirim</returns>
+        [HttpPost("update/{id}/status")]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateFeedbackStatus(
+            long id,
+            [FromBody] UpdateFeedbackStatusDto dto)
+        {
+            var result = await _feedbackService.UpdateFeedbackStatusAsync(id, dto);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirimi siler (soft delete)
+        /// </summary>
+        /// <param name="id">Geri bildirim ID</param>
+        /// <returns>Başarı durumu</returns>
+        [HttpPost("delete/{id}")]
+        [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeleteFeedback(long id)
+        {
+            var result = await _feedbackService.DeleteFeedbackAsync(id);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirim istatistiklerini getirir
+        /// </summary>
+        /// <returns>İstatistik verileri</returns>
+        [HttpGet("statistics")]
+        [ProducesResponseType(typeof(ResponseModel<FeedbackStatisticsDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetStatistics()
+        {
+            var result = await _feedbackService.GetStatisticsAsync();
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Kullanıcının kendi geri bildirimlerini getirir
+        /// </summary>
+        /// <returns>Kullanıcının geri bildirimleri</returns>
+        [HttpGet("my-feedbacks")]
+        [ProducesResponseType(typeof(ResponseModel<List<UserFeedbackDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyFeedbacks()
+        {
+            var result = await _feedbackService.GetMyFeedbacksAsync();
+            return StatusCode((int)result.StatusCode, result);
+        }
+    }
+}
