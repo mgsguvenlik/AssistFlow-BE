@@ -4460,19 +4460,20 @@ namespace Business.Services.Ykb
             // Çok istisnai durumda buraya düşer
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
-        public async Task<ResponseModel<PagedResult<YkbWorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<YkbWorkFlowGetDto>>> GetWorkFlowsAsync(YkbWorkFlowQueryParams q)
         {
+            q.Normalize(maxPageSize: 200);
+
             var me = await _currentUser.GetAsync();
             if (me is null)
                 return ResponseModel<PagedResult<YkbWorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 
-            // paging guard
-            var page = q.Page <= 0 ? 1 : q.Page;
-            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
+            var page = q.Page;
+            var pageSize = q.PageSize;
 
-            // TECHNICIAN kontrolü 
-            var roles = me.Roles?.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase)
-                        ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Permission step codes
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // Çoklu rol kodu desteği
             var technicianRoleRaw = await _uow.Repository
@@ -4488,28 +4489,66 @@ namespace Business.Services.Ykb
                 (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
                     StringComparer.OrdinalIgnoreCase)) ?? false);
 
-            // Permission step codes
-            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
-            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            // permission yoksa
-            if (!isTechnician && permittedSet.Count == 0)
-                return ResponseModel<PagedResult<YkbWorkFlowGetDto>>
-                    .Success(new PagedResult<YkbWorkFlowGetDto>(new List<YkbWorkFlowGetDto>(), 0, page, pageSize));
-
             var pendingStatus = WorkFlowStatus.Pending;
 
             IQueryable<YkbWorkFlow> wfBase = _uow.Repository.GetQueryable<YkbWorkFlow>()
                 .AsNoTracking()
                 .Include(x => x.CurrentStep)
-                .Include(x => x.ApproverTechnician) // projection'da kullanıyorsun
+                .Include(x => x.ApproverTechnician)
                 .Where(x => !x.IsDeleted && x.WorkFlowStatus == pendingStatus);
 
-            // 🔥 Teknisyen ise sadece kendine atanmış akışlar
-            // Değilse permission step filtrele
-            wfBase = isTechnician
-                ? wfBase.Where(x => x.ApproverTechnicianId == me.Id && permittedSet.Contains(x.CurrentStep.Code))
-                : wfBase.Where(x => x.CurrentStep != null && permittedSet.Contains(x.CurrentStep.Code));
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
+            {
+                wfBase = wfBase.Where(_ => false);
+            }
+            else
+            {
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
+            }
+
+            // --- FİLTRELEME ÖZELLİKLERİ ---
+
+            // WorkFlowStep filtreleme (ID bazlı)
+            if (q.CurrentStepId.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
+            }
+
+            // WorkFlowStep filtreleme (Code bazlı)
+            if (!string.IsNullOrWhiteSpace(q.StepCode))
+            {
+                var stepCode = q.StepCode.Trim();
+                wfBase = wfBase.Where(w => w.CurrentStep != null && w.CurrentStep.Code == stepCode);
+            }
+
+            // WorkFlowPriority filtreleme (tekil)
+            if (q.Priority.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.Priority == q.Priority.Value);
+            }
+
+            // Çoklu Priority filtreleme
+            if (q.Priorities != null && q.Priorities.Count > 0)
+            {
+                wfBase = wfBase.Where(w => q.Priorities.Contains(w.Priority));
+            }
+
+            // 🆕 Tarih filtreleri (CreatedDate)
+            if (q.StartDate.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CreatedDate >= q.StartDate.Value);
+            }
+
+            if (q.EndDate.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CreatedDate <= q.EndDate.Value);
+            }
 
             // Search
             if (!string.IsNullOrWhiteSpace(q.Search))
@@ -4528,8 +4567,54 @@ namespace Business.Services.Ykb
 
             var total = await qJoined.CountAsync();
 
-            var items = await qJoined
-                .OrderByDescending(x => x.wf.CreatedDate)
+            // --- SIRALAMA ---
+            var finalQuery = qJoined;
+
+            if (!string.IsNullOrWhiteSpace(q.Sort))
+            {
+                var sortLower = q.Sort.ToLowerInvariant();
+
+                if (sortLower == "requestno")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.RequestNo)
+                        : qJoined.OrderBy(x => x.wf.RequestNo);
+                }
+                else if (sortLower == "requesttitle")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
+                        : qJoined.OrderBy(x => x.wf.RequestTitle);
+                }
+                else if (sortLower == "priority")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.Priority)
+                        : qJoined.OrderBy(x => x.wf.Priority);
+                }
+                else if (sortLower == "createddate")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
+                        : qJoined.OrderBy(x => x.wf.CreatedDate);
+                }
+                else if (sortLower == "updateddate")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
+                        : qJoined.OrderBy(x => x.wf.UpdatedDate);
+                }
+                else
+                {
+                    finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                }
+            }
+            else
+            {
+                finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+            }
+
+            var items = await finalQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new YkbWorkFlowGetDto
@@ -4579,7 +4664,6 @@ namespace Business.Services.Ykb
             return ResponseModel<PagedResult<YkbWorkFlowGetDto>>
                 .Success(new PagedResult<YkbWorkFlowGetDto>(items, total, page, pageSize));
         }
-      
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();

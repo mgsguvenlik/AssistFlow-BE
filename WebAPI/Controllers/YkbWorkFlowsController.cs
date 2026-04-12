@@ -11,6 +11,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
 using System.Net;
 
@@ -76,7 +77,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-list")]
-        public async Task<IActionResult> GetWorkFlowList([FromQuery] QueryParams p)
+        public async Task<IActionResult> GetWorkFlowList([FromQuery] YkbWorkFlowQueryParams p)
         {
             var result = await _workFlowService.GetWorkFlowsAsync(p);
             return Ok(result);

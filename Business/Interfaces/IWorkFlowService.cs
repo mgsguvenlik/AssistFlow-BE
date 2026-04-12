@@ -45,7 +45,7 @@ namespace Business.Interfaces
         // WorkFlow (tanım)
 
         Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR");
-        Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q);
+        Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(WorkFlowQueryParams q);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
         Task<ResponseModel> CancelWorkFlowAsync(long id);
 

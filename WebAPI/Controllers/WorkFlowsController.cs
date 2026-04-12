@@ -8,6 +8,7 @@ using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
+using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using System.Net;
 
@@ -75,7 +76,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-list")]
-        public async Task<IActionResult> GetWorkFlowList([FromQuery] QueryParams p)
+        public async Task<IActionResult> GetWorkFlowList([FromQuery] WorkFlowQueryParams p)
         {
             var result = await _workFlowService.GetWorkFlowsAsync(p);
             return Ok(result);
