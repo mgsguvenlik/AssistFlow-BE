@@ -53,6 +53,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
         public DbSet<Tenant> Tenants { get; set; } = null!;
         public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
+        public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
 
 
         #region YKB
@@ -108,6 +109,51 @@ namespace Data.Concrete.EfCore.Context
                         .HasIndex(x => x.RequestNo);
             #endregion
 
+
+            modelBuilder.Entity<WorkFlowSlaSetting>(entity =>
+            {
+                entity.ToTable("WorkFlowSlaSettings");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.CustomerType)
+                    .IsRequired()
+                    .HasComment("Müşteri/İş birimi tipi (General, Ykb, Individual, Corporate)");
+
+                entity.Property(x => x.Priority)
+                    .IsRequired()
+                    .HasComment("İş akışı öncelik seviyesi");
+
+                entity.Property(x => x.SlaDurationDays)
+                    .IsRequired()
+                    .HasComment("SLA süresi (gün)");
+
+                entity.Property(x => x.NotificationBeforeDays)
+                    .IsRequired()
+                    .HasComment("Bildirim gönderilecek süre (gün önce)");
+
+                entity.Property(x => x.NotificationEmails)
+                    .HasMaxLength(1000)
+                    .HasComment("Bildirim gönderilecek e-posta adresleri (virgülle ayrılmış)");
+
+
+                entity.Property(x => x.IsActive)
+                    .IsRequired()
+                    .HasDefaultValue(true)
+                    .HasComment("Aktif mi");
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(500)
+                    .HasComment("Açıklama");
+
+                // Composite unique index: CustomerType + Priority kombinasyonu benzersiz olmalı
+                entity.HasIndex(x => new { x.CustomerType, x.Priority })
+                    .IsUnique()
+                    .HasDatabaseName("IX_WorkFlowSlaSettings_CustomerType_Priority");
+
+                entity.HasIndex(x => x.IsActive)
+                    .HasDatabaseName("IX_WorkFlowSlaSettings_IsActive");
+            });
 
 
             /// ProgressApprover Entity Configuration

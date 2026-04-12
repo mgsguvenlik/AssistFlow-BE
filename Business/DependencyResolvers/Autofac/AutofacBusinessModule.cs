@@ -56,6 +56,9 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkFlowDashboardService), typeof(WorkFlowDashboardService));
             services.AddScoped(typeof(IUserFeedbackService), typeof(UserFeedbackService));
 
+            // ✅ YENİ: WorkFlowSlaSetting Service
+            services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
+
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
 
@@ -177,7 +180,6 @@ namespace Business.DependencyResolvers.Autofac
                            Model.Dtos.Configuration.ConfigurationGetDto,
                            long>, ConfigurationService>();
 
-
             services.AddScoped<
                 ICrudService<Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceCreateDto,
                            Model.Dtos.CustomerGroupProductPrice.CustomerGroupProductPriceUpdateDto,
@@ -240,6 +242,15 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<
                    ICrudService<TenantCreateDto, TenantUpdateDto, TenantGetDto, long>,
                    TenantService>();
+
+            // ✅ YENİ: WorkFlowSlaSetting ICrudService kaydı
+            services.AddScoped<
+                ICrudService<
+                    Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting.WorkFlowSlaSettingCreateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting.WorkFlowSlaSettingUpdateDto,
+                    Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting.WorkFlowSlaSettingGetDto,
+                    long>,
+                WorkFlowSlaSettingService>();
 
         }
         protected override void Load(ContainerBuilder builder)
