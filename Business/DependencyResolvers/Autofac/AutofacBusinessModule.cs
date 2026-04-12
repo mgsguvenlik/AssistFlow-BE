@@ -61,6 +61,7 @@ namespace Business.DependencyResolvers.Autofac
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
+            services.AddHostedService<SlaNotificationDispatcher>();
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<Model.Concrete.User>, PasswordHasher<Model.Concrete.User>>();
