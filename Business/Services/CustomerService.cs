@@ -385,6 +385,107 @@ namespace Business.Services
             return string.IsNullOrWhiteSpace(phone) ? null : phone;
         }
 
+      public async Task<ResponseModel<PaginatedList<CustomerGetDto>>> GetByTenantCodeAsync(string? tenantCode, QueryParams queryParams)
+        {
+            var response = new ResponseModel<PaginatedList<CustomerGetDto>>();
+        
+            try
+            {
+                // Tenant'ı kod ile bul
+                long? tenantId = null;
+                if (!string.IsNullOrWhiteSpace(tenantCode))
+                {
+                    var tenant = await _unitOfWork.Repository
+                        .GetQueryable<Tenant>()
+                        .Where(t => t.Code == tenantCode.Trim())
+                        .FirstOrDefaultAsync();
+        
+                    if (tenant == null)
+                    {
+                        response.IsSuccess = false;
+                        response.Message = $"Tenant bulunamadı: {tenantCode}";
+                        return response;
+                    }
+        
+                    tenantId = tenant.Id;
+                }
+        
+                // Customer sorgusu
+                var query = _unitOfWork.Repository
+                    .GetQueryable<Customer>()
+                    .Include(c => c.CustomerType)
+                    .Include(c => c.CustomerGroup)
+                    .Include(c => c.CustomerSystemAssignments)
+                        .ThenInclude(a => a.CustomerSystem)
+                    .Include(c => c.Tenant)
+                    .AsQueryable();
+        
+                // TenantId ile filtrele
+                if (tenantId.HasValue)
+                {
+                    query = query.Where(c => c.TenantId == tenantId.Value);
+                }
+        
+                // Search parametresi varsa
+                if (!string.IsNullOrWhiteSpace(queryParams.Search))
+                {
+                    var searchTerm = queryParams.Search.ToLower();
+                    query = query.Where(c =>
+                        (c.SubscriberCode != null && c.SubscriberCode.ToLower().Contains(searchTerm)) ||
+                        (c.SubscriberCompany != null && c.SubscriberCompany.ToLower().Contains(searchTerm)) ||
+                        (c.ContactName1 != null && c.ContactName1.ToLower().Contains(searchTerm)) ||
+                        (c.Phone1 != null && c.Phone1.Contains(searchTerm)) ||
+                        (c.Email1 != null && c.Email1.ToLower().Contains(searchTerm)) ||
+                        (c.City != null && c.City.ToLower().Contains(searchTerm))
+                    );
+                }
+        
+                // Sıralama
+                if (!string.IsNullOrWhiteSpace(queryParams.Sort))
+                {
+                    query = queryParams.Sort.ToLower() switch
+                    {
+                        "name" => queryParams.Desc ? query.OrderByDescending(c => c.SubscriberCompany) : query.OrderBy(c => c.SubscriberCompany),
+                        "code" => queryParams.Desc ? query.OrderByDescending(c => c.SubscriberCode) : query.OrderBy(c => c.SubscriberCode),
+                        "city" => queryParams.Desc ? query.OrderByDescending(c => c.City) : query.OrderBy(c => c.City),
+                        "createdate" => queryParams.Desc ? query.OrderByDescending(c => c.CreatedDate) : query.OrderBy(c => c.CreatedDate),
+                        _ => queryParams.Desc ? query.OrderByDescending(c => c.Id) : query.OrderBy(c => c.Id)
+                    };
+                }
+                else
+                {
+                    query = query.OrderByDescending(c => c.Id);
+                }
+        
+                // Toplam kayıt sayısı
+                var totalCount = await query.CountAsync();
+        
+                // Sayfalama
+                var page = queryParams.Page < 1 ? 1 : queryParams.Page;
+                var pageSize = queryParams.PageSize < 1 ? 20 : queryParams.PageSize > 100 ? 100 : queryParams.PageSize;
+        
+                var items = await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+        
+                // DTO'ya map
+                var dtos = _mapper.Map<List<CustomerGetDto>>(items);
+        
+                var paginatedList = new PaginatedList<CustomerGetDto>(dtos, totalCount, page, pageSize);
+        
+                response.IsSuccess = true;
+                response.Data = paginatedList;
+                response.Message = "Müşteriler başarıyla getirildi.";
+            }
+            catch (Exception ex)
+            {
+                response.IsSuccess = false;
+                response.Message = $"Hata oluştu: {ex.Message}";
+            }
+        
+            return response;
+        }
     }
 }
 

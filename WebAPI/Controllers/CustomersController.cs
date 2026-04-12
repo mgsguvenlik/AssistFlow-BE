@@ -49,5 +49,18 @@ namespace WebAPI.Controllers
             var result = await _activationRecordService.GetCustomerActivity(customerId, q);
             return ToActionResult(result);
         }
+
+        /// <summary>
+        /// Tenant koduna göre müşterileri getirir. TenantCode null ise tüm müşteriler döner.
+        /// </summary>
+        /// <param name="tenantCode">Tenant kodu (nullable)</param>
+        /// <param name="q">Sayfalama ve arama parametreleri</param>
+        /// <returns>Sayfalanmış müşteri listesi</returns>
+        [HttpGet("by-tenant")]
+        public async Task<IActionResult> GetByTenantCode([FromQuery] string? tenantCode, [FromQuery] QueryParams q)
+        {
+            var result = await _customerService.GetByTenantCodeAsync(tenantCode, q);
+            return ToActionResult(result);
+        }
     }
 }
