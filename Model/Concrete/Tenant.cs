@@ -22,5 +22,6 @@ namespace Model.Concrete
         // Navi. props
         public ICollection<Customer> Customers { get; set; } = new List<Customer>();
         public ICollection<User> Users { get; set; } = new List<User>();
+        public ICollection<TenantProductPrice> TenantProductPrices { get; set; } = new List<TenantProductPrice>(); // 🆕
     }
 }

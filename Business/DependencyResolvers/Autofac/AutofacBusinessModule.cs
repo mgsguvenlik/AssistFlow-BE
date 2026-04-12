@@ -43,6 +43,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IYkbWorkFlowService), typeof(YkbWorkFlowService));
             services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
+            services.AddScoped(typeof(ITenantProductPriceService), typeof(TenantProductPriceService)); 
             services.AddScoped(typeof(IWorkFlowTransitionService), typeof(WorkFlowTransitionService));
             services.AddScoped(typeof(IActivationRecordService), typeof(ActivationRecordService));
             services.AddScoped(typeof(IMailPushService), typeof(MailPushService));
@@ -193,6 +194,13 @@ namespace Business.DependencyResolvers.Autofac
                         Model.Dtos.CustomerProductPrice.CustomerProductPriceUpdateDto,
                         Model.Dtos.CustomerProductPrice.CustomerProductPriceGetDto,
                         long>, CustomerProductPriceService>();
+
+            // 🆕 TenantProductPrice CRUD kaydı
+            services.AddScoped<
+                ICrudService<Model.Dtos.TenantProductPrice.TenantProductPriceCreateDto,
+                             Model.Dtos.TenantProductPrice.TenantProductPriceUpdateDto,
+                             Model.Dtos.TenantProductPrice.TenantProductPriceGetDto,
+                             long>, TenantProductPriceService>();
 
             services.AddScoped<
                 ICrudService<Model.Dtos.WorkFlowDtos.WorkFlowTransition.WorkFlowTransitionCreateDto,

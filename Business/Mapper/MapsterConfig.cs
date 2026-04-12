@@ -25,6 +25,7 @@ using Model.Dtos.Role;
 using Model.Dtos.ServiceType;
 using Model.Dtos.SystemType;
 using Model.Dtos.Tenant;
+using Model.Dtos.TenantProductPrice;
 using Model.Dtos.User;
 using Model.Dtos.UserFeedbackDtos;
 using Model.Dtos.UserRole;
@@ -642,6 +643,22 @@ namespace Business.Mapper
                   .Map(d => d.RespondedByName, s => (string?)null);    // Servis'te doldurulur
 
 
+            // ---------------- TenantProductPrice ----------------
+            config.NewConfig<TenantProductPriceCreateDto, TenantProductPrice>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<TenantProductPriceUpdateDto, TenantProductPrice>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.Product);
+
+            config.NewConfig<TenantProductPrice, TenantProductPriceGetDto>()
+                  .Map(d => d.TenantName, s => s.Tenant != null ? s.Tenant.Name : null)
+                  .Map(d => d.TenantCode, s => s.Tenant != null ? s.Tenant.Code : null)
+                  .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
+                  .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
         }
 
         // Helper metodlar için (MapsterConfig sınıfı içine ekleyin)

@@ -33,6 +33,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<ServicesRequestProduct> ServicesRequestProducts { get; set; }
         public DbSet<CustomerProductPrice> CustomerProductPrices { get; set; }
         public DbSet<CustomerGroupProductPrice> CustomerGroupProductPrices { get; set; }
+        public DbSet<TenantProductPrice> TenantProductPrices { get; set; }
         public DbSet<Warehouse> Warehouses { get; set; }
         public DbSet<TechnicalService> TechnicalServices { get; set; }
         public DbSet<TechnicalServiceImage> TechnicalServiceImages { get; set; }
@@ -245,27 +246,37 @@ namespace Data.Concrete.EfCore.Context
                 e.Property(x => x.CorporateCustomerShortCode).HasMaxLength(50);
                 e.Property(x => x.OracleCustomerCode).HasMaxLength(100);
 
+                // Brand ilişkisi
                 e.HasOne(x => x.Brand)
                  .WithMany(b => b.Products)
                  .HasForeignKey(x => x.BrandId)
                  .OnDelete(DeleteBehavior.SetNull);
 
+                // Model ilişkisi
                 e.HasOne(x => x.Model)
                  .WithMany(m => m.Products)
                  .HasForeignKey(x => x.ModelId)
                  .OnDelete(DeleteBehavior.SetNull);
 
+                // CurrencyType ilişkisi
                 e.HasOne(x => x.CurrencyType)
                  .WithMany(c => c.Products)
                  .HasForeignKey(x => x.CurrencyTypeId)
                  .OnDelete(DeleteBehavior.SetNull);
 
+                // ProductType ilişkisi
                 e.HasOne(x => x.ProductType)
                  .WithMany(pt => pt.Products)
                  .HasForeignKey(x => x.ProductTypeId)
                  .OnDelete(DeleteBehavior.SetNull);
 
-                // Tipik aramalar için akıllı indeksler
+                // 🆕 TenantProductPrices ilişkisi
+                e.HasMany(x => x.TenantProductPrices)
+                 .WithOne(tp => tp.Product)
+                 .HasForeignKey(tp => tp.ProductId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Indexler
                 e.HasIndex(x => x.ProductCode).IsUnique(false);
                 e.HasIndex(x => x.OracleProductCode).IsUnique(false);
                 e.HasIndex(x => new { x.BrandId, x.ModelId });
@@ -338,6 +349,41 @@ namespace Data.Concrete.EfCore.Context
                 .OnDelete(DeleteBehavior.Cascade);
 
 
+
+            // TenantProductPrices: Tenant + Product tekil olsun
+            modelBuilder.Entity<TenantProductPrice>(e =>
+            {
+                e.ToTable("TenantProductPrice"); // 🆕 Tablo adı açık
+
+                // 🔹 Composite Unique Index
+                e.HasIndex(x => new { x.TenantId, x.ProductId })
+                    .IsUnique();
+
+                // 🔹 Price precision (diğer fiyat tablolarıyla tutarlı)
+                e.Property(x => x.Price)
+                    .HasPrecision(18, 2)
+                    .IsRequired();
+
+                // 🔹 CurrencyCode
+                e.Property(x => x.CurrencyCode)
+                    .HasMaxLength(10);
+
+                // 🔹 Name
+                e.Property(x => x.Name)
+                    .HasMaxLength(200);
+
+                // 🔹 Tenant İlişkisi
+                e.HasOne(x => x.Tenant)
+                    .WithMany(t => t.TenantProductPrices)
+                    .HasForeignKey(x => x.TenantId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // 🔹 Product İlişkisi
+                e.HasOne(x => x.Product)
+                    .WithMany(p => p.TenantProductPrices)
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             modelBuilder.Entity<WorkFlowTransition>()
                     .HasOne(t => t.FromStep)
@@ -534,6 +580,12 @@ namespace Data.Concrete.EfCore.Context
                       .WithOne(u => u.Tenant!)
                       .HasForeignKey(u => u.TenantId)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                // 🆕 TenantProductPrices ilişkisi
+                entity.HasMany(t => t.TenantProductPrices)
+                      .WithOne(tp => tp.Tenant)
+                      .HasForeignKey(tp => tp.TenantId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ---------------- UserFeedback ----------------
