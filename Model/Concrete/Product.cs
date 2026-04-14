@@ -35,5 +35,6 @@ namespace Model.Concrete
         // Navigations (fiyatlar)
         public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
         public ICollection<CustomerGroupProductPrice> GroupProductPrices { get; set; } = new List<CustomerGroupProductPrice>();
+        public ICollection<TenantProductPrice> TenantProductPrices { get; set; } = new List<TenantProductPrice>(); // 🆕
     }
 }

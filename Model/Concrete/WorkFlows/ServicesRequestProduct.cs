@@ -22,31 +22,47 @@ namespace Model.Concrete.WorkFlows
 
         public decimal GetEffectivePrice()
         {
+            // 1️⃣ Grup fiyatı
             if (Customer?.CustomerGroup?.GroupProductPrices
                 .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
                 return groupPrice.Price;
 
+            // 2️⃣ Müşteri özel fiyatı
             if (Customer?.CustomerProductPrices
                 .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
                 return customerPrice.Price;
 
+            // 3️⃣ Tenant fiyatı 🆕
+            if (Customer?.Tenant?.TenantProductPrices
+                .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
+                return tenantPrice.Price;
+
+            // 4️⃣ Ürün genel fiyatı
             return Product?.Price ?? 0m;
         }
 
         public decimal GetTotalEffectivePrice()
         {
+            // 1️⃣ Grup fiyatı
             if (Customer?.CustomerGroup?.GroupProductPrices
                 .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
                 return Quantity * groupPrice.Price;
 
+            // 2️⃣ Müşteri özel fiyatı
             if (Customer?.CustomerProductPrices
                 .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
                 return Quantity * customerPrice.Price;
 
+            // 3️⃣ Tenant fiyatı 🆕
+            if (Customer?.Tenant?.TenantProductPrices
+                .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
+                return Quantity * tenantPrice.Price;
+
+            // 4️⃣ Ürün genel fiyatı
             return Quantity * (Product?.Price ?? 0m);
         }
 
-        // ---------- YENİ: “o anki” fiyatı sabitleyen alanlar ----------
+        // ---------- YENİ: "o anki" fiyatı sabitleyen alanlar ----------
         /// <summary>Fiyat sabitlendi mi? (true ise aşağıdaki captured alanları kullan)</summary>
         public bool IsPriceCaptured { get; set; }
 

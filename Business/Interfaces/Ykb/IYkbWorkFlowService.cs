@@ -49,7 +49,7 @@ namespace Business.Interfaces.Ykb
         // WorkFlow (tanım)
 
         Task<ResponseModel<string>> GetRequestNoAsync(string? prefix = "SR");
-        Task<ResponseModel<PagedResult<YkbWorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q);
+        Task<ResponseModel<PagedResult<YkbWorkFlowGetDto>>> GetWorkFlowsAsync(YkbWorkFlowQueryParams q);
         Task<ResponseModel> DeleteWorkFlowAsync(long id);
         Task<ResponseModel> CancelWorkFlowAsync(long id);
 

@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260412091917_SlaSettingsRemoveIsMailSen")]
+    partial class SlaSettingsRemoveIsMailSen
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -974,57 +977,6 @@ namespace Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants");
-                });
-
-            modelBuilder.Entity("Model.Concrete.TenantProductPrice", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("CreatedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("CurrencyCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<long>("ProductId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("TenantId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset?>("UpdatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("UpdatedUser")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("TenantId", "ProductId")
-                        .IsUnique();
-
-                    b.ToTable("TenantProductPrice", (string)null);
                 });
 
             modelBuilder.Entity("Model.Concrete.User", b =>
@@ -2922,25 +2874,6 @@ namespace Data.Migrations
                     b.Navigation("City");
                 });
 
-            modelBuilder.Entity("Model.Concrete.TenantProductPrice", b =>
-                {
-                    b.HasOne("Model.Concrete.Product", "Product")
-                        .WithMany("TenantProductPrices")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Model.Concrete.Tenant", "Tenant")
-                        .WithMany("TenantProductPrices")
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("Tenant");
-                });
-
             modelBuilder.Entity("Model.Concrete.User", b =>
                 {
                     b.HasOne("Model.Concrete.Tenant", "Tenant")
@@ -3278,8 +3211,6 @@ namespace Data.Migrations
                     b.Navigation("CustomerProductPrices");
 
                     b.Navigation("GroupProductPrices");
-
-                    b.Navigation("TenantProductPrices");
                 });
 
             modelBuilder.Entity("Model.Concrete.ProductType", b =>
@@ -3297,8 +3228,6 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.Tenant", b =>
                 {
                     b.Navigation("Customers");
-
-                    b.Navigation("TenantProductPrices");
 
                     b.Navigation("Users");
                 });

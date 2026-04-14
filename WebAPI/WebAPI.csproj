@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <Folder Include="Logs\" />
+    <Folder Include="wwwroot\" />
     <Folder Include="UploadsStorage\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>

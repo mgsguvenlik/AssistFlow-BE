@@ -88,10 +88,28 @@ namespace Business.Services
         {
             try
             {
+                var me = await _currentUser.GetAsync();
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<PaginatedList<UserFeedbackDto>>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
                 var query = _uow.Repository
                     .GetQueryable<UserFeedback>()
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted);
+
+                // Admin değilse sadece kendi kayıtlarını görebilir
+                if (!isAdmin)
+                {
+                    query = query.Where(x => x.CreatedUser == userId);
+                }
 
                 // Filtreleme
                 if (!string.IsNullOrWhiteSpace(search))
@@ -147,6 +165,18 @@ namespace Business.Services
         {
             try
             {
+                var me = await _currentUser.GetAsync();
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
                 var feedback = await _uow.Repository
                     .GetQueryable<UserFeedback>()
                     .AsNoTracking()
@@ -157,6 +187,14 @@ namespace Business.Services
                     return ResponseModel<UserFeedbackDto>.Fail(
                         "Geri bildirim bulunamadı",
                         StatusCode.NotFound);
+                }
+
+                // Admin değilse sadece kendi kaydını görebilir
+                if (!isAdmin && feedback.CreatedUser != userId)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Bu geri bildirime erişim yetkiniz yok",
+                        StatusCode.Unauthorized);
                 }
 
                 return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
@@ -179,6 +217,15 @@ namespace Business.Services
                 var me = await _currentUser.GetAsync();
                 var userId = me?.Id ?? 0;
 
+                if (userId <= 0)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
                 var feedback = await _uow.Repository
                     .GetQueryable<UserFeedback>()
                     .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
@@ -188,6 +235,14 @@ namespace Business.Services
                     return ResponseModel<UserFeedbackDto>.Fail(
                         "Geri bildirim bulunamadı",
                         StatusCode.NotFound);
+                }
+
+                // Admin değilse sadece kendi kaydını güncelleyebilir
+                if (!isAdmin && feedback.CreatedUser != userId)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Bu geri bildirime erişim yetkiniz yok",
+                        StatusCode.Unauthorized);
                 }
 
                 feedback.Status = dto.Status;
@@ -237,6 +292,15 @@ namespace Business.Services
                 var me = await _currentUser.GetAsync();
                 var userId = me?.Id ?? 0;
 
+                if (userId <= 0)
+                {
+                    return ResponseModel<bool>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
                 var feedback = await _uow.Repository
                     .GetQueryable<UserFeedback>()
                     .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
@@ -246,6 +310,14 @@ namespace Business.Services
                     return ResponseModel<bool>.Fail(
                         "Geri bildirim bulunamadı",
                         StatusCode.NotFound);
+                }
+
+                // Admin değilse sadece kendi kaydını silebilir
+                if (!isAdmin && feedback.CreatedUser != userId)
+                {
+                    return ResponseModel<bool>.Fail(
+                        "Bu geri bildirime erişim yetkiniz yok",
+                        StatusCode.Unauthorized);
                 }
 
                 feedback.IsDeleted = true;
@@ -272,11 +344,30 @@ namespace Business.Services
         {
             try
             {
-                var feedbacks = await _uow.Repository
+                var me = await _currentUser.GetAsync();
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<FeedbackStatisticsDto>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
+                var query = _uow.Repository
                     .GetQueryable<UserFeedback>()
                     .AsNoTracking()
-                    .Where(x => !x.IsDeleted)
-                    .ToListAsync();
+                    .Where(x => !x.IsDeleted);
+
+                // Admin değilse sadece kendi kayıtlarının istatistiklerini görebilir
+                if (!isAdmin)
+                {
+                    query = query.Where(x => x.CreatedUser == userId);
+                }
+
+                var feedbacks = await query.ToListAsync();
 
                 var totalCount = feedbacks.Count;
 
@@ -379,6 +470,19 @@ namespace Business.Services
         }
 
         #region Private Methods
+
+        /// <summary>
+        /// Kullanıcının ADMIN rolünde olup olmadığını kontrol eder
+        /// </summary>
+        private static bool IsUserAdmin(Model.Dtos.Auth.CurrentUserDto? user)
+        {
+            if (user == null || user.Roles == null || !user.Roles.Any())
+                return false;
+
+            return user.Roles.Any(r =>
+                r.Code?.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) == true ||
+                r.Name?.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) == true);
+        }
 
         private async Task<UserFeedbackDto> MapToDto(UserFeedback feedback)
         {

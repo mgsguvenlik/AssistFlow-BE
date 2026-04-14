@@ -1920,8 +1920,8 @@ namespace Business.Services
 
                          Quantity = p.Quantity,
 
-                         // --- EF-translatable EffectivePrice ---
-                         // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Ürün liste fiyatı → 0
+                         // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
+                         // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Tenant fiyatı → 4) Ürün liste fiyatı
                          EffectivePrice =
                              p.Customer.CustomerGroup.GroupProductPrices
                                  .Where(gp => gp.ProductId == p.ProductId)
@@ -1931,6 +1931,10 @@ namespace Business.Services
                                  .Where(cp => cp.ProductId == p.ProductId)
                                  .Select(cp => (decimal?)cp.Price)
                                  .FirstOrDefault()
+                             ?? p.Customer.Tenant.TenantProductPrices
+                                 .Where(tp => tp.ProductId == p.ProductId)
+                                 .Select(tp => (decimal?)tp.Price)
+                                 .FirstOrDefault() // 🆕 Tenant fiyatı
                              ?? (decimal?)p.Product.Price
                              ?? 0m
                      })
@@ -2087,6 +2091,7 @@ namespace Business.Services
             }
 
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
+            // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
@@ -2105,8 +2110,7 @@ namespace Business.Services
 
                     Quantity = p.Quantity,
 
-                    // --- EF-translatable EffectivePrice ---
-                    // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Ürün liste fiyatı → 0
+                    // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
                     EffectivePrice =
                              p.Customer.CustomerGroup.GroupProductPrices
                                  .Where(gp => gp.ProductId == p.ProductId)
@@ -2116,6 +2120,10 @@ namespace Business.Services
                                  .Where(cp => cp.ProductId == p.ProductId)
                                  .Select(cp => (decimal?)cp.Price)
                                  .FirstOrDefault()
+                             ?? p.Customer.Tenant.TenantProductPrices
+                                 .Where(tp => tp.ProductId == p.ProductId)
+                                 .Select(tp => (decimal?)tp.Price)
+                                 .FirstOrDefault() // 🆕 Tenant fiyatı
                              ?? (decimal?)p.Product.Price
                              ?? 0m
                 })
@@ -3084,7 +3092,6 @@ namespace Business.Services
                         ?? (p.Product != null ? p.Product.PriceCurrency : null),
 
                     // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                    // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
                     ProductPrice = p.CapturedUnitPrice
                        ?? (p.Product != null ? (decimal?)p.Product.Price : null)
                        ?? 0m,
@@ -3251,6 +3258,14 @@ namespace Business.Services
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
                 .Include(p => p.Product)
+                .Include(p => p.Customer)                           // 🆕
+                    .ThenInclude(c => c.Tenant)                     // 🆕
+                        .ThenInclude(t => t.TenantProductPrices)    // 🆕
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerGroup)
+                        .ThenInclude(g => g.GroupProductPrices)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerProductPrices)
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
@@ -3263,7 +3278,7 @@ namespace Business.Services
                     // 1) Birim fiyat
                     decimal effectivePrice = captured
                         ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
-                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla (TENANT İÇERİR)
 
                     // 2) Para birimi
                     string? currency = captured
@@ -3287,7 +3302,7 @@ namespace Business.Services
                         // Ürün fiyatı: ekranda kullanılacak birim fiyat
                         ProductPrice = effectivePrice,
 
-                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
+                        // EffectivePrice: her zaman ekranda görünen "esas" fiyat
                         EffectivePrice = effectivePrice,
                     };
                 })
@@ -3386,6 +3401,14 @@ namespace Business.Services
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
                 .Include(p => p.Product)
+                .Include(p => p.Customer)                           // 🆕
+                    .ThenInclude(c => c.Tenant)                     // 🆕
+                        .ThenInclude(t => t.TenantProductPrices)    // 🆕
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerGroup)
+                        .ThenInclude(g => g.GroupProductPrices)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerProductPrices)
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
@@ -3395,10 +3418,10 @@ namespace Business.Services
                     // Fiyat sabitlenmiş mi?
                     bool captured = p.IsPriceCaptured;
 
-                    // 1) Birim fiyat
+                    // 1) Birim fiyat (GetEffectivePrice artık Tenant'ı da içeriyor)
                     decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
-                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+                        ? (p.CapturedUnitPrice ?? 0m)
+                        : p.GetEffectivePrice();
 
                     // 2) Para birimi
                     string? currency = captured
@@ -3415,14 +3438,8 @@ namespace Business.Services
 
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
-
-                        // Para birimi: sabitse Captured, değilse Product
                         PriceCurrency = currency,
-
-                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
                         ProductPrice = effectivePrice,
-
-                        // EffectivePrice: her zaman ekranda görünen "esas" fiyat
                         EffectivePrice = effectivePrice,
                     };
                 })
@@ -3617,7 +3634,6 @@ namespace Business.Services
                          ?? (p.Product != null ? p.Product.PriceCurrency : null),
 
                      // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                     // (Frontend'de ProductPrice kullanıyorsan burada CapturedUnitPrice'ı döndürmek mantıklı)
                      ProductPrice = p.CapturedUnitPrice
                         ?? (p.Product != null ? (decimal?)p.Product.Price : null)
                         ?? 0m,
@@ -3820,7 +3836,7 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(QueryParams q)
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
         {
             var me = await _currentUser.GetAsync();
             //var me =  new User { Id=14};
@@ -3942,8 +3958,209 @@ namespace Business.Services
                 .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
         }
 
+        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(WorkFlowQueryParams q)
+        {
+            q.Normalize(maxPageSize: 200);
 
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
 
+            var page = q.Page;
+            var pageSize = q.PageSize;
+
+            var pendingStatus = WorkFlowStatus.Pending;
+
+            // Permission step codes (WH, PRC, TS, ...)
+            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
+            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Çoklu rol kodu desteği
+            var technicianRoleRaw = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .Where(x => x.Name == "TechnicianRoleCode")
+                .Select(x => x.Value)
+                .FirstOrDefaultAsync();
+
+            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
+
+            var isTechnician = technicianRoleCodes.Count > 0 &&
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                    StringComparer.OrdinalIgnoreCase)) ?? false);
+
+            // base query
+            var wfBase = _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .AsNoTracking()
+                .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
+
+            var myId = me.Id;
+
+            if (!isTechnician && permittedSet.Count == 0)
+            {
+                wfBase = wfBase.Where(_ => false);
+            }
+            else
+            {
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    (!isTechnician || w.ApproverTechnicianId == myId)
+                );
+            }
+
+            // --- FİLTRELEME ÖZELLİKLERİ ---
+
+            // WorkFlowStep filtreleme (ID bazlı)
+            if (q.CurrentStepId.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
+            }
+
+            // WorkFlowStep filtreleme (Code bazlı)
+            if (!string.IsNullOrWhiteSpace(q.StepCode))
+            {
+                var stepCode = q.StepCode.Trim();
+                wfBase = wfBase.Where(w => w.CurrentStep != null && w.CurrentStep.Code == stepCode);
+            }
+
+            // WorkFlowPriority filtreleme (tekil)
+            if (q.Priority.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.Priority == q.Priority.Value);
+            }
+
+            // Çoklu Priority filtreleme
+            if (q.Priorities != null && q.Priorities.Count > 0)
+            {
+                wfBase = wfBase.Where(w => q.Priorities.Contains(w.Priority));
+            }
+
+            // 🆕 Tarih filtreleri (CreatedDate)
+            if (q.StartDate.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CreatedDate >= q.StartDate.Value);
+            }
+
+            if (q.EndDate.HasValue)
+            {
+                wfBase = wfBase.Where(w => w.CreatedDate <= q.EndDate.Value);
+            }
+
+            // Search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
+            }
+
+            // LEFT JOIN ServicesRequest
+            var qJoined =
+                from wf in wfBase
+                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
+                    on wf.RequestNo equals sr0.RequestNo into srj
+                from sr in srj.DefaultIfEmpty()
+                select new { wf, sr };
+
+            var total = await qJoined.CountAsync();
+
+            // --- SIRALAMA ---
+            var finalQuery = qJoined;
+
+            if (!string.IsNullOrWhiteSpace(q.Sort))
+            {
+                var sortLower = q.Sort.ToLowerInvariant();
+
+                if (sortLower == "requestno")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.RequestNo)
+                        : qJoined.OrderBy(x => x.wf.RequestNo);
+                }
+                else if (sortLower == "requesttitle")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
+                        : qJoined.OrderBy(x => x.wf.RequestTitle);
+                }
+                else if (sortLower == "priority")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.Priority)
+                        : qJoined.OrderBy(x => x.wf.Priority);
+                }
+                else if (sortLower == "createddate")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
+                        : qJoined.OrderBy(x => x.wf.CreatedDate);
+                }
+                else if (sortLower == "updateddate")
+                {
+                    finalQuery = q.Desc
+                        ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
+                        : qJoined.OrderBy(x => x.wf.UpdatedDate);
+                }
+                else
+                {
+                    finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                }
+            }
+            else
+            {
+                finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+            }
+
+            var items = await finalQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new WorkFlowGetDto
+                {
+                    Id = x.wf.Id,
+                    RequestTitle = x.wf.RequestTitle,
+                    RequestNo = x.wf.RequestNo,
+                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+                    Priority = x.wf.Priority,
+                    WorkFlowStatus = x.wf.WorkFlowStatus,
+                    IsAgreement = x.wf.IsAgreement,
+                    CreatedDate = x.wf.CreatedDate,
+                    UpdatedDate = x.wf.UpdatedDate,
+                    CreatedUser = x.wf.CreatedUser,
+                    UpdatedUser = x.wf.UpdatedUser,
+                    IsDeleted = x.wf.IsDeleted,
+                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
+                    ApproverTechnician = x.wf.ApproverTechnician == null
+                        ? null
+                        : new UserGetDto
+                        {
+                            Id = x.wf.ApproverTechnician.Id,
+                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
+                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
+                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
+                            City = x.wf.ApproverTechnician.City,
+                            District = x.wf.ApproverTechnician.District,
+                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                        },
+
+                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
+                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
+                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+
+                    CurrentStep = x.wf.CurrentStep == null
+                        ? null
+                        : new WorkFlowStepGetDto
+                        {
+                            Id = x.wf.CurrentStep.Id,
+                            Name = x.wf.CurrentStep.Name,
+                            Code = x.wf.CurrentStep.Code
+                        }
+                })
+                .ToListAsync();
+
+            return ResponseModel<PagedResult<WorkFlowGetDto>>
+                .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
+        }
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
             var me = await _currentUser.GetAsync();
