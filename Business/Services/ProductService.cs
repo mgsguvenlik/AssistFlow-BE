@@ -30,7 +30,7 @@ namespace Business.Services
                      .Include(p => p.CurrencyType)
                      .Include(p => p.CustomerProductPrices)
                      .Include(p => p.ProductType)
-                     .Include(p => p.TenantProductPrices); // 🆕
+                     .Include(p => p.TenantProductPrices);
 
         protected override Task<Product?> ResolveEntityForUpdateAsync(ProductUpdateDto dto)
             => _unitOfWork.Repository.GetSingleAsync<Product>(false, x => x.Id == dto.Id,
@@ -340,9 +340,12 @@ namespace Business.Services
             return ResponseModel<List<ProductEffectivePriceDto>>.Success(result);
         }
 
+        /// <summary>
+        /// 🎯 Müşteri bazlı ürün listesi + efektif fiyat hesaplama (TENANT FİLTRELİ)
+        /// </summary>
         public async Task<ResponseModel<PagedResult<ProductEffectivePriceDto>>> GetEffectivePriceByCustomerAsync(QueryParams q, long? customerId)
         {
-            // 1️⃣ Eğer müşteri belirtilmemişse: sadece ürün fiyatlarını döndür
+            // 1️⃣ Müşteri belirtilmemişse: sadece ürün fiyatlarını döndür (tenant filtresi YOK)
             if (customerId == null)
             {
                 var defaultProductResponse = await GetPagedAsync(q);
@@ -383,7 +386,7 @@ namespace Business.Services
                 return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Fail("Müşteri bulunamadı.", StatusCode.NotFound);
 
             // 3️⃣ Tenant'a ait ürün ID'lerini al
-            List<long> tenantProductIds = new();
+            List<long>? tenantProductIds = null;
             if (customer.TenantId.HasValue)
             {
                 var tenantPrices = await _unitOfWork.Repository.GetMultipleAsync<TenantProductPrice>(
@@ -391,24 +394,75 @@ namespace Business.Services
                     whereExpression: tp => tp.TenantId == customer.TenantId.Value
                 );
 
-                tenantProductIds = tenantPrices?.Select(tp => tp.ProductId).ToList() ?? new List<long>();
+                tenantProductIds = tenantPrices?.Select(tp => tp.ProductId).ToList();
 
-                if (!tenantProductIds.Any())
+                if (tenantProductIds == null || !tenantProductIds.Any())
                     return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
                         new PagedResult<ProductEffectivePriceDto>(new List<ProductEffectivePriceDto>(), 0, q.Page, q.PageSize)
                     );
             }
 
-            var pagedProductResponse = await GetPagedAsync(q);
-            if (!pagedProductResponse.IsSuccess || pagedProductResponse.Data == null)
-                return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Fail("Ürün listesi alınamadı.", StatusCode.BadRequest);
+            // 4️⃣ Ürünleri getir - TENANT FİLTRESİ İLE 🆕
+            var query = _unitOfWork.Repository.GetQueryable<Product>();
+            var inc = IncludeExpression();
+            if (inc is not null) query = inc(query);
 
-            var allProductsList = pagedProductResponse.Data.Items.ToList();
+            // 🔍 Tenant filtresi uygula (varsa)
+            if (tenantProductIds != null)
+            {
+                query = query.Where(p => tenantProductIds.Contains(p.Id));
+            }
 
-            // 4️⃣ Tenant filtresi uygula
-            var filteredProducts = customer.TenantId.HasValue
-                ? allProductsList.Where(p => tenantProductIds.Contains(p.Id)).ToList()
-                : allProductsList;
+            // 🔍 Search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var search = q.Search.Trim();
+                query = query.Where(x =>
+                    (x.ProductCode != null && x.ProductCode.Contains(search)) ||
+                    (x.Description != null && x.Description.Contains(search)) ||
+                    (x.OracleProductCode != null && x.OracleProductCode.Contains(search))
+                );
+            }
+
+            // 🔢 Sıralama
+            if (!string.IsNullOrWhiteSpace(q.Sort))
+            {
+                var prop = typeof(Product).GetProperty(q.Sort,
+                    System.Reflection.BindingFlags.IgnoreCase |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+
+                if (prop != null)
+                {
+                    var parameter = Expression.Parameter(typeof(Product), "x");
+                    var property = Expression.Property(parameter, prop);
+                    var lambda = Expression.Lambda(property, parameter);
+
+                    string methodName = q.Desc ? "OrderByDescending" : "OrderBy";
+                    var resultExp = Expression.Call(
+                        typeof(Queryable),
+                        methodName,
+                        new Type[] { typeof(Product), prop.PropertyType },
+                        query.Expression,
+                        Expression.Quote(lambda));
+
+                    query = query.Provider.CreateQuery<Product>(resultExp);
+                }
+            }
+            else
+            {
+                query = query.OrderByDescending(x => x.Id);
+            }
+
+            // 📄 Sayfalama
+            var totalCount = await query.CountAsync();
+
+            var filteredProducts = await query
+                .AsNoTracking()
+                .Skip((q.Page - 1) * q.PageSize)
+                .Take(q.PageSize)
+                .ProjectToType<ProductGetDto>(_config)
+                .ToListAsync();
 
             var customerPrices = customer.CustomerProductPrices;
             var groupPrices = customer.CustomerGroup?.GroupProductPrices ?? new List<CustomerGroupProductPrice>();
@@ -459,8 +513,6 @@ namespace Business.Services
                     EffectiveCurrency = effectiveCurrency
                 });
             }
-
-            var totalCount = customer.TenantId.HasValue ? effectiveList.Count : pagedProductResponse.Data.TotalCount;
 
             return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
              new PagedResult<ProductEffectivePriceDto>(effectiveList, totalCount, q.Page, q.PageSize));
