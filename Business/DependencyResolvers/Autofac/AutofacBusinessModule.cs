@@ -58,8 +58,8 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IUserFeedbackService), typeof(UserFeedbackService));
             services.AddScoped(typeof(IOvertimeReportService), typeof(OvertimeReportService));
             services.AddScoped(typeof(IWorkingHourPolicyService), typeof(WorkingHourPolicyService));
-            // ✅ YENİ: WorkFlowSlaSetting Service
             services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
+            services.AddScoped(typeof(IYkbOvertimeReportService), typeof(YkbOvertimeReportService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
