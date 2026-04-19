@@ -55,6 +55,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<Tenant> Tenants { get; set; } = null!;
         public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
+        public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
 
 
         #region YKB
@@ -622,6 +623,9 @@ namespace Data.Concrete.EfCore.Context
                 entity.HasIndex(x => x.CreatedDate);
                 entity.HasIndex(x => new { x.Status, x.FeedbackType });
             });
+
+            // DbSet ekleyin:
+           
         }
     }
 }

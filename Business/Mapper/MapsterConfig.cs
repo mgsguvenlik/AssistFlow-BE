@@ -41,6 +41,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
+using Model.Dtos.WorkingHourPolicy;
 
 namespace Business.Mapper
 {
@@ -48,7 +49,6 @@ namespace Business.Mapper
     {
         public void Register(TypeAdapterConfig config)
         {
-
             config.Default.MaxDepth(2);
 
 
@@ -613,7 +613,7 @@ namespace Business.Mapper
                   .Ignore(d => d.RespondedBy)
                   .Ignore(d => d.CompletedDate)
                   .Ignore(d => d.UserAgent)           // Servis'te set edilir
-                  .Ignore(d => d.AttachmentUrls)      // Servis'te JSON'a çevrilir
+                  .Ignore(d => d.AttachmentUrls)      // Servis'te JSON'a cevrilir
                   .Ignore(d => d.CreatedDate)
                   .Ignore(d => d.CreatedUser)
                   .Ignore(d => d.UpdatedDate)
@@ -659,6 +659,39 @@ namespace Business.Mapper
                   .Map(d => d.TenantCode, s => s.Tenant != null ? s.Tenant.Code : null)
                   .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
                   .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
+
+            // ---------------- WorkingHourPolicy ----------------
+            config.NewConfig<WorkingHourPolicyCreateDto, WorkingHourPolicy>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.HolidayTypes)
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser)
+                  .Ignore(d => d.IsDeleted);
+
+            config.NewConfig<WorkingHourPolicyUpdateDto, WorkingHourPolicy>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Name)
+                  .Ignore(d => d.PolicyType)
+                  .Ignore(d => d.SpecificDate)
+                  .Ignore(d => d.Year)
+                  .Ignore(d => d.DayOfWeek)
+                  .Ignore(d => d.CountryCode)
+                  .Ignore(d => d.IsPublicHoliday)
+                  .Ignore(d => d.HolidayTypes)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser)
+                  .Ignore(d => d.IsDeleted);
+
+            config.NewConfig<WorkingHourPolicy, WorkingHourPolicyGetDto>()
+                  .Map(d => d.PolicyTypeText, s => GetPolicyTypeText(s.PolicyType))
+                  .Map(d => d.DayOfWeekText, s => s.DayOfWeek.HasValue ? GetDayOfWeekText(s.DayOfWeek.Value) : null);
         }
 
         // Helper metodlar için (MapsterConfig sınıfı içine ekleyin)
@@ -698,5 +731,28 @@ namespace Business.Mapper
                 return null;
             }
         }
+
+        static string GetPolicyTypeText(WorkingHourPolicyType type) => type switch
+        {
+            WorkingHourPolicyType.WeekdayDefault => "Hafta İçi Default",
+            WorkingHourPolicyType.WeekendDefault => "Hafta Sonu Default",
+            WorkingHourPolicyType.WeekDay => "Hafta Günü",
+            WorkingHourPolicyType.PublicHoliday => "Resmi Tatil",
+            WorkingHourPolicyType.SpecificDate => "Belirli Tarih",
+            WorkingHourPolicyType.CustomDay => "Özel Gün",
+            _ => "Bilinmiyor"
+        };
+
+        static string GetDayOfWeekText(DayOfWeek day) => day switch
+        {
+            DayOfWeek.Monday => "Pazartesi",
+            DayOfWeek.Tuesday => "Salı",
+            DayOfWeek.Wednesday => "Çarşamba",
+            DayOfWeek.Thursday => "Perşembe",
+            DayOfWeek.Friday => "Cuma",
+            DayOfWeek.Saturday => "Cumartesi",
+            DayOfWeek.Sunday => "Pazar",
+            _ => "Bilinmiyor"
+        };
     }
 }
