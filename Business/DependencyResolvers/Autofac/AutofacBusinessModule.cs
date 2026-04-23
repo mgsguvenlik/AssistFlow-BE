@@ -56,9 +56,10 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(ITenantService), typeof(TenantService));
             services.AddScoped(typeof(IWorkFlowDashboardService), typeof(WorkFlowDashboardService));
             services.AddScoped(typeof(IUserFeedbackService), typeof(UserFeedbackService));
-
-            // ✅ YENİ: WorkFlowSlaSetting Service
+            services.AddScoped(typeof(IOvertimeReportService), typeof(OvertimeReportService));
+            services.AddScoped(typeof(IWorkingHourPolicyService), typeof(WorkingHourPolicyService));
             services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
+            services.AddScoped(typeof(IYkbOvertimeReportService), typeof(YkbOvertimeReportService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
@@ -261,6 +262,7 @@ namespace Business.DependencyResolvers.Autofac
                     long>,
                 WorkFlowSlaSettingService>();
 
+            
         }
         protected override void Load(ContainerBuilder builder)
         {
