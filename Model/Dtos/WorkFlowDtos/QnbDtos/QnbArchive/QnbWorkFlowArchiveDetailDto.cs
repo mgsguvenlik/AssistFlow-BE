@@ -1,0 +1,12 @@
+namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive
+{
+    public class QnbWorkFlowArchiveDetailDto
+    {
+        public long Id { get; set; }
+        public string RequestNo { get; set; } = default!;
+        public DateTime ArchivedAt { get; set; }
+        public string ArchiveReason { get; set; } = default!;
+
+        public QnbWorkFlowArchiveSnapshotDto Snapshot { get; set; } = default!;
+    }
+}

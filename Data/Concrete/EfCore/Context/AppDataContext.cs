@@ -2,6 +2,7 @@
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Qnb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -74,6 +75,23 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
 
+        #endregion  
+
+        #region QNB
+        public DbSet<QnbCustomerForm> QnbCustomerForms { get; set; } = default!;
+        public DbSet<QnbServicesRequest> QnbServicesRequests { get; set; } = default!;
+        public DbSet<QnbServicesRequestProduct> QnbServicesRequestProducts { get; set; } = default!;
+        public DbSet<QnbTechnicalService> QnbTechnicalServices { get; set; } = default!;
+        public DbSet<QnbTechnicalServiceImage> QnbTechnicalServiceImages { get; set; } = default!;
+        public DbSet<QnbTechnicalServiceFormImage> QnbTechnicalServiceFormImages { get; set; } = default!;
+        public DbSet<QnbPricing> QnbPricings { get; set; } = default!;
+        public DbSet<QnbFinalApproval> QnbFinalApprovals { get; set; } = default!;
+        public DbSet<QnbWarehouse> QnbWarehouses { get; set; } = default!;
+        public DbSet<QnbWorkFlow> QnbWorkFlows { get; set; } = default!;
+        public DbSet<QnbWorkFlowStep> QnbWorkFlowSteps { get; set; } = default!;
+        public DbSet<QnbWorkFlowActivityRecord> QnbWorkFlowActivityRecords { get; set; } = default!;
+        public DbSet<QnbWorkFlowArchive> QnbWorkFlowArchives { get; set; } = default!;
+        public DbSet<QnbWorkFlowReviewLog> QnbWorkFlowReviewLogs { get; set; } = default!;
         #endregion
 
         /// <summary>
@@ -625,7 +643,33 @@ namespace Data.Concrete.EfCore.Context
             });
 
             // DbSet ekleyin:
-           
+            #region QNB
+
+            modelBuilder.Entity<QnbServicesRequestProduct>()
+                        .Property(x => x.CapturedUnitPrice)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<QnbServicesRequestProduct>()
+                        .Property(x => x.CapturedTotal)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<QnbTechnicalService>()
+                        .Property(x => x.StartTime)
+                        .HasConversion(
+                            v => v,
+                            v => v.HasValue ? DateTime.SpecifyKind(v.Value.DateTime, DateTimeKind.Utc) : v
+                        );
+
+            modelBuilder.Entity<QnbWorkFlow>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<QnbServicesRequest>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<QnbCustomerForm>()
+                        .HasIndex(x => x.RequestNo);
+
+            #endregion
         }
     }
 }
