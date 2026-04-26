@@ -3582,10 +3582,10 @@ namespace Business.Services.Qnb
                                 CustomerId = a.CustomerId,
                                 CustomerSystemId = a.CustomerSystemId,
                                 HasMaintenanceContract = a.HasMaintenanceContract,
-                                SystemName = a.CustomerSystem.Name,
-                                SystemCode = a.CustomerSystem.Code,
-                                CustomerName = a.Customer.SubscriberCompany,
-                                CustomerShortCode = a.Customer.CustomerShortCode
+                                SystemName = a.CustomerSystem != null ? a.CustomerSystem.Name : null,
+                                SystemCode = a.CustomerSystem != null ? a.CustomerSystem.Code : null,
+                                CustomerName = a.Customer != null ? a.Customer.SubscriberCompany : null,
+                                CustomerShortCode = a.Customer != null ? a.Customer.CustomerShortCode : null
                             })
                             .ToList()
                     }
