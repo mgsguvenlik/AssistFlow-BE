@@ -1,8 +1,10 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Qnb;
 using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Qnb;
 using Business.Services.Ykb;
 using Business.Utilities.Security;
 using Castle.DynamicProxy;
@@ -17,7 +19,7 @@ using Model.Dtos.MailOutbox;
 using Model.Dtos.Tenant;
 
 namespace Business.DependencyResolvers.Autofac
-{
+{   
     public class AutofacBusinessModule : Module, ICoreModule
     {
         public void Load(IServiceCollection services)
@@ -41,6 +43,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IMailService), typeof(MailService));
             services.AddScoped(typeof(IWorkFlowService), typeof(WorkFlowService));
             services.AddScoped(typeof(IYkbWorkFlowService), typeof(YkbWorkFlowService));
+            services.AddScoped(typeof(IQnbWorkFlowService), typeof(QnbWorkFlowService));
             services.AddScoped(typeof(ICustomerGroupProductPriceService), typeof(CustomerGroupProductPriceService));
             services.AddScoped(typeof(ICustomerProductPriceService), typeof(CustomerProductPriceService));
             services.AddScoped(typeof(ITenantProductPriceService), typeof(TenantProductPriceService)); 
@@ -60,6 +63,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkingHourPolicyService), typeof(WorkingHourPolicyService));
             services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
             services.AddScoped(typeof(IYkbOvertimeReportService), typeof(YkbOvertimeReportService));
+            services.AddScoped(typeof(IQnbOvertimeReportService), typeof(QnbOvertimeReportService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
