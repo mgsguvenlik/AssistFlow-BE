@@ -18,29 +18,41 @@ namespace Business.Interfaces
             string? toStepCode,
             string? summary,
             object? payload,
-
             CancellationToken ct = default);
-
 
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestActivityRecordByRequestNoAsync(string requestNo);
         Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetUserActivity(int userId, QueryParams q);
         Task<ResponseModel<PagedResult<WorkFlowActivityGroupDto>>> GetUserActivityGroupedByRequestNo(int userId, QueryParams q, int perGroupTake = 50);
         Task<ResponseModel<PagedResult<WorkFlowActivityRecorGetDto>>> GetCustomerActivity(int customerId, QueryParams q);
 
-
-
         #region YKB
-        public Task LogYkbAsync(
-           WorkFlowActionType type,
-           string? requestNo,
-           long? workFlowId,
-           long? customerId,
-           string? fromStepCode,
-           string? toStepCode,
-           string? summary,
-           object? payload,
-           CancellationToken ct = default);
+        Task LogYkbAsync(
+            WorkFlowActionType type,
+            string? requestNo,
+            long? workFlowId,
+            long? customerId,
+            string? fromStepCode,
+            string? toStepCode,
+            string? summary,
+            object? payload,
+            CancellationToken ct = default);
+
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestYkbActivityRecordByRequestNoAsync(string requestNo);
+        #endregion
+
+        #region QNB
+        Task LogQnbAsync(
+            WorkFlowActionType type,
+            string? requestNo,
+            long? workFlowId,
+            long? customerId,
+            string? fromStepCode,
+            string? toStepCode,
+            string? summary,
+            object? payload,
+            CancellationToken ct = default);
+
+        Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestQnbActivityRecordByRequestNoAsync(string requestNo);
         #endregion
     }
 }
