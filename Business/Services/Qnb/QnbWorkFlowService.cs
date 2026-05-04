@@ -1031,21 +1031,31 @@ namespace Business.Services.Qnb
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
                 #endregion
-
                 #region Lokasyon kontrolü
-                if (technicalService.IsLocationCheckRequired)
+                if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
                 {
-                    if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
+                    if (string.IsNullOrEmpty(dto.Longitude) && !string.IsNullOrEmpty(dto.Latitude))
                     {
-                        return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
+                        return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.InvalidCustomerLocation);
                     }
                     else
                     {
-                        var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
+                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, dto.Latitude, dto.Longitude);
                         if (!locationResult.IsSuccess)
                         {
+                            #region Hareket Loglama
+                            await _activationRecord.LogAsync(
+                               WorkFlowActionType.LocationCheckFailed,
+                               dto.RequestNo,
+                               wf.Id,
+                               request.CustomerId,
+                               "TS",
+                               "TS",
+                               "Lokasyon kontrolü başarısız",
+                               new { locationResult.Message }
+                           );
+                            #endregion
+
                             return ResponseModel<QnbTechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
                         }
                     }

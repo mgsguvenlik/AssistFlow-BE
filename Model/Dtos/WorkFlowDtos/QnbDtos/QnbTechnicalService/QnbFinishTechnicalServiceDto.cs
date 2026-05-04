@@ -12,8 +12,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
         public long? ServiceTypeId { get; set; }
         public string? ProblemDescription { get; set; }
         public string? ResolutionAndActions { get; set; }
-        public double? Latitude { get; set; }
-        public double? Longitude { get; set; }
+        public string? Latitude { get; set; }
+        public string? Longitude { get; set; }
         public string? EndLocation { get; set; } // Örn: "41.01224, 28.976018"
         public ServicesCostStatus ServicesCostStatus { get; set; }
 

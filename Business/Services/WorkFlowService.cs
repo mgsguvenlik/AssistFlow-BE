@@ -915,26 +915,35 @@ namespace Business.Services
                 #endregion
 
                 #region Lokasyon kontrolü
-                ///MZK NOT: Burak Türk talebi üzerine Servisi tamamlama aşamasında lokasyon kontrolü gerekli bulunmadı. MZK: Fazla Mesai hesaplamaları için geri açıldı.
-                if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise.
+                if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
                 {
-                    if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
+                    if (string.IsNullOrEmpty(dto.Longitude) && !string.IsNullOrEmpty(dto.Latitude))
                     {
-                        return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
+                        return ResponseModel<TechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.InvalidCustomerLocation);
                     }
                     else
                     {
-                        var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
+                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, dto.Latitude, dto.Longitude);
                         if (!locationResult.IsSuccess)
                         {
+                            #region Hareket Loglama
+                            await _activationRecord.LogAsync(
+                               WorkFlowActionType.LocationCheckFailed,
+                               dto.RequestNo,
+                               wf.Id,
+                               request.CustomerId,
+                               "TS",
+                               "TS",
+                               "Lokasyon kontrolü başarısız",
+                               new { locationResult.Message }
+                           );
+                            #endregion
+
                             return ResponseModel<TechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
                         }
                     }
                 }
                 #endregion
-
                 #region Teknik Servis Kaydı güncelle 
                 technicalService.EndTime = DateTime.Now;
                 technicalService.ServicesStatus = TechnicalServiceStatus.Completed;
