@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Model.Abstractions;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Qnb;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using System;
@@ -174,6 +175,44 @@ namespace Business.Services
         public async Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestYkbActivityRecordByRequestNoAsync(string requestNo)
         {
             var query = _uow.Repository.GetQueryable<YkbWorkFlowActivityRecord>();
+            return await GetLatestActivityByRequestNoCoreAsync(requestNo, query);
+        }
+        #endregion
+        #region QNB
+        public async Task LogQnbAsync(QnbWorkFlowActivityRecord entry, CancellationToken ct = default)
+        {
+            await LogCoreAsync(entry, ct);
+        }
+
+        public Task LogQnbAsync(
+            WorkFlowActionType type,
+            string? requestNo,
+            long? workFlowId,
+            long? customerId,
+            string? fromStepCode,
+            string? toStepCode,
+            string? summary,
+            object? payload,
+            CancellationToken ct = default)
+        {
+            var entry = new QnbWorkFlowActivityRecord
+            {
+                ActionType = type,
+                RequestNo = requestNo,
+                WorkFlowId = workFlowId,
+                FromStepCode = fromStepCode,
+                ToStepCode = toStepCode,
+                Summary = summary,
+                CustomerId = customerId,
+                PayloadJson = payload is null ? null : JsonSerializer.Serialize(payload, JsonOpts)
+            };
+
+            return LogQnbAsync(entry, ct);
+        }
+
+        public async Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestQnbActivityRecordByRequestNoAsync(string requestNo)
+        {
+            var query = _uow.Repository.GetQueryable<QnbWorkFlowActivityRecord>();
             return await GetLatestActivityByRequestNoCoreAsync(requestNo, query);
         }
         #endregion
@@ -406,22 +445,13 @@ namespace Business.Services
                 .Where(a => a.PerformedByUserId == userId)
                 .Select(a => new ActivityRecordUnion
                 {
-                    Id = a.Id,
-                    RequestNo = a.RequestNo,
-                    ActionType = a.ActionType,
-                    FromStepCode = a.FromStepCode,
-                    ToStepCode = a.ToStepCode,
-                    OccurredAtUtc = a.OccurredAtUtc,
-                    PerformedByUserId = a.PerformedByUserId,
-                    PerformedByUserName = a.PerformedByUserName,
-                    ClientIp = a.ClientIp,
-                    UserAgent = a.UserAgent,
-                    CorrelationId = a.CorrelationId,
-                    CustomerId = a.CustomerId,
-                    Summary = a.Summary,
-                    PayloadJson = a.PayloadJson,
-                    WorkFlowId = a.WorkFlowId,
-                    IsYkb = false
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = false, IsQnb = false
                 });
 
             var ykb = _uow.Repository
@@ -430,26 +460,31 @@ namespace Business.Services
                 .Where(a => a.PerformedByUserId == userId)
                 .Select(a => new ActivityRecordUnion
                 {
-                    Id = a.Id,
-                    RequestNo = a.RequestNo,
-                    ActionType = a.ActionType,
-                    FromStepCode = a.FromStepCode,
-                    ToStepCode = a.ToStepCode,
-                    OccurredAtUtc = a.OccurredAtUtc,
-                    PerformedByUserId = a.PerformedByUserId,
-                    PerformedByUserName = a.PerformedByUserName,
-                    ClientIp = a.ClientIp,
-                    UserAgent = a.UserAgent,
-                    CorrelationId = a.CorrelationId,
-                    CustomerId = a.CustomerId,
-                    Summary = a.Summary,
-                    PayloadJson = a.PayloadJson,
-                    WorkFlowId = a.WorkFlowId,
-                    IsYkb = true
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = true, IsQnb = false
                 });
 
-            // EF Core bunu UNION ALL (Concat) olarak SQL'e çevirir
-            return normal.Concat(ykb);
+            var qnb = _uow.Repository
+                .GetQueryable<QnbWorkFlowActivityRecord>()
+                .AsNoTracking()
+                .Where(a => a.PerformedByUserId == userId)
+                .Select(a => new ActivityRecordUnion
+                {
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = false, IsQnb = true
+                });
+
+            return normal.Concat(ykb).Concat(qnb);
         }
 
         private IQueryable<ActivityRecordUnion> GetCombinedCustomerActivityQuery(int customerId)
@@ -460,22 +495,13 @@ namespace Business.Services
                 .Where(a => a.CustomerId == customerId)
                 .Select(a => new ActivityRecordUnion
                 {
-                    Id = a.Id,
-                    RequestNo = a.RequestNo,
-                    ActionType = a.ActionType,
-                    FromStepCode = a.FromStepCode,
-                    ToStepCode = a.ToStepCode,
-                    OccurredAtUtc = a.OccurredAtUtc,
-                    PerformedByUserId = a.PerformedByUserId,
-                    PerformedByUserName = a.PerformedByUserName,
-                    ClientIp = a.ClientIp,
-                    UserAgent = a.UserAgent,
-                    CorrelationId = a.CorrelationId,
-                    CustomerId = a.CustomerId,
-                    Summary = a.Summary,
-                    PayloadJson = a.PayloadJson,
-                    WorkFlowId = a.WorkFlowId,
-                    IsYkb = false
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = false, IsQnb = false
                 });
 
             var ykb = _uow.Repository
@@ -484,25 +510,31 @@ namespace Business.Services
                 .Where(a => a.CustomerId == customerId)
                 .Select(a => new ActivityRecordUnion
                 {
-                    Id = a.Id,
-                    RequestNo = a.RequestNo,
-                    ActionType = a.ActionType,
-                    FromStepCode = a.FromStepCode,
-                    ToStepCode = a.ToStepCode,
-                    OccurredAtUtc = a.OccurredAtUtc,
-                    PerformedByUserId = a.PerformedByUserId,
-                    PerformedByUserName = a.PerformedByUserName,
-                    ClientIp = a.ClientIp,
-                    UserAgent = a.UserAgent,
-                    CorrelationId = a.CorrelationId,
-                    CustomerId = a.CustomerId,
-                    Summary = a.Summary,
-                    PayloadJson = a.PayloadJson,
-                    WorkFlowId = a.WorkFlowId,
-                    IsYkb = true
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = true, IsQnb = false
                 });
 
-            return normal.Concat(ykb);
+            var qnb = _uow.Repository
+                .GetQueryable<QnbWorkFlowActivityRecord>()
+                .AsNoTracking()
+                .Where(a => a.CustomerId == customerId)
+                .Select(a => new ActivityRecordUnion
+                {
+                    Id = a.Id, RequestNo = a.RequestNo, ActionType = a.ActionType,
+                    FromStepCode = a.FromStepCode, ToStepCode = a.ToStepCode,
+                    OccurredAtUtc = a.OccurredAtUtc, PerformedByUserId = a.PerformedByUserId,
+                    PerformedByUserName = a.PerformedByUserName, ClientIp = a.ClientIp,
+                    UserAgent = a.UserAgent, CorrelationId = a.CorrelationId,
+                    CustomerId = a.CustomerId, Summary = a.Summary, PayloadJson = a.PayloadJson,
+                    WorkFlowId = a.WorkFlowId, IsYkb = false, IsQnb = true
+                });
+
+            return normal.Concat(ykb).Concat(qnb);
         }
 
         private class ActivityRecordUnion : IActivityRecordEntity
@@ -531,8 +563,8 @@ namespace Business.Services
 
             public long? WorkFlowId { get; set; }
 
-            // İleride işine yarar diye flag de ekledim (isteğe bağlı)
             public bool IsYkb { get; set; }
+            public bool IsQnb { get; set; } // 🆕
         }
     }
 

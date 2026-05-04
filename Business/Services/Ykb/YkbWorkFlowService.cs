@@ -19,6 +19,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
@@ -29,6 +30,7 @@ using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
@@ -1087,25 +1089,36 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Lokasyon kontrolü
-                ///MZK NOT: Burak Türk talebi üzerine Servisi tamamlama aşamasında lokasyon kontrolü gerekli bulunmadı.  MZK: Fazla Mesai hesaplamaları için geri açıldı.
                 if (technicalService.IsLocationCheckRequired) //Lokasyon kontrolü gerekli ise
                 {
-                    if (!dto.Longitude.HasValue && !dto.Latitude.HasValue)
+                    if (string.IsNullOrEmpty(dto.Longitude) && !string.IsNullOrEmpty(dto.Latitude))
                     {
-                        return ResponseModel<YkbTechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.BadRequest);
+                        return ResponseModel<YkbTechnicalServiceGetDto>.Fail("Lokasyon bilgileri gönderilmemiş.", StatusCode.InvalidCustomerLocation);
                     }
                     else
                     {
-                        var latStr = dto.Latitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var lonStr = dto.Longitude.Value.ToString(CultureInfo.InvariantCulture);
-                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, latStr, lonStr);
+                        var locationResult = await IsTechnicianInValidLocation(customer.Latitude, customer.Longitude, dto.Latitude, dto.Longitude);
                         if (!locationResult.IsSuccess)
                         {
+                            #region Hareket Loglama
+                            await _activationRecord.LogAsync(
+                               WorkFlowActionType.LocationCheckFailed,
+                               dto.RequestNo,
+                               wf.Id,
+                               request.CustomerId,
+                               "TS",
+                               "TS",
+                               "Lokasyon kontrolü başarısız",
+                               new { locationResult.Message }
+                           );
+                            #endregion
+
                             return ResponseModel<YkbTechnicalServiceGetDto>.Fail(locationResult.Message, locationResult.StatusCode);
                         }
                     }
                 }
                 #endregion
+
 
                 #region Teknik Servis Kaydı güncelle 
                 technicalService.EndTime = DateTime.Now;
