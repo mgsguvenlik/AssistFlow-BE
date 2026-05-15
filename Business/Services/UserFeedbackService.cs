@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
 using Model.Dtos.UserFeedbackDtos;
+using System.Net;
 using System.Text.Json;
 
 namespace Business.Services
@@ -15,20 +16,23 @@ namespace Business.Services
         private readonly IUnitOfWork _uow;
         private readonly ILogger<UserFeedbackService> _logger;
         private readonly ICurrentUser _currentUser;
+        private readonly IMailPushService _mailPushService;
 
         public UserFeedbackService(
             IUnitOfWork uow,
             ILogger<UserFeedbackService> logger,
-            ICurrentUser currentUser)
+            ICurrentUser currentUser,
+            IMailPushService mailPushService)
         {
             _uow = uow;
             _logger = logger;
             _currentUser = currentUser;
+            _mailPushService = mailPushService;
         }
 
         public async Task<ResponseModel<UserFeedbackDto>> CreateFeedbackAsync(
-            CreateUserFeedbackDto dto,
-            string? userAgent = null)
+      CreateUserFeedbackDto dto,
+      string? userAgent = null)
         {
             try
             {
@@ -48,7 +52,7 @@ namespace Business.Services
                     Description = dto.Description,
                     FeedbackType = dto.FeedbackType,
                     Status = FeedbackStatus.Created,
-                    Priority = 3, // Varsayılan orta öncelik
+                    Priority = 3,
                     RelatedUrl = dto.RelatedUrl,
                     UserAgent = userAgent,
                     AttachmentUrls = dto.AttachmentUrls != null && dto.AttachmentUrls.Any()
@@ -67,6 +71,9 @@ namespace Business.Services
                     feedback.Id,
                     feedback.FeedbackType,
                     userId);
+
+                // Yeni feedback oluşturulduğunda ilgili yönetici mail hesaplarına bildirim kuyruğu oluşturulur.
+                await EnqueueNewFeedbackCreatedMailAsync(feedback);
 
                 return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
             }
@@ -208,82 +215,6 @@ namespace Business.Services
             }
         }
 
-        public async Task<ResponseModel<UserFeedbackDto>> UpdateFeedbackStatusAsync(
-            long id,
-            UpdateFeedbackStatusDto dto)
-        {
-            try
-            {
-                var me = await _currentUser.GetAsync();
-                var userId = me?.Id ?? 0;
-
-                if (userId <= 0)
-                {
-                    return ResponseModel<UserFeedbackDto>.Fail(
-                        "Kullanıcı bilgisi bulunamadı",
-                        StatusCode.Unauthorized);
-                }
-
-                var isAdmin = IsUserAdmin(me);
-
-                var feedback = await _uow.Repository
-                    .GetQueryable<UserFeedback>()
-                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-
-                if (feedback == null)
-                {
-                    return ResponseModel<UserFeedbackDto>.Fail(
-                        "Geri bildirim bulunamadı",
-                        StatusCode.NotFound);
-                }
-
-                // Admin değilse sadece kendi kaydını güncelleyebilir
-                if (!isAdmin && feedback.CreatedUser != userId)
-                {
-                    return ResponseModel<UserFeedbackDto>.Fail(
-                        "Bu geri bildirime erişim yetkiniz yok",
-                        StatusCode.Unauthorized);
-                }
-
-                feedback.Status = dto.Status;
-                feedback.UpdatedDate = DateTimeOffset.Now;
-                feedback.UpdatedUser = userId;
-
-                if (!string.IsNullOrWhiteSpace(dto.AdminResponse))
-                {
-                    feedback.AdminResponse = dto.AdminResponse;
-                    feedback.ResponseDate = DateTimeOffset.Now;
-                    feedback.RespondedBy = userId;
-                }
-
-                if (dto.Priority.HasValue)
-                {
-                    feedback.Priority = dto.Priority.Value;
-                }
-
-                if (dto.Status == FeedbackStatus.Completed || dto.Status == FeedbackStatus.Closed)
-                {
-                    feedback.CompletedDate = DateTimeOffset.Now;
-                }
-
-                _uow.Repository.Update(feedback);
-                await _uow.Repository.CompleteAsync();
-
-                _logger.LogInformation(
-                    "Geri bildirim durumu güncellendi. ID: {Id}, Yeni Durum: {Status}",
-                    id,
-                    dto.Status);
-
-                return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "UpdateFeedbackStatusAsync hatası. ID: {Id}", id);
-                return ResponseModel<UserFeedbackDto>.Fail(
-                    $"Geri bildirim güncellenirken hata: {ex.Message}",
-                    StatusCode.Error);
-            }
-        }
 
         public async Task<ResponseModel<bool>> DeleteFeedbackAsync(long id)
         {
@@ -553,6 +484,520 @@ namespace Business.Services
                 FeedbackStatus.Rejected => "Reddedildi",
                 FeedbackStatus.Closed => "Kapatıldı",
                 _ => "Bilinmiyor"
+            };
+        }
+
+
+        public async Task<ResponseModel<UserFeedbackDto>> UpdateFeedbackStatusAsync(
+    long id,
+    UpdateFeedbackStatusDto dto)
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var isAdmin = IsUserAdmin(me);
+
+                var feedback = await _uow.Repository
+                    .GetQueryable<UserFeedback>()
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+                if (feedback == null)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Geri bildirim bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                if (!isAdmin && feedback.CreatedUser != userId)
+                {
+                    return ResponseModel<UserFeedbackDto>.Fail(
+                        "Bu geri bildirime erişim yetkiniz yok",
+                        StatusCode.Unauthorized);
+                }
+
+                var oldStatus = feedback.Status;
+                var oldAdminResponse = feedback.AdminResponse;
+
+                var statusChanged = oldStatus != dto.Status;
+
+                var hasNewAdminResponse =
+                    !string.IsNullOrWhiteSpace(dto.AdminResponse) &&
+                    !string.Equals(
+                        oldAdminResponse?.Trim(),
+                        dto.AdminResponse.Trim(),
+                        StringComparison.Ordinal);
+
+                feedback.Status = dto.Status;
+                feedback.UpdatedDate = DateTimeOffset.Now;
+                feedback.UpdatedUser = userId;
+
+                if (hasNewAdminResponse)
+                {
+                    feedback.AdminResponse = dto.AdminResponse.Trim();
+                    feedback.ResponseDate = DateTimeOffset.Now;
+                    feedback.RespondedBy = userId;
+                }
+
+                if (dto.Priority.HasValue)
+                {
+                    feedback.Priority = dto.Priority.Value;
+                }
+
+                if (dto.Status == FeedbackStatus.Completed || dto.Status == FeedbackStatus.Closed)
+                {
+                    feedback.CompletedDate = DateTimeOffset.Now;
+                }
+
+                _uow.Repository.Update(feedback);
+                await _uow.Repository.CompleteAsync();
+
+                _logger.LogInformation(
+                    "Geri bildirim güncellendi. ID: {Id}, Yeni Durum: {Status}",
+                    id,
+                    dto.Status);
+
+                // Durum eski değerinden farklıysa feedback sahibine mail kuyruğu oluşturulur.
+                if (statusChanged)
+                {
+                    await EnqueueFeedbackStatusChangedMailAsync(feedback, oldStatus, dto.Status);
+                }
+
+                // AdminResponse eski değerinden farklı ve doluysa feedback sahibine mail kuyruğu oluşturulur.
+                if (hasNewAdminResponse)
+                {
+                    await EnqueueFeedbackAdminResponseMailAsync(feedback);
+                }
+
+                return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "UpdateFeedbackStatusAsync hatası. ID: {Id}", id);
+                return ResponseModel<UserFeedbackDto>.Fail(
+                    $"Geri bildirim güncellenirken hata: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+
+        private static string BuildNewFeedbackCreatedMailBody(UserFeedback feedback, User? createdUser)
+        {
+            var title = WebUtility.HtmlEncode(feedback.Title);
+            var description = WebUtility.HtmlEncode(feedback.Description);
+            var createdUserName = WebUtility.HtmlEncode(createdUser?.TechnicianName ?? "Bilinmiyor");
+            var createdUserEmail = WebUtility.HtmlEncode(createdUser?.TechnicianEmail ?? "-");
+            var feedbackType = WebUtility.HtmlEncode(GetFeedbackTypeText(feedback.FeedbackType));
+            var createdDate = feedback.CreatedDate.ToString("dd.MM.yyyy HH:mm");
+
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+</head>
+<body style='margin:0;padding:0;background-color:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;'>
+    <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f4f6f8;padding:24px 0;'>
+        <tr>
+            <td align='center'>
+                <table width='640' cellpadding='0' cellspacing='0' style='background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;'>
+                    <tr>
+                        <td style='background-color:#1f4e79;color:#ffffff;padding:20px 24px;'>
+                            <h2 style='margin:0;font-size:20px;'>Yeni Geri Bildirim Talebi Oluşturuldu</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:24px;'>
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 16px;'>
+                                Merhaba,
+                            </p>
+
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 20px;'>
+                                Sistemde yeni bir geri bildirim talebi oluşturulmuştur. Talep detayları aşağıdadır.
+                            </p>
+
+                            <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse;margin-top:12px;'>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;width:180px;'><strong>Talep No</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>#{feedback.Id}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Başlık</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{title}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Tip</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{feedbackType}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Oluşturan Kullanıcı</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{createdUserName}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>E-posta</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{createdUserEmail}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Oluşturma Tarihi</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{createdDate}</td>
+                                </tr>
+                            </table>
+
+                            <div style='margin-top:20px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;'>
+                                <strong>Açıklama:</strong>
+                                <p style='margin:8px 0 0;line-height:1.6;'>{description}</p>
+                            </div>
+
+                            <p style='font-size:14px;line-height:1.6;margin:24px 0 0;color:#6b7280;'>
+                                Bu bildirim FlowAssist sistemi tarafından otomatik olarak oluşturulmuştur.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+        }
+
+        private static string BuildFeedbackStatusChangedMailBody(
+            UserFeedback feedback,
+            User owner,
+            FeedbackStatus oldStatus,
+            FeedbackStatus newStatus,
+            string statusMessage)
+        {
+            var ownerName = WebUtility.HtmlEncode(owner.TechnicianName);
+            var title = WebUtility.HtmlEncode(feedback.Title);
+            var oldStatusText = WebUtility.HtmlEncode(GetStatusText(oldStatus));
+            var newStatusText = WebUtility.HtmlEncode(GetStatusText(newStatus));
+            var message = WebUtility.HtmlEncode(statusMessage);
+
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+</head>
+<body style='margin:0;padding:0;background-color:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;'>
+    <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f4f6f8;padding:24px 0;'>
+        <tr>
+            <td align='center'>
+                <table width='640' cellpadding='0' cellspacing='0' style='background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;'>
+                    <tr>
+                        <td style='background-color:#2563eb;color:#ffffff;padding:20px 24px;'>
+                            <h2 style='margin:0;font-size:20px;'>Geri Bildirim Talebiniz Güncellendi</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:24px;'>
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 16px;'>
+                                Merhaba {ownerName},
+                            </p>
+
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 20px;'>
+                                <strong>#{feedback.Id}</strong> numaralı geri bildirim talebiniz <strong>{message}</strong>.
+                            </p>
+
+                            <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse;margin-top:12px;'>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;width:180px;'><strong>Talep No</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>#{feedback.Id}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Başlık</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{title}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Önceki Durum</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{oldStatusText}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Yeni Durum</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{newStatusText}</td>
+                                </tr>
+                            </table>
+
+                            <div style='margin-top:24px;text-align:center;'>
+                                <a href='https://flowassist.mgs.com.tr'
+                                   style='display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold;'>
+                                    Talebi Görüntüle
+                                </a>
+                            </div>
+
+                            <p style='font-size:14px;line-height:1.6;margin:24px 0 0;color:#6b7280;'>
+                                Detayları görüntülemek için FlowAssist sistemine giriş yapabilirsiniz.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+        }
+
+        private static string BuildFeedbackAdminResponseMailBody(UserFeedback feedback, User owner)
+        {
+            var ownerName = WebUtility.HtmlEncode(owner.TechnicianName);
+            var title = WebUtility.HtmlEncode(feedback.Title);
+            var adminResponse = WebUtility.HtmlEncode(feedback.AdminResponse ?? "");
+
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+</head>
+<body style='margin:0;padding:0;background-color:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;'>
+    <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f4f6f8;padding:24px 0;'>
+        <tr>
+            <td align='center'>
+                <table width='640' cellpadding='0' cellspacing='0' style='background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;'>
+                    <tr>
+                        <td style='background-color:#047857;color:#ffffff;padding:20px 24px;'>
+                            <h2 style='margin:0;font-size:20px;'>Geri Bildirim Talebinize Açıklama Eklendi</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:24px;'>
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 16px;'>
+                                Merhaba {ownerName},
+                            </p>
+
+                            <p style='font-size:15px;line-height:1.6;margin:0 0 20px;'>
+                                <strong>#{feedback.Id}</strong> numaralı geri bildirim talebiniz için bir açıklama eklenmiştir.
+                            </p>
+
+                            <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse;margin-top:12px;'>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;width:180px;'><strong>Talep No</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>#{feedback.Id}</td>
+                                </tr>
+                                <tr>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;background:#f9fafb;'><strong>Başlık</strong></td>
+                                    <td style='padding:10px;border:1px solid #e5e7eb;'>{title}</td>
+                                </tr>
+                            </table>
+
+                            <div style='margin-top:20px;padding:14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;'>
+                                <strong>Eklenen Açıklama:</strong>
+                                <p style='margin:8px 0 0;line-height:1.6;'>{adminResponse}</p>
+                            </div>
+
+                            <div style='margin-top:24px;text-align:center;'>
+                                <a href='https://flowassist.mgs.com.tr'
+                                   style='display:inline-block;background:#047857;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:bold;'>
+                                    Talebi Kontrol Et
+                                </a>
+                            </div>
+
+                            <p style='font-size:14px;line-height:1.6;margin:24px 0 0;color:#6b7280;'>
+                                Bu bilgilendirme FlowAssist sistemi tarafından otomatik olarak gönderilmiştir.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>";
+        }
+
+
+        private async Task EnqueueNewFeedbackCreatedMailAsync(UserFeedback feedback)
+        {
+            try
+            {
+                var recipients = await GetFeedbackNotificationRecipientsAsync();
+
+                if (string.IsNullOrWhiteSpace(recipients))
+                {
+                    _logger.LogWarning(
+                        "Yeni feedback maili gönderilemedi. Configuration tablosunda FeedbackNotificationEmails değeri bulunamadı. FeedbackId: {FeedbackId}",
+                        feedback.Id);
+
+                    return;
+                }
+
+                var createdUser = await GetFeedbackOwnerAsync(feedback.CreatedUser);
+
+                var subject = $"Yeni Geri Bildirim Talebi Oluşturuldu - Talep No: {feedback.Id}";
+
+                var body = BuildNewFeedbackCreatedMailBody(feedback, createdUser);
+
+                await _mailPushService.EnqueueAsync(new MailOutbox
+                {
+                    RequestNo = feedback.Id.ToString(),
+                    FromStepCode = "FEEDBACK_CREATED",
+                    ToStepCode = "ADMIN_NOTIFICATION",
+                    ToRecipients = recipients,
+                    Subject = subject,
+                    BodyHtml = body,
+                    Status = MailOutboxStatus.Pending,
+                    TryCount = 0,
+                    MaxTry = 5,
+                    NextAttemptAt = DateTime.Now,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = feedback.CreatedUser
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Yeni feedback mail kuyruğu oluşturulamadı. FeedbackId: {FeedbackId}", feedback.Id);
+            }
+        }
+
+        private async Task EnqueueFeedbackStatusChangedMailAsync(
+            UserFeedback feedback,
+            FeedbackStatus oldStatus,
+            FeedbackStatus newStatus)
+        {
+            try
+            {
+                var owner = await GetFeedbackOwnerAsync(feedback.CreatedUser);
+
+                if (owner == null || string.IsNullOrWhiteSpace(owner.TechnicianEmail))
+                {
+                    _logger.LogWarning(
+                        "Feedback status maili gönderilemedi. Kullanıcı veya e-posta adresi bulunamadı. FeedbackId: {FeedbackId}, UserId: {UserId}",
+                        feedback.Id,
+                        feedback.CreatedUser);
+
+                    return;
+                }
+
+                var statusMessage = GetStatusMailMessage(newStatus);
+                var statusText = GetStatusText(newStatus);
+
+                var subject = $"Geri Bildirim Talebiniz Güncellendi - Talep No: {feedback.Id}";
+
+                var body = BuildFeedbackStatusChangedMailBody(
+                    feedback,
+                    owner,
+                    oldStatus,
+                    newStatus,
+                    statusMessage);
+
+                await _mailPushService.EnqueueAsync(new MailOutbox
+                {
+                    RequestNo = feedback.Id.ToString(),
+                    FromStepCode = oldStatus.ToString(),
+                    ToStepCode = newStatus.ToString(),
+                    ToRecipients = owner.TechnicianEmail,
+                    Subject = subject,
+                    BodyHtml = body,
+                    Status = MailOutboxStatus.Pending,
+                    TryCount = 0,
+                    MaxTry = 5,
+                    NextAttemptAt = DateTime.Now,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = feedback.UpdatedUser
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Feedback status mail kuyruğu oluşturulamadı. FeedbackId: {FeedbackId}", feedback.Id);
+            }
+        }
+
+        private async Task EnqueueFeedbackAdminResponseMailAsync(UserFeedback feedback)
+        {
+            try
+            {
+                var owner = await GetFeedbackOwnerAsync(feedback.CreatedUser);
+
+                if (owner == null || string.IsNullOrWhiteSpace(owner.TechnicianEmail))
+                {
+                    _logger.LogWarning(
+                        "Feedback admin response maili gönderilemedi. Kullanıcı veya e-posta adresi bulunamadı. FeedbackId: {FeedbackId}, UserId: {UserId}",
+                        feedback.Id,
+                        feedback.CreatedUser);
+
+                    return;
+                }
+
+                var subject = $"Geri Bildirim Talebinize Açıklama Eklendi - Talep No: {feedback.Id}";
+
+                var body = BuildFeedbackAdminResponseMailBody(feedback, owner);
+
+                await _mailPushService.EnqueueAsync(new MailOutbox
+                {
+                    RequestNo = feedback.Id.ToString(),
+                    FromStepCode = "ADMIN_RESPONSE_UPDATED",
+                    ToStepCode = "USER_NOTIFICATION",
+                    ToRecipients = owner.TechnicianEmail,
+                    Subject = subject,
+                    BodyHtml = body,
+                    Status = MailOutboxStatus.Pending,
+                    TryCount = 0,
+                    MaxTry = 5,
+                    NextAttemptAt = DateTime.Now,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = feedback.UpdatedUser
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Feedback admin response mail kuyruğu oluşturulamadı. FeedbackId: {FeedbackId}", feedback.Id);
+            }
+        }
+
+        private async Task<string?> GetFeedbackNotificationRecipientsAsync()
+        {
+            var config = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Name == "FeedbackNotificationEmails");
+
+            if (config == null || string.IsNullOrWhiteSpace(config.Value))
+                return null;
+
+            var emails = config.Value
+                .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+
+            return emails.Any()
+                ? string.Join(";", emails)
+                : null;
+        }
+
+        private async Task<User?> GetFeedbackOwnerAsync(long? userId)
+        {
+            if (!userId.HasValue || userId.Value <= 0)
+                return null;
+
+            return await _uow.Repository
+                .GetQueryable<User>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == userId.Value);
+        }
+
+        private static string GetStatusMailMessage(FeedbackStatus status)
+        {
+            return status switch
+            {
+                FeedbackStatus.UnderReview => "incelemeye alındı",
+                FeedbackStatus.InProgress => "işleme alındı",
+                FeedbackStatus.Completed => "tamamlandı",
+                FeedbackStatus.Rejected => "reddedildi",
+                FeedbackStatus.Closed => "kapatıldı",
+                FeedbackStatus.Created => "oluşturuldu",
+                _ => "güncellendi"
             };
         }
 
