@@ -6,7 +6,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 
 namespace WebAPI.Controllers
 {
-    //[Authorize]
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WorkFlowArchivesController : ControllerBase
