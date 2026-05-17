@@ -1638,7 +1638,7 @@ namespace Business.Services.Qnb
                 #region Arşivleme
                 if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
                 {
-                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Completed" : "Cancelled";
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Tamamlandı" : "İptal";
                     await ArchiveWorkflowAsync(dto.RequestNo, reason);
                 }
                 #endregion
