@@ -6022,6 +6022,59 @@ namespace Business.Services.Ykb
             try { pricing = JsonConvert.DeserializeObject<YkbPricing>(archive.YkbPricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<YkbFinalApproval>(archive.YkbFinalApprovalJson); } catch { }
 
+            // --------------------------------------------------------------------
+            //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
+            // --------------------------------------------------------------------
+            var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+            var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+
+            string? NormalizeImageUrl(string? urlOrFileName)
+            {
+                if (string.IsNullOrWhiteSpace(urlOrFileName))
+                    return urlOrFileName;
+
+                // 1) Zaten tam URL ise dokunma
+                if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    return urlOrFileName;
+                }
+
+                // 2) /uploads/xxx.png gibi relative path ise
+                if (urlOrFileName.StartsWith("/"))
+                {
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? urlOrFileName
+                        : $"{baseUrl}{urlOrFileName}";
+                }
+
+                // 3) Sadece dosya adı ise
+                var relative = $"/uploads/{urlOrFileName}";
+
+                return string.IsNullOrEmpty(baseUrl)
+                    ? relative
+                    : $"{baseUrl}{relative}";
+            }
+
+            // Arşiv servis görselleri
+            if (serviceImages != null)
+            {
+                foreach (var img in serviceImages)
+                {
+                    img.Url = NormalizeImageUrl(img.Url) ?? img.Url;
+                }
+            }
+
+            // Arşiv form görselleri
+            if (formImages != null)
+            {
+                foreach (var img in formImages)
+                {
+                    img.Url = NormalizeImageUrl(img.Url) ?? img.Url;
+                }
+            }
+            // --------------------------------------------------------------------
+
             var snapshot = new YkbWorkFlowArchiveSnapshotDto
             {
                 ServicesRequest = servicesRequest,
