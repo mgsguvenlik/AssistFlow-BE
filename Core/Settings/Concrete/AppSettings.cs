@@ -15,5 +15,15 @@ namespace Core.Settings.Concrete
         public required string AppUrl { get; set; }
         public required string FrontUrl { get; set; }
         public  string? FileUrl { get; set; }
+
+        // Manitou Settings
+        public required string ManitouBaseUrl { get; set; }
+        public string? ManitouUserName { get; set; }
+        public required string ManitouPassword { get; set; }
+        public string? ManitouAuthenticationType { get; set; }
+
+        public int ManitouCustomerGroupMaxRows { get; set; }
+        public int ManitouCustomerMaxRows { get; set; }
+        public int ManitouRunEveryMinutes { get; set; }
     }
 }
