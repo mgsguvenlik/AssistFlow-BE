@@ -4321,7 +4321,7 @@ namespace Business.Services.Ykb
             ).FirstOrDefaultAsync();
 
             if (dto is null)
-                return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+                return ResponseModel<YkbFinalApprovalGetDto>.Fail("Bu adımda kayıt bulunamadı.", StatusCode.NotFound);
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır (Tenant eklendi)
             var productEntities = await _uow.Repository
