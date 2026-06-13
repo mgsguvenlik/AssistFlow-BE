@@ -49,5 +49,15 @@ namespace Business.Interfaces
         /// Coğrafi dağılım istatistiklerini getirir
         /// </summary>
         Task<ResponseModel<GeographicDistributionDto>> GetGeographicDistributionAsync();
+
+        /// <summary>
+        /// YKB 
+        /// </summary>
+        /// <param name="from"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(
+            DateTimeOffset? from = null,
+            DateTimeOffset? to = null);
     }
 }

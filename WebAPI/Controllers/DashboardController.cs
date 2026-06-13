@@ -1,5 +1,6 @@
 ﻿// WebAPI\Controllers\DashboardController.cs
 using Business.Interfaces;
+using Business.Services;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -184,6 +185,17 @@ namespace WebAPI.Controllers
                     Core.Enums.StatusCode.Error));
             }
         }
+
+
+
+
+        [HttpGet("ykb/kpi")]
+        public async Task<IActionResult> GetYkbKpi(  [FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
+        {
+            var result = await _dashboardService.GetYkbKpiAsync(from, to);
+            return Ok(result);
+        }
+
     }
 
     /// <summary>

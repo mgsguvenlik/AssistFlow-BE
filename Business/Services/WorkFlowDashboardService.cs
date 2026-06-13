@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 using Model.Dtos.Dashboard;
 
 namespace Business.Services
@@ -250,6 +251,8 @@ namespace Business.Services
             }
         }
 
+
+        #region Bireysel Müşteri
         public async Task<ResponseModel<List<CustomerStatisticsDto>>> GetTopCustomersAsync(int count = 10)
         {
             try
@@ -1043,6 +1046,88 @@ namespace Business.Services
                 _logger.LogError(ex, "GetGeographicDistributionAsync");
                 return ResponseModel<GeographicDistributionDto>.Fail(
                     $"Coğrafi dağılım verileri getirilirken hata: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        #endregion
+
+        public async Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync( DateTimeOffset? from = null, DateTimeOffset? to = null)
+        {
+            try
+            {
+                var query = _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                if (from.HasValue)
+                {
+                    query = query.Where(x => x.CreatedDate >= from.Value);
+                }
+
+                if (to.HasValue)
+                {
+                    // Eğer frontend sadece tarih gönderirse örn: 2026-06-13 00:00,
+                    // o günü komple dahil etmek için bitişi ertesi gün exclusive yapıyoruz.
+                    if (to.Value.TimeOfDay == TimeSpan.Zero)
+                    {
+                        var endExclusive = to.Value.AddDays(1);
+                        query = query.Where(x => x.CreatedDate < endExclusive);
+                    }
+                    else
+                    {
+                        query = query.Where(x => x.CreatedDate <= to.Value);
+                    }
+                }
+
+                var dto = await query
+                    .GroupBy(x => 1)
+                    .Select(g => new YkbDashboardKpiDto
+                    {
+                        TotalWorkFlows = g.Count(),
+
+                        CompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus == WorkFlowStatus.Complated),
+
+                        NotCompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus != WorkFlowStatus.Complated),
+
+                        InServiceRequest = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "SR"),
+
+                        InWarehouse = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "WH"),
+
+                        InTechnicalService = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "TS"),
+
+                        InPricing = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "PRC"),
+
+                        InFinalApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "APR"),
+
+                        InCustomerApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "CAPR")
+                    })
+                    .FirstOrDefaultAsync();
+
+                dto ??= new YkbDashboardKpiDto();
+                return ResponseModel<YkbDashboardKpiDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetYkbKpiAsync");
+
+                return ResponseModel<YkbDashboardKpiDto>.Fail(
+                    $"YKB dashboard KPI verileri getirilirken hata: {ex.Message}",
                     StatusCode.Error);
             }
         }
