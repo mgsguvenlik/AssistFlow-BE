@@ -176,8 +176,6 @@ namespace Business.Services.Ykb
 
                 await _uow.Repository.CompleteAsync();
 
-
-
                 #region Notification Kaydı 
                 await _notification.CreateForUserAsync(
                     new NotificationCreateDto
@@ -2031,28 +2029,22 @@ namespace Business.Services.Ykb
         //--------------------- Customer Form ----------------------------
         public async Task<ResponseModel<YkbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo)
         {
-            var now = DateTimeOffset.Now;
-
-            // 1) Ana DTO: SR + (WF last) + Customer (warranty türetmeleri)
-            var baseDto = await (
-                from sr in _uow.Repository.GetQueryable<YkbCustomerForm>().AsNoTracking()
-                where sr.RequestNo == requestNo
-
-                // left join: aynı RequestNo’ya sahip ve silinmemiş workflow’lar
-                join wf0 in _uow.Repository.GetQueryable<YkbWorkFlow>().AsNoTracking().Where(w => !w.IsDeleted)
-                    on sr.RequestNo equals wf0.RequestNo into wfJoin
-                from wf in wfJoin
-                    .OrderByDescending(x => x.CreatedDate)  // “en güncel” workflow tercih ediliyorsa
-                    .Take(1)
-                    .DefaultIfEmpty()
-                select new YkbCustomerFormGetDto
+            // 1) Ana kayıt sadece YkbCustomerForm üzerinden alınır.
+            var baseDto = await _uow.Repository
+                .GetQueryable<YkbCustomerForm>()
+                .AsNoTracking()
+                .Where(sr => sr.RequestNo == requestNo)
+                .Select(sr => new YkbCustomerFormGetDto
                 {
                     Id = sr.Id,
                     RequestNo = sr.RequestNo,
+                    YkbServiceTrackNo = sr.YkbServiceTrackNo,
                     ServicesDate = sr.ServicesDate,
                     PlannedCompletionDate = sr.PlannedCompletionDate,
                     Description = sr.Description,
-                    Title = wf != null ? wf.RequestTitle : null,
+
+                    Title = null,
+
                     CustomerApproverId = sr.CustomerApproverId,
                     CustomerId = sr.CustomerId,
                     CreatedDate = sr.CreatedDate,
@@ -2061,9 +2053,12 @@ namespace Business.Services.Ykb
                     UpdatedUser = sr.UpdatedUser,
                     IsDeleted = sr.IsDeleted,
 
-                    Priority = wf != null ? wf.Priority : WorkFlowPriority.Normal,
+                    // YkbCustomerForm içinde bu iki kolon yok.
+                    // Aşağıda YkbServicesRequest'ten doldurulacak.
+                    ServiceTypeId = null,
 
-                    // 🔹 Customer alt DTO + warranty türetmeleri
+                    Priority = sr.Priority,
+
                     Customer = sr.Customer == null ? null : new CustomerGetDto
                     {
                         Id = sr.Customer.Id,
@@ -2090,32 +2085,71 @@ namespace Business.Services.Ykb
                         Note = sr.Customer.Note,
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
+
                         Systems = sr.Customer.CustomerSystemAssignments
-                         .Select(a => new CustomerSystemAssignmentGetDto
-                         {
-                             Id = a.Id,
-                             CustomerId = a.CustomerId,
-                             CustomerSystemId = a.CustomerSystemId,
-                             HasMaintenanceContract = a.HasMaintenanceContract,
-
-                             // Ekranda göstermek için:
-                             SystemName = a.CustomerSystem.Name,
-                             SystemCode = a.CustomerSystem.Code,
-
-                             // İstersen müşteri bilgilerini de doldurabiliriz:
-                             CustomerName = a.Customer.SubscriberCompany,
-                             CustomerShortCode = a.Customer.CustomerShortCode
-                         })
-                      .ToList()
+                            .Select(a => new CustomerSystemAssignmentGetDto
+                            {
+                                Id = a.Id,
+                                CustomerId = a.CustomerId,
+                                CustomerSystemId = a.CustomerSystemId,
+                                HasMaintenanceContract = a.HasMaintenanceContract,
+                                SystemName = a.CustomerSystem.Name,
+                                SystemCode = a.CustomerSystem.Code,
+                                CustomerName = a.Customer.SubscriberCompany,
+                                CustomerShortCode = a.Customer.CustomerShortCode
+                            })
+                            .ToList()
                     }
-                }
-            ).FirstOrDefaultAsync();
+                })
+                .FirstOrDefaultAsync();
 
             if (baseDto is null)
-                return ResponseModel<YkbCustomerFormGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+            {
+                return ResponseModel<YkbCustomerFormGetDto>.Fail(
+                    "Kayıt bulunamadı.",
+                    StatusCode.NotFound
+                );
+            }
 
+            // 2) Workflow bilgisi ayrı sorgu
+            var latestWorkflow = await _uow.Repository
+                .GetQueryable<YkbWorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new
+                {
+                    x.RequestTitle,
+                    x.Priority
+                })
+                .FirstOrDefaultAsync();
 
-            // NEW: CustomerGroup + ProgressApprovers (tek ek sorgu)
+            if (latestWorkflow != null)
+            {
+                baseDto.Title = latestWorkflow.RequestTitle;
+                baseDto.Priority = latestWorkflow.Priority;
+            }
+
+            // 3) ServicesCostStatus ve ServiceTypeId sadece YkbServicesRequest'ten gelir
+            var latestServicesRequest = await _uow.Repository
+                .GetQueryable<YkbServicesRequest>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                .OrderByDescending(x => x.CreatedDate)
+                .Select(x => new
+                {
+                    x.ServicesCostStatus,
+                    x.ServiceTypeId
+                })
+                .FirstOrDefaultAsync();
+
+            if (latestServicesRequest != null)
+            {
+                baseDto.ServicesCostStatus = latestServicesRequest.ServicesCostStatus;
+                baseDto.ServiceTypeId = latestServicesRequest.ServiceTypeId;
+            }
+
+            // 4) CustomerGroup + ProgressApprovers
             if (baseDto.Customer?.CustomerGroupId is long cgId)
             {
                 baseDto.Customer.CustomerGroup = await _uow.Repository
@@ -2144,7 +2178,7 @@ namespace Business.Services.Ykb
                     .FirstOrDefaultAsync() ?? new CustomerGroupGetDto();
             }
 
-            // 2) Ürünler (tek bağımsız sorgu — Tenant fiyatı eklendi)
+            // 5) Ürünler
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<YkbServicesRequestProduct>()
                 .AsNoTracking()
@@ -2155,16 +2189,13 @@ namespace Business.Services.Ykb
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
 
-                    // Ürün temel alanları
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
                     ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    PriceCurrency = p.Product != null ? p.Product.PriceCurrency : null,
 
                     Quantity = p.Quantity,
 
-                    // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
-                    // 1) CustomerGroup → 2) Customer → 3) Tenant → 4) Product
                     EffectivePrice =
                         p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
@@ -2177,15 +2208,18 @@ namespace Business.Services.Ykb
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
-                            .FirstOrDefault() // 🆕 Tenant fiyatı
+                            .FirstOrDefault()
                         ?? (decimal?)p.Product.Price
                         ?? 0m
                 })
                 .ToListAsync();
 
-            // 3) Review logs (tek bağımsız sorgu — SR adımıyla sınırlı)
+            // 6) Review logs
             baseDto.ReviewLogs = await _uow.Repository
-                .GetQueryable<YkbWorkFlowReviewLog>(x => x.RequestNo == requestNo && (x.FromStepCode == "SR" || x.ToStepCode == "SR"))
+                .GetQueryable<YkbWorkFlowReviewLog>(
+                    x => x.RequestNo == requestNo &&
+                         (x.FromStepCode == "SR" || x.ToStepCode == "SR")
+                )
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .Select(x => new YkbWorkFlowReviewLogDto
@@ -2205,7 +2239,6 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbCustomerFormGetDto>.Success(baseDto);
         }
-
         // -------------------- Services Request --------------------
         private static Func<IQueryable<YkbServicesRequest>, IIncludableQueryable<YkbServicesRequest, object>>? RequestIncludes()
             => q => q

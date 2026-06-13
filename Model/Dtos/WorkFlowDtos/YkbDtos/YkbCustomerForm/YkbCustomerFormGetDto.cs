@@ -33,6 +33,9 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm
 
         public bool IsDeleted { get; set; }
 
+        public long? ServiceTypeId { get; set; }
+        public ServicesCostStatus ServicesCostStatus { get; set; }
+
         public List<YkbServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
