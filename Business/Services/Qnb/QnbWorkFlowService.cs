@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -3838,12 +3839,27 @@ namespace Business.Services.Qnb
                 wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
             }
 
+
+            var usersQuery = _uow.Repository
+                    .GetQueryable<User>()
+                    .AsNoTracking();
             var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<QnbServicesRequest>().AsNoTracking()
-                     on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
+               from wf in wfBase
+
+               join sr0 in _uow.Repository.GetQueryable<QnbServicesRequest>().AsNoTracking()
+                   on wf.RequestNo equals sr0.RequestNo into srj
+               from sr in srj.DefaultIfEmpty()
+
+               join createdUser0 in usersQuery
+                   on wf.CreatedUser equals createdUser0.Id into createdUserJoin
+               from createdUser in createdUserJoin.DefaultIfEmpty()
+
+               select new
+               {
+                   wf,
+                   sr,
+                   createdUser
+               };
 
             var total = await qJoined.CountAsync();
 
@@ -3886,6 +3902,7 @@ namespace Business.Services.Qnb
                     CreatedDate = x.wf.CreatedDate,
                     UpdatedDate = x.wf.UpdatedDate,
                     CreatedUser = x.wf.CreatedUser,
+                    CreatedUserFullName = x.createdUser == null ? null : x.createdUser.TechnicianName,
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
                     ApproverTechnicianId = x.wf.ApproverTechnicianId,

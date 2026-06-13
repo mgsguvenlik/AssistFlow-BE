@@ -24,6 +24,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow
         public DateTimeOffset CreatedDate { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }
         public long CreatedUser { get; set; }
+        public string? CreatedUserFullName { get; set; }
         public long? UpdatedUser { get; set; }
         public bool IsDeleted { get; set; }
         public string? CustomerCode { get; set; }
