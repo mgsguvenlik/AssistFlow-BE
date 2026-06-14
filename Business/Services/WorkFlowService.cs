@@ -36,6 +36,7 @@ using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
@@ -3845,128 +3846,6 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
-        {
-            var me = await _currentUser.GetAsync();
-            //var me =  new User { Id=14};
-            if (me is null)
-                return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
-
-            var page = q.Page <= 0 ? 1 : q.Page;
-            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            // Permission step codes (WH, PRC, TS, ...)
-            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
-            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
-            // Çoklu rol kodu desteği
-            var technicianRoleRaw = await _uow.Repository
-                .GetQueryable<Configuration>()
-                .AsNoTracking()
-                .Where(x => x.Name == "TechnicianRoleCode")
-                .Select(x => x.Value)
-                .FirstOrDefaultAsync();
-
-            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
-
-            var isTechnician = technicianRoleCodes.Count > 0 &&
-                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
-                    StringComparer.OrdinalIgnoreCase)) ?? false);
-
-            // base query
-            var wfBase = _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
-
-            // Teknisyen ise sadece kendi üzerindeki ve Teknik Servis adımındaki akışları görebilsin
-            var myId = me.Id;
-
-            if (!isTechnician && permittedSet.Count == 0)
-            {
-                wfBase = wfBase.Where(_ => false);
-            }
-            else
-            {
-                wfBase = wfBase.Where(w =>
-                    w.CurrentStep != null &&
-                    permittedSet.Contains(w.CurrentStep.Code) &&
-                    (!isTechnician || w.ApproverTechnicianId == myId)
-                );
-            }
-           
-
-            // search
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
-            }
-
-            // LEFT JOIN
-            var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                    on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
-
-            var total = await qJoined.CountAsync();
-
-            var items = await qJoined
-                .OrderByDescending(x => x.wf.CreatedDate)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new WorkFlowGetDto
-                {
-                    Id = x.wf.Id,
-                    RequestTitle = x.wf.RequestTitle,
-                    RequestNo = x.wf.RequestNo,
-                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
-                    Priority = x.wf.Priority,
-                    WorkFlowStatus = x.wf.WorkFlowStatus,
-                    IsAgreement = x.wf.IsAgreement,
-                    CreatedDate = x.wf.CreatedDate,
-                    UpdatedDate = x.wf.UpdatedDate,
-                    CreatedUser = x.wf.CreatedUser,
-                    UpdatedUser = x.wf.UpdatedUser,
-                    IsDeleted = x.wf.IsDeleted,
-                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
-                        ? null
-                        : new UserGetDto
-                        {
-                            Id = x.wf.ApproverTechnician.Id,
-                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                            City = x.wf.ApproverTechnician.City,
-                            District = x.wf.ApproverTechnician.District,
-                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
-                        },
-
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
-
-                    CurrentStep = x.wf.CurrentStep == null
-                        ? null
-                        : new WorkFlowStepGetDto
-                        {
-                            Id = x.wf.CurrentStep.Id,
-                            Name = x.wf.CurrentStep.Name,
-                            Code = x.wf.CurrentStep.Code
-                        }
-                })
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<WorkFlowGetDto>>
-                .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(WorkFlowQueryParams q)
         {
             q.Normalize(maxPageSize: 200);
@@ -3979,12 +3858,16 @@ namespace Business.Services
             var pageSize = q.PageSize;
 
             var pendingStatus = WorkFlowStatus.Pending;
+            var myId = me.Id;
 
-            // Permission step codes (WH, PRC, TS, ...)
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
-            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // Çoklu rol kodu desteği
+            var permittedStepCodes = permittedSteps
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct()
+                .ToList();
+
             var technicianRoleRaw = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
@@ -3995,58 +3878,57 @@ namespace Business.Services
             var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
 
             var isTechnician = technicianRoleCodes.Count > 0 &&
-                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(
+                    r.Code,
                     StringComparer.OrdinalIgnoreCase)) ?? false);
 
-            // base query
             var wfBase = _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
 
-            var myId = me.Id;
-
-            if (!isTechnician && permittedSet.Count == 0)
+            if (!isTechnician && permittedStepCodes.Count == 0)
             {
                 wfBase = wfBase.Where(_ => false);
             }
             else
             {
                 wfBase = wfBase.Where(w =>
+                    w.CurrentStepId.HasValue &&
                     w.CurrentStep != null &&
-                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    w.CurrentStep.Code != null &&
+                    permittedStepCodes.Contains(w.CurrentStep.Code) &&
                     (!isTechnician || w.ApproverTechnicianId == myId)
                 );
             }
 
-            // --- FİLTRELEME ÖZELLİKLERİ ---
-
-            // WorkFlowStep filtreleme (ID bazlı)
+            // WorkFlowStep filtreleme
             if (q.CurrentStepId.HasValue)
             {
                 wfBase = wfBase.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
             }
 
-            // WorkFlowStep filtreleme (Code bazlı)
             if (!string.IsNullOrWhiteSpace(q.StepCode))
             {
                 var stepCode = q.StepCode.Trim();
-                wfBase = wfBase.Where(w => w.CurrentStep != null && w.CurrentStep.Code == stepCode);
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    w.CurrentStep.Code == stepCode);
             }
 
-            // WorkFlowPriority filtreleme (tekil)
+            // Priority filtreleme
             if (q.Priority.HasValue)
             {
                 wfBase = wfBase.Where(w => w.Priority == q.Priority.Value);
             }
 
-            // Çoklu Priority filtreleme
-            if (q.Priorities != null && q.Priorities.Count > 0)
+            if (q.Priorities is { Count: > 0 })
             {
-                wfBase = wfBase.Where(w => q.Priorities.Contains(w.Priority));
+                var priorities = q.Priorities;
+                wfBase = wfBase.Where(w => priorities.Contains(w.Priority));
             }
 
-            // 🆕 Tarih filtreleri (CreatedDate)
+            // CreatedDate filtreleme
             if (q.StartDate.HasValue)
             {
                 wfBase = wfBase.Where(w => w.CreatedDate >= q.StartDate.Value);
@@ -4054,80 +3936,470 @@ namespace Business.Services
 
             if (q.EndDate.HasValue)
             {
-                wfBase = wfBase.Where(w => w.CreatedDate <= q.EndDate.Value);
-            }
+                var endDate = q.EndDate.Value;
 
-            // Search
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
+                // Frontend sadece tarih gönderirse, örn: 2026-06-14 00:00,
+                // bütün günü kapsaması için bir sonraki günün başına kadar alıyoruz.
+                if (endDate.TimeOfDay == TimeSpan.Zero)
+                {
+                    var endExclusive = new DateTimeOffset(endDate.Date.AddDays(1), endDate.Offset);
+                    wfBase = wfBase.Where(w => w.CreatedDate < endExclusive);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(w => w.CreatedDate <= endDate);
+                }
             }
 
             var usersQuery = _uow.Repository
-                    .GetQueryable<User>()
-                    .AsNoTracking();
-            // LEFT JOIN ServicesRequest
+                .GetQueryable<User>()
+                .AsNoTracking();
+
+            var stepsQuery = _uow.Repository
+                .GetQueryable<WorkFlowStep>()
+                .AsNoTracking();
+
+            var serviceRequestsQuery = _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .AsNoTracking();
+
+            var customersQuery = _uow.Repository
+                .GetQueryable<Customer>()
+                .AsNoTracking();
+
+            var serviceTypesQuery = _uow.Repository
+                .GetQueryable<ServiceType>()
+                .AsNoTracking();
+
+            var customerGroupsQuery = _uow.Repository
+                .GetQueryable<CustomerGroup>()
+                .AsNoTracking();
+
+            var progressApproversQuery = _uow.Repository
+                .GetQueryable<ProgressApprover>()
+                .AsNoTracking();
+
             var qJoined =
                 from wf in wfBase
-                
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                    on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                
+
+                join step0 in stepsQuery
+                    on wf.CurrentStepId equals (long?)step0.Id into stepJoin
+                from step in stepJoin.DefaultIfEmpty()
+
+                join sr0 in serviceRequestsQuery
+                    on wf.RequestNo equals sr0.RequestNo into srJoin
+                from sr in srJoin.DefaultIfEmpty()
+
+                join customer0 in customersQuery
+                    on sr.CustomerId equals customer0.Id into customerJoin
+                from customer in customerJoin.DefaultIfEmpty()
+
+                join customerGroup0 in customerGroupsQuery
+                    on customer.CustomerGroupId equals (long?)customerGroup0.Id into customerGroupJoin
+                from customerGroup in customerGroupJoin.DefaultIfEmpty()
+
+                join serviceType0 in serviceTypesQuery
+                    on sr.ServiceTypeId equals serviceType0.Id into serviceTypeJoin
+                from serviceType in serviceTypeJoin.DefaultIfEmpty()
+
                 join createdUser0 in usersQuery
                     on wf.CreatedUser equals createdUser0.Id into createdUserJoin
                 from createdUser in createdUserJoin.DefaultIfEmpty()
-                
+
+                join approverTechnician0 in usersQuery
+                    on wf.ApproverTechnicianId equals (long?)approverTechnician0.Id into approverTechnicianJoin
+                from approverTechnician in approverTechnicianJoin.DefaultIfEmpty()
+
                 select new
                 {
                     wf,
+                    step,
                     sr,
-                    createdUser
+                    customer,
+                    customerGroup,
+                    serviceType,
+                    createdUser,
+                    approverTechnician
                 };
+
+            // 1- Servis konfigurasyonu bazlı => ServicesRequest.ServicesCostStatus
+            if (q.ServicesCostStatus.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.ServicesCostStatus == q.ServicesCostStatus.Value);
+            }
+
+            if (q.ServicesCostStatuses is { Count: > 0 })
+            {
+                var costStatuses = q.ServicesCostStatuses;
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    costStatuses.Contains(x.sr.ServicesCostStatus));
+            }
+
+            // 3- Servis türü bazlı => ServicesRequest.ServiceTypeId
+            if (q.ServiceTypeId.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.ServiceTypeId == q.ServiceTypeId.Value);
+            }
+
+            if (q.ServiceTypeIds is { Count: > 0 })
+            {
+                var serviceTypeIds = q.ServiceTypeIds;
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    serviceTypeIds.Contains(x.sr.ServiceTypeId));
+            }
+
+            // 4- İl bazlı => Customer.City
+            if (!string.IsNullOrWhiteSpace(q.City))
+            {
+                var city = q.City.Trim();
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.City != null &&
+                    x.customer.City.Contains(city));
+            }
+
+            if (q.Cities is { Count: > 0 })
+            {
+                var cities = q.Cities;
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.City != null &&
+                    cities.Contains(x.customer.City));
+            }
+
+            // Opsiyonel: müşteri grubu bazlı filtre
+            if (q.CustomerGroupId.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId == q.CustomerGroupId.Value);
+            }
+
+            // 5- Hakediş temsilcisi bazlı => Customer.CustomerGroup.ProgressApprovers
+            if (q.ProgressApproverId.HasValue)
+            {
+                var progressApproverId = q.ProgressApproverId.Value;
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId.HasValue &&
+                    progressApproversQuery.Any(pa =>
+                        pa.Id == progressApproverId &&
+                        pa.CustomerGroupId == x.customer.CustomerGroupId.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(q.ProgressApproverSearch))
+            {
+                var progressApproverTerm = q.ProgressApproverSearch.Trim();
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId.HasValue &&
+                    progressApproversQuery.Any(pa =>
+                        pa.CustomerGroupId == x.customer.CustomerGroupId.Value &&
+                        (
+                            pa.FullName.Contains(progressApproverTerm) ||
+                            pa.Email.Contains(progressApproverTerm) ||
+                            pa.Phone.Contains(progressApproverTerm)
+                        )));
+            }
+
+            // Detaylı Search
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var term = q.Search.Trim();
+
+                var priorityAliases = new Dictionary<WorkFlowPriority, string[]>
+                    {
+                        { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
+                        { WorkFlowPriority.Normal, new[] { "Normal" } },
+                        { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
+                        { WorkFlowPriority.Urgent, new[] { "Acil", "Urgent" } }
+                    };
+
+                            var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
+                    {
+                        { WorkFlowStatus.Pending, new[] { "Beklemede", "Pending" } },
+                        { WorkFlowStatus.Complated, new[] { "Tamamlandı", "Tamamlandi", "Completed", "Complated" } },
+                        { WorkFlowStatus.Cancelled, new[] { "İptal", "Iptal", "İptal Edildi", "Iptal Edildi", "Cancelled" } }
+                    };
+
+                            var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
+                    {
+                        { ServicesCostStatus.Unknown, new[] { "Belirtilmemiş", "Belirtilmemis", "Unknown" } },
+                        { ServicesCostStatus.NotRequired, new[] { "Ücret gerekmiyor", "Ucret gerekmiyor", "Ücretsiz", "Ucretsiz", "Not Required" } },
+                        { ServicesCostStatus.Chargeable, new[] { "Ücretli", "Ucretli", "Müşteri öder", "Musteri oder", "Chargeable" } },
+                        { ServicesCostStatus.Maintenance, new[] { "Bakım", "Bakim", "Bakım kapsamında", "Bakim kapsaminda", "Maintenance" } }
+                    };
+
+                var priorityMatches =CommonFunctions.MatchEnumValues(term, priorityAliases);
+                var workflowStatusMatches = CommonFunctions.MatchEnumValues(term, workflowStatusAliases);
+                var serviceCostStatusMatches = CommonFunctions.MatchEnumValues(term, serviceCostStatusAliases);
+
+                var hasPriorityMatches = priorityMatches.Count > 0;
+                var hasWorkflowStatusMatches = workflowStatusMatches.Count > 0;
+                var hasServiceCostStatusMatches = serviceCostStatusMatches.Count > 0;
+
+                var hasLong = long.TryParse(term, out var longValue);
+
+                var parsedDate = default(DateTimeOffset);
+
+                var hasDate =
+                    (term.Contains('.') || term.Contains('/') || term.Contains('-')) &&
+                    DateTimeOffset.TryParse(
+                        term,
+                        CultureInfo.GetCultureInfo("tr-TR"),
+                        DateTimeStyles.AssumeLocal,
+                        out parsedDate);
+
+                var searchDateStart = default(DateTimeOffset);
+                var searchDateEnd = default(DateTimeOffset);
+
+                if (hasDate)
+                {
+                    searchDateStart = new DateTimeOffset(parsedDate.Date, parsedDate.Offset);
+                    searchDateEnd = searchDateStart.AddDays(1);
+                }
+
+                qJoined = qJoined.Where(x =>
+                    // WorkFlow
+                    x.wf.RequestNo.Contains(term) ||
+                    x.wf.RequestTitle.Contains(term) ||
+
+                    // WorkFlowStep
+                    (
+                        x.step != null &&
+                        (
+                            x.step.Name.Contains(term) ||
+                            (x.step.Code != null && x.step.Code.Contains(term))
+                        )
+                    ) ||
+
+                    // ServicesRequest
+                    (
+                        x.sr != null &&
+                        (
+                            x.sr.RequestNo.Contains(term) ||
+                            (x.sr.OracleNo != null && x.sr.OracleNo.Contains(term)) ||
+                            (x.sr.Description != null && x.sr.Description.Contains(term))
+                        )
+                    ) ||
+
+                    // ServiceType
+                    (
+                        x.serviceType != null &&
+                        (
+                            x.serviceType.Name.Contains(term) ||
+                            (x.serviceType.ContractNumber != null && x.serviceType.ContractNumber.Contains(term))
+                        )
+                    ) ||
+
+                    // Customer
+                    (
+                        x.customer != null &&
+                        (
+                            (x.customer.SubscriberCode != null && x.customer.SubscriberCode.Contains(term)) ||
+                            (x.customer.SubscriberCompany != null && x.customer.SubscriberCompany.Contains(term)) ||
+                            (x.customer.SubscriberAddress != null && x.customer.SubscriberAddress.Contains(term)) ||
+                            (x.customer.City != null && x.customer.City.Contains(term)) ||
+                            (x.customer.District != null && x.customer.District.Contains(term)) ||
+                            (x.customer.LocationCode != null && x.customer.LocationCode.Contains(term)) ||
+                            (x.customer.ContactName1 != null && x.customer.ContactName1.Contains(term)) ||
+                            (x.customer.Phone1 != null && x.customer.Phone1.Contains(term)) ||
+                            (x.customer.Email1 != null && x.customer.Email1.Contains(term)) ||
+                            (x.customer.ContactName2 != null && x.customer.ContactName2.Contains(term)) ||
+                            (x.customer.Phone2 != null && x.customer.Phone2.Contains(term)) ||
+                            (x.customer.Email2 != null && x.customer.Email2.Contains(term)) ||
+                            (x.customer.CustomerShortCode != null && x.customer.CustomerShortCode.Contains(term)) ||
+                            (x.customer.CorporateLocationId != null && x.customer.CorporateLocationId.Contains(term)) ||
+                            (x.customer.Longitude != null && x.customer.Longitude.Contains(term)) ||
+                            (x.customer.Latitude != null && x.customer.Latitude.Contains(term)) ||
+                            (x.customer.Note != null && x.customer.Note.Contains(term)) ||
+                            (x.customer.LockType != null && x.customer.LockType.Contains(term)) ||
+                            (x.customer.CashCenter != null && x.customer.CashCenter.Contains(term))
+                        )
+                    ) ||
+
+                    // CustomerGroup
+                    (
+                        x.customerGroup != null &&
+                        (
+                            x.customerGroup.GroupName.Contains(term) ||
+                            x.customerGroup.Code.Contains(term)
+                        )
+                    ) ||
+
+                    // Created User
+                    (
+                        x.createdUser != null &&
+                        (
+                            (x.createdUser.TechnicianName != null && x.createdUser.TechnicianName.Contains(term)) ||
+                            (x.createdUser.TechnicianEmail != null && x.createdUser.TechnicianEmail.Contains(term)) ||
+                            (x.createdUser.TechnicianPhone != null && x.createdUser.TechnicianPhone.Contains(term)) ||
+                            (x.createdUser.City != null && x.createdUser.City.Contains(term)) ||
+                            (x.createdUser.District != null && x.createdUser.District.Contains(term))
+                        )
+                    ) ||
+
+                    // Approver Technician
+                    (
+                        x.approverTechnician != null &&
+                        (
+                            (x.approverTechnician.TechnicianName != null && x.approverTechnician.TechnicianName.Contains(term)) ||
+                            (x.approverTechnician.TechnicianEmail != null && x.approverTechnician.TechnicianEmail.Contains(term)) ||
+                            (x.approverTechnician.TechnicianPhone != null && x.approverTechnician.TechnicianPhone.Contains(term)) ||
+                            (x.approverTechnician.City != null && x.approverTechnician.City.Contains(term)) ||
+                            (x.approverTechnician.District != null && x.approverTechnician.District.Contains(term))
+                        )
+                    ) ||
+
+                    // ProgressApprovers
+                    (
+                        x.customer != null &&
+                        x.customer.CustomerGroupId.HasValue &&
+                        progressApproversQuery.Any(pa =>
+                            pa.CustomerGroupId == x.customer.CustomerGroupId.Value &&
+                            (
+                                pa.FullName.Contains(term) ||
+                                pa.Email.Contains(term) ||
+                                pa.Phone.Contains(term)
+                            ))
+                    ) ||
+
+                    // Enum aramaları
+                    (
+                        hasPriorityMatches &&
+                        priorityMatches.Contains(x.wf.Priority)
+                    ) ||
+
+                    (
+                        hasWorkflowStatusMatches &&
+                        workflowStatusMatches.Contains(x.wf.WorkFlowStatus)
+                    ) ||
+
+                    (
+                        x.sr != null &&
+                        hasServiceCostStatusMatches &&
+                        serviceCostStatusMatches.Contains(x.sr.ServicesCostStatus)
+                    ) ||
+
+                    // Sayısal arama
+                    (
+                        hasLong &&
+                        (
+                            x.wf.Id == longValue ||
+                            x.wf.CreatedUser == longValue ||
+                            x.wf.UpdatedUser == longValue ||
+                            x.wf.ApproverTechnicianId == longValue ||
+                            (x.sr != null && x.sr.Id == longValue) ||
+                            (x.sr != null && x.sr.CustomerId == longValue) ||
+                            (x.sr != null && x.sr.ServiceTypeId == longValue) ||
+                            (x.customer != null && x.customer.Id == longValue) ||
+                            (x.serviceType != null && x.serviceType.Id == longValue) ||
+                            (x.customerGroup != null && x.customerGroup.Id == longValue)
+                        )
+                    ) ||
+
+                    // Tarih arama
+                    (
+                        hasDate &&
+                        x.wf.CreatedDate >= searchDateStart &&
+                        x.wf.CreatedDate < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.wf.UpdatedDate.HasValue &&
+                        x.wf.UpdatedDate.Value >= searchDateStart &&
+                        x.wf.UpdatedDate.Value < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.sr != null &&
+                        x.sr.ServicesDate >= searchDateStart &&
+                        x.sr.ServicesDate < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.sr != null &&
+                        x.sr.PlannedCompletionDate.HasValue &&
+                        x.sr.PlannedCompletionDate.Value >= searchDateStart &&
+                        x.sr.PlannedCompletionDate.Value < searchDateEnd
+                    )
+                );
+            }
 
             var total = await qJoined.CountAsync();
 
-            // --- SIRALAMA ---
             var finalQuery = qJoined;
 
             if (!string.IsNullOrWhiteSpace(q.Sort))
             {
                 var sortLower = q.Sort.ToLowerInvariant();
 
-                if (sortLower == "requestno")
+                switch (sortLower)
                 {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.RequestNo)
-                        : qJoined.OrderBy(x => x.wf.RequestNo);
-                }
-                else if (sortLower == "requesttitle")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
-                        : qJoined.OrderBy(x => x.wf.RequestTitle);
-                }
-                else if (sortLower == "priority")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.Priority)
-                        : qJoined.OrderBy(x => x.wf.Priority);
-                }
-                else if (sortLower == "createddate")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
-                        : qJoined.OrderBy(x => x.wf.CreatedDate);
-                }
-                else if (sortLower == "updateddate")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
-                        : qJoined.OrderBy(x => x.wf.UpdatedDate);
-                }
-                else
-                {
-                    finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                    case "requestno":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.RequestNo)
+                            : qJoined.OrderBy(x => x.wf.RequestNo);
+                        break;
+
+                    case "requesttitle":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
+                            : qJoined.OrderBy(x => x.wf.RequestTitle);
+                        break;
+
+                    case "priority":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.Priority)
+                            : qJoined.OrderBy(x => x.wf.Priority);
+                        break;
+
+                    case "createddate":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
+                            : qJoined.OrderBy(x => x.wf.CreatedDate);
+                        break;
+
+                    case "updateddate":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
+                            : qJoined.OrderBy(x => x.wf.UpdatedDate);
+                        break;
+
+                    case "servicetype":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.serviceType != null ? x.serviceType.Name : string.Empty)
+                            : qJoined.OrderBy(x => x.serviceType != null ? x.serviceType.Name : string.Empty);
+                        break;
+
+                    case "city":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.customer != null ? x.customer.City : string.Empty)
+                            : qJoined.OrderBy(x => x.customer != null ? x.customer.City : string.Empty);
+                        break;
+
+                    case "servicescoststatus":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.sr != null ? (int)x.sr.ServicesCostStatus : -1)
+                            : qJoined.OrderBy(x => x.sr != null ? (int)x.sr.ServicesCostStatus : -1);
+                        break;
+
+                    default:
+                        finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                        break;
                 }
             }
             else
@@ -4143,42 +4415,68 @@ namespace Business.Services
                     Id = x.wf.Id,
                     RequestTitle = x.wf.RequestTitle,
                     RequestNo = x.wf.RequestNo,
+
                     CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+
                     Priority = x.wf.Priority,
                     WorkFlowStatus = x.wf.WorkFlowStatus,
                     IsAgreement = x.wf.IsAgreement,
+
                     CreatedDate = x.wf.CreatedDate,
                     UpdatedDate = x.wf.UpdatedDate,
+
                     CreatedUser = x.wf.CreatedUser,
-                    CreatedUserFullName = x.createdUser == null ? null : x.createdUser.TechnicianName,
+                    CreatedUserFullName = x.createdUser == null
+                        ? null
+                        : x.createdUser.TechnicianName,
+
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
+
                     ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
+
+                    ApproverTechnician = x.approverTechnician == null
                         ? null
                         : new UserGetDto
                         {
-                            Id = x.wf.ApproverTechnician.Id,
-                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                            City = x.wf.ApproverTechnician.City,
-                            District = x.wf.ApproverTechnician.District,
-                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                            Id = x.approverTechnician.Id,
+                            TechnicianName = x.approverTechnician.TechnicianName,
+                            TechnicianPhone = x.approverTechnician.TechnicianPhone,
+                            TechnicianAddress = x.approverTechnician.TechnicianAddress,
+                            City = x.approverTechnician.City,
+                            District = x.approverTechnician.District,
+                            TechnicianEmail = x.approverTechnician.TechnicianEmail,
                         },
 
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+                    CustomerCode = x.customer == null
+                        ? null
+                        : x.customer.SubscriberCode,
 
-                    CurrentStep = x.wf.CurrentStep == null
+                    CustomerName = x.customer == null
+                        ? null
+                        : x.customer.SubscriberCompany,
+
+                    CustomerAddress = x.customer == null
+                        ? null
+                        : x.customer.SubscriberAddress,
+
+                    CurrentStep = x.step == null
                         ? null
                         : new WorkFlowStepGetDto
                         {
-                            Id = x.wf.CurrentStep.Id,
-                            Name = x.wf.CurrentStep.Name,
-                            Code = x.wf.CurrentStep.Code
+                            Id = x.step.Id,
+                            Name = x.step.Name,
+                            Code = x.step.Code
                         }
+
+                        // Eğer WorkFlowGetDto içinde aşağıdaki alanlar varsa bunları da açabilirsin:
+                        // CustomerCity = x.customer == null ? null : x.customer.City,
+                        // CustomerDistrict = x.customer == null ? null : x.customer.District,
+                        // ServiceTypeId = x.serviceType == null ? null : x.serviceType.Id,
+                        // ServiceTypeName = x.serviceType == null ? null : x.serviceType.Name,
+                        // ServicesCostStatus = x.sr == null ? null : x.sr.ServicesCostStatus,
+                        // CustomerGroupId = x.customerGroup == null ? null : x.customerGroup.Id,
+                        // CustomerGroupName = x.customerGroup == null ? null : x.customerGroup.GroupName,
                 })
                 .ToListAsync();
 

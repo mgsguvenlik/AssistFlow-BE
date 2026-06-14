@@ -1,4 +1,5 @@
 ﻿using Core.Utilities.Constants;
+using System.Globalization;
 
 namespace Core.Common
 {
@@ -60,6 +61,58 @@ namespace Core.Common
                 .Select(x => x.Trim())
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeEnumSearchText(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            return value.Trim()
+                .ToLowerInvariant()
+                .Replace("ı", "i")
+                .Replace("ğ", "g")
+                .Replace("ü", "u")
+                .Replace("ş", "s")
+                .Replace("ö", "o")
+                .Replace("ç", "c");
+        }
+
+        public static List<TEnum> MatchEnumValues<TEnum>(
+            string search,
+            IReadOnlyDictionary<TEnum, string[]>? aliases = null)
+            where TEnum : struct, Enum
+        {
+            var normalizedSearch = NormalizeEnumSearchText(search);
+            var result = new List<TEnum>();
+
+            foreach (var value in Enum.GetValues<TEnum>())
+            {
+                var enumName = NormalizeEnumSearchText(value.ToString());
+                var enumNumber = Convert.ToInt64(value, CultureInfo.InvariantCulture)
+                    .ToString(CultureInfo.InvariantCulture);
+
+                var aliasMatch = false;
+
+                if (aliases != null && aliases.TryGetValue(value, out var aliasList))
+                {
+                    aliasMatch = aliasList.Any(alias =>
+                    {
+                        var normalizedAlias = NormalizeEnumSearchText(alias);
+                        return normalizedAlias.Contains(normalizedSearch)
+                               || normalizedSearch.Contains(normalizedAlias);
+                    });
+                }
+
+                if (enumName.Contains(normalizedSearch)
+                    || enumNumber == normalizedSearch
+                    || aliasMatch)
+                {
+                    result.Add(value);
+                }
+            }
+
+            return result.Distinct().ToList();
         }
     }
 }
