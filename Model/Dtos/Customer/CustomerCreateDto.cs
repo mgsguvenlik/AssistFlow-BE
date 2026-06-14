@@ -76,6 +76,8 @@ namespace Model.Dtos.Customer
         public string? CashCenter { get; set; }
 
         public long? TenantId { get; set; }
+
+        public int? MonitoringStatus { get; set; }
     }
 
     /// ---- Yardımcı Attribute'lar ----
