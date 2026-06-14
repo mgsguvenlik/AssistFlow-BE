@@ -1,6 +1,7 @@
 using Core.Common;
 using Core.Enums;
 using Model.Concrete.WorkFlows;
+using Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting;
 
 namespace Business.Interfaces
 {
@@ -10,5 +11,7 @@ namespace Business.Interfaces
         /// Belirli bir CustomerType ve Priority için SLA ayarýný getirir
         /// </summary>
         Task<ResponseModel<WorkFlowSlaSetting?>> GetSlaSettingAsync(WorkFlowCustomerType customerType, WorkFlowPriority priority);
+
+        Task<ResponseModel<List<WorkFlowSlaSettingGetDto>>> GetByCustomerTypeAsync( WorkFlowCustomerType customerType);
     }
 }
