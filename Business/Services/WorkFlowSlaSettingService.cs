@@ -231,7 +231,7 @@ namespace Business.Services
             return Convert.ToInt32(priority) switch
             {
                 0 => "Düşük",
-                1 => "Orta",
+                1 => "Normal",
                 2 => "Yüksek",
                 3 => "Kritik",
                 _ => priority.ToString()
