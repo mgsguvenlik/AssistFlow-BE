@@ -1,5 +1,6 @@
 using Business.Interfaces;
 using Business.Interfaces.Qnb;
+using Business.Services.Qnb;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -314,6 +315,13 @@ namespace WebAPI.Controllers
             return File(content, contentType, fileName);
         }
 
+
+        [HttpGet("basic-report")]
+        public async Task<IActionResult> GetBasicReport([FromQuery] QnbBasicReportQueryParams q)
+        {
+            var result = await _workFlowService.GetQnbBasicWorkFlowReportAsync(q);
+            return StatusCode((int)result.StatusCode, result);
+        }
         // ---------- Helpers ----------
         private IActionResult ToActionResult(ResponseModel resp)
         {

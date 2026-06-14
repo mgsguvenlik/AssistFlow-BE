@@ -1,5 +1,6 @@
 ﻿using Business.Interfaces;
 using Business.Interfaces.Ykb;
+using Business.Services.Ykb;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -326,6 +327,13 @@ namespace WebAPI.Controllers
         {
             var (content, fileName, contentType) = await _workFlowService.ExportReportLinesAsync(q);
             return File(content, contentType, fileName);
+        }
+
+        [HttpGet("basic-report")]
+        public async Task<IActionResult> GetBasicReport([FromQuery] YkbBasicReportQueryParams q)
+        {
+            var result = await _workFlowService.GetYkbBasicWorkFlowReportAsync(q);
+            return StatusCode((int)result.StatusCode, result);
         }
 
 

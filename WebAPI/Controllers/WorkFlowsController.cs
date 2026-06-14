@@ -296,6 +296,12 @@ namespace WebAPI.Controllers
             return File(content, contentType, fileName);
         }
 
+        [HttpGet("basic-report")]
+        public async Task<IActionResult> GetBasicReport([FromQuery] WorkFlowBasicReportQueryParams q)
+        {
+            var result = await _workFlowService.GetBasicWorkFlowReportAsync(q);
+            return StatusCode((int)result.StatusCode, result);
+        }
 
         //---------Arşiv---------------
 

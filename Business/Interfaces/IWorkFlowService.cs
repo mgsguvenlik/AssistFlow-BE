@@ -63,11 +63,10 @@ namespace Business.Interfaces
 
         //Task<ResponseModel<PagedResult<WorkFlowReportListItemDto>>> GetReportsAsync(ReportQueryParams q);
         Task<ResponseModel<WorkFlowReportDto>> GetReportAsync(string requestNo);
-
         Task<PagedResult<WorkFlowReportListItemDto>> GetReportsAsync(ReportQueryParams q);
         Task<PagedResult<WorkFlowReportLineDto>> GetReportLinesAsync(ReportQueryParams q);
-
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(ReportQueryParams q);
+        Task<ResponseModel<PagedResult<WorkFlowBasicReportListDto>>> GetBasicWorkFlowReportAsync(WorkFlowBasicReportQueryParams q);
 
 
         //Arşiv 
