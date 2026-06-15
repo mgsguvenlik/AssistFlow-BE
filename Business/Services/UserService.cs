@@ -386,7 +386,7 @@ public class UserService
                 Merhaba {user.TechnicianName},
                 <br/><br/>
                 Şifrenizi sıfırlamak için lütfen aşağıdaki bağlantıya tıklayın:<br/>
-                <a href='{appSettings.Value.AppUrl}/change-password/{tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
+                <a href='{appSettings.Value.AppUrl}/reset-password?code={tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
                 Eğer bu isteği siz yapmadıysanız, lütfen bu e-postayı dikkate almayın.<br/><br/>
                 Saygılarımızla,<br/>
             ";
