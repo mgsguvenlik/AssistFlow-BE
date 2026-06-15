@@ -41,5 +41,14 @@ namespace WebAPI.Controllers
             var result = await _slaService.GetSlaSettingAsync(customerType, priority);
             return Ok(result);
         }
+
+        [HttpGet("by-customer-type")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetByCustomerType(
+        [FromQuery] WorkFlowCustomerType customerType)
+        {
+            var result = await _slaService.GetByCustomerTypeAsync(customerType);
+            return Ok(result);
+        }
     }
 }

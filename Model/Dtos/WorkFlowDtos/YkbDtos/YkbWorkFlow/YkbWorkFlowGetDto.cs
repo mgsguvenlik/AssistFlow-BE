@@ -25,6 +25,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow
         public DateTimeOffset? UpdatedDate { get; set; }
         public long CreatedUser { get; set; }
         public long? UpdatedUser { get; set; }
+        public string? CreatedUserFullName { get; set; }
         public bool IsDeleted { get; set; }
         public string? CustomerCode { get; set; }
         public string? CustomerName { get; set; }

@@ -62,7 +62,7 @@ namespace Business.Services
             var slaSettings = await uow.Repository
                 .GetQueryable<WorkFlowSlaSetting>()
                 .AsNoTracking()
-                .Where(x => x.IsActive && !x.IsDeleted)
+                .Where(x => x.IsActive && !x.IsDeleted &&!string.IsNullOrEmpty(x.NotificationEmails))
                 .ToListAsync(stoppingToken);
 
             if (!slaSettings.Any())

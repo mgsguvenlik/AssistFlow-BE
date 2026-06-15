@@ -5,6 +5,7 @@ using Core.Common;
 using Core.Enums;
 using Mapster;
 using MapsterMapper;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting;
@@ -134,13 +135,11 @@ namespace Business.Services
         {
             var result = await base.GetPagedAsync(q);
 
-            // 🔹 Enum değerlerini string'e çevir
             if (result.IsSuccess && result.Data?.Items != null)
             {
                 foreach (var item in result.Data.Items)
                 {
-                    item.CustomerTypeName = item.CustomerType.ToString();
-                    item.PriorityName = item.Priority.ToString();
+                    SetDisplayNames(item);
                 }
             }
 
@@ -193,5 +192,57 @@ namespace Business.Services
                     Core.Enums.StatusCode.Error);
             }
         }
+
+        public async Task<ResponseModel<List<WorkFlowSlaSettingGetDto>>> GetByCustomerTypeAsync(WorkFlowCustomerType customerType)
+        {
+            try
+            {
+                var list = await _unitOfWork.Repository
+                    .GetQueryable<WorkFlowSlaSetting>()
+                    .AsNoTracking()
+                    .Where(x => x.CustomerType == customerType && x.IsActive)
+                    .OrderBy(x => x.Priority)
+                    .ProjectToType<WorkFlowSlaSettingGetDto>(_config)
+                    .ToListAsync();
+
+                foreach (var item in list)
+                {
+                    item.CustomerTypeName = item.CustomerType.ToString();
+                    item.PriorityName = item.Priority.ToString();
+                }
+
+                return ResponseModel<List<WorkFlowSlaSettingGetDto>>.Success(list);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Müşteri tipine göre SLA ayarları alınırken hata oluştu. CustomerType: {CustomerType}",
+                    customerType);
+
+                return ResponseModel<List<WorkFlowSlaSettingGetDto>>.Fail(
+                    "SLA ayarları alınırken bir hata oluştu",
+                    Core.Enums.StatusCode.Error);
+            }
+        }
+      
+        private static string GetPriorityNameTr(WorkFlowPriority priority)
+        {
+            return Convert.ToInt32(priority) switch
+            {
+                0 => "Düşük",
+                1 => "Normal",
+                2 => "Yüksek",
+                3 => "Kritik",
+                _ => priority.ToString()
+            };
+        }
+
+        private static void SetDisplayNames(WorkFlowSlaSettingGetDto item)
+        {
+            item.CustomerTypeName = item.CustomerType.ToString();
+            item.PriorityName = GetPriorityNameTr(item.Priority);
+        }
+
     }
 }

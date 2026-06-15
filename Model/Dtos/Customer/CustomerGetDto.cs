@@ -30,6 +30,7 @@ namespace Model.Dtos.Customer
 
         public string? LockType { get; set; }
         public string? CashCenter { get; set; }
+        public int? MonitoringStatus { get; set; }
 
         public long? TenantId { get; set; }
         public CustomerGroupGetDto CustomerGroup { get; set; } = new();

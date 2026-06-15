@@ -21,6 +21,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public long? CustomerId { get; set; }
         public string? CustomerName { get; set; }
         public long? ServiceTypeId { get; set; }
+      
         public string? ServiceTypeName { get; set; }
         public long? CustomerApproverId { get; set; }
         public string? CustomerApproverName { get; set; }

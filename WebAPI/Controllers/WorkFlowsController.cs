@@ -9,6 +9,7 @@ using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using System.Net;
 
@@ -296,6 +297,12 @@ namespace WebAPI.Controllers
             return File(content, contentType, fileName);
         }
 
+        [HttpGet("basic-report")]
+        public async Task<IActionResult> GetBasicReport([FromQuery] WorkFlowBasicReportQueryParams q)
+        {
+            var result = await _workFlowService.GetBasicWorkFlowReportAsync(q);
+            return StatusCode((int)result.StatusCode, result);
+        }
 
         //---------Arşiv---------------
 
