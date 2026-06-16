@@ -5,10 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace Model.Dtos.Customer
 {
-    [RequireAny(nameof(Phone1), nameof(Email1),
-        ErrorMessage = Messages.PrimaryContactRequired)]
-    [RequireAny(nameof(SubscriberCompany), nameof(ContactName1),
-        ErrorMessage = Messages.CustomerNameRequired)]
+    [RequireAny(nameof(SubscriberCompany),ErrorMessage = Messages.CustomerNameRequired)]
     public class CustomerCreateDto
     {
         // Kodlar: harf, rakam, ., _, - (opsiyonel)
@@ -40,11 +37,11 @@ namespace Model.Dtos.Customer
 
         // Telefon: +905551112233 veya 05551112233 gibi (7-15 rakam, isteğe bağlı +)
         //[RegexIfNotEmpty(@"^\+?[0-9]{7,15}$", ErrorMessage = Messages.PhoneNumberFormat)]
-        [Required]
+        //[Required]
         public string? Phone1 { get; set; }
 
-        [EmailAddress(ErrorMessage = Messages.EnterValidEmail)]
-        [StringLength(200, ErrorMessage = Messages.EmailMaxLength)]
+        //[EmailAddress(ErrorMessage = Messages.EnterValidEmail)]
+        //[StringLength(200, ErrorMessage = Messages.EmailMaxLength)]
         public string? Email1 { get; set; }
 
         public string? ContactName2 { get; set; }

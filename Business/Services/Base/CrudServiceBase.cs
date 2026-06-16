@@ -91,7 +91,7 @@ namespace Business.Services.Base
             if (prop is null) return false;
 
             TrySetBool(entity, CommonConstants.IsDeleted, true, onlyIfDefault: false);
-            SetUpdateAuditIfExists(entity);
+            SetUpdateAuditIfExists(entity).Wait();
             return true;
         }
         private static void TrySetDate(object entity, string name, DateTimeOffset value, bool onlyIfDefault)
