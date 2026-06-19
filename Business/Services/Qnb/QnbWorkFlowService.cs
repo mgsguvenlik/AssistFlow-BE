@@ -84,7 +84,6 @@ namespace Business.Services.Qnb
             _menuService = menuService;
         }
 
-        // -------------------- Customer Form / Services Request --------------------
 
         // 0 Müşteri kendi formunu oluşturulması ve Servis talebine gönderim.
         public async Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto)
@@ -219,114 +218,170 @@ namespace Business.Services.Qnb
             }
         }
 
-        // 1 Servis Talebi güncelleme adımı
-        public async Task<ResponseModel<QnbServicesRequestGetDto>> UpdateServiceRequestAsync(QnbServicesRequestUpdateDto dto)
+        // 1 Servis Talebi oluşturma akışı
+        public async Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto)
         {
-            var entity = await _uow.Repository.GetSingleAsync<QnbServicesRequest>(
-                false,
-                x => x.RequestNo == dto.RequestNo,
-                includeExpression: RequestIncludes());
-
-            if (entity is null)
-                return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            var wf = await _uow.Repository
-                .GetQueryable<QnbWorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-
-            if (wf is null)
-                return ResponseModel<QnbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
-
-            var me = await _currentUser.GetAsync();
-            var meId = me?.Id ?? 0;
-
-            // Ana talep bilgilerini güncelle
-            wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = meId;
-            wf.IsLocationValid = dto.IsLocationValid;
-            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
-            wf.CustomerApproverName = dto.CustomerApproverName;
-            wf.Priority = dto.Priority;
-            wf.RequestTitle = dto.Title;
-            _uow.Repository.Update(wf);
-
-            dto.Adapt(entity, _config);
-            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
-
-            // Mevcut ürünleri çek (RequestNo bazlı)
-            var existingProducts = await _uow.Repository
-                .GetMultipleAsync<QnbServicesRequestProduct>(
-                    asNoTracking: false,
-                    whereExpression: x => x.RequestNo == dto.RequestNo);
-
-            // Ürün listesi değişmişse:
-            if (dto.Products is not null)
+            try
             {
-                var updatedProducts = dto.Products
-                    .GroupBy(p => p.ProductId)
-                    .Select(g => g.First())
-                    .ToDictionary(p => p.ProductId, p => p);
+                #region Validasyon/Kontroller
 
-                existingProducts ??= new List<QnbServicesRequestProduct>();
+                var initialStep = await _uow.Repository.GetQueryable<QnbWorkFlowStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Code == "SR");
 
-                // Silinecek ürünler
-                var toRemove = existingProducts
-                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
+                if (initialStep is null)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "İş akışı başlangıç adımı (SR) tanımlı değil.",
+                        StatusCode.BadRequest
+                    );
 
-                // Eklenecek ürünler
-                var toAdd = updatedProducts
-                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
-                    .Select(p => p.Value)
-                    .ToList();
-
-                // Güncellenecek ürünler
-                var toUpdate = existingProducts
-                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
-
-                // ❌ Sil
-                foreach (var prod in toRemove)
-                    await _uow.Repository.HardDeleteAsync(prod);
-
-                // ➕ Ekle
-                foreach (var prod in toAdd)
+                if (string.IsNullOrWhiteSpace(dto.RequestNo))
                 {
-                    var entityProd = new QnbServicesRequestProduct
+                    var rn = await GetRequestNoAsync("QNB");
+                    if (!rn.IsSuccess)
+                        return ResponseModel<QnbServicesRequestGetDto>.Fail(rn.Message, rn.StatusCode);
+
+                    dto.RequestNo = rn.Data!;
+                }
+
+                bool exists = await _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .Include(x => x.ApproverTechnician)
+                    .AsNoTracking()
+                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+                if (exists)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Aynı akış numarası ile başka bir kayıt zaten var.",
+                        StatusCode.Conflict
+                    );
+
+                var serviceTypeExist = await _uow.Repository
+                    .GetQueryable<ServiceType>()
+                    .AsNoTracking()
+                    .AnyAsync(s => s.Id == dto.ServiceTypeId);
+
+                if (!serviceTypeExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Servis tipi bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var customerExist = await _uow.Repository
+                    .GetQueryable<Customer>()
+                    .AsNoTracking()
+                    .AnyAsync(c => c.Id == dto.CustomerId);
+
+                if (!customerExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Müşteri bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var customerApproverExist = dto.CustomerApproverId.HasValue
+                    ? await _uow.Repository.GetQueryable<ProgressApprover>()
+                        .AsNoTracking()
+                        .AnyAsync(ca => ca.Id == dto.CustomerApproverId.Value)
+                    : true;
+
+                if (!customerApproverExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Müşteri yetkilisi bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                #endregion
+
+                #region Servis Talebi Oluşturma
+
+                var request = dto.Adapt<QnbServicesRequest>(_config);
+                request.CreatedDate = DateTime.Now;
+                request.CreatedUser = meId;
+                request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+                await _uow.Repository.AddAsync(request);
+
+                #endregion
+
+                #region Ürün Ekleme
+
+                if (dto.Products is not null)
+                {
+                    foreach (var p in dto.Products)
                     {
-                        RequestNo = dto.RequestNo,
-                        ProductId = prod.ProductId,
-                        Quantity = prod.Quantity,
-                        CustomerId = dto.CustomerId,
-                    };
-                    await _uow.Repository.AddAsync(entityProd);
+                        await _uow.Repository.AddAsync(new QnbServicesRequestProduct
+                        {
+                            RequestNo = request.RequestNo,
+                            ProductId = p.ProductId,
+                            Quantity = p.Quantity,
+                            CustomerId = request.CustomerId
+                        });
+                    }
                 }
 
-                // 🔁 Güncelle
-                foreach (var prod in toUpdate)
+                #endregion
+
+                #region WorkFlow Oluşturma
+
+                var wf = new QnbWorkFlow
                 {
-                    var dtoProd = updatedProducts[prod.ProductId];
-                    prod.Quantity = dtoProd.Quantity;
-                    prod.CustomerId = dto.CustomerId;
-                    prod.RequestNo = dto.RequestNo;
-                    prod.ProductId = dtoProd.ProductId;
-                    _uow.Repository.Update(prod);
-                }
+                    RequestNo = request.RequestNo,
+                    RequestTitle = dto.Title ?? "",
+                    Priority = dto.Priority,
+                    CurrentStepId = initialStep.Id,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = meId,
+                    WorkFlowStatus = WorkFlowStatus.Pending,
+                    IsAgreement = null,
+                    IsLocationValid = dto.IsLocationValid,
+                    ApproverTechnicianId = dto.ApproverTechnicianId,
+                    CustomerApproverName = dto.CustomerApproverName
+                };
+
+                await _uow.Repository.AddAsync(wf);
+
+                #endregion
+
+                #region Hareket Kaydı
+
+                await _activationRecord.LogQnbAsync(
+                    WorkFlowActionType.ServiceRequestCreated,
+                    request.RequestNo,
+                    null,
+                    dto.CustomerId,
+                    initialStep.Code,
+                    "SR",
+                    "Servis talebi oluşturuldu",
+                    new
+                    {
+                        dto,
+                        request.Id,
+                        Products = dto.Products?.Select(p => new
+                        {
+                            p.ProductId,
+                            p.Quantity
+                        })
+                    }
+                );
+
+                #endregion
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetServiceRequestByIdAsync(request.Id);
             }
-            else
+            catch (Exception ex)
             {
-                foreach (var item in existingProducts)
-                {
-                    await _uow.Repository.HardDeleteAsync(item);
-                }
+                _logger.LogError(ex, "CreateRequestAsync");
+                return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                    $"Servis talebi oluşturma sırasında hata: {ex.Message}",
+                    StatusCode.Error
+                );
             }
-
-            await _uow.Repository.UpdateAsync(entity);
-            await _uow.Repository.CompleteAsync();
-            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
         }
-
         // 2.1 Depoya Gönderim (Ürün var ise)
         public async Task<ResponseModel<QnbWarehouseGetDto>> SendWarehouseAsync(QnbSendWarehouseDto dto)
         {
@@ -1480,7 +1535,7 @@ namespace Business.Services.Qnb
         }
 
         // 5 Kontrol ve Son Onay (FinalApproval)
-        public async Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
+        public async Task<ResponseModel<QnbFinalApprovalGetDto>> _FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
         {
             try
             {
@@ -1670,6 +1725,213 @@ namespace Business.Services.Qnb
             {
                 _logger.LogError(ex, "FinalApprovalAsync");
                 return ResponseModel<QnbFinalApprovalGetDto>.Fail($"  Kontrol ve Son Onay sırasında hata: {ex.Message}", StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
+        {
+            try
+            {
+                #region Validasyonlar/Kontroller
+
+                var wf = await _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .Include(x => x.ApproverTechnician)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+                if (wf is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış kaydı bulunamadı.",
+                        StatusCode.NotFound
+                    );
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış iptal edilmiş.",
+                        StatusCode.NotFound
+                    );
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış tamamlanmış.",
+                        StatusCode.NotFound
+                    );
+
+                var request = await _uow.Repository
+                    .GetQueryable<QnbServicesRequest>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                if (request is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "Servis talebi bulunamadı.",
+                        StatusCode.NotFound
+                    );
+
+                var statusCode = dto.WorkFlowStatus switch
+                {
+                    WorkFlowStatus.Cancelled => "CNC",
+                    WorkFlowStatus.Complated => "CMP",
+                    _ => "APR"
+                };
+
+                var targetStep = await _uow.Repository
+                    .GetQueryable<QnbWorkFlowStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Code == statusCode);
+
+                if (targetStep is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        $"Hedef iş akışı adımı {statusCode} tanımlı değil.",
+                        StatusCode.BadRequest
+                    );
+
+                var existsFinalApproval = await _uow.Repository
+                    .GetQueryable<QnbFinalApproval>()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                if (existsFinalApproval is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "Kayıt bulunamadı.",
+                        StatusCode.BadRequest
+                    );
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                #endregion
+
+                #region Workflow Güncelleme
+
+                wf.CurrentStepId = targetStep.Id;
+                wf.UpdatedDate = DateTime.Now;
+                wf.UpdatedUser = meId;
+                wf.WorkFlowStatus = dto.WorkFlowStatus;
+
+                _uow.Repository.Update(wf);
+
+                #endregion
+
+                #region Ürünler Güncellemesi
+
+                var existingProducts = await _uow.Repository
+                    .GetMultipleAsync<QnbServicesRequestProduct>(
+                        asNoTracking: false,
+                        whereExpression: x => x.RequestNo == dto.RequestNo
+                    );
+
+                var deliveredDict = dto.Products?.ToDictionary(x => x.ProductId, x => x)
+                                    ?? new Dictionary<long, QnbServicesRequestProductCreateDto>();
+
+                foreach (var existing in existingProducts)
+                {
+                    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                    {
+                        existing.Quantity = delivered.Quantity;
+                        existing.CapturedUnitPrice = delivered.Price;
+
+                        _uow.Repository.Update(existing);
+                        deliveredDict.Remove(existing.ProductId);
+                    }
+                    else
+                    {
+                        _uow.Repository.HardDelete(existing);
+                    }
+                }
+
+                foreach (var newItem in deliveredDict.Values)
+                {
+                    var newEntity = new QnbServicesRequestProduct
+                    {
+                        CustomerId = request.CustomerId,
+                        RequestNo = request.RequestNo,
+                        ProductId = newItem.ProductId,
+                        Quantity = newItem.Quantity,
+                        CapturedUnitPrice = newItem.Price
+                    };
+
+                    _uow.Repository.Add(newEntity);
+                }
+
+                #endregion
+
+                #region Ürün Fiyat Sabitleme
+
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+
+                #endregion
+
+                #region FinalApproval Güncelleme
+
+                existsFinalApproval.Notes = dto.Notes;
+                existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
+                    ? FinalApprovalStatus.Approved
+                    : dto.WorkFlowStatus == WorkFlowStatus.Cancelled
+                        ? FinalApprovalStatus.Rejected
+                        : FinalApprovalStatus.Pending;
+
+                existsFinalApproval.DecidedBy = meId;
+                existsFinalApproval.UpdatedDate = DateTime.Now;
+                existsFinalApproval.UpdatedUser = meId;
+                existsFinalApproval.DiscountPercent = dto.DiscountPercent;
+
+                _uow.Repository.Update(existsFinalApproval);
+
+                #endregion
+
+                #region Hareket Kaydı
+
+                await _activationRecord.LogQnbAsync(
+                    WorkFlowActionType.FinalApprovalUpdated,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    fromStepCode: wf.CurrentStep?.Code ?? "APR",
+                    toStepCode: statusCode,
+                    "Kontrol ve Son Onay kaydı güncellendi.",
+                    new
+                    {
+                        dto.Notes,
+                        dto.WorkFlowStatus,
+                        meId,
+                        TotalAmount = dto.Products?.Sum(x => x.Price),
+                        DateTime.Now,
+                        Products = dto.Products?.Select(p => new
+                        {
+                            p.ProductId,
+                            p.Quantity,
+                            p.Price
+                        })
+                    }
+                );
+
+                #endregion
+
+                #region Arşivleme
+
+                if (dto.WorkFlowStatus == WorkFlowStatus.Complated ||
+                    dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                {
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated
+                        ? "Tamamlandı"
+                        : "İptal";
+
+                    await ArchiveWorkflowAsync(dto.RequestNo, reason);
+                }
+
+                #endregion
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinalApprovalAsync");
+                return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                    $"Kontrol ve Son Onay sırasında hata: {ex.Message}",
+                    StatusCode.Error
+                );
             }
         }
 
@@ -2052,34 +2314,7 @@ namespace Business.Services.Qnb
                         _uow.Repository.Update(serviceRequest);
                     }
                     break;
-
-                case "CAPR":
-                    var customerForm = await _uow.Repository
-                        .GetQueryable<QnbCustomerForm>()
-                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                    if (customerForm != null)
-                    {
-                        targetStep = await _uow.Repository.GetQueryable<QnbWorkFlowStep>()
-                            .AsNoTracking()
-                            .FirstOrDefaultAsync(s => s.Code == "APR");
-                        if (targetStep is null)
-                            return ResponseModel<QnbWorkFlowGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
-                        customerForm.UpdatedDate = DateTime.Now;
-                        customerForm.UpdatedUser = meId;
-                        customerForm.Status = QnbCustomerFormStatus.AwaitingReview;
-                        _uow.Repository.Update(customerForm);
-
-                        var approval = await _uow.Repository.GetQueryable<QnbFinalApproval>()
-                            .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                        if (approval is null)
-                            return ResponseModel<QnbWorkFlowGetDto>.Fail("Hedef iş akışı (APR) bulunamadı", StatusCode.BadRequest);
-
-                        approval.Status = FinalApprovalStatus.Pending;
-                        approval.UpdatedDate = DateTime.Now;
-                        approval.UpdatedUser = meId;
-                    }
-                    break;
-
+              
                 default:
                     break;
             }
@@ -2417,6 +2652,114 @@ namespace Business.Services.Qnb
         }
 
         // -------------------- Services Request --------------------
+
+        // 1 Servis Talebi güncelleme adımı
+        public async Task<ResponseModel<QnbServicesRequestGetDto>> UpdateServiceRequestAsync(QnbServicesRequestUpdateDto dto)
+        {
+            var entity = await _uow.Repository.GetSingleAsync<QnbServicesRequest>(
+                false,
+                x => x.RequestNo == dto.RequestNo,
+                includeExpression: RequestIncludes());
+
+            if (entity is null)
+                return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var wf = await _uow.Repository
+                .GetQueryable<QnbWorkFlow>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<QnbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
+            // Ana talep bilgilerini güncelle
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = meId;
+            wf.IsLocationValid = dto.IsLocationValid;
+            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
+            wf.CustomerApproverName = dto.CustomerApproverName;
+            wf.Priority = dto.Priority;
+            wf.RequestTitle = dto.Title;
+            _uow.Repository.Update(wf);
+
+            dto.Adapt(entity, _config);
+            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            // Mevcut ürünleri çek (RequestNo bazlı)
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<QnbServicesRequestProduct>(
+                    asNoTracking: false,
+                    whereExpression: x => x.RequestNo == dto.RequestNo);
+
+            // Ürün listesi değişmişse:
+            if (dto.Products is not null)
+            {
+                var updatedProducts = dto.Products
+                    .GroupBy(p => p.ProductId)
+                    .Select(g => g.First())
+                    .ToDictionary(p => p.ProductId, p => p);
+
+                existingProducts ??= new List<QnbServicesRequestProduct>();
+
+                // Silinecek ürünler
+                var toRemove = existingProducts
+                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // Eklenecek ürünler
+                var toAdd = updatedProducts
+                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
+                    .Select(p => p.Value)
+                    .ToList();
+
+                // Güncellenecek ürünler
+                var toUpdate = existingProducts
+                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // ❌ Sil
+                foreach (var prod in toRemove)
+                    await _uow.Repository.HardDeleteAsync(prod);
+
+                // ➕ Ekle
+                foreach (var prod in toAdd)
+                {
+                    var entityProd = new QnbServicesRequestProduct
+                    {
+                        RequestNo = dto.RequestNo,
+                        ProductId = prod.ProductId,
+                        Quantity = prod.Quantity,
+                        CustomerId = dto.CustomerId,
+                    };
+                    await _uow.Repository.AddAsync(entityProd);
+                }
+
+                // 🔁 Güncelle
+                foreach (var prod in toUpdate)
+                {
+                    var dtoProd = updatedProducts[prod.ProductId];
+                    prod.Quantity = dtoProd.Quantity;
+                    prod.CustomerId = dto.CustomerId;
+                    prod.RequestNo = dto.RequestNo;
+                    prod.ProductId = dtoProd.ProductId;
+                    _uow.Repository.Update(prod);
+                }
+            }
+            else
+            {
+                foreach (var item in existingProducts)
+                {
+                    await _uow.Repository.HardDeleteAsync(item);
+                }
+            }
+
+            await _uow.Repository.UpdateAsync(entity);
+            await _uow.Repository.CompleteAsync();
+            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
+        }
         private static Func<IQueryable<QnbServicesRequest>, IIncludableQueryable<QnbServicesRequest, object>>? RequestIncludes()
             => q => q
                 .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
@@ -5839,8 +6182,6 @@ namespace Business.Services.Qnb
                 ["QnbServiceRequestWarehouse"] = "WH",
                 ["QnbServiceRequestPricing"] = "PRC",
                 ["QnbCancelledFlows"] = "CNC",
-                ["QnbCustomerServiceRequestCreate"] = "CF",
-                ["QnbServiceRequestCustomerAgreement"] = "CAPR",
                 ["QnbServiceRequestFinalApproval"] = "APR",
                 ["QnbServiceRequestCreate"] = "SR",
                 ["QnbServiceRequestComplate"] = "CMP",
