@@ -74,10 +74,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public long? ServiceTypeId { get; set; }
         public string? ServiceTypeName { get; set; }
 
-        public QnbCustomerFormStatus? CustomerFormStatus { get; set; }
-        public DateTime? CustomerFormServicesDate { get; set; }
-        public DateTime? CustomerFormPlannedCompletionDate { get; set; }
-
+ 
         public DateTimeOffset? ServicesDate { get; set; }
         public DateTimeOffset? PlannedCompletionDate { get; set; }
 
@@ -104,11 +101,6 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public decimal? DiscountPercent { get; set; }
 
         public string? FinalApprovalNotes { get; set; }
-        public string? CustomerNote { get; set; }
-        public long? CustomerApprovedBy { get; set; }
-        public string? CustomerApprovedByName { get; set; }
-        public DateTime? CustomerApprovedAt { get; set; }
-
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
     }
 }
