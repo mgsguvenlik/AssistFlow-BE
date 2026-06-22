@@ -2610,8 +2610,8 @@ namespace Business.Services
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
 
-                //CreatedUser
-                join cru  in qCreatedUsers on sr.CreatedUser equals cru.Id into  cruj
+                    //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
                 from cu in cruj.DefaultIfEmpty()
 
                 select new WarehouseGetDto
@@ -4116,31 +4116,111 @@ namespace Business.Services
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var term = q.Search.Trim();
-
                 var priorityAliases = new Dictionary<WorkFlowPriority, string[]>
-                    {
-                        { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
-                        { WorkFlowPriority.Normal, new[] { "Normal" } },
-                        { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
-                        { WorkFlowPriority.Urgent, new[] { "Acil", "Urgent" } }
-                    };
+                        {
+                            { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
+                        
+                            { WorkFlowPriority.Normal, new[] { "Normal" } },
+                        
+                            { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
+                        
+                            { WorkFlowPriority.Urgent, new[] { "Acil", "Urgent" } },
+                        
+                            {
+                                WorkFlowPriority.Region1Urgent,
+                                new[]
+                                {
+                                    "1. Bölge Acil",
+                                    "1.Bölge Acil",
+                                    "1 Bolge Acil",
+                                    "1. Bolge Acil",
+                                    "Region1Urgent",
+                                    "Region 1 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region1Normal,
+                                new[]
+                                {
+                                    "1. Bölge Normal",
+                                    "1.Bölge Normal",
+                                    "1 Bolge Normal",
+                                    "1. Bolge Normal",
+                                    "Region1Normal",
+                                    "Region 1 Normal"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region2Urgent,
+                                new[]
+                                {
+                                    "2. Bölge Acil",
+                                    "2.Bölge Acil",
+                                    "2 Bolge Acil",
+                                    "2. Bolge Acil",
+                                    "Region2Urgent",
+                                    "Region 2 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region2Normal,
+                                new[]
+                                {
+                                    "2. Bölge Normal",
+                                    "2.Bölge Normal",
+                                    "2 Bolge Normal",
+                                    "2. Bolge Normal",
+                                    "Region2Normal",
+                                    "Region 2 Normal"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region3Urgent,
+                                new[]
+                                {
+                                    "3. Bölge Acil",
+                                    "3.Bölge Acil",
+                                    "3 Bolge Acil",
+                                    "3. Bolge Acil",
+                                    "Region3Urgent",
+                                    "Region 3 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region3Normal,
+                                new[]
+                                {
+                                    "3. Bölge Normal",
+                                    "3.Bölge Normal",
+                                    "3 Bolge Normal",
+                                    "3. Bolge Normal",
+                                    "Region3Normal",
+                                    "Region 3 Normal"
+                                }
+                            }
+                        };
 
-                            var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
-                    {
-                        { WorkFlowStatus.Pending, new[] { "Beklemede", "Pending" } },
-                        { WorkFlowStatus.Complated, new[] { "Tamamlandı", "Tamamlandi", "Completed", "Complated" } },
-                        { WorkFlowStatus.Cancelled, new[] { "İptal", "Iptal", "İptal Edildi", "Iptal Edildi", "Cancelled" } }
-                    };
+                var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
+{
+    { WorkFlowStatus.Pending, new[] { "Beklemede", "Pending" } },
+    { WorkFlowStatus.Complated, new[] { "Tamamlandı", "Tamamlandi", "Completed", "Complated" } },
+    { WorkFlowStatus.Cancelled, new[] { "İptal", "Iptal", "İptal Edildi", "Iptal Edildi", "Cancelled" } }
+};
 
-                            var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
-                    {
-                        { ServicesCostStatus.Unknown, new[] { "Belirtilmemiş", "Belirtilmemis", "Unknown" } },
-                        { ServicesCostStatus.NotRequired, new[] { "Ücret gerekmiyor", "Ucret gerekmiyor", "Ücretsiz", "Ucretsiz", "Not Required" } },
-                        { ServicesCostStatus.Chargeable, new[] { "Ücretli", "Ucretli", "Müşteri öder", "Musteri oder", "Chargeable" } },
-                        { ServicesCostStatus.Maintenance, new[] { "Bakım", "Bakim", "Bakım kapsamında", "Bakim kapsaminda", "Maintenance" } }
-                    };
+                var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
+{
+    { ServicesCostStatus.Unknown, new[] { "Belirtilmemiş", "Belirtilmemis", "Unknown" } },
+    { ServicesCostStatus.NotRequired, new[] { "Ücret gerekmiyor", "Ucret gerekmiyor", "Ücretsiz", "Ucretsiz", "Not Required" } },
+    { ServicesCostStatus.Chargeable, new[] { "Ücretli", "Ucretli", "Müşteri öder", "Musteri oder", "Chargeable" } },
+    { ServicesCostStatus.Maintenance, new[] { "Bakım", "Bakim", "Bakım kapsamında", "Bakim kapsaminda", "Maintenance" } }
+};
 
-                var priorityMatches =CommonFunctions.MatchEnumValues(term, priorityAliases);
+                var priorityMatches = CommonFunctions.MatchEnumValues(term, priorityAliases);
                 var workflowStatusMatches = CommonFunctions.MatchEnumValues(term, workflowStatusAliases);
                 var serviceCostStatusMatches = CommonFunctions.MatchEnumValues(term, serviceCostStatusAliases);
 

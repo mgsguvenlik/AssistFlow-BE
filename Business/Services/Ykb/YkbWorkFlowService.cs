@@ -5105,12 +5105,105 @@ namespace Business.Services.Ykb
                 var term = q.Search.Trim();
 
                 var priorityAliases = new Dictionary<WorkFlowPriority, string[]>
+{
+    { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
+
+    { WorkFlowPriority.Normal, new[] { "Normal", "Orta" } },
+
+    { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
+
+    { WorkFlowPriority.Urgent, new[] { "Acil", "Kritik", "Urgent" } },
+
+    {
+        WorkFlowPriority.Region1Normal,
+        new[]
         {
-            { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
-            { WorkFlowPriority.Normal, new[] { "Normal", "Orta" } },
-            { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
-            { WorkFlowPriority.Urgent, new[] { "Acil", "Kritik", "Urgent" } }
-        };
+            "1. Bölge Normal",
+            "1.Bölge Normal",
+            "1 Bolge Normal",
+            "1. Bolge Normal",
+            "Bölge 1 Normal",
+            "Bolge 1 Normal",
+            "Region1Normal"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region1Urgent,
+        new[]
+        {
+            "1. Bölge Acil",
+            "1.Bölge Acil",
+            "1 Bolge Acil",
+            "1. Bolge Acil",
+            "1. Bölge Kritik",
+            "1 Bolge Kritik",
+            "Bölge 1 Acil",
+            "Bolge 1 Acil",
+            "Region1Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region2Urgent,
+        new[]
+        {
+            "2. Bölge Acil",
+            "2.Bölge Acil",
+            "2 Bolge Acil",
+            "2. Bolge Acil",
+            "2. Bölge Kritik",
+            "2 Bolge Kritik",
+            "Bölge 2 Acil",
+            "Bolge 2 Acil",
+            "Region2Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region2Normal,
+        new[]
+        {
+            "2. Bölge Normal",
+            "2.Bölge Normal",
+            "2 Bolge Normal",
+            "2. Bolge Normal",
+            "Bölge 2 Normal",
+            "Bolge 2 Normal",
+            "Region2Normal"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region3Urgent,
+        new[]
+        {
+            "3. Bölge Acil",
+            "3.Bölge Acil",
+            "3 Bolge Acil",
+            "3. Bolge Acil",
+            "3. Bölge Kritik",
+            "3 Bolge Kritik",
+            "Bölge 3 Acil",
+            "Bolge 3 Acil",
+            "Region3Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region3Normal,
+        new[]
+        {
+            "3. Bölge Normal",
+            "3.Bölge Normal",
+            "3 Bolge Normal",
+            "3. Bolge Normal",
+            "Bölge 3 Normal",
+            "Bolge 3 Normal",
+            "Region3Normal"
+        }
+    }
+}; 
 
                 var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
         {

@@ -226,14 +226,25 @@ namespace Business.Services
             }
         }
       
-        private static string GetPriorityNameTr(WorkFlowPriority priority)
+     
+         private static string GetPriorityNameTr(WorkFlowPriority priority)
         {
-            return Convert.ToInt32(priority) switch
+            return priority switch
             {
-                0 => "Düşük",
-                1 => "Normal",
-                2 => "Yüksek",
-                3 => "Kritik",
+                WorkFlowPriority.Low => "Düşük",
+                WorkFlowPriority.Normal => "Normal",
+                WorkFlowPriority.High => "Yüksek",
+                WorkFlowPriority.Urgent => "Kritik",
+
+                WorkFlowPriority.Region1Normal => "1. Bölge - Normal",
+                WorkFlowPriority.Region1Urgent => "1. Bölge - Acil",
+
+                WorkFlowPriority.Region2Normal => "2. Bölge - Normal",
+                WorkFlowPriority.Region2Urgent => "2. Bölge - Acil",
+
+                WorkFlowPriority.Region3Normal => "3. Bölge - Normal",
+                WorkFlowPriority.Region3Urgent => "3. Bölge - Acil",
+
                 _ => priority.ToString()
             };
         }

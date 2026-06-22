@@ -25,6 +25,16 @@ namespace Model.Dtos.WorkFlowDtos.Report
             WorkFlowPriority.Normal => "Normal",
             WorkFlowPriority.High => "Yüksek",
             WorkFlowPriority.Urgent => "Acil",
+
+            WorkFlowPriority.Region1Normal => "1. Bölge Normal",
+            WorkFlowPriority.Region1Urgent => "1. Bölge Acil",
+
+            WorkFlowPriority.Region2Urgent => "2. Bölge Acil",
+            WorkFlowPriority.Region2Normal => "2. Bölge Normal",
+
+            WorkFlowPriority.Region3Urgent => "3. Bölge Acil",
+            WorkFlowPriority.Region3Normal => "3. Bölge Normal",
+
             _ => Priority.ToString()
         };
 
