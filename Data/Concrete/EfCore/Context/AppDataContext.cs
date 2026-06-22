@@ -57,6 +57,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
         public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
+        public DbSet<TechnicalServiceWorkSession> TechnicalServiceWorkSessions { get; set; }
 
 
         #region YKB

@@ -75,6 +75,7 @@ namespace Model.Dtos.Customer
         public long? TenantId { get; set; }
 
         public int? MonitoringStatus { get; set; }
+        public int? SerialNo { get; set; }
     }
 
     /// ---- Yardımcı Attribute'lar ----

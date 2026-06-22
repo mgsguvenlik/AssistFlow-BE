@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260620134501_addSerialNoToCustomer")]
+    partial class addSerialNoToCustomer
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1678,83 +1681,6 @@ namespace Data.Migrations
                     b.HasIndex("Code");
 
                     b.ToTable("SystemType", (string)null);
-                });
-
-            modelBuilder.Entity("Model.Concrete.TechnicalServiceWorkSession", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("CreatedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("ExtendCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("FinishDescription")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset?>("FinishedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<bool>("HasMissingZoneOnFinish")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<long?>("ManitouLogSequence")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("MissingZonesText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTimeOffset>("PlannedEndAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("ReceivedZonesText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RequestNo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("SerialNo")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("StartedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("TechnicalServiceId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset?>("UpdatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("UpdatedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("WorkFlowId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TechnicalServiceWorkSessions");
                 });
 
             modelBuilder.Entity("Model.Concrete.Tenant", b =>

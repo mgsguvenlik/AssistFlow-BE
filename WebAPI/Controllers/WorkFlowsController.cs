@@ -323,5 +323,36 @@ namespace WebAPI.Controllers
 
             return StatusCode((int)resp.StatusCode, resp);
         }
+
+        ///Manitou System Test Zone ilgili işlemler
+
+        [HttpPost("start-working")]
+        public async Task<IActionResult> StartWorking([FromBody] StartWorkingDto dto)
+        {
+            var result = await _workFlowService.StartWorking(dto);
+            return ToActionResult(result);
+        }
+
+        [HttpGet("working-status")]
+        public async Task<IActionResult> GetWorkingStatus([FromQuery] string requestNo)
+        {
+            var result = await _workFlowService.GetWorkingStatus(requestNo);
+            return ToActionResult(result);
+        }
+
+        [HttpPost("extend-working")]
+        public async Task<IActionResult> ExtendWorking([FromBody] ExtendWorkingDto dto)
+        {
+            var result = await _workFlowService.ExtendWorking(dto);
+            return ToActionResult(result);
+        }
+
+        [HttpPost("finish-working")]
+        public async Task<IActionResult> FinishWorking([FromBody] FinishWorkingDto dto)
+        {
+            var result = await _workFlowService.FinishWorking(dto);
+            return ToActionResult(result);
+        }
+
     }
 }

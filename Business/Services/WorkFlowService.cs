@@ -1,5 +1,7 @@
 ﻿using Azure.Core;
 using Business.Interfaces;
+using Business.Interfaces.Manitou;
+using Business.Services.Manitou;
 using Business.UnitOfWork;
 using ClosedXML.Excel;
 using Core.Common;
@@ -23,6 +25,7 @@ using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
+using Model.Dtos.Manitou;
 using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
@@ -44,6 +47,7 @@ using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Business.Services
 {
@@ -57,11 +61,12 @@ namespace Business.Services
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
         private readonly IMenuService _menuService;
+        private readonly IManitouApiService _manitouApiService;
         private readonly AppDataContext _ctx;
 
 
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
-            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService)
+            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService, IManitouApiService manitouApiService)
         {
             _uow = uow;
             _config = config;
@@ -72,6 +77,7 @@ namespace Business.Services
             _ctx = ctx;
             _notification = notification;
             _menuService = menuService;
+            _manitouApiService = manitouApiService;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -1185,6 +1191,9 @@ namespace Business.Services
 
 
         }
+
+
+
 
         // 4 Fiyatlama onay ve kontrole gönderim.
         public async Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto)
@@ -2610,8 +2619,8 @@ namespace Business.Services
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
 
-                //CreatedUser
-                join cru  in qCreatedUsers on sr.CreatedUser equals cru.Id into  cruj
+                    //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
                 from cu in cruj.DefaultIfEmpty()
 
                 select new WarehouseGetDto
@@ -3061,6 +3070,7 @@ namespace Business.Services
                     Note = sr.Customer.Note,
                     CashCenter = sr.Customer.CashCenter,
                     LockType = sr.Customer.LockType,
+                    SerialNo=sr.Customer.SerialNo,
                     Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -3075,7 +3085,7 @@ namespace Business.Services
 
                                      // İstersen müşteri bilgilerini de doldurabiliriz:
                                      CustomerName = a.Customer.SubscriberCompany,
-                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                     CustomerShortCode = a.Customer.CustomerShortCode,
                                  })
                                 .ToList()
                 })
@@ -4125,14 +4135,14 @@ namespace Business.Services
                         { WorkFlowPriority.Urgent, new[] { "Acil", "Urgent" } }
                     };
 
-                            var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
+                var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
                     {
                         { WorkFlowStatus.Pending, new[] { "Beklemede", "Pending" } },
                         { WorkFlowStatus.Complated, new[] { "Tamamlandı", "Tamamlandi", "Completed", "Complated" } },
                         { WorkFlowStatus.Cancelled, new[] { "İptal", "Iptal", "İptal Edildi", "Iptal Edildi", "Cancelled" } }
                     };
 
-                            var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
+                var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
                     {
                         { ServicesCostStatus.Unknown, new[] { "Belirtilmemiş", "Belirtilmemis", "Unknown" } },
                         { ServicesCostStatus.NotRequired, new[] { "Ücret gerekmiyor", "Ucret gerekmiyor", "Ücretsiz", "Ucretsiz", "Not Required" } },
@@ -4140,7 +4150,7 @@ namespace Business.Services
                         { ServicesCostStatus.Maintenance, new[] { "Bakım", "Bakim", "Bakım kapsamında", "Bakim kapsaminda", "Maintenance" } }
                     };
 
-                var priorityMatches =CommonFunctions.MatchEnumValues(term, priorityAliases);
+                var priorityMatches = CommonFunctions.MatchEnumValues(term, priorityAliases);
                 var workflowStatusMatches = CommonFunctions.MatchEnumValues(term, workflowStatusAliases);
                 var serviceCostStatusMatches = CommonFunctions.MatchEnumValues(term, serviceCostStatusAliases);
 
@@ -6292,7 +6302,6 @@ namespace Business.Services
             return ResponseModel.Success();
         }
 
-
         /// --------------------- Arşivleme  ---------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
@@ -6474,5 +6483,668 @@ namespace Business.Services
             public decimal Subtotal { get; set; }
             public string Currency { get; set; } = "TRY";
         }
+
+        //Manitou Test Zone ile ilgili işlemler 
+        public async Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                    return ResponseModel<WorkingStatusDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.Conflict);
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                    return ResponseModel<WorkingStatusDto>.Fail("İlgili akış tamamlanmış.", StatusCode.Conflict);
+
+                if (technicalService.ServicesStatus != TechnicalServiceStatus.InProgress)
+                    return ResponseModel<WorkingStatusDto>.Fail("Çalışma başlatmak için teknik servis önce başlatılmalıdır.", StatusCode.Conflict);
+
+                if (!customer.SerialNo.HasValue || customer.SerialNo.Value <= 0)
+                    return ResponseModel<WorkingStatusDto>.Fail("Müşteri için Manitou SerialNo bilgisi bulunamadı.", StatusCode.BadRequest);
+
+                var existingActiveSession = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (existingActiveSession is not null)
+                    return await GetWorkingStatus(dto.RequestNo);
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var serialNo = customer.SerialNo.Value;
+
+                // Aynı müşteri için aktif test var mı?
+                var activeCustomerSession = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .AsNoTracking()
+                    .OrderByDescending(x => x.Id)
+                    .FirstOrDefaultAsync(x =>
+                        x.CustomerId == request.CustomerId &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (activeCustomerSession is not null)
+                {
+                    // Aynı talep zaten açık ise yeniden Manitou çağrısı yapma,
+                    // mevcut çalışma durumunu dön.
+                    if (string.Equals(
+                        activeCustomerSession.RequestNo,
+                        dto.RequestNo,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        return await GetWorkingStatus(dto.RequestNo);
+                    }
+
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        $"Bu müşteri için aktif bir test bulunmaktadır. " +
+                        $"Önce '{activeCustomerSession.RequestNo}' numaralı talepteki test tamamlanmalıdır.",
+                        StatusCode.Conflict);
+                }
+                var nowUtc = DateTimeOffset.UtcNow;
+                var plannedEndUtc = nowUtc.AddHours(1);
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                        me?.TechnicianName ??
+                        me?.Name ??
+                        me?.Email ??
+                        "Bilinmeyen Teknisyen";
+
+                var startDescription = BuildManitouTestDescription(
+                    dto.RequestNo,
+                    technicianName,
+                    "başlatıldı");
+
+                await _manitouApiService.BeginSystemTestAsync(accessToken, serialNo);
+
+                await _manitouApiService.SetCustomerOnTestAsync(
+                    accessToken,
+                    new ManitouOnTestRequest
+                    {
+                        SerialNo = serialNo,
+                        Description = startDescription,
+                        UtcFrom = ToManitouUtcText(nowUtc),
+                        UtcTo = ToManitouUtcText(plannedEndUtc),
+                        IsNew = true
+                    });
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(accessToken, serialNo);
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(accessToken, serialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(outOfServiceRecords, serialNo, dto.RequestNo);
+
+                var session = new TechnicalServiceWorkSession
+                {
+                    RequestNo = dto.RequestNo,
+                    WorkFlowId = wf.Id,
+                    TechnicalServiceId = technicalService.Id,
+                    CustomerId = request.CustomerId,
+                    SerialNo = serialNo,
+                    StartedAtUtc = nowUtc,
+                    PlannedEndAtUtc = plannedEndUtc,
+                    IsActive = true,
+                    IsCompleted = false,
+                    ExtendCount = 0,
+                    ManitouLogSequence = relatedOutOfServiceRecord?.LogSequence,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = meId,
+                    IsDeleted = false
+                };
+
+                _uow.Repository.Add(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceStarted,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma/test başlatıldı",
+                    new
+                    {
+                        SerialNo = serialNo,
+                        StartedAtUtc = nowUtc,
+                        PlannedEndAtUtc = plannedEndUtc,
+                        ZoneCount = zones.Count
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetWorkingStatus(dto.RequestNo);
+            }
+            catch (ManitouApiException ex)
+            {
+                _logger.LogError(ex, "StartWorking Manitou hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Manitou çalışma başlatma sırasında hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "StartWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma başlatılırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(
+                    accessToken,
+                    session.SerialNo);
+
+                var receivedZones = GetReceivedZones(zones);
+                var missingZones = GetMissingZones(zones);
+
+                if (missingZones.Count > 0 && !dto.ForceFinish)
+                {
+                    return ResponseModel<FinishWorkingResultDto>.Success(
+                        new FinishWorkingResultDto
+                        {
+                            RequestNo = dto.RequestNo,
+                            SerialNo = session.SerialNo,
+                            IsFinished = false,
+                            NeedConfirmation = true,
+                            Message = "Uyarı, bütün bölgelerden alarm göndermediniz. Yine de çalışmayı bitirmek istiyor musunuz?",
+                            ReceivedZones = receivedZones,
+                            MissingZones = missingZones
+                        },
+                        "Eksik alarm bölgesi var. Kullanıcı onayı gerekiyor.",
+                        StatusCode.Ok);
+                }
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                        accessToken,
+                        session.SerialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                    outOfServiceRecords,
+                    session.SerialNo,
+                    dto.RequestNo);
+
+                var logSequence = relatedOutOfServiceRecord?.LogSequence
+                                  ?? session.ManitouLogSequence
+                                  ?? 0;
+
+                if (logSequence <= 0)
+                {
+                    return ResponseModel<FinishWorkingResultDto>.Fail(
+                        "Manitou çalışma kaydı logSequence bilgisi bulunamadı. Test kapatılamadı.",
+                        StatusCode.Error);
+                }
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                      me?.TechnicianName ??
+                      me?.Name ??
+                      me?.Email ??
+                      "Bilinmeyen Teknisyen";
+
+                var finishDescription = BuildManitouTestDescription(
+                       dto.RequestNo,
+                       technicianName,
+                       "bitirildi");
+                await _manitouApiService.SetCustomerOffTestAsync(
+                    accessToken,
+                    new ManitouOffTestRequest
+                    {
+                        SerialNo = session.SerialNo,
+                        LogSequence = logSequence,
+                        Description = finishDescription,
+                        IsNew = false,
+                        UtcFrom = ToManitouUtcText(session.StartedAtUtc),
+                        UtcTo = ToManitouUtcText(nowUtc)
+                    });
+
+                if (missingZones.Count > 0)
+                {
+                    await SendMissingZoneWarningMailAsync(
+                        technicianName,
+                        customer.SubscriberCompany ?? customer.ContactName1 ?? "-",
+                        dto.RequestNo,
+                        receivedZones,
+                        missingZones);
+                }
+
+
+                session.IsActive = false;
+                session.IsCompleted = true;
+                session.FinishedAtUtc = nowUtc;
+                session.ManitouLogSequence = logSequence;
+                session.HasMissingZoneOnFinish = missingZones.Count > 0;
+                session.ReceivedZonesText = string.Join(",", receivedZones);
+                session.MissingZonesText = string.Join(",", missingZones);
+                session.FinishDescription = missingZones.Count > 0
+                    ? "Eksik zone ile kullanıcı onayı sonrası çalışma bitirildi."
+                    : "Tüm zonlardan alarm alındı. Çalışma bitirildi.";
+                session.UpdatedDate = DateTime.Now;
+                session.UpdatedUser = meId;
+
+                _uow.Repository.Update(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceFinished,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma/test bitirildi",
+                    new
+                    {
+                        SerialNo = session.SerialNo,
+                        ReceivedZones = receivedZones,
+                        MissingZones = missingZones,
+                        ForceFinish = dto.ForceFinish,
+                        FinishedAtUtc = nowUtc
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel<FinishWorkingResultDto>.Success(
+                    new FinishWorkingResultDto
+                    {
+                        RequestNo = dto.RequestNo,
+                        SerialNo = session.SerialNo,
+                        IsFinished = true,
+                        NeedConfirmation = false,
+                        Message = "Çalışma başarıyla bitirildi. Müşteri test modundan çıkarıldı.",
+                        ReceivedZones = receivedZones,
+                        MissingZones = missingZones
+                    },
+                    "Çalışma başarıyla bitirildi.",
+                    StatusCode.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinishWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<FinishWorkingResultDto>.Fail(
+                    $"Çalışma bitirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        private async Task<(WorkFlow wf, ServicesRequest request, Customer customer, TechnicalService technicalService)?> GetTechnicalServiceContextAsync(string requestNo)
+        {
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return null;
+
+            var request = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.Customer)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (request is null || request.Customer is null)
+                return null;
+
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (technicalService is null)
+                return null;
+
+            return (wf, request, request.Customer, technicalService);
+        }
+        private static string ToManitouUtcText(DateTimeOffset value)
+        {
+            return value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        private static List<string> GetReceivedZones(List<ManitouSystemTestZoneResult> zones)
+        {
+            return zones
+                .Where(x => x.TestSignalCount > 0)
+                .Select(x => string.IsNullOrWhiteSpace(x.ZoneId) ? "-" : x.ZoneId!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+        private static List<string> GetMissingZones(List<ManitouSystemTestZoneResult> zones)
+        {
+            return zones
+                .Where(x => x.TestSignalCount <= 0)
+                .Select(x => string.IsNullOrWhiteSpace(x.ZoneId) ? "-" : x.ZoneId!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+        public async Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .AsNoTracking()
+                    .OrderByDescending(x => x.Id)
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == requestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(
+                    accessToken,
+                    session.SerialNo);
+
+                var activity = await _manitouApiService.GetCustomerActivityAsync(
+                    accessToken,
+                    session.SerialNo,
+                    days: 1);
+
+                var receivedZones = GetReceivedZones(zones);
+                var missingZones = GetMissingZones(zones);
+
+                var remainingSeconds = Convert.ToInt64(
+                    Math.Max(0, (session.PlannedEndAtUtc - DateTimeOffset.UtcNow).TotalSeconds));
+
+                var result = new WorkingStatusDto
+                {
+                    RequestNo = session.RequestNo,
+                    SerialNo = session.SerialNo,
+                    IsActive = session.IsActive,
+                    IsCompleted = session.IsCompleted,
+                    StartedAtUtc = session.StartedAtUtc,
+                    PlannedEndAtUtc = session.PlannedEndAtUtc,
+                    RemainingSeconds = remainingSeconds,
+                    ExtendCount = session.ExtendCount,
+                    Zones = zones,
+                    Activity = activity,
+                    ReceivedZones = receivedZones,
+                    MissingZones = missingZones
+                };
+
+                return ResponseModel<WorkingStatusDto>.Success(
+                    result,
+                    "Çalışma durumu getirildi.",
+                    StatusCode.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetWorkingStatus hatası. RequestNo={RequestNo}", requestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma durumu alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                if (dto.ExtendMinutes <= 0)
+                    dto.ExtendMinutes = 30;
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                var extensionBaseUtc = session.PlannedEndAtUtc > nowUtc
+                    ? session.PlannedEndAtUtc
+                    : nowUtc;
+
+                var newEndUtc = extensionBaseUtc.AddMinutes(dto.ExtendMinutes);
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                      me?.TechnicianName ??
+                      me?.Name ??
+                      me?.Email ??
+                      "Bilinmeyen Teknisyen";
+
+
+
+                var extendDescription = BuildManitouTestDescription(
+                dto.RequestNo,
+                technicianName,
+                "uzatıldı");
+
+                await _manitouApiService.SetCustomerOnTestAsync(
+                    accessToken,
+                    new ManitouOnTestRequest
+                    {
+                        SerialNo = session.SerialNo,
+                        Description = extendDescription,
+                        UtcFrom = ToManitouUtcText(session.StartedAtUtc),
+                        UtcTo = ToManitouUtcText(newEndUtc),
+                        IsNew = false
+                    });
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                        accessToken,
+                        session.SerialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                    outOfServiceRecords,
+                    session.SerialNo,
+                    dto.RequestNo);
+
+                if (relatedOutOfServiceRecord is not null)
+                {
+                    session.ManitouLogSequence = relatedOutOfServiceRecord.LogSequence;
+                }
+
+                session.PlannedEndAtUtc = newEndUtc;
+                session.ExtendCount += 1;
+                session.UpdatedDate = DateTime.Now;
+                session.UpdatedUser = meId;
+
+                _uow.Repository.Update(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceStarted,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma süresi uzatıldı",
+                    new
+                    {
+                        SerialNo = session.SerialNo,
+                        ExtendMinutes = dto.ExtendMinutes,
+                        NewEndUtc = newEndUtc
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetWorkingStatus(dto.RequestNo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExtendWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma uzatılırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        private async Task SendMissingZoneWarningMailAsync(string technicianName, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
+        {
+            var me= await _currentUser.GetAsync();
+            var receivedText = receivedZones.Count > 0
+                ? string.Join(", ", receivedZones)
+                : "hiçbir";
+
+            var missingText = missingZones.Count > 0
+                ? string.Join(", ", missingZones)
+                : "-";
+
+            var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
+
+            var body =
+                $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada " +
+                $"{receivedText} bölgelerinden alarm aldı fakat {missingText} bölgelerinden alarm almadı.";
+
+            var managerMails = new List<string>();
+            var managerMailConfig = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Name == "TechnicalServiceManagerEmails");
+
+            if (managerMailConfig is not null && !string.IsNullOrWhiteSpace(managerMailConfig.Value))
+            {
+                managerMails = managerMailConfig.Value
+                    .Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            if (managerMails.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Eksik zone uyarı maili gönderilemedi. TechnicalServiceManagerEmails tanımlı değil. RequestNo={RequestNo}",
+                    requestNo);
+
+                return;
+            }
+            await _mailPush.EnqueueAsync(new MailOutbox
+            {
+                RequestNo = requestNo,
+                FromStepCode = "TS",
+                ToStepCode = "TS",
+                ToRecipients = string.Join(";", managerMails),
+                Subject = subject,
+                BodyHtml = body,
+                CreatedUser = me?.Id
+            });
+
+            await Task.CompletedTask;
+        }
+        private static string BuildManitouTestDescription(
+            string requestNo,
+            string technicianName,
+            string action)
+        {
+            return
+                $"FlowAssist Teknik Servis Testi [FA:{requestNo}] - " +
+                $"{technicianName} tarafından {action}.";
+        }
+
+        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(
+                IEnumerable<ManitouOutOfServiceResult> records,
+                int serialNo,
+                string requestNo)
+        {
+            var requestMarker = $"[FA:{requestNo}]";
+
+            var customerRecords = records
+                .Where(x => x.SerialNo == serialNo)
+                .Where(x => x.AdvancedOnTest)
+                .Where(x => x.LogSequence > 0)
+                .ToList();
+
+            if (customerRecords.Count == 0)
+                return null;
+
+            // Sadece bu FlowAssist talebine ait kaydı bul.
+            return customerRecords
+                .Where(x => !string.IsNullOrWhiteSpace(x.Description))
+                .Where(x => x.Description!.Contains(
+                    requestMarker,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.UtcTo ?? DateTime.MinValue)
+                .ThenByDescending(x => x.LogSequence)
+                .FirstOrDefault();
+        }
+
     }
 }

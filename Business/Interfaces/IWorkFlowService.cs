@@ -75,6 +75,14 @@ namespace Business.Interfaces
         Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+         
+
+
+        //Manitou System Test Zone ile ilgili işlemler eklenecek
+        Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
+        Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
+        Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
+        Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto);
 
     }
 }
