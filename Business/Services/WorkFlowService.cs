@@ -40,6 +40,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
@@ -114,6 +115,16 @@ namespace Business.Services
                 if (!customerApproverExist)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
 
+               
+                var (workOrderTypeIds, workOrderTypeValidationError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (workOrderTypeValidationError is not null)
+                {
+                    return ResponseModel<ServicesRequestGetDto>.Fail(
+                        workOrderTypeValidationError,
+                        StatusCode.BadRequest
+                    );
+                }
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
@@ -121,9 +132,17 @@ namespace Business.Services
 
                 #region Servis talebi güncelleme 
                 var request = dto.Adapt<ServicesRequest>(_config);
+
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                request.ServicesRequestWorkOrderTypes = workOrderTypeIds
+                    .Select(workOrderTypeId => new ServicesRequestWorkOrderType
+                    {
+                        WorkOrderTypeId = workOrderTypeId
+                    })
+                    .ToList();
+
                 await _uow.Repository.AddAsync(request);
                 #endregion
 
@@ -1132,6 +1151,22 @@ namespace Business.Services
 
                 #endregion
 
+                #region İş Emri Türleri Güncellemesi
+                if (dto.WorkOrderTypeIds is not null)
+                {
+                    var srEntity = await _uow.Repository.GetQueryable<ServicesRequest>()
+                        .Include(x => x.ServicesRequestWorkOrderTypes)
+                        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                    if (srEntity is not null)
+                    {
+                        var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                        if (wotError is null)
+                            SyncWorkOrderTypes(srEntity, validatedWotIds);
+                    }
+                }
+                #endregion
+
                 #region Hareket Kaydı
                 await _activationRecord.LogAsync(
                      WorkFlowActionType.TechnicalServiceFinished,
@@ -1734,14 +1769,18 @@ namespace Business.Services
         ///----------------------------- 
 
         // -------------------- Services Request --------------------
-        private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
-            => q => q
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.ServiceType)
-                .Include(x => x.CustomerApprover)
-                .Include(x => x.CustomerApprover)
-                .Include(x => x.WorkFlowStep);
+       private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
+           => q => q
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerGroup)
+                   .ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.ServiceType)
+               .Include(x => x.CustomerApprover)
+               .Include(x => x.WorkFlowStep)
+               .Include(x => x.ServicesRequestWorkOrderTypes)
+            .ThenInclude(x => x.WorkOrderType);
 
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
@@ -1911,6 +1950,25 @@ namespace Business.Services
             if (baseDto is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+            baseDto.WorkOrderTypes = await _uow.Repository
+            .GetQueryable<ServicesRequestWorkOrderType>()
+            .AsNoTracking()
+            .Where(x => x.ServicesRequestId == baseDto.Id)
+            .OrderBy(x => x.WorkOrderType.Name)
+            .Select(x => new WorkOrderTypeGetDto
+            {
+                Id = x.WorkOrderTypeId,
+                Name = x.WorkOrderType.Name,
+                Code = x.WorkOrderType.Code
+            })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
+
+
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
                      .GetQueryable<ServicesRequestProduct>()
@@ -2071,6 +2129,22 @@ namespace Business.Services
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
 
+            baseDto.WorkOrderTypes = await _uow.Repository
+             .GetQueryable<ServicesRequestWorkOrderType>()
+             .AsNoTracking()
+             .Where(x => x.ServicesRequest.RequestNo == requestNo)
+             .OrderBy(x => x.WorkOrderType.Name)
+             .Select(x => new WorkOrderTypeGetDto
+             {
+                 Id = x.WorkOrderTypeId,
+                 Name = x.WorkOrderType.Name,
+                 Code = x.WorkOrderType.Code
+             })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
             // NEW: CustomerGroup + ProgressApprovers (tek ek sorgu)
             if (baseDto.Customer?.CustomerGroupId is long cgId)
             {
@@ -2100,7 +2174,6 @@ namespace Business.Services
                     .FirstOrDefaultAsync() ?? new CustomerGroupGetDto();
             }
 
-            // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
@@ -2195,8 +2268,32 @@ namespace Business.Services
             _uow.Repository.Update(wf);
 
 
+            List<long>? validatedWorkOrderTypeIds = null;
+
+            if (dto.WorkOrderTypeIds is not null)
+            {
+                var (ids, validationError) =
+                    await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (validationError is not null)
+                {
+                    return ResponseModel<ServicesRequestGetDto>.Fail(
+                        validationError,
+                        StatusCode.BadRequest
+                    );
+                }
+
+                validatedWorkOrderTypeIds = ids;
+            }
+
             dto.Adapt(entity, _config);
+
             entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            if (validatedWorkOrderTypeIds is not null)
+            {
+                SyncWorkOrderTypes(entity, validatedWorkOrderTypeIds);
+            }
 
             // Mevcut ürünleri çek (RequestNo bazlı)
             var existingProducts = await _uow.Repository
@@ -3029,6 +3126,23 @@ namespace Business.Services
 
             if (dto is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            dto.WorkOrderTypes = await _uow.Repository
+                 .GetQueryable<ServicesRequestWorkOrderType>()
+                 .AsNoTracking()
+                 .Where(x => x.ServicesRequest.RequestNo == requestNo)
+                 .OrderBy(x => x.WorkOrderType.Name)
+                 .Select(x => new WorkOrderTypeGetDto
+                 {
+                     Id = x.WorkOrderTypeId,
+                     Name = x.WorkOrderType.Name,
+                     Code = x.WorkOrderType.Code
+                 })
+                .ToListAsync();
+
+            dto.WorkOrderTypeIds = dto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
 
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
@@ -4645,6 +4759,8 @@ namespace Business.Services
                 .Include(x => x.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.ProgressApprovers)
+                .Include(x => x.ServicesRequestWorkOrderTypes)
+                    .ThenInclude(x => x.WorkOrderType)
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
 
             if (sr is not null)
@@ -4663,7 +4779,15 @@ namespace Business.Services
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType?.Name,
                     Priority = sr.Priority.ToString(),
-                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString()
+                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString(),
+                    WorkOrderTypes = sr.ServicesRequestWorkOrderTypes
+                        .Select(x => new WorkOrderTypeLiteDto
+                        {
+                            Id = x.WorkOrderType.Id,
+                            Name = x.WorkOrderType.Name,
+                            Code = x.WorkOrderType.Code
+                        })
+                        .ToList()
                 };
 
                 if (sr.Customer is not null)
@@ -5621,6 +5745,26 @@ namespace Business.Services
                     })
                     .ToListAsync();
 
+                var workOrderTypes = await _uow.Repository
+                    .GetQueryable<ServicesRequestWorkOrderType>()
+                    .AsNoTracking()
+                    .Where(x => requestNos.Contains(x.ServicesRequest.RequestNo))
+                    .Select(x => new
+                    {
+                        RequestNo = x.ServicesRequest.RequestNo,
+                        x.WorkOrderType.Id,
+                        x.WorkOrderType.Name,
+                        x.WorkOrderType.Code
+                    })
+                    .ToListAsync();
+
+                var wotDict = workOrderTypes
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.Select(w => new WorkOrderTypeLiteDto { Id = w.Id, Name = w.Name, Code = w.Code }).ToList()
+                    );
+
                 var userIds = workflows
                     .SelectMany(x => new long?[]
                     {
@@ -5765,7 +5909,11 @@ namespace Business.Services
                         Currency = pricing?.Currency,
 
                         FinalApprovalStatus = finalApproval?.Status,
-                        DiscountPercent = finalApproval?.DiscountPercent
+                        DiscountPercent = finalApproval?.DiscountPercent,
+
+                        WorkOrderTypes = wotDict.TryGetValue(w.RequestNo, out var wotList)
+                            ? wotList
+                            : new List<WorkOrderTypeLiteDto>()
                     };
                 }).ToList();
 
@@ -6319,6 +6467,76 @@ namespace Business.Services
                 Snapshot = snapshot
             };
         }
+
+        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(  IEnumerable<long>? rawIds)
+        {
+            var ids = rawIds?.ToList() ?? new List<long>();
+
+            if (ids.Any(x => x <= 0))
+            {
+                return (new List<long>(),
+                    "İş emri türü listesinde geçersiz bir ID bulundu.");
+            }
+
+            var distinctIds = ids
+                .Distinct()
+                .ToList();
+
+            if (distinctIds.Count == 0)
+                return (distinctIds, null);
+
+            var existingIds = await _uow.Repository
+                .GetQueryable<WorkOrderType>()
+                .AsNoTracking()
+                .Where(x => distinctIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            var invalidIds = distinctIds
+                .Except(existingIds)
+                .ToList();
+
+            if (invalidIds.Count > 0)
+            {
+                return (new List<long>(),
+                    $"Geçersiz iş emri türü ID'leri: {string.Join(", ", invalidIds)}");
+            }
+
+            return (distinctIds, null);
+        }
+        private void SyncWorkOrderTypes(
+            ServicesRequest request,
+            IReadOnlyCollection<long> workOrderTypeIds)
+        {
+            var requestedIds = workOrderTypeIds.ToHashSet();
+
+            var currentRelations = request.ServicesRequestWorkOrderTypes
+                .ToList();
+
+            // Artık seçili olmayanları kaldır
+            foreach (var relation in currentRelations
+                         .Where(x => !requestedIds.Contains(x.WorkOrderTypeId))
+                         .ToList())
+            {
+                _uow.Repository.HardDelete(relation);
+            }
+
+            var currentIds = currentRelations
+                .Select(x => x.WorkOrderTypeId)
+                .ToHashSet();
+
+            // Yeni seçilenleri ekle
+            foreach (var workOrderTypeId in requestedIds
+                         .Where(x => !currentIds.Contains(x)))
+            {
+                _uow.Repository.Add(new ServicesRequestWorkOrderType
+                {
+                    ServicesRequestId = request.Id,
+                    WorkOrderTypeId = workOrderTypeId
+                });
+            }
+        }
+
 
         /// Servis Ürünleri Fiyat savbitleme
         private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(

@@ -1,10 +1,6 @@
 ﻿using Core.Enums;
 using Core.Enums.Ykb;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -118,6 +114,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public long? CustomerApprovedBy { get; set; }
         public string? CustomerApprovedByName { get; set; }
         public DateTime? CustomerApprovedAt { get; set; }
+
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
 
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
     }

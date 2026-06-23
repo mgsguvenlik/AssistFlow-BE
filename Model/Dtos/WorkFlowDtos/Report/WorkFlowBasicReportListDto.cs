@@ -93,6 +93,8 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public FinalApprovalStatus? FinalApprovalStatus { get; set; }
         public decimal? DiscountPercent { get; set; }
 
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
+
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
     }
 }

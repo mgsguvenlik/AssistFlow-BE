@@ -48,6 +48,8 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
 
         public long StatuId { get; set; } //Akış taleplerin id si. Ekranda seçilecek.
+
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 
 }

@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260623204743_AddWorkOrderTypeToServicesRequest")]
+    partial class AddWorkOrderTypeToServicesRequest
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3173,21 +3176,6 @@ namespace Data.Migrations
                     b.ToTable("YkbServicesRequestProduct", "ykb");
                 });
 
-            modelBuilder.Entity("Model.Concrete.Ykb.YkbServicesRequestWorkOrderType", b =>
-                {
-                    b.Property<long>("YkbServicesRequestId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("WorkOrderTypeId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("YkbServicesRequestId", "WorkOrderTypeId");
-
-                    b.HasIndex("WorkOrderTypeId");
-
-                    b.ToTable("YkbServicesRequestWorkOrderTypes", "ykb");
-                });
-
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalService", b =>
                 {
                     b.Property<long>("Id")
@@ -4194,25 +4182,6 @@ namespace Data.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("Model.Concrete.Ykb.YkbServicesRequestWorkOrderType", b =>
-                {
-                    b.HasOne("Model.Concrete.WorkOrderType", "WorkOrderType")
-                        .WithMany("YkbServicesRequestWorkOrderTypes")
-                        .HasForeignKey("WorkOrderTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Model.Concrete.Ykb.YkbServicesRequest", "YkbServicesRequest")
-                        .WithMany("YkbServicesRequestWorkOrderTypes")
-                        .HasForeignKey("YkbServicesRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("WorkOrderType");
-
-                    b.Navigation("YkbServicesRequest");
-                });
-
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalService", b =>
                 {
                     b.HasOne("Model.Concrete.ServiceType", "ServiceType")
@@ -4388,13 +4357,6 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.WorkOrderType", b =>
                 {
                     b.Navigation("ServicesRequestWorkOrderTypes");
-
-                    b.Navigation("YkbServicesRequestWorkOrderTypes");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Ykb.YkbServicesRequest", b =>
-                {
-                    b.Navigation("YkbServicesRequestWorkOrderTypes");
                 });
 
             modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalService", b =>

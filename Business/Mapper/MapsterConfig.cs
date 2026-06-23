@@ -42,6 +42,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowTransition;
 using Model.Dtos.WorkingHourPolicy;
+using Model.Dtos.WorkOrderType;
 
 namespace Business.Mapper
 {
@@ -365,7 +366,8 @@ namespace Business.Mapper
                   .Ignore(d => d.Customer)          // nav
                   .Ignore(d => d.CustomerApprover)  // nav
                   .Ignore(d => d.ServiceType)       // nav
-                  .Ignore(d => d.WorkFlowStep);   // nav
+                  .Ignore(d => d.WorkFlowStep)
+                  .Ignore(d => d.ServicesRequestWorkOrderTypes);
 
             // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
             config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
@@ -374,7 +376,8 @@ namespace Business.Mapper
                   .Ignore(d => d.Customer)          // nav
                   .Ignore(d => d.CustomerApprover)  // nav
                   .Ignore(d => d.ServiceType)       // nav
-                  .Ignore(d => d.WorkFlowStep);   // nav
+                  .Ignore(d => d.WorkFlowStep)   // nav
+                  .Ignore(d => d.ServicesRequestWorkOrderTypes);
 
             // --- ServicesRequest: ENTITY -> GET DTO ---
             config.NewConfig<ServicesRequest, ServicesRequestGetDto>()
@@ -383,7 +386,17 @@ namespace Business.Mapper
                   .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.ContactName1 : null)
                   .Map(d => d.CustomerApproverName, s => s.CustomerApprover != null ? s.CustomerApprover.FullName : null)
                   .Map(d => d.ServiceTypeName, s => s.ServiceType != null ? s.ServiceType.Name : null)
-                  .Map(d => d.WorkFlowStepName, s => s.WorkFlowStep != null ? s.WorkFlowStep.Name : null);
+                  .Map(d => d.WorkFlowStepName, s => s.WorkFlowStep != null ? s.WorkFlowStep.Name : null)
+                  .Map(d => d.WorkOrderTypes,
+                     s => s.ServicesRequestWorkOrderTypes
+                           .Where(x => x.WorkOrderType != null)
+                           .Select(x => new WorkOrderTypeGetDto
+                           {
+                               Id = x.WorkOrderTypeId,
+                               Name = x.WorkOrderType.Name,
+                               Code = x.WorkOrderType.Code
+                           })
+                           .ToList());
 
 
             // ---------------- Pricing: CustomerGroupProductPrice ----------------
@@ -692,6 +705,18 @@ namespace Business.Mapper
             config.NewConfig<WorkingHourPolicy, WorkingHourPolicyGetDto>()
                   .Map(d => d.PolicyTypeText, s => GetPolicyTypeText(s.PolicyType))
                   .Map(d => d.DayOfWeekText, s => s.DayOfWeek.HasValue ? GetDayOfWeekText(s.DayOfWeek.Value) : null);
+
+
+
+            // ---------------- WorkOrderType ----------------
+            config.NewConfig<WorkOrderTypeCreateDto, WorkOrderType>()
+                  .Ignore(d => d.Id);
+
+            config.NewConfig<WorkOrderTypeUpdateDto, WorkOrderType>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id);
+
+            config.NewConfig<WorkOrderType, WorkOrderTypeGetDto>();
         }
 
         // Helper metodlar için (MapsterConfig sınıfı içine ekleyin)

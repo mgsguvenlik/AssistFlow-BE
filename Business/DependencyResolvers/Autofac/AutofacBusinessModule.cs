@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Business.Interfaces;
 using Business.Interfaces.Qnb;
 using Business.Interfaces.Ykb;
 using Business.Services;
@@ -64,6 +65,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
             services.AddScoped(typeof(IYkbOvertimeReportService), typeof(YkbOvertimeReportService));
             services.AddScoped(typeof(IQnbOvertimeReportService), typeof(QnbOvertimeReportService));
+            services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();

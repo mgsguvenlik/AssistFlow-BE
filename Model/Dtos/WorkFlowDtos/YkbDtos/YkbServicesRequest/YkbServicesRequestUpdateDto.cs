@@ -30,5 +30,6 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public string? ApproverTechnician { get; set; }
         public List<YkbServicesRequestProductUpdateDto>? Products { get; set; }
         public long StatuId { get; set; } //Akış taleplerin id si. Ekranda seçilecek.
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 }
