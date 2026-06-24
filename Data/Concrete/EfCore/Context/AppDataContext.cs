@@ -58,10 +58,14 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
         public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
 
+        public DbSet<WorkOrderType> WorkOrderTypes { get; set; } = null!;
+        public DbSet<ServicesRequestWorkOrderType> ServicesRequestWorkOrderTypes { get; set; } = null!;
+
 
         #region YKB
         public DbSet<YkbCustomerForm> YkbCustomerForms { get; set; } = default!;
         public DbSet<YkbServicesRequest> YkbServicesRequests { get; set; } = default!;
+        public DbSet<YkbServicesRequestWorkOrderType> YkbServicesRequestWorkOrderTypes { get; set; } = default!;
         public DbSet<YkbServicesRequestProduct> YkbServicesRequestProducts { get; set; } = default!;
         public DbSet<YkbTechnicalService> YkbTechnicalServices { get; set; } = default!;
         public DbSet<YkbTechnicalServiceImage> YkbTechnicalServiceImages { get; set; } = default!;
@@ -127,6 +131,21 @@ namespace Data.Concrete.EfCore.Context
 
             modelBuilder.Entity<YkbCustomerForm>()
                         .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbServicesRequestWorkOrderType>()
+                .HasKey(x => new { x.YkbServicesRequestId, x.WorkOrderTypeId });
+
+            modelBuilder.Entity<YkbServicesRequestWorkOrderType>()
+                .HasOne(x => x.YkbServicesRequest)
+                .WithMany(x => x.YkbServicesRequestWorkOrderTypes)
+                .HasForeignKey(x => x.YkbServicesRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<YkbServicesRequestWorkOrderType>()
+                .HasOne(x => x.WorkOrderType)
+                .WithMany(x => x.YkbServicesRequestWorkOrderTypes)
+                .HasForeignKey(x => x.WorkOrderTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
             #endregion
 
 
@@ -640,6 +659,27 @@ namespace Data.Concrete.EfCore.Context
                 entity.HasIndex(x => x.CreatedUser);
                 entity.HasIndex(x => x.CreatedDate);
                 entity.HasIndex(x => new { x.Status, x.FeedbackType });
+            });
+
+            modelBuilder.Entity<ServicesRequestWorkOrderType>(entity =>
+            {
+                entity.ToTable("ServicesRequestWorkOrderTypes");
+
+                entity.HasKey(x => new
+                {
+                    x.ServicesRequestId,
+                    x.WorkOrderTypeId
+                });
+
+                entity.HasOne(x => x.ServicesRequest)
+                    .WithMany(x => x.ServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.ServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.WorkOrderType)
+                    .WithMany(x => x.ServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.WorkOrderTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // DbSet ekleyin:

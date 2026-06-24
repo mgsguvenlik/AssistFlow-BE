@@ -2,6 +2,7 @@
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
+using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
 {
@@ -40,5 +41,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public List<YkbServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
     }
 }
