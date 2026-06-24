@@ -1,10 +1,6 @@
 ﻿using Core.Enums;
 using Core.Enums.Ykb;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -41,6 +37,16 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
             WorkFlowPriority.Normal => "Normal",
             WorkFlowPriority.High => "Yüksek",
             WorkFlowPriority.Urgent => "Acil",
+
+            WorkFlowPriority.Region1Normal => "1. Bölge Normal",
+            WorkFlowPriority.Region1Urgent => "1. Bölge Acil",
+
+            WorkFlowPriority.Region2Urgent => "2. Bölge Acil",
+            WorkFlowPriority.Region2Normal => "2. Bölge Normal",
+
+            WorkFlowPriority.Region3Urgent => "3. Bölge Acil",
+            WorkFlowPriority.Region3Normal => "3. Bölge Normal",
+
             _ => Priority.ToString()
         };
 
@@ -108,6 +114,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public long? CustomerApprovedBy { get; set; }
         public string? CustomerApprovedByName { get; set; }
         public DateTime? CustomerApprovedAt { get; set; }
+
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
 
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
     }

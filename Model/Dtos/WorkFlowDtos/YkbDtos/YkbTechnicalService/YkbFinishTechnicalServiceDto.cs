@@ -25,5 +25,6 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService
         [MinLength(1, ErrorMessage = "En az bir form görseli seçin.")]
         public List<IFormFile>? FormImages { get; set; }
         public List<YkbServicesRequestProductCreateDto>? Products { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 }

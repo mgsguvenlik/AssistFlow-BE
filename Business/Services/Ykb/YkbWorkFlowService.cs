@@ -47,6 +47,8 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
+using WorkOrderTypeLiteDto = Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto;
+using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
@@ -122,6 +124,10 @@ namespace Business.Services.Ykb
                 if (!customerApproverExist)
                     return ResponseModel<YkbCustomerFormGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
 
+                var (ykbWorkOrderTypeIds, ykbWorkOrderTypeError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                if (ykbWorkOrderTypeError is not null)
+                    return ResponseModel<YkbCustomerFormGetDto>.Fail(ykbWorkOrderTypeError, StatusCode.BadRequest);
+
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
                 #endregion
@@ -155,6 +161,9 @@ namespace Business.Services.Ykb
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
                 request.Id = 0;
+                request.YkbServicesRequestWorkOrderTypes = ykbWorkOrderTypeIds
+                    .Select(wotId => new YkbServicesRequestWorkOrderType { WorkOrderTypeId = wotId })
+                    .ToList();
                 await _uow.Repository.AddAsync(request);
                 #endregion
 
@@ -321,6 +330,23 @@ namespace Business.Services.Ykb
 
                 }
             }
+
+            #region İş Emri Türleri Güncellemesi
+            if (dto.WorkOrderTypeIds is not null)
+            {
+                var ykbSrEntity = await _uow.Repository.GetQueryable<YkbServicesRequest>()
+                    .Include(x => x.YkbServicesRequestWorkOrderTypes)
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                if (ykbSrEntity is not null)
+                {
+                    var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                    if (wotError is null)
+                        SyncYkbWorkOrderTypes(ykbSrEntity, validatedWotIds);
+                }
+            }
+            #endregion
+
             await _uow.Repository.UpdateAsync(entity);
             await _uow.Repository.CompleteAsync();
             return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
@@ -1306,6 +1332,22 @@ namespace Business.Services.Ykb
 
                 #endregion
 
+                #region İş Emri Türleri Güncellemesi
+                if (dto.WorkOrderTypeIds is not null)
+                {
+                    var ykbSrEntity = await _uow.Repository.GetQueryable<YkbServicesRequest>()
+                        .Include(x => x.YkbServicesRequestWorkOrderTypes)
+                        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                    if (ykbSrEntity is not null)
+                    {
+                        var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                        if (wotError is null)
+                            SyncYkbWorkOrderTypes(ykbSrEntity, validatedWotIds);
+                    }
+                }
+                #endregion
+
                 #region Hareket Kaydı
                 await _activationRecord.LogYkbAsync(
                      WorkFlowActionType.TechnicalServiceFinished,
@@ -2237,6 +2279,22 @@ namespace Business.Services.Ykb
                 })
                 .ToListAsync();
 
+            // 7) İş Emri Türleri (GetCustomerFormByRequestNoAsync)
+            baseDto.WorkOrderTypes = await _uow.Repository
+                .GetQueryable<YkbServicesRequestWorkOrderType>()
+                .AsNoTracking()
+                .Where(x => x.YkbServicesRequest.RequestNo == requestNo)
+                .OrderBy(x => x.WorkOrderType.Name)
+                .Select(x => new WorkOrderTypeGetDto
+                {
+                    Id = x.WorkOrderTypeId,
+                    Name = x.WorkOrderType.Name,
+                    Code = x.WorkOrderType.Code
+                })
+                .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes.Select(x => x.Id).ToList();
+
             return ResponseModel<YkbCustomerFormGetDto>.Success(baseDto);
         }
         // -------------------- Services Request --------------------
@@ -2485,6 +2543,22 @@ namespace Business.Services.Ykb
                 })
                 .ToListAsync();
 
+            // 4) İş Emri Türleri (GetServiceRequestByIdAsync)
+            baseDto.WorkOrderTypes = await _uow.Repository
+                .GetQueryable<YkbServicesRequestWorkOrderType>()
+                .AsNoTracking()
+                .Where(x => x.YkbServicesRequest.RequestNo == baseDto.RequestNo)
+                .OrderBy(x => x.WorkOrderType.Name)
+                .Select(x => new WorkOrderTypeGetDto
+                {
+                    Id = x.WorkOrderTypeId,
+                    Name = x.WorkOrderType.Name,
+                    Code = x.WorkOrderType.Code
+                })
+                .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes.Select(x => x.Id).ToList();
+
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo)
@@ -2669,6 +2743,22 @@ namespace Business.Services.Ykb
                     CreatedUser = x.CreatedUser
                 })
                 .ToListAsync();
+
+            // 4) İş Emri Türleri (GetServiceRequestByRequestNoAsync)
+            baseDto.WorkOrderTypes = await _uow.Repository
+                .GetQueryable<YkbServicesRequestWorkOrderType>()
+                .AsNoTracking()
+                .Where(x => x.YkbServicesRequest.RequestNo == requestNo)
+                .OrderBy(x => x.WorkOrderType.Name)
+                .Select(x => new WorkOrderTypeGetDto
+                {
+                    Id = x.WorkOrderTypeId,
+                    Name = x.WorkOrderType.Name,
+                    Code = x.WorkOrderType.Code
+                })
+                .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes.Select(x => x.Id).ToList();
 
             return ResponseModel<YkbServicesRequestGetDto>.Success(baseDto);
         }
@@ -3563,6 +3653,22 @@ namespace Business.Services.Ykb
                 }
             }
             // --------------------------------------------------------------------
+
+            // İş Emri Türleri (GetTechnicalServiceByRequestNoAsync)
+            dto.WorkOrderTypes = await _uow.Repository
+                .GetQueryable<YkbServicesRequestWorkOrderType>()
+                .AsNoTracking()
+                .Where(x => x.YkbServicesRequest.RequestNo == requestNo)
+                .OrderBy(x => x.WorkOrderType.Name)
+                .Select(x => new WorkOrderTypeGetDto
+                {
+                    Id = x.WorkOrderTypeId,
+                    Name = x.WorkOrderType.Name,
+                    Code = x.WorkOrderType.Code
+                })
+                .ToListAsync();
+
+            dto.WorkOrderTypeIds = dto.WorkOrderTypes.Select(x => x.Id).ToList();
 
             return ResponseModel<YkbTechnicalServiceGetDto>.Success(dto);
         }
@@ -5105,12 +5211,105 @@ namespace Business.Services.Ykb
                 var term = q.Search.Trim();
 
                 var priorityAliases = new Dictionary<WorkFlowPriority, string[]>
+{
+    { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
+
+    { WorkFlowPriority.Normal, new[] { "Normal", "Orta" } },
+
+    { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
+
+    { WorkFlowPriority.Urgent, new[] { "Acil", "Kritik", "Urgent" } },
+
+    {
+        WorkFlowPriority.Region1Normal,
+        new[]
         {
-            { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
-            { WorkFlowPriority.Normal, new[] { "Normal", "Orta" } },
-            { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
-            { WorkFlowPriority.Urgent, new[] { "Acil", "Kritik", "Urgent" } }
-        };
+            "1. Bölge Normal",
+            "1.Bölge Normal",
+            "1 Bolge Normal",
+            "1. Bolge Normal",
+            "Bölge 1 Normal",
+            "Bolge 1 Normal",
+            "Region1Normal"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region1Urgent,
+        new[]
+        {
+            "1. Bölge Acil",
+            "1.Bölge Acil",
+            "1 Bolge Acil",
+            "1. Bolge Acil",
+            "1. Bölge Kritik",
+            "1 Bolge Kritik",
+            "Bölge 1 Acil",
+            "Bolge 1 Acil",
+            "Region1Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region2Urgent,
+        new[]
+        {
+            "2. Bölge Acil",
+            "2.Bölge Acil",
+            "2 Bolge Acil",
+            "2. Bolge Acil",
+            "2. Bölge Kritik",
+            "2 Bolge Kritik",
+            "Bölge 2 Acil",
+            "Bolge 2 Acil",
+            "Region2Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region2Normal,
+        new[]
+        {
+            "2. Bölge Normal",
+            "2.Bölge Normal",
+            "2 Bolge Normal",
+            "2. Bolge Normal",
+            "Bölge 2 Normal",
+            "Bolge 2 Normal",
+            "Region2Normal"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region3Urgent,
+        new[]
+        {
+            "3. Bölge Acil",
+            "3.Bölge Acil",
+            "3 Bolge Acil",
+            "3. Bolge Acil",
+            "3. Bölge Kritik",
+            "3 Bolge Kritik",
+            "Bölge 3 Acil",
+            "Bolge 3 Acil",
+            "Region3Urgent"
+        }
+    },
+
+    {
+        WorkFlowPriority.Region3Normal,
+        new[]
+        {
+            "3. Bölge Normal",
+            "3.Bölge Normal",
+            "3 Bolge Normal",
+            "3. Bolge Normal",
+            "Bölge 3 Normal",
+            "Bolge 3 Normal",
+            "Region3Normal"
+        }
+    }
+}; 
 
                 var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
         {
@@ -5626,6 +5825,8 @@ namespace Business.Services.Ykb
                 .Include(x => x.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.ProgressApprovers)
+                .Include(x => x.YkbServicesRequestWorkOrderTypes)
+                    .ThenInclude(x => x.WorkOrderType)
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
 
             if (sr is not null)
@@ -5644,7 +5845,15 @@ namespace Business.Services.Ykb
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType?.Name,
                     Priority = sr.Priority.ToString(),
-                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString()
+                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString(),
+                    WorkOrderTypes = sr.YkbServicesRequestWorkOrderTypes
+                        .Select(x => new WorkOrderTypeLiteDto
+                        {
+                            Id = x.WorkOrderType.Id,
+                            Name = x.WorkOrderType.Name,
+                            Code = x.WorkOrderType.Code
+                        })
+                        .ToList()
                 };
 
                 if (sr.Customer is not null)
@@ -6637,6 +6846,26 @@ namespace Business.Services.Ykb
                     .GroupBy(x => x.RequestNo)
                     .ToDictionary(x => x.Key, x => x.First());
 
+                var ykbWorkOrderTypes = await _uow.Repository
+                    .GetQueryable<YkbServicesRequestWorkOrderType>()
+                    .AsNoTracking()
+                    .Where(x => requestNos.Contains(x.YkbServicesRequest.RequestNo))
+                    .Select(x => new
+                    {
+                        RequestNo = x.YkbServicesRequest.RequestNo,
+                        x.WorkOrderType.Id,
+                        x.WorkOrderType.Name,
+                        x.WorkOrderType.Code
+                    })
+                    .ToListAsync();
+
+                var ykbWotDict = ykbWorkOrderTypes
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.Select(w => new WorkOrderTypeLiteDto { Id = w.Id, Name = w.Name, Code = w.Code }).ToList()
+                    );
+
                 var userDict = users
                     .GroupBy(x => x.Id)
                     .ToDictionary(x => x.Key, x => x.First());
@@ -6749,7 +6978,11 @@ namespace Business.Services.Ykb
                         CustomerNote = finalApproval?.CustomerNote,
                         CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
                         CustomerApprovedByName = customerApprovedByUser?.TechnicianName,
-                        CustomerApprovedAt = finalApproval?.CustomerApprovedAt
+                        CustomerApprovedAt = finalApproval?.CustomerApprovedAt,
+
+                        WorkOrderTypes = ykbWotDict.TryGetValue(w.RequestNo, out var ykbWotList)
+                            ? ykbWotList
+                            : new List<WorkOrderTypeLiteDto>()
                     };
                 }).ToList();
 
@@ -7699,7 +7932,70 @@ namespace Business.Services.Ykb
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
         }
-         
+
+        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(
+            IEnumerable<long>? rawIds)
+        {
+            var ids = (rawIds ?? Enumerable.Empty<long>())
+                .Where(x => x > 0)
+                .ToList();
+
+            var distinctIds = ids
+                .Distinct()
+                .ToList();
+
+            if (distinctIds.Count == 0)
+                return (distinctIds, null);
+
+            var existingIds = await _uow.Repository
+                .GetQueryable<WorkOrderType>()
+                .AsNoTracking()
+                .Where(x => distinctIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            var invalidIds = distinctIds
+                .Except(existingIds)
+                .ToList();
+
+            if (invalidIds.Count > 0)
+                return (new List<long>(),
+                    $"Geçersiz iş emri türü ID'leri: {string.Join(", ", invalidIds)}");
+
+            return (distinctIds, null);
+        }
+
+        private void SyncYkbWorkOrderTypes(
+            YkbServicesRequest request,
+            IReadOnlyCollection<long> workOrderTypeIds)
+        {
+            var requestedIds = workOrderTypeIds.ToHashSet();
+
+            var currentRelations = request.YkbServicesRequestWorkOrderTypes.ToList();
+
+            // Artık seçili olmayanları kaldır
+            foreach (var relation in currentRelations
+                .Where(x => !requestedIds.Contains(x.WorkOrderTypeId))
+                .ToList())
+            {
+                _uow.Repository.HardDelete(relation);
+            }
+
+            var currentIds = currentRelations
+                .Select(x => x.WorkOrderTypeId)
+                .ToHashSet();
+
+            // Yeni seçilenleri ekle
+            foreach (var workOrderTypeId in requestedIds.Where(x => !currentIds.Contains(x)))
+            {
+                _uow.Repository.Add(new YkbServicesRequestWorkOrderType
+                {
+                    YkbServicesRequestId = request.Id,
+                    WorkOrderTypeId = workOrderTypeId
+                });
+            }
+        }
+
         private sealed class ReportRowDto
         {
             public int TotalCount { get; set; }
