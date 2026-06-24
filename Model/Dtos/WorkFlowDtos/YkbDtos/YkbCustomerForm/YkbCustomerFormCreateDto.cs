@@ -18,6 +18,6 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm
 
         public long ServiceTypeId { get; set; }
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
-        public List<long> WorkOrderTypeIds { get; set; } = new();
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 }
