@@ -16,9 +16,14 @@ namespace Business.Interfaces.Qnb
 {
     public interface IQnbWorkFlowService
     {
+
+
         // -------------------- Customer Form / Services Request --------------------
         Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto);
         Task<ResponseModel<QnbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo);
+
+        //-------------------- Service Request Create--------------------
+        Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto);
 
         Task<ResponseModel<PagedResult<QnbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<QnbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);

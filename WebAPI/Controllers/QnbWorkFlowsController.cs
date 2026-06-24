@@ -39,6 +39,15 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+
+        [HttpPost("create-services-request")]
+        public async Task<IActionResult> CreateRequest([FromBody] QnbServicesRequestCreateDto dto)
+        {
+            var result = await _workFlowService.CreateRequestAsync(dto);
+            return Ok(result);
+        }
+
+
         [HttpPost("create-customer-form")]
         public async Task<IActionResult> CreateCustomerForm([FromBody] QnbCustomerFormCreateDto dto)
         {

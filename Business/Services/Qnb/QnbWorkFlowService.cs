@@ -84,7 +84,6 @@ namespace Business.Services.Qnb
             _menuService = menuService;
         }
 
-        // -------------------- Customer Form / Services Request --------------------
 
         // 0 Müşteri kendi formunu oluşturulması ve Servis talebine gönderim.
         public async Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto)
@@ -219,114 +218,170 @@ namespace Business.Services.Qnb
             }
         }
 
-        // 1 Servis Talebi güncelleme adımı
-        public async Task<ResponseModel<QnbServicesRequestGetDto>> UpdateServiceRequestAsync(QnbServicesRequestUpdateDto dto)
+        // 1 Servis Talebi oluşturma akışı
+        public async Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto)
         {
-            var entity = await _uow.Repository.GetSingleAsync<QnbServicesRequest>(
-                false,
-                x => x.RequestNo == dto.RequestNo,
-                includeExpression: RequestIncludes());
-
-            if (entity is null)
-                return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
-            var wf = await _uow.Repository
-                .GetQueryable<QnbWorkFlow>()
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-
-            if (wf is null)
-                return ResponseModel<QnbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
-
-            var me = await _currentUser.GetAsync();
-            var meId = me?.Id ?? 0;
-
-            // Ana talep bilgilerini güncelle
-            wf.UpdatedDate = DateTime.Now;
-            wf.UpdatedUser = meId;
-            wf.IsLocationValid = dto.IsLocationValid;
-            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
-            wf.CustomerApproverName = dto.CustomerApproverName;
-            wf.Priority = dto.Priority;
-            wf.RequestTitle = dto.Title;
-            _uow.Repository.Update(wf);
-
-            dto.Adapt(entity, _config);
-            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
-
-            // Mevcut ürünleri çek (RequestNo bazlı)
-            var existingProducts = await _uow.Repository
-                .GetMultipleAsync<QnbServicesRequestProduct>(
-                    asNoTracking: false,
-                    whereExpression: x => x.RequestNo == dto.RequestNo);
-
-            // Ürün listesi değişmişse:
-            if (dto.Products is not null)
+            try
             {
-                var updatedProducts = dto.Products
-                    .GroupBy(p => p.ProductId)
-                    .Select(g => g.First())
-                    .ToDictionary(p => p.ProductId, p => p);
+                #region Validasyon/Kontroller
 
-                existingProducts ??= new List<QnbServicesRequestProduct>();
+                var initialStep = await _uow.Repository.GetQueryable<QnbWorkFlowStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Code == "SR");
 
-                // Silinecek ürünler
-                var toRemove = existingProducts
-                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
+                if (initialStep is null)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "İş akışı başlangıç adımı (SR) tanımlı değil.",
+                        StatusCode.BadRequest
+                    );
 
-                // Eklenecek ürünler
-                var toAdd = updatedProducts
-                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
-                    .Select(p => p.Value)
-                    .ToList();
-
-                // Güncellenecek ürünler
-                var toUpdate = existingProducts
-                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
-                    .ToList();
-
-                // ❌ Sil
-                foreach (var prod in toRemove)
-                    await _uow.Repository.HardDeleteAsync(prod);
-
-                // ➕ Ekle
-                foreach (var prod in toAdd)
+                if (string.IsNullOrWhiteSpace(dto.RequestNo))
                 {
-                    var entityProd = new QnbServicesRequestProduct
+                    var rn = await GetRequestNoAsync("QNB");
+                    if (!rn.IsSuccess)
+                        return ResponseModel<QnbServicesRequestGetDto>.Fail(rn.Message, rn.StatusCode);
+
+                    dto.RequestNo = rn.Data!;
+                }
+
+                bool exists = await _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .Include(x => x.ApproverTechnician)
+                    .AsNoTracking()
+                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+                if (exists)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Aynı akış numarası ile başka bir kayıt zaten var.",
+                        StatusCode.Conflict
+                    );
+
+                var serviceTypeExist = await _uow.Repository
+                    .GetQueryable<ServiceType>()
+                    .AsNoTracking()
+                    .AnyAsync(s => s.Id == dto.ServiceTypeId);
+
+                if (!serviceTypeExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Servis tipi bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var customerExist = await _uow.Repository
+                    .GetQueryable<Customer>()
+                    .AsNoTracking()
+                    .AnyAsync(c => c.Id == dto.CustomerId);
+
+                if (!customerExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Müşteri bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var customerApproverExist = dto.CustomerApproverId.HasValue
+                    ? await _uow.Repository.GetQueryable<ProgressApprover>()
+                        .AsNoTracking()
+                        .AnyAsync(ca => ca.Id == dto.CustomerApproverId.Value)
+                    : true;
+
+                if (!customerApproverExist)
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        "Müşteri yetkilisi bulunamadı.",
+                        StatusCode.Conflict
+                    );
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                #endregion
+
+                #region Servis Talebi Oluşturma
+
+                var request = dto.Adapt<QnbServicesRequest>(_config);
+                request.CreatedDate = DateTime.Now;
+                request.CreatedUser = meId;
+                request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+                await _uow.Repository.AddAsync(request);
+
+                #endregion
+
+                #region Ürün Ekleme
+
+                if (dto.Products is not null)
+                {
+                    foreach (var p in dto.Products)
                     {
-                        RequestNo = dto.RequestNo,
-                        ProductId = prod.ProductId,
-                        Quantity = prod.Quantity,
-                        CustomerId = dto.CustomerId,
-                    };
-                    await _uow.Repository.AddAsync(entityProd);
+                        await _uow.Repository.AddAsync(new QnbServicesRequestProduct
+                        {
+                            RequestNo = request.RequestNo,
+                            ProductId = p.ProductId,
+                            Quantity = p.Quantity,
+                            CustomerId = request.CustomerId
+                        });
+                    }
                 }
 
-                // 🔁 Güncelle
-                foreach (var prod in toUpdate)
+                #endregion
+
+                #region WorkFlow Oluşturma
+
+                var wf = new QnbWorkFlow
                 {
-                    var dtoProd = updatedProducts[prod.ProductId];
-                    prod.Quantity = dtoProd.Quantity;
-                    prod.CustomerId = dto.CustomerId;
-                    prod.RequestNo = dto.RequestNo;
-                    prod.ProductId = dtoProd.ProductId;
-                    _uow.Repository.Update(prod);
-                }
+                    RequestNo = request.RequestNo,
+                    RequestTitle = dto.Title ?? "",
+                    Priority = dto.Priority,
+                    CurrentStepId = initialStep.Id,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = meId,
+                    WorkFlowStatus = WorkFlowStatus.Pending,
+                    IsAgreement = null,
+                    IsLocationValid = dto.IsLocationValid,
+                    ApproverTechnicianId = dto.ApproverTechnicianId,
+                    CustomerApproverName = dto.CustomerApproverName
+                };
+
+                await _uow.Repository.AddAsync(wf);
+
+                #endregion
+
+                #region Hareket Kaydı
+
+                await _activationRecord.LogQnbAsync(
+                    WorkFlowActionType.ServiceRequestCreated,
+                    request.RequestNo,
+                    null,
+                    dto.CustomerId,
+                    initialStep.Code,
+                    "SR",
+                    "Servis talebi oluşturuldu",
+                    new
+                    {
+                        dto,
+                        request.Id,
+                        Products = dto.Products?.Select(p => new
+                        {
+                            p.ProductId,
+                            p.Quantity
+                        })
+                    }
+                );
+
+                #endregion
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetServiceRequestByIdAsync(request.Id);
             }
-            else
+            catch (Exception ex)
             {
-                foreach (var item in existingProducts)
-                {
-                    await _uow.Repository.HardDeleteAsync(item);
-                }
+                _logger.LogError(ex, "CreateRequestAsync");
+                return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                    $"Servis talebi oluşturma sırasında hata: {ex.Message}",
+                    StatusCode.Error
+                );
             }
-
-            await _uow.Repository.UpdateAsync(entity);
-            await _uow.Repository.CompleteAsync();
-            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
         }
-
         // 2.1 Depoya Gönderim (Ürün var ise)
         public async Task<ResponseModel<QnbWarehouseGetDto>> SendWarehouseAsync(QnbSendWarehouseDto dto)
         {
@@ -1480,7 +1535,7 @@ namespace Business.Services.Qnb
         }
 
         // 5 Kontrol ve Son Onay (FinalApproval)
-        public async Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
+        public async Task<ResponseModel<QnbFinalApprovalGetDto>> _FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
         {
             try
             {
@@ -1670,6 +1725,213 @@ namespace Business.Services.Qnb
             {
                 _logger.LogError(ex, "FinalApprovalAsync");
                 return ResponseModel<QnbFinalApprovalGetDto>.Fail($"  Kontrol ve Son Onay sırasında hata: {ex.Message}", StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
+        {
+            try
+            {
+                #region Validasyonlar/Kontroller
+
+                var wf = await _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .Include(x => x.ApproverTechnician)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+                if (wf is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış kaydı bulunamadı.",
+                        StatusCode.NotFound
+                    );
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış iptal edilmiş.",
+                        StatusCode.NotFound
+                    );
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "İlgili akış tamamlanmış.",
+                        StatusCode.NotFound
+                    );
+
+                var request = await _uow.Repository
+                    .GetQueryable<QnbServicesRequest>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                if (request is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "Servis talebi bulunamadı.",
+                        StatusCode.NotFound
+                    );
+
+                var statusCode = dto.WorkFlowStatus switch
+                {
+                    WorkFlowStatus.Cancelled => "CNC",
+                    WorkFlowStatus.Complated => "CMP",
+                    _ => "APR"
+                };
+
+                var targetStep = await _uow.Repository
+                    .GetQueryable<QnbWorkFlowStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Code == statusCode);
+
+                if (targetStep is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        $"Hedef iş akışı adımı {statusCode} tanımlı değil.",
+                        StatusCode.BadRequest
+                    );
+
+                var existsFinalApproval = await _uow.Repository
+                    .GetQueryable<QnbFinalApproval>()
+                    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                if (existsFinalApproval is null)
+                    return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                        "Kayıt bulunamadı.",
+                        StatusCode.BadRequest
+                    );
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                #endregion
+
+                #region Workflow Güncelleme
+
+                wf.CurrentStepId = targetStep.Id;
+                wf.UpdatedDate = DateTime.Now;
+                wf.UpdatedUser = meId;
+                wf.WorkFlowStatus = dto.WorkFlowStatus;
+
+                _uow.Repository.Update(wf);
+
+                #endregion
+
+                #region Ürünler Güncellemesi
+
+                var existingProducts = await _uow.Repository
+                    .GetMultipleAsync<QnbServicesRequestProduct>(
+                        asNoTracking: false,
+                        whereExpression: x => x.RequestNo == dto.RequestNo
+                    );
+
+                var deliveredDict = dto.Products?.ToDictionary(x => x.ProductId, x => x)
+                                    ?? new Dictionary<long, QnbServicesRequestProductCreateDto>();
+
+                foreach (var existing in existingProducts)
+                {
+                    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                    {
+                        existing.Quantity = delivered.Quantity;
+                        existing.CapturedUnitPrice = delivered.Price;
+
+                        _uow.Repository.Update(existing);
+                        deliveredDict.Remove(existing.ProductId);
+                    }
+                    else
+                    {
+                        _uow.Repository.HardDelete(existing);
+                    }
+                }
+
+                foreach (var newItem in deliveredDict.Values)
+                {
+                    var newEntity = new QnbServicesRequestProduct
+                    {
+                        CustomerId = request.CustomerId,
+                        RequestNo = request.RequestNo,
+                        ProductId = newItem.ProductId,
+                        Quantity = newItem.Quantity,
+                        CapturedUnitPrice = newItem.Price
+                    };
+
+                    _uow.Repository.Add(newEntity);
+                }
+
+                #endregion
+
+                #region Ürün Fiyat Sabitleme
+
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+
+                #endregion
+
+                #region FinalApproval Güncelleme
+
+                existsFinalApproval.Notes = dto.Notes;
+                existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
+                    ? FinalApprovalStatus.Approved
+                    : dto.WorkFlowStatus == WorkFlowStatus.Cancelled
+                        ? FinalApprovalStatus.Rejected
+                        : FinalApprovalStatus.Pending;
+
+                existsFinalApproval.DecidedBy = meId;
+                existsFinalApproval.UpdatedDate = DateTime.Now;
+                existsFinalApproval.UpdatedUser = meId;
+                existsFinalApproval.DiscountPercent = dto.DiscountPercent;
+
+                _uow.Repository.Update(existsFinalApproval);
+
+                #endregion
+
+                #region Hareket Kaydı
+
+                await _activationRecord.LogQnbAsync(
+                    WorkFlowActionType.FinalApprovalUpdated,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    fromStepCode: wf.CurrentStep?.Code ?? "APR",
+                    toStepCode: statusCode,
+                    "Kontrol ve Son Onay kaydı güncellendi.",
+                    new
+                    {
+                        dto.Notes,
+                        dto.WorkFlowStatus,
+                        meId,
+                        TotalAmount = dto.Products?.Sum(x => x.Price),
+                        DateTime.Now,
+                        Products = dto.Products?.Select(p => new
+                        {
+                            p.ProductId,
+                            p.Quantity,
+                            p.Price
+                        })
+                    }
+                );
+
+                #endregion
+
+                #region Arşivleme
+
+                if (dto.WorkFlowStatus == WorkFlowStatus.Complated ||
+                    dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                {
+                    var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated
+                        ? "Tamamlandı"
+                        : "İptal";
+
+                    await ArchiveWorkflowAsync(dto.RequestNo, reason);
+                }
+
+                #endregion
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinalApprovalAsync");
+                return ResponseModel<QnbFinalApprovalGetDto>.Fail(
+                    $"Kontrol ve Son Onay sırasında hata: {ex.Message}",
+                    StatusCode.Error
+                );
             }
         }
 
@@ -2052,34 +2314,7 @@ namespace Business.Services.Qnb
                         _uow.Repository.Update(serviceRequest);
                     }
                     break;
-
-                case "CAPR":
-                    var customerForm = await _uow.Repository
-                        .GetQueryable<QnbCustomerForm>()
-                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                    if (customerForm != null)
-                    {
-                        targetStep = await _uow.Repository.GetQueryable<QnbWorkFlowStep>()
-                            .AsNoTracking()
-                            .FirstOrDefaultAsync(s => s.Code == "APR");
-                        if (targetStep is null)
-                            return ResponseModel<QnbWorkFlowGetDto>.Fail("Hedef iş akışı adımı (APR) tanımlı değil.", StatusCode.BadRequest);
-                        customerForm.UpdatedDate = DateTime.Now;
-                        customerForm.UpdatedUser = meId;
-                        customerForm.Status = QnbCustomerFormStatus.AwaitingReview;
-                        _uow.Repository.Update(customerForm);
-
-                        var approval = await _uow.Repository.GetQueryable<QnbFinalApproval>()
-                            .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
-                        if (approval is null)
-                            return ResponseModel<QnbWorkFlowGetDto>.Fail("Hedef iş akışı (APR) bulunamadı", StatusCode.BadRequest);
-
-                        approval.Status = FinalApprovalStatus.Pending;
-                        approval.UpdatedDate = DateTime.Now;
-                        approval.UpdatedUser = meId;
-                    }
-                    break;
-
+              
                 default:
                     break;
             }
@@ -2417,6 +2652,114 @@ namespace Business.Services.Qnb
         }
 
         // -------------------- Services Request --------------------
+
+        // 1 Servis Talebi güncelleme adımı
+        public async Task<ResponseModel<QnbServicesRequestGetDto>> UpdateServiceRequestAsync(QnbServicesRequestUpdateDto dto)
+        {
+            var entity = await _uow.Repository.GetSingleAsync<QnbServicesRequest>(
+                false,
+                x => x.RequestNo == dto.RequestNo,
+                includeExpression: RequestIncludes());
+
+            if (entity is null)
+                return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var wf = await _uow.Repository
+                .GetQueryable<QnbWorkFlow>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return ResponseModel<QnbServicesRequestGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
+            // Ana talep bilgilerini güncelle
+            wf.UpdatedDate = DateTime.Now;
+            wf.UpdatedUser = meId;
+            wf.IsLocationValid = dto.IsLocationValid;
+            wf.ApproverTechnicianId = dto.ApproverTechnicianId;
+            wf.CustomerApproverName = dto.CustomerApproverName;
+            wf.Priority = dto.Priority;
+            wf.RequestTitle = dto.Title;
+            _uow.Repository.Update(wf);
+
+            dto.Adapt(entity, _config);
+            entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            // Mevcut ürünleri çek (RequestNo bazlı)
+            var existingProducts = await _uow.Repository
+                .GetMultipleAsync<QnbServicesRequestProduct>(
+                    asNoTracking: false,
+                    whereExpression: x => x.RequestNo == dto.RequestNo);
+
+            // Ürün listesi değişmişse:
+            if (dto.Products is not null)
+            {
+                var updatedProducts = dto.Products
+                    .GroupBy(p => p.ProductId)
+                    .Select(g => g.First())
+                    .ToDictionary(p => p.ProductId, p => p);
+
+                existingProducts ??= new List<QnbServicesRequestProduct>();
+
+                // Silinecek ürünler
+                var toRemove = existingProducts
+                    .Where(p => !updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // Eklenecek ürünler
+                var toAdd = updatedProducts
+                    .Where(p => !existingProducts.Any(e => e.ProductId == p.Key))
+                    .Select(p => p.Value)
+                    .ToList();
+
+                // Güncellenecek ürünler
+                var toUpdate = existingProducts
+                    .Where(p => updatedProducts.ContainsKey(p.ProductId))
+                    .ToList();
+
+                // ❌ Sil
+                foreach (var prod in toRemove)
+                    await _uow.Repository.HardDeleteAsync(prod);
+
+                // ➕ Ekle
+                foreach (var prod in toAdd)
+                {
+                    var entityProd = new QnbServicesRequestProduct
+                    {
+                        RequestNo = dto.RequestNo,
+                        ProductId = prod.ProductId,
+                        Quantity = prod.Quantity,
+                        CustomerId = dto.CustomerId,
+                    };
+                    await _uow.Repository.AddAsync(entityProd);
+                }
+
+                // 🔁 Güncelle
+                foreach (var prod in toUpdate)
+                {
+                    var dtoProd = updatedProducts[prod.ProductId];
+                    prod.Quantity = dtoProd.Quantity;
+                    prod.CustomerId = dto.CustomerId;
+                    prod.RequestNo = dto.RequestNo;
+                    prod.ProductId = dtoProd.ProductId;
+                    _uow.Repository.Update(prod);
+                }
+            }
+            else
+            {
+                foreach (var item in existingProducts)
+                {
+                    await _uow.Repository.HardDeleteAsync(item);
+                }
+            }
+
+            await _uow.Repository.UpdateAsync(entity);
+            await _uow.Repository.CompleteAsync();
+            return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
+        }
         private static Func<IQueryable<QnbServicesRequest>, IIncludableQueryable<QnbServicesRequest, object>>? RequestIncludes()
             => q => q
                 .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
@@ -4565,7 +4908,7 @@ namespace Business.Services.Qnb
             public string Currency { get; set; } = "TRY";
         }
 
-        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q)
+        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync__(QnbBasicReportQueryParams q)
         {
             try
             {
@@ -5174,9 +5517,9 @@ namespace Business.Services.Qnb
                         ServiceTypeId = sr?.ServiceTypeId,
                         ServiceTypeName = sr?.ServiceTypeName,
 
-                        CustomerFormStatus = cf?.Status,
-                        CustomerFormServicesDate = cf?.ServicesDate,
-                        CustomerFormPlannedCompletionDate = cf?.PlannedCompletionDate,
+                        //CustomerFormStatus = cf?.Status,
+                        //CustomerFormServicesDate = cf?.ServicesDate,
+                        //CustomerFormPlannedCompletionDate = cf?.PlannedCompletionDate,
 
                         ServicesDate = sr?.ServicesDate,
                         PlannedCompletionDate = sr?.PlannedCompletionDate,
@@ -5204,10 +5547,10 @@ namespace Business.Services.Qnb
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
-                        CustomerNote = finalApproval?.CustomerNote,
-                        CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
-                        CustomerApprovedByName = customerApprovedByUser?.TechnicianName,
-                        CustomerApprovedAt = finalApproval?.CustomerApprovedAt
+                        //CustomerNote = finalApproval?.CustomerNote,
+                        //CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
+                        //CustomerApprovedByName = customerApprovedByUser?.TechnicianName,
+                        //CustomerApprovedAt = finalApproval?.CustomerApprovedAt
                     };
                 }).ToList();
 
@@ -5230,8 +5573,585 @@ namespace Business.Services.Qnb
                 );
             }
         }
+        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync( QnbBasicReportQueryParams q)
+        {
+            try
+            {
+                q ??= new QnbBasicReportQueryParams();
+                q.Normalize(maxPageSize: 200);
 
+                var wfQuery = _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
 
+                var srQuery = _uow.Repository
+                    .GetQueryable<QnbServicesRequest>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var whQuery = _uow.Repository
+                    .GetQueryable<QnbWarehouse>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var tsQuery = _uow.Repository
+                    .GetQueryable<QnbTechnicalService>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var pricingQuery = _uow.Repository
+                    .GetQueryable<QnbPricing>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var finalApprovalQuery = _uow.Repository
+                    .GetQueryable<QnbFinalApproval>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var userQuery = _uow.Repository
+                    .GetQueryable<User>()
+                    .AsNoTracking();
+
+                #region Filtreler
+
+                if (!string.IsNullOrWhiteSpace(q.Search))
+                {
+                    var term = q.Search.Trim();
+
+                    wfQuery = wfQuery.Where(w =>
+                        w.RequestNo.Contains(term) ||
+                        w.RequestTitle.Contains(term) ||
+
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            (
+                                (sr.Description != null && sr.Description.Contains(term)) ||
+                                (sr.QnbServiceTrackNo != null && sr.QnbServiceTrackNo.Contains(term)) ||
+                                (sr.Customer != null &&
+                                 sr.Customer.SubscriberCompany != null &&
+                                 sr.Customer.SubscriberCompany.Contains(term)) ||
+                                (sr.Customer != null &&
+                                 sr.Customer.SubscriberCode != null &&
+                                 sr.Customer.SubscriberCode.Contains(term))
+                            )
+                        ) ||
+
+                        userQuery.Any(u =>
+                            w.ApproverTechnicianId == u.Id &&
+                            u.TechnicianName != null &&
+                            u.TechnicianName.Contains(term)
+                        )
+                    );
+                }
+
+                if (!string.IsNullOrWhiteSpace(q.RequestNo))
+                {
+                    wfQuery = wfQuery.Where(w => w.RequestNo == q.RequestNo);
+                }
+
+                if (!string.IsNullOrWhiteSpace(q.QnbServiceTrackNo))
+                {
+                    var trackNo = q.QnbServiceTrackNo.Trim();
+
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.QnbServiceTrackNo != null &&
+                            sr.QnbServiceTrackNo.Contains(trackNo)
+                        )
+                    );
+                }
+
+                if (q.CurrentStepId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CurrentStepId == q.CurrentStepId.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(q.StepCode))
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CurrentStep != null &&
+                        w.CurrentStep.Code == q.StepCode);
+                }
+
+                if (q.ApproverTechnicianId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.ApproverTechnicianId == q.ApproverTechnicianId.Value);
+                }
+
+                if (q.CreatedUserId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CreatedUser == q.CreatedUserId.Value);
+                }
+
+                if (q.Priority.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.Priority == q.Priority.Value);
+                }
+
+                if (q.Priorities is { Count: > 0 })
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        q.Priorities.Contains(w.Priority));
+                }
+
+                if (q.WorkFlowStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.WorkFlowStatus == q.WorkFlowStatus.Value);
+                }
+
+                if (q.WorkFlowStatuses is { Count: > 0 })
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        q.WorkFlowStatuses.Contains(w.WorkFlowStatus));
+                }
+
+                // Normal WorkFlowService ile birebir kalması isteniyorsa korunabilir.
+                if (q.IsAgreement.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.IsAgreement == q.IsAgreement.Value);
+                }
+
+                if (q.IsLocationValid.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.IsLocationValid == q.IsLocationValid.Value);
+                }
+
+                if (q.CreatedFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CreatedDate >= q.CreatedFrom.Value);
+                }
+
+                if (q.CreatedTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CreatedDate <= q.CreatedTo.Value);
+                }
+
+                if (q.CustomerId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.CustomerId == q.CustomerId.Value));
+                }
+
+                if (q.ServiceTypeId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServiceTypeId == q.ServiceTypeId.Value));
+                }
+
+                if (q.ServicesRequestStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesRequestStatus == q.ServicesRequestStatus.Value));
+                }
+
+                if (q.ServicesCostStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesCostStatus == q.ServicesCostStatus.Value));
+                }
+
+                if (q.IsProductRequirement.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.IsProductRequirement == q.IsProductRequirement.Value));
+                }
+
+                if (q.ServicesDateFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesDate >= q.ServicesDateFrom.Value));
+                }
+                if (q.ServicesDateTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesDate <= q.ServicesDateTo.Value
+                        )
+                    );
+                }
+
+                if (q.TechnicalServiceStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.ServicesStatus == q.TechnicalServiceStatus.Value));
+                }
+
+                if (q.TechnicalStartFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.StartTime.HasValue &&
+                            ts.StartTime.Value >= q.TechnicalStartFrom.Value));
+                }
+
+                if (q.TechnicalStartTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.StartTime.HasValue &&
+                            ts.StartTime.Value <= q.TechnicalStartTo.Value));
+                }
+
+                if (q.TechnicalEndFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.EndTime.HasValue &&
+                            ts.EndTime.Value >= q.TechnicalEndFrom.Value));
+                }
+
+                if (q.TechnicalEndTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.EndTime.HasValue &&
+                            ts.EndTime.Value <= q.TechnicalEndTo.Value));
+                }
+
+                if (q.PricingStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        pricingQuery.Any(pr =>
+                            pr.RequestNo == w.RequestNo &&
+                            pr.Status == q.PricingStatus.Value));
+                }
+
+                if (q.FinalApprovalStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        finalApprovalQuery.Any(fa =>
+                            fa.RequestNo == w.RequestNo &&
+                            fa.Status == q.FinalApprovalStatus.Value));
+                }
+
+                #endregion
+
+                var total = await wfQuery.CountAsync();
+
+                wfQuery = q.SortBy?.ToLowerInvariant() switch
+                {
+                    "requestno" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.RequestNo)
+                        : wfQuery.OrderBy(w => w.RequestNo),
+
+                    "priority" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.Priority)
+                        : wfQuery.OrderBy(w => w.Priority),
+
+                    "workflowstatus" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.WorkFlowStatus)
+                        : wfQuery.OrderBy(w => w.WorkFlowStatus),
+
+                    "currentstep" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.CurrentStep!.Code)
+                        : wfQuery.OrderBy(w => w.CurrentStep!.Code),
+
+                    _ => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.CreatedDate)
+                        : wfQuery.OrderBy(w => w.CreatedDate)
+                };
+
+                var workflows = await wfQuery
+                    .Skip((q.Page - 1) * q.PageSize)
+                    .Take(q.PageSize)
+                    .Select(w => new
+                    {
+                        w.Id,
+                        w.RequestNo,
+                        w.RequestTitle,
+                        w.CurrentStepId,
+                        CurrentStepCode = w.CurrentStep != null ? w.CurrentStep.Code : null,
+                        CurrentStepName = w.CurrentStep != null ? w.CurrentStep.Name : null,
+                        w.Priority,
+                        w.WorkFlowStatus,
+                        w.CreatedDate,
+                        w.UpdatedDate,
+                        w.CreatedUser,
+                        w.ApproverTechnicianId,
+                        w.IsAgreement,
+                        w.IsLocationValid
+                    })
+                    .ToListAsync();
+
+                var requestNos = workflows
+                    .Select(x => x.RequestNo)
+                    .Distinct()
+                    .ToList();
+
+                if (requestNos.Count == 0)
+                {
+                    return ResponseModel<PagedResult<QnbBasicReportListDto>>.Success(
+                        new PagedResult<QnbBasicReportListDto>(
+                            new List<QnbBasicReportListDto>(),
+                            total,
+                            q.Page,
+                            q.PageSize
+                        )
+                    );
+                }
+
+                var servicesRequests = await srQuery
+                    .Where(sr => requestNos.Contains(sr.RequestNo))
+                    .Select(sr => new
+                    {
+                        sr.Id,
+                        sr.RequestNo,
+                        sr.QnbServiceTrackNo,
+                        sr.CustomerId,
+                        CustomerCode = sr.Customer != null ? sr.Customer.SubscriberCode : null,
+                        CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
+                        CustomerCity = sr.Customer != null ? sr.Customer.City : null,
+                        CustomerDistrict = sr.Customer != null ? sr.Customer.District : null,
+                        sr.ServiceTypeId,
+                        ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                        sr.ServicesDate,
+                        sr.PlannedCompletionDate,
+                        sr.IsProductRequirement,
+                        sr.ServicesCostStatus,
+                        sr.ServicesRequestStatus
+                    })
+                    .ToListAsync();
+
+                var warehouses = await whQuery
+                    .Where(wh => requestNos.Contains(wh.RequestNo))
+                    .Select(wh => new
+                    {
+                        wh.Id,
+                        wh.RequestNo,
+                        wh.WarehouseStatus,
+                        wh.DeliveryDate
+                    })
+                    .ToListAsync();
+
+                var technicalServices = await tsQuery
+                    .Where(ts => requestNos.Contains(ts.RequestNo))
+                    .Select(ts => new
+                    {
+                        ts.Id,
+                        ts.RequestNo,
+                        ts.ServicesStatus,
+                        ts.StartTime,
+                        ts.EndTime
+                    })
+                    .ToListAsync();
+
+                var pricings = await pricingQuery
+                    .Where(pr => requestNos.Contains(pr.RequestNo))
+                    .Select(pr => new
+                    {
+                        pr.RequestNo,
+                        pr.Status,
+                        pr.TotalAmount,
+                        pr.Currency
+                    })
+                    .ToListAsync();
+
+                var finalApprovals = await finalApprovalQuery
+                    .Where(fa => requestNos.Contains(fa.RequestNo))
+                    .Select(fa => new
+                    {
+                        fa.RequestNo,
+                        fa.Status,
+                        fa.DiscountPercent,
+                        fa.Notes
+                    })
+                    .ToListAsync();
+
+                var userIds = workflows
+                    .SelectMany(x => new long?[]
+                    {
+                x.CreatedUser,
+                x.ApproverTechnicianId
+                    })
+                    .Where(x => x.HasValue && x.Value > 0)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var users = await userQuery
+                    .Where(u => userIds.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.TechnicianName,
+                        u.TechnicianEmail,
+                        u.City,
+                        u.District
+                    })
+                    .ToListAsync();
+
+                var srDict = servicesRequests
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.OrderByDescending(y => y.Id).First()
+                    );
+
+                var whDict = warehouses
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.OrderByDescending(y => y.Id).First()
+                    );
+
+                var tsDict = technicalServices
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.OrderByDescending(y => y.Id).First()
+                    );
+
+                var pricingDict = pricings
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var finalApprovalDict = finalApprovals
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var userDict = users
+                    .GroupBy(x => x.Id)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var items = workflows.Select(w =>
+                {
+                    srDict.TryGetValue(w.RequestNo, out var sr);
+                    whDict.TryGetValue(w.RequestNo, out var wh);
+                    tsDict.TryGetValue(w.RequestNo, out var ts);
+                    pricingDict.TryGetValue(w.RequestNo, out var pricing);
+                    finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
+
+                    userDict.TryGetValue(w.CreatedUser, out var createdUser);
+
+                    var technician = w.ApproverTechnicianId.HasValue &&
+                                     userDict.TryGetValue(w.ApproverTechnicianId.Value, out var techUser)
+                        ? techUser
+                        : null;
+
+                    double? durationMinutes = null;
+
+                    if (ts?.StartTime != null && ts?.EndTime != null)
+                    {
+                        durationMinutes = Math.Round(
+                            (ts.EndTime.Value - ts.StartTime.Value).TotalMinutes,
+                            2
+                        );
+                    }
+
+                    return new QnbBasicReportListDto
+                    {
+                        WorkFlowId = w.Id,
+
+                        RequestNo = w.RequestNo,
+                        RequestTitle = w.RequestTitle,
+                        QnbServiceTrackNo = sr?.QnbServiceTrackNo,
+
+                        CurrentStepId = w.CurrentStepId,
+                        CurrentStepCode = w.CurrentStepCode,
+                        CurrentStepName = w.CurrentStepName,
+
+                        Priority = w.Priority,
+                        WorkFlowStatus = w.WorkFlowStatus,
+
+                        CreatedDate = w.CreatedDate,
+                        UpdatedDate = w.UpdatedDate,
+
+                        CreatedUserId = w.CreatedUser,
+                        CreatedUserName = createdUser?.TechnicianName,
+
+                        ApproverTechnicianId = w.ApproverTechnicianId,
+                        ApproverTechnicianName = technician?.TechnicianName,
+                        ApproverTechnicianEmail = technician?.TechnicianEmail,
+                        TechnicianCity = technician?.City,
+                        TechnicianDistrict = technician?.District,
+
+                        CustomerId = sr?.CustomerId,
+                        CustomerCode = sr?.CustomerCode,
+                        CustomerName = sr?.CustomerName,
+                        CustomerCity = sr?.CustomerCity,
+                        CustomerDistrict = sr?.CustomerDistrict,
+
+                        ServiceTypeId = sr?.ServiceTypeId,
+                        ServiceTypeName = sr?.ServiceTypeName,
+
+                        ServicesDate = sr?.ServicesDate,
+                        PlannedCompletionDate = sr?.PlannedCompletionDate,
+
+                        IsAgreement = w.IsAgreement,
+                        IsLocationValid = w.IsLocationValid,
+                        IsProductRequirement = sr?.IsProductRequirement,
+
+                        ServicesCostStatus = sr?.ServicesCostStatus,
+                        ServicesRequestStatus = sr?.ServicesRequestStatus,
+
+                        WarehouseStatus = wh?.WarehouseStatus,
+                        WarehouseDeliveryDate = wh?.DeliveryDate,
+
+                        TechnicalServiceStatus = ts?.ServicesStatus,
+                        TechnicalStartTime = ts?.StartTime,
+                        TechnicalEndTime = ts?.EndTime,
+                        TechnicalServiceDurationMinutes = durationMinutes,
+
+                        PricingStatus = pricing?.Status,
+                        PricingTotalAmount = pricing?.TotalAmount,
+                        Currency = pricing?.Currency,
+
+                        FinalApprovalStatus = finalApproval?.Status,
+                        DiscountPercent = finalApproval?.DiscountPercent,
+                        FinalApprovalNotes = finalApproval?.Notes
+                    };
+                }).ToList();
+
+                return ResponseModel<PagedResult<QnbBasicReportListDto>>.Success(
+                    new PagedResult<QnbBasicReportListDto>(
+                        items,
+                        total,
+                        q.Page,
+                        q.PageSize
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetQnbBasicWorkFlowReportAsync");
+
+                return ResponseModel<PagedResult<QnbBasicReportListDto>>.Fail(
+                    $"QNB workflow raporu getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
         // ------------------------ Archive — public ------------------------
         public async Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter)
         {
@@ -5839,8 +6759,6 @@ namespace Business.Services.Qnb
                 ["QnbServiceRequestWarehouse"] = "WH",
                 ["QnbServiceRequestPricing"] = "PRC",
                 ["QnbCancelledFlows"] = "CNC",
-                ["QnbCustomerServiceRequestCreate"] = "CF",
-                ["QnbServiceRequestCustomerAgreement"] = "CAPR",
                 ["QnbServiceRequestFinalApproval"] = "APR",
                 ["QnbServiceRequestCreate"] = "SR",
                 ["QnbServiceRequestComplate"] = "CMP",
