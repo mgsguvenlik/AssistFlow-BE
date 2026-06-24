@@ -26,5 +26,6 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
         [MinLength(1, ErrorMessage = "En az bir form görseli seçin.")]
         public List<IFormFile>? FormImages { get; set; }
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 }

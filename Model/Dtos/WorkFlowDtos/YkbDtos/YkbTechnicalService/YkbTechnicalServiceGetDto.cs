@@ -4,6 +4,7 @@ using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
+using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService
 {
@@ -35,5 +36,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService
 
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
     }
 }

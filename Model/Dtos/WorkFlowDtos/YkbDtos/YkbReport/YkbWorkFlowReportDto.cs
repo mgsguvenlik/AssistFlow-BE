@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -109,6 +105,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public string? ServiceTypeName { get; set; }
         public string Priority { get; set; } = "Normal";
         public string ServicesRequestStatus { get; set; } = string.Empty;
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
     }
 
     public class TechnicalServiceSectionDto

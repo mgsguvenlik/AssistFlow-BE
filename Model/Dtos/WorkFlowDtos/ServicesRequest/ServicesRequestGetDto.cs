@@ -3,6 +3,7 @@ using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
+using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 {
@@ -45,8 +46,11 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
 
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
+     
         public List<ServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
     }
 }

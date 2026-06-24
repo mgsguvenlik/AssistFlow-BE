@@ -40,5 +40,10 @@ namespace Model.Concrete.Ykb
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
 
+        /// <summary>
+        /// Bu servis talebine bağlı iş emri türleri.
+        /// </summary>
+        public ICollection<YkbServicesRequestWorkOrderType> YkbServicesRequestWorkOrderTypes { get; set; }
+            = new List<YkbServicesRequestWorkOrderType>();
     }
 }

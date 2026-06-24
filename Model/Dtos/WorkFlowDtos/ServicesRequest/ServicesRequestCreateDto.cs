@@ -38,6 +38,8 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
 
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
         public long? ApproverTechnicianId { get; set; }
-        public string? CustomerApproverName { get; set; } 
+        public string? CustomerApproverName { get; set; }
+
+        public List<long> WorkOrderTypeIds { get; set; } = new();
     }
 }
