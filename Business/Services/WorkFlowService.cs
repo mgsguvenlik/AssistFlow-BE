@@ -970,6 +970,7 @@ namespace Business.Services
                     }
                 }
                 #endregion
+
                 #region Teknik Servis Kaydı güncelle 
                 technicalService.EndTime = DateTime.Now;
                 technicalService.ServicesStatus = TechnicalServiceStatus.Completed;
