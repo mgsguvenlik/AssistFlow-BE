@@ -7244,6 +7244,7 @@ namespace Business.Services
 
                 var result = new WorkingStatusDto
                 {
+                    RequestId = session.WorkFlowId,
                     RequestNo = session.RequestNo,
                     SerialNo = session.SerialNo,
                     IsActive = session.IsActive,
@@ -7307,11 +7308,29 @@ namespace Business.Services
 
                 var nowUtc = DateTimeOffset.UtcNow;
 
-                var extensionBaseUtc = session.PlannedEndAtUtc > nowUtc
-                    ? session.PlannedEndAtUtc
-                    : nowUtc;
+                // Süre henüz bitmediyse uzatma yapılmasın.
+                // Frontend butonu zaten bu durumda pasif göstermeli.
+                if (session.PlannedEndAtUtc > nowUtc)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Çalışma süresi henüz dolmadı. Süre dolduktan sonra uzatma yapılabilir.",
+                        StatusCode.Conflict);
+                }
 
-                var newEndUtc = extensionBaseUtc.AddMinutes(dto.ExtendMinutes);
+                if (dto.ExtendMinutes <= 0)
+                    dto.ExtendMinutes = 30;
+
+                // Manitou tek işlemde en fazla 1 saat kabul ediyor.
+                if (dto.ExtendMinutes > 60)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou üzerinde çalışma süresi tek işlemde en fazla 60 dakika uzatılabilir.",
+                        StatusCode.BadRequest);
+                }
+
+                // Yeni çalışma periyodu şu andan itibaren başlar.
+                var newStartUtc = nowUtc;
+                var newEndUtc = newStartUtc.AddMinutes(dto.ExtendMinutes);
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
@@ -7334,7 +7353,7 @@ namespace Business.Services
                     {
                         SerialNo = session.SerialNo,
                         Description = extendDescription,
-                        UtcFrom = ToManitouUtcText(session.StartedAtUtc),
+                        UtcFrom = ToManitouUtcText(newStartUtc),
                         UtcTo = ToManitouUtcText(newEndUtc),
                         IsNew = false
                     });

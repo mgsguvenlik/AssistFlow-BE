@@ -4,6 +4,7 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
 {
     public sealed class WorkingStatusDto
     {
+        public long RequestId { get; set; }
         public string RequestNo { get; set; } = string.Empty;
 
         public int SerialNo { get; set; }
