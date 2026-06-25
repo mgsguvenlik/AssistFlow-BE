@@ -12,5 +12,6 @@
         public long? CreatedUser { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }
         public long? UpdatedUser { get; set; }
+        public bool IsTechnicalServiceTestEnabled { get; set; } = false;
     }
 }

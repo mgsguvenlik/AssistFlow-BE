@@ -257,8 +257,8 @@ namespace Business.Mapper
                          s => s.TenantId ?? 0) // DTO long, entity long? olduğu için null gelirse 0 veriyoruz
                     .Map(d => d.TenantCode,
                          s => s.Tenant != null ? s.Tenant.Code : string.Empty)
-                    .Map(d => d.TenantName,
-                         s => s.Tenant != null ? s.Tenant.Name : string.Empty)
+                    .Map(d => d.TenantName,s => s.Tenant != null ? s.Tenant.Name : string.Empty)
+                    .Map(d => d.IsTechnicalServiceTestEnabled, s => s.Tenant != null ? s.Tenant.IsTechnicalServiceTestEnabled : false)
                     // 🔹 Diğer basit alanlar (istersen bunları Mapster’a da bırakabilirsin)
                     .Map(d => d.TechnicianCode, s => s.TechnicianCode)
                     .Map(d => d.TechnicianCompany, s => s.TechnicianCompany)
