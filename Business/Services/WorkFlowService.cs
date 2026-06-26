@@ -7,6 +7,7 @@ using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
+using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
@@ -64,7 +65,6 @@ namespace Business.Services
         private readonly IMenuService _menuService;
         private readonly IManitouApiService _manitouApiService;
         private readonly AppDataContext _ctx;
-
 
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
             ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService, IManitouApiService manitouApiService)
@@ -938,6 +938,43 @@ namespace Business.Services
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
+
+                var isManitouTestEnabled =  await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (isManitouTestEnabled)
+                {
+                    var activeWorkingExists = await _uow.Repository
+                        .GetQueryable<TechnicalServiceWorkSession>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestNo == dto.RequestNo &&
+                            x.IsActive &&
+                            !x.IsCompleted &&
+                            !x.IsDeleted);
+
+                    if (activeWorkingExists)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(
+                            "Aktif Manitou çalışma/test kaydı bitirilmeden teknik servis tamamlanamaz.",
+                            StatusCode.Conflict);
+                    }
+
+                    var completedWorkingExists = await _uow.Repository
+                        .GetQueryable<TechnicalServiceWorkSession>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestNo == dto.RequestNo &&
+                            x.IsCompleted &&
+                            !x.IsDeleted);
+
+                    if (!completedWorkingExists)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(
+                            "Teknik servis tamamlanmadan önce Manitou çalışma/test işlemi tamamlanmalıdır.",
+                            StatusCode.Conflict);
+                    }
+                }
+
                 #endregion
 
                 #region Lokasyon kontrolü
@@ -1227,8 +1264,6 @@ namespace Business.Services
 
 
         }
-
-
 
 
         // 4 Fiyatlama onay ve kontrole gönderim.
@@ -3181,6 +3216,7 @@ namespace Business.Services
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
+                .Include(sr => sr.Customer).ThenInclude(c => c.Tenant)
                 .AsNoTracking()
                 .Where(sr => sr.RequestNo == requestNo && sr.Customer != null)
                 .Select(sr => new CustomerGetDto
@@ -3210,6 +3246,8 @@ namespace Business.Services
                     CashCenter = sr.Customer.CashCenter,
                     LockType = sr.Customer.LockType,
                     SerialNo=sr.Customer.SerialNo,
+                    TenantId=sr.Customer.TenantId,
+                    IsTechnicalServiceTestEnabled = sr.Customer.Tenant.IsTechnicalServiceTestEnabled,
                     Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -6848,6 +6886,15 @@ namespace Business.Services
 
                 var (wf, request, customer, technicalService) = context.Value;
 
+                var isManitouTestEnabled = await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.NotFound);
+                }
+
                 if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
                     return ResponseModel<WorkingStatusDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.Conflict);
 
@@ -7209,6 +7256,27 @@ namespace Business.Services
                 if (string.IsNullOrWhiteSpace(requestNo))
                     return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
 
+                var context = await GetTechnicalServiceContextAsync(requestNo);
+
+                if (context is null)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.",
+                        StatusCode.BadRequest);
+                }
+
+                var (_, _, customer, _) = context.Value;
+
+                var isManitouTestEnabled =
+                    await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.BadRequest);
+                }
+
                 var session = await _uow.Repository
                     .GetQueryable<TechnicalServiceWorkSession>()
                     .AsNoTracking()
@@ -7300,6 +7368,15 @@ namespace Business.Services
                     return ResponseModel<WorkingStatusDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
 
                 var (wf, request, customer, technicalService) = context.Value;
+
+                var isManitouTestEnabled = await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.NotFound);
+                }
 
                 var accessToken = await _manitouApiService.LoginAsync();
 
@@ -7409,20 +7486,43 @@ namespace Business.Services
         }
         private async Task SendMissingZoneWarningMailAsync(string technicianName, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
         {
-            var me= await _currentUser.GetAsync();
-            var receivedText = receivedZones.Count > 0
-                ? string.Join(", ", receivedZones)
-                : "hiçbir";
+            var me = await _currentUser.GetAsync();
 
-            var missingText = missingZones.Count > 0
-                ? string.Join(", ", missingZones)
-                : "-";
+            // Listelerin null olma ihtimalini ve dolu olup olmadığını kontrol ediyoruz.
+            bool hasReceived = receivedZones?.Count > 0;
+            bool hasMissing = missingZones?.Count > 0;
+
+            string receivedText = hasReceived ? string.Join(", ", receivedZones) : string.Empty;
+            string missingText = hasMissing ? string.Join(", ", missingZones) : string.Empty;
+
+            string messageDetail;
+
+            // Senaryolara göre cümlenin aksiyon bildiren kısmını oluşturuyoruz.
+            if (hasReceived && hasMissing)
+            {
+                // 1. Senaryo: Hem alınan hem de eksik bölgeler var.
+                messageDetail = $"{receivedText} bölgelerinden alarm aldı fakat {missingText} bölgelerinden alarm almadı.";
+            }
+            else if (!hasReceived && hasMissing)
+            {
+                // 2. Senaryo: Hiç alarm alınmadı ama eksik/beklenen bölgeler var. (Senin bahsettiğin senaryo)
+                messageDetail = $"hiçbir bölgeden alarm almadı. {missingText} bölgelerinden alarm bekleniyor.";
+            }
+            else if (hasReceived && !hasMissing)
+            {
+                // 3. Senaryo: Alarmlar geldi, eksik bölge yok.
+                messageDetail = $"{receivedText} bölgelerinden alarm aldı. Eksik veya beklenen alarm bölgesi bulunmamaktadır.";
+            }
+            else
+            {
+                // 4. Senaryo: İki liste de boş.
+                messageDetail = $"hiçbir bölgeden alarm almadı. Sistemde beklenen eksik alarm bölgesi de bulunmamaktadır.";
+            }
 
             var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
 
-            var body =
-                $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada " +
-                $"{receivedText} bölgelerinden alarm aldı fakat {missingText} bölgelerinden alarm almadı.";
+            // Ana gövde ile dinamik oluşturduğumuz detayı birleştiriyoruz.
+            var body = $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
 
             var managerMails = new List<string>();
             var managerMailConfig = await _uow.Repository
@@ -7438,6 +7538,7 @@ namespace Business.Services
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
+
             if (managerMails.Count == 0)
             {
                 _logger.LogWarning(
@@ -7446,6 +7547,7 @@ namespace Business.Services
 
                 return;
             }
+
             await _mailPush.EnqueueAsync(new MailOutbox
             {
                 RequestNo = requestNo,
@@ -7456,8 +7558,6 @@ namespace Business.Services
                 BodyHtml = body,
                 CreatedUser = me?.Id
             });
-
-            await Task.CompletedTask;
         }
         private static string BuildManitouTestDescription(
             string requestNo,
@@ -7810,6 +7910,22 @@ namespace Business.Services
                     false,
                     $"'{session.RequestNo}' numaralı aktif çalışma kapatılırken hata oluştu: {ex.Message}");
             }
+        }
+
+
+        private async Task<bool> IsManitouTechnicalServiceTestEnabledAsync( long? tenantId, CancellationToken cancellationToken = default)
+        {
+            if (!tenantId.HasValue || tenantId.Value <= 0)
+                return false;
+
+            return await _uow.Repository
+                .GetQueryable<Tenant>()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id == tenantId.Value &&
+                    x.Code ==CommonConstants.ManitouTestTenantCode &&
+                    x.IsTechnicalServiceTestEnabled,
+                    cancellationToken);
         }
 
     }

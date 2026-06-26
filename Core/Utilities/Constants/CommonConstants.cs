@@ -33,8 +33,9 @@
         public const string TrTR = "tr-TR";
         public const string Id = "Id";
         public const string ApplicationJson = "application/json";
+        public const string ManitouTestTenantCode = "MGS";
 
-        
+
 
 
     }
