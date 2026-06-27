@@ -79,7 +79,6 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<PagedResult<YkbBasicReportListDto>>> GetYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q);
 
         //Arşiv 
-
         Task<ResponseModel<PagedResult<YkbWorkFlowArchiveListDto>>> GetArchiveListAsync(YkbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);

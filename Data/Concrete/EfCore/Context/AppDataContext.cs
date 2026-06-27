@@ -98,6 +98,8 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<QnbWorkFlowActivityRecord> QnbWorkFlowActivityRecords { get; set; } = default!;
         public DbSet<QnbWorkFlowArchive> QnbWorkFlowArchives { get; set; } = default!;
         public DbSet<QnbWorkFlowReviewLog> QnbWorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } 
+
         #endregion
 
         /// <summary>

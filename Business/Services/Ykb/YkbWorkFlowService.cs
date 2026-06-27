@@ -5863,6 +5863,14 @@ namespace Business.Services.Ykb
             if (entity is null)
                 return ResponseModel.Fail("İptal edilecek kayıt bulunamadı.", StatusCode.NotFound);
 
+
+            var forceFinishResult = await ForceFinishActiveWorkingByRequestNoAsync(entity.RequestNo, "Akış iptal edildiği için çalışma zorunlu olarak bitirildi.");
+            if (!forceFinishResult.Success)
+            {
+                return ResponseModel.Fail(
+                    forceFinishResult.ErrorMessage!,
+                    StatusCode.Error);
+            }
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.WorkFlowStatus = WorkFlowStatus.Cancelled;                // varsa
             entity.UpdatedDate = DateTime.Now; // varsa
