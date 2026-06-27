@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Model.Dtos.WorkFlowDtos.TechnicalService
+namespace Model.Dtos.WorkFlowDtos
 {
     public sealed class FinishWorkingDto
     {

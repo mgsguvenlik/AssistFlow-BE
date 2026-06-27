@@ -1,5 +1,6 @@
 ﻿using Core.Common;
 using Core.Enums;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
@@ -82,5 +83,12 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<PagedResult<YkbWorkFlowArchiveListDto>>> GetArchiveListAsync(YkbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+
+
+        //Manitou System Test Zone ile ilgili işlemler eklenecek
+        Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
+        Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
+        Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
+        Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto);
     }
 }

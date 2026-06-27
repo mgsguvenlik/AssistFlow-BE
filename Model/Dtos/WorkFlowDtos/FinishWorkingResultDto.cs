@@ -1,4 +1,4 @@
-﻿namespace Model.Dtos.WorkFlowDtos.TechnicalService
+﻿namespace Model.Dtos.WorkFlowDtos
 {
     public sealed class FinishWorkingResultDto
     {

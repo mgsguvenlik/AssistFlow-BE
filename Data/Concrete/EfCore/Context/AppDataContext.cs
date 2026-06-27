@@ -79,6 +79,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowActivityRecord> YkbWorkFlowActivityRecords { get; set; } = default!;
         public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
 
         #endregion  
 

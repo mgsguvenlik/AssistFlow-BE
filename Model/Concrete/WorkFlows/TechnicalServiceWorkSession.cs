@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Model.Concrete
+namespace Model.Concrete.WorkFlows
 {
     public class TechnicalServiceWorkSession : AuditableWithUserEntity
     {

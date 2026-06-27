@@ -31,6 +31,7 @@ using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.Report;
@@ -1838,7 +1839,7 @@ namespace Business.Services
         ///----------------------------- 
 
         // -------------------- Services Request --------------------
-       private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
+        private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
            => q => q
                .Include(x => x.Customer)
                    .ThenInclude(x => x.CustomerProductPrices)
@@ -3216,9 +3217,9 @@ namespace Business.Services
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
-                .Include(sr => sr.Customer).ThenInclude(c => c.Tenant)
                 .AsNoTracking()
                 .Where(sr => sr.RequestNo == requestNo && sr.Customer != null)
+                .Include(sr => sr.Customer).ThenInclude(c => c.Tenant)
                 .Select(sr => new CustomerGetDto
                 {
                     Id = sr.Customer!.Id,
@@ -7195,7 +7196,6 @@ namespace Business.Services
                     StatusCode.Error);
             }
         }
-
         private async Task<(WorkFlow wf, ServicesRequest request, Customer customer, TechnicalService technicalService)?> GetTechnicalServiceContextAsync(string requestNo)
         {
             var wf = await _uow.Repository
@@ -7230,7 +7230,6 @@ namespace Business.Services
         {
             return value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
         }
-
         private static List<string> GetReceivedZones(List<ManitouSystemTestZoneResult> zones)
         {
             return zones
@@ -7559,20 +7558,13 @@ namespace Business.Services
                 CreatedUser = me?.Id
             });
         }
-        private static string BuildManitouTestDescription(
-            string requestNo,
-            string technicianName,
-            string action)
+        private static string BuildManitouTestDescription(string requestNo,string technicianName,string action)
         {
             return
                 $"FlowAssist Teknik Servis Testi [FA:{requestNo}] - " +
                 $"{technicianName} tarafından {action}.";
         }
-
-        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(
-                IEnumerable<ManitouOutOfServiceResult> records,
-                int serialNo,
-                string requestNo)
+        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records,int serialNo,string requestNo)
         {
             var requestMarker = $"[FA:{requestNo}]";
 
@@ -7595,11 +7587,7 @@ namespace Business.Services
                 .ThenByDescending(x => x.LogSequence)
                 .FirstOrDefault();
         }
-
-        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(
-        long customerId,
-        string newRequestNo,
-        string accessToken)
+        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId,string newRequestNo,string accessToken)
         {
             var nowUtc = DateTimeOffset.UtcNow;
 
@@ -7734,10 +7722,7 @@ namespace Business.Services
 
             return (true, StatusCode.Ok, null);
         }
-
-        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(
-        string requestNo,
-        string reason)
+        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo,string reason)
         {
             var activeSession = await _uow.Repository
                 .GetQueryable<TechnicalServiceWorkSession>()
@@ -7753,9 +7738,7 @@ namespace Business.Services
 
             return await CloseActiveWorkingSessionAsync(activeSession, reason);
         }
-        private async Task<(bool Success, string? ErrorMessage)> CloseActiveWorkingSessionAsync(
-            TechnicalServiceWorkSession session,
-            string reason)
+        private async Task<(bool Success, string? ErrorMessage)> CloseActiveWorkingSessionAsync(TechnicalServiceWorkSession session,string reason)
         {
             try
             {
@@ -7911,7 +7894,6 @@ namespace Business.Services
                     $"'{session.RequestNo}' numaralı aktif çalışma kapatılırken hata oluştu: {ex.Message}");
             }
         }
-
         private async Task<bool> IsManitouTechnicalServiceTestEnabledAsync( long? tenantId, CancellationToken cancellationToken = default)
         {
             if (!tenantId.HasValue || tenantId.Value <= 0)
@@ -7922,7 +7904,7 @@ namespace Business.Services
                 .AsNoTracking()
                 .AnyAsync(x =>
                     x.Id == tenantId.Value &&
-                    x.Code ==CommonConstants.ManitouTestTenantCode &&
+                    x.Code ==CommonConstants.ManitouTestTenantCodeMGS &&
                     x.IsTechnicalServiceTestEnabled,
                     cancellationToken);
         }
