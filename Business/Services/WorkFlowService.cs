@@ -7912,7 +7912,6 @@ namespace Business.Services
             }
         }
 
-
         private async Task<bool> IsManitouTechnicalServiceTestEnabledAsync( long? tenantId, CancellationToken cancellationToken = default)
         {
             if (!tenantId.HasValue || tenantId.Value <= 0)
