@@ -40,6 +40,6 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public long? ApproverTechnicianId { get; set; }
         public string? CustomerApproverName { get; set; }
 
-        public List<long> WorkOrderTypeIds { get; set; } = new();
+        public List<long>? WorkOrderTypeIds { get; set; } = new();
     }
 }
