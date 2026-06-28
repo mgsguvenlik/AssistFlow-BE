@@ -2195,7 +2195,7 @@ namespace Business.Services.Ykb
                         Note = sr.Customer.Note,
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
-
+                        
                         Systems = sr.Customer.CustomerSystemAssignments
                             .Select(a => new CustomerSystemAssignmentGetDto
                             {
