@@ -3742,6 +3742,33 @@ namespace Business.Services.Ykb
 
             dto.WorkOrderTypeIds = dto.WorkOrderTypes.Select(x => x.Id).ToList();
 
+
+            // Servis başlığı WorkFlow.RequestTitle'dan,
+            // servis açıklaması ServicesRequest.Description alanından alınır.
+            var serviceHeader = await (
+                from sr in _uow.Repository
+                    .GetQueryable<YkbServicesRequest>()
+                    .AsNoTracking()
+                join wf in _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+
+                    on sr.RequestNo equals wf.RequestNo into workflowJoin
+
+                from wf in workflowJoin.DefaultIfEmpty()
+
+                where sr.RequestNo == dto.RequestNo
+
+                select new
+                {
+                    ServiceTitle = wf != null ? wf.RequestTitle : null,
+                    ServiceDescription = sr.Description
+                }
+            ).FirstOrDefaultAsync();
+
+            dto.ServiceTitle = serviceHeader?.ServiceTitle ?? string.Empty;
+            dto.ServiceDescription = serviceHeader?.ServiceDescription ?? string.Empty;
+
             return ResponseModel<YkbTechnicalServiceGetDto>.Success(dto);
         }
         /// ------------------ Pricing -----------------------------------

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Abstractions;
+using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
 using System.ComponentModel.DataAnnotations;
@@ -36,5 +37,11 @@ namespace Model.Concrete
         /// </summary>
         public ICollection<YkbServicesRequestWorkOrderType> YkbServicesRequestWorkOrderTypes { get; set; }
             = new List<YkbServicesRequestWorkOrderType>();
+
+        /// <summary>
+        ///  Bu iş emri türünün bağlı olduğu servis talepleri.
+        /// </summary>
+        public ICollection<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; }
+            = new List<QnbServicesRequestWorkOrderType>();
     }
 }

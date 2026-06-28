@@ -32,5 +32,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
         public string? ApproverTechnician { get; set; }
         public List<QnbServicesRequestProductUpdateDto>? Products { get; set; }
         public long StatuId { get; set; } // Akýþ taleplerin id si. Ekranda seçilecek.
+
+        public List<long>? WorkOrderTypeIds { get; set; }
     }
 }

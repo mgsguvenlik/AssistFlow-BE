@@ -1196,20 +1196,20 @@ namespace Business.Services
 
                 #endregion
 
-                #region İş Emri Türleri Güncellemesi
-                if (dto.WorkOrderTypeIds is not null)
-                {
-                    var srEntity = await _uow.Repository.GetQueryable<ServicesRequest>()
-                        .Include(x => x.ServicesRequestWorkOrderTypes)
-                        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+                #region İş Emri Türleri Güncellemesi  (ReadOnly yapıldı MZK )
+                //if (dto.WorkOrderTypeIds is not null)
+                //{
+                //    var srEntity = await _uow.Repository.GetQueryable<ServicesRequest>()
+                //        .Include(x => x.ServicesRequestWorkOrderTypes)
+                //        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
-                    if (srEntity is not null)
-                    {
-                        var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
-                        if (wotError is null)
-                            SyncWorkOrderTypes(srEntity, validatedWotIds);
-                    }
-                }
+                //    if (srEntity is not null)
+                //    {
+                //        var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                //        if (wotError is null)
+                //            SyncWorkOrderTypes(srEntity, validatedWotIds);
+                //    }
+                //}
                 #endregion
 
                 #region Hareket Kaydı
@@ -3363,6 +3363,33 @@ namespace Business.Services
                 }
             }
             // --------------------------------------------------------------------
+
+
+            // Servis başlığı WorkFlow.RequestTitle'dan,
+            // servis açıklaması ServicesRequest.Description alanından alınır.
+            var serviceHeader = await (
+                from sr in _uow.Repository
+                    .GetQueryable<ServicesRequest>()
+                    .AsNoTracking()
+                join wf in _uow.Repository
+                    .GetQueryable<WorkFlow>()
+                    .AsNoTracking()
+
+                    on sr.RequestNo equals wf.RequestNo into workflowJoin
+
+                from wf in workflowJoin.DefaultIfEmpty()
+
+                where sr.RequestNo == dto.RequestNo
+
+                select new
+                {
+                    ServiceTitle = wf != null ? wf.RequestTitle : null,
+                    ServiceDescription = sr.Description
+                }
+            ).FirstOrDefaultAsync();
+
+            dto.ServiceTitle = serviceHeader?.ServiceTitle ?? string.Empty;
+            dto.ServiceDescription = serviceHeader?.ServiceDescription ?? string.Empty;
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }

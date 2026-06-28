@@ -33,5 +33,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
 
         public List<QnbServicesRequestProductCreateDto>? Products { get; set; }
+
+        public List<long>? WorkOrderTypeIds { get; set; } = new();
     }
 }

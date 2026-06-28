@@ -98,7 +98,8 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<QnbWorkFlowActivityRecord> QnbWorkFlowActivityRecords { get; set; } = default!;
         public DbSet<QnbWorkFlowArchive> QnbWorkFlowArchives { get; set; } = default!;
         public DbSet<QnbWorkFlowReviewLog> QnbWorkFlowReviewLogs { get; set; } = default!;
-        public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } 
+        public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } = default!;
+        public DbSet<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; } = default!;
 
         #endregion
 
@@ -713,6 +714,26 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<QnbCustomerForm>()
                         .HasIndex(x => x.RequestNo);
 
+            modelBuilder.Entity<QnbServicesRequestWorkOrderType>(entity =>
+            {
+                entity.ToTable("QnbServicesRequestWorkOrderTypes");
+
+                entity.HasKey(x => new
+                {
+                    x.QnbServicesRequestId,
+                    x.WorkOrderTypeId
+                });
+
+                entity.HasOne(x => x.QnbServicesRequest)
+                    .WithMany(x => x.QnbServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.QnbServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.WorkOrderType)
+                    .WithMany(x => x.QnbServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.WorkOrderTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
             #endregion
         }
     }

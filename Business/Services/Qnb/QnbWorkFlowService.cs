@@ -48,8 +48,7 @@ using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlowStep;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
-using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
-using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
+using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
@@ -138,6 +137,18 @@ namespace Business.Services.Qnb
                 if (!customerApproverExist)
                     return ResponseModel<QnbCustomerFormGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
 
+
+                //var (workOrderTypeIds, workOrderTypeValidationError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                //if (workOrderTypeValidationError is not null)
+                //{
+                //    return ResponseModel<ServicesRequestGetDto>.Fail(
+                //        workOrderTypeValidationError,
+                //        StatusCode.BadRequest
+                //    );
+                //}
+
+
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
                 #endregion
@@ -170,6 +181,13 @@ namespace Business.Services.Qnb
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                //request.QnbServicesRequestWorkOrderTypes = workOrderTypeIds
+                //     .Select(workOrderTypeId => new QnbServicesRequestWorkOrderType
+                //     {
+                //         WorkOrderTypeId = workOrderTypeId
+                //     })
+                //     .ToList();
+
                 request.Id = 0;
                 await _uow.Repository.AddAsync(request);
                 #endregion
@@ -301,6 +319,15 @@ namespace Business.Services.Qnb
                         StatusCode.Conflict
                     );
 
+                var (workOrderTypeIds, workOrderTypeValidationError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (workOrderTypeValidationError is not null)
+                {
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        workOrderTypeValidationError,
+                        StatusCode.BadRequest
+                    );
+                }
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
 
@@ -312,6 +339,12 @@ namespace Business.Services.Qnb
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                request.QnbServicesRequestWorkOrderTypes = workOrderTypeIds
+                 .Select(workOrderTypeId => new QnbServicesRequestWorkOrderType
+                 {
+                     WorkOrderTypeId = workOrderTypeId
+                 })
+                 .ToList();
 
                 await _uow.Repository.AddAsync(request);
 
@@ -2190,7 +2223,7 @@ namespace Business.Services.Qnb
                         _uow.Repository.Update(serviceRequest);
                     }
                     break;
-              
+
                 default:
                     break;
             }
@@ -2561,8 +2594,31 @@ namespace Business.Services.Qnb
             wf.RequestTitle = dto.Title;
             _uow.Repository.Update(wf);
 
+            List<long>? validatedWorkOrderTypeIds = null;
+
+            if (dto.WorkOrderTypeIds is not null)
+            {
+                var (ids, validationError) =
+                    await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (validationError is not null)
+                {
+                    return ResponseModel<QnbServicesRequestGetDto>.Fail(
+                        validationError,
+                        StatusCode.BadRequest
+                    );
+                }
+
+                validatedWorkOrderTypeIds = ids;
+            }
+
             dto.Adapt(entity, _config);
             entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            if (validatedWorkOrderTypeIds is not null)
+            {
+                SyncWorkOrderTypes(entity, validatedWorkOrderTypeIds);
+            }
 
             // Mevcut ürünleri çek (RequestNo bazlı)
             var existingProducts = await _uow.Repository
@@ -2637,12 +2693,16 @@ namespace Business.Services.Qnb
             return await GetServiceRequestByRequestNoAsync(entity.RequestNo);
         }
         private static Func<IQueryable<QnbServicesRequest>, IIncludableQueryable<QnbServicesRequest, object>>? RequestIncludes()
-            => q => q
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.ServiceType)
-                .Include(x => x.CustomerApprover)
-                .Include(x => x.QnbWorkFlowStep);
+             => q => q
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerGroup)
+                   .ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.ServiceType)
+               .Include(x => x.CustomerApprover)
+               .Include(x => x.QnbServicesRequestWorkOrderTypes)
+            .ThenInclude(x => x.WorkOrderType);
 
         public async Task<ResponseModel<PagedResult<QnbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
@@ -2803,6 +2863,27 @@ namespace Business.Services.Qnb
             if (baseDto is null)
                 return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+
+            baseDto.WorkOrderTypes = await _uow.Repository
+            .GetQueryable<QnbServicesRequestWorkOrderType>()
+            .AsNoTracking()
+            .Where(x => x.QnbServicesRequestId == baseDto.Id)
+            .OrderBy(x => x.WorkOrderType.Name)
+            .Select(x => new WorkOrderTypeGetDto
+            {
+                Id = x.WorkOrderTypeId,
+                Name = x.WorkOrderType.Name,
+                Code = x.WorkOrderType.Code
+            })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
+
+
+
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
@@ -2943,6 +3024,24 @@ namespace Business.Services.Qnb
             if (baseDto is null)
                 return ResponseModel<QnbServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+
+            baseDto.WorkOrderTypes = await _uow.Repository
+             .GetQueryable<QnbServicesRequestWorkOrderType>()
+             .AsNoTracking()
+             .Where(x => x.QnbServicesRequest.RequestNo == requestNo)
+             .OrderBy(x => x.WorkOrderType.Name)
+             .Select(x => new WorkOrderTypeGetDto
+             {
+                 Id = x.WorkOrderTypeId,
+                 Name = x.WorkOrderType.Name,
+                 Code = x.WorkOrderType.Code
+             })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
             if (baseDto.Customer?.CustomerGroupId is long cgId)
             {
                 baseDto.Customer.CustomerGroup = await _uow.Repository
@@ -3443,6 +3542,23 @@ namespace Business.Services.Qnb
             if (dto is null)
                 return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+            dto.WorkOrderTypes = await _uow.Repository
+                 .GetQueryable<QnbServicesRequestWorkOrderType>()
+                 .AsNoTracking()
+                 .Where(x => x.QnbServicesRequest.RequestNo == requestNo)
+                 .OrderBy(x => x.WorkOrderType.Name)
+                 .Select(x => new WorkOrderTypeGetDto
+                 {
+                     Id = x.WorkOrderTypeId,
+                     Name = x.WorkOrderType.Name,
+                     Code = x.WorkOrderType.Code
+                 })
+                .ToListAsync();
+
+            dto.WorkOrderTypeIds = dto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
             dto.Customer = await _uow.Repository
                 .GetQueryable<QnbServicesRequest>()
                 .AsNoTracking()
@@ -3542,6 +3658,33 @@ namespace Business.Services.Qnb
                     img.Url = NormalizeImageUrlInternal(img.Url, baseUrl) ?? string.Empty;
                 }
             }
+
+
+            // Servis başlığı WorkFlow.RequestTitle'dan,
+            // servis açıklaması ServicesRequest.Description alanından alınır.
+            var serviceHeader = await (
+                from sr in _uow.Repository
+                    .GetQueryable<QnbServicesRequest>()
+                    .AsNoTracking()
+                join wf in _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .AsNoTracking()
+
+                    on sr.RequestNo equals wf.RequestNo into workflowJoin
+
+                from wf in workflowJoin.DefaultIfEmpty()
+
+                where sr.RequestNo == dto.RequestNo
+
+                select new
+                {
+                    ServiceTitle = wf != null ? wf.RequestTitle : null,
+                    ServiceDescription = sr.Description
+                }
+            ).FirstOrDefaultAsync();
+
+            dto.ServiceTitle = serviceHeader?.ServiceTitle ?? string.Empty;
+            dto.ServiceDescription = serviceHeader?.ServiceDescription ?? string.Empty;
 
             return ResponseModel<QnbTechnicalServiceGetDto>.Success(dto);
         }
@@ -4787,6 +4930,77 @@ namespace Business.Services.Qnb
             return p;
         }
 
+
+        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(IEnumerable<long>? rawIds)
+        {
+            var ids = rawIds?.ToList() ?? new List<long>();
+
+            if (ids.Any(x => x <= 0))
+            {
+                return (new List<long>(),
+                    "İş emri türü listesinde geçersiz bir ID bulundu.");
+            }
+
+            var distinctIds = ids
+                .Distinct()
+                .ToList();
+
+            if (distinctIds.Count == 0)
+                return (distinctIds, null);
+
+            var existingIds = await _uow.Repository
+                .GetQueryable<WorkOrderType>()
+                .AsNoTracking()
+                .Where(x => distinctIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            var invalidIds = distinctIds
+                .Except(existingIds)
+                .ToList();
+
+            if (invalidIds.Count > 0)
+            {
+                return (new List<long>(),
+                    $"Geçersiz iş emri türü ID'leri: {string.Join(", ", invalidIds)}");
+            }
+
+            return (distinctIds, null);
+        }
+        private void SyncWorkOrderTypes(
+            QnbServicesRequest request,
+            IReadOnlyCollection<long> workOrderTypeIds)
+        {
+            var requestedIds = workOrderTypeIds.ToHashSet();
+
+            var currentRelations = request.QnbServicesRequestWorkOrderTypes
+                .ToList();
+
+            // Artık seçili olmayanları kaldır
+            foreach (var relation in currentRelations
+                         .Where(x => !requestedIds.Contains(x.WorkOrderTypeId))
+                         .ToList())
+            {
+                _uow.Repository.HardDelete(relation);
+            }
+
+            var currentIds = currentRelations
+                .Select(x => x.WorkOrderTypeId)
+                .ToHashSet();
+
+            // Yeni seçilenleri ekle
+            foreach (var workOrderTypeId in requestedIds
+                         .Where(x => !currentIds.Contains(x)))
+            {
+                _uow.Repository.Add(new QnbServicesRequestWorkOrderType
+                {
+                    QnbServicesRequestId = request.Id,
+                    WorkOrderTypeId = workOrderTypeId
+                });
+            }
+        }
+
+
         // SP satır tipi (sadece bu service kullanır)
         private sealed class ReportRowDto
         {
@@ -4809,672 +5023,8 @@ namespace Business.Services.Qnb
             public string Currency { get; set; } = "TRY";
         }
 
-        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync__(QnbBasicReportQueryParams q)
-        {
-            try
-            {
-                q ??= new QnbBasicReportQueryParams();
-                q.Normalize(maxPageSize: 200);
 
-                var wfQuery = _uow.Repository
-                    .GetQueryable<QnbWorkFlow>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var customerFormQuery = _uow.Repository
-                    .GetQueryable<QnbCustomerForm>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var srQuery = _uow.Repository
-                    .GetQueryable<QnbServicesRequest>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var whQuery = _uow.Repository
-                    .GetQueryable<QnbWarehouse>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var tsQuery = _uow.Repository
-                    .GetQueryable<QnbTechnicalService>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var pricingQuery = _uow.Repository
-                    .GetQueryable<QnbPricing>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var finalApprovalQuery = _uow.Repository
-                    .GetQueryable<QnbFinalApproval>()
-                    .AsNoTracking()
-                    .Where(x => !x.IsDeleted);
-
-                var userQuery = _uow.Repository
-                    .GetQueryable<User>()
-                    .AsNoTracking();
-
-                if (!string.IsNullOrWhiteSpace(q.Search))
-                {
-                    var term = q.Search.Trim();
-
-                    wfQuery = wfQuery.Where(w =>
-                        w.RequestNo.Contains(term) ||
-                        w.RequestTitle.Contains(term) ||
-
-                        customerFormQuery.Any(cf =>
-                            cf.RequestNo == w.RequestNo &&
-                            (
-                                (cf.Description != null && cf.Description.Contains(term)) ||
-                                (cf.QnbServiceTrackNo != null && cf.QnbServiceTrackNo.Contains(term)) ||
-                                (cf.Customer != null && cf.Customer.SubscriberCompany != null && cf.Customer.SubscriberCompany.Contains(term)) ||
-                                (cf.Customer != null && cf.Customer.SubscriberCode != null && cf.Customer.SubscriberCode.Contains(term))
-                            )
-                        ) ||
-
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            (
-                                (sr.Description != null && sr.Description.Contains(term)) ||
-                                (sr.QnbServiceTrackNo != null && sr.QnbServiceTrackNo.Contains(term)) ||
-                                (sr.Customer != null && sr.Customer.SubscriberCompany != null && sr.Customer.SubscriberCompany.Contains(term)) ||
-                                (sr.Customer != null && sr.Customer.SubscriberCode != null && sr.Customer.SubscriberCode.Contains(term))
-                            )
-                        ) ||
-
-                        userQuery.Any(u =>
-                            w.ApproverTechnicianId == u.Id &&
-                            u.TechnicianName != null &&
-                            u.TechnicianName.Contains(term)
-                        )
-                    );
-                }
-
-                if (!string.IsNullOrWhiteSpace(q.RequestNo))
-                {
-                    wfQuery = wfQuery.Where(w => w.RequestNo == q.RequestNo);
-                }
-
-                if (!string.IsNullOrWhiteSpace(q.QnbServiceTrackNo))
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        customerFormQuery.Any(cf =>
-                            cf.RequestNo == w.RequestNo &&
-                            cf.QnbServiceTrackNo != null &&
-                            cf.QnbServiceTrackNo.Contains(q.QnbServiceTrackNo)) ||
-
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.QnbServiceTrackNo != null &&
-                            sr.QnbServiceTrackNo.Contains(q.QnbServiceTrackNo))
-                    );
-                }
-
-                if (q.CurrentStepId.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
-                }
-
-                if (!string.IsNullOrWhiteSpace(q.StepCode))
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        w.CurrentStep != null &&
-                        w.CurrentStep.Code == q.StepCode);
-                }
-
-                if (q.ApproverTechnicianId.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.ApproverTechnicianId == q.ApproverTechnicianId.Value);
-                }
-
-                if (q.CreatedUserId.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.CreatedUser == q.CreatedUserId.Value);
-                }
-
-                if (q.Priority.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.Priority == q.Priority.Value);
-                }
-
-                if (q.Priorities is { Count: > 0 })
-                {
-                    wfQuery = wfQuery.Where(w => q.Priorities.Contains(w.Priority));
-                }
-
-                if (q.WorkFlowStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.WorkFlowStatus == q.WorkFlowStatus.Value);
-                }
-
-                if (q.WorkFlowStatuses is { Count: > 0 })
-                {
-                    wfQuery = wfQuery.Where(w => q.WorkFlowStatuses.Contains(w.WorkFlowStatus));
-                }
-
-                if (q.IsAgreement.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.IsAgreement == q.IsAgreement.Value);
-                }
-
-                if (q.IsLocationValid.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.IsLocationValid == q.IsLocationValid.Value);
-                }
-
-                if (q.CreatedFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.CreatedDate >= q.CreatedFrom.Value);
-                }
-
-                if (q.CreatedTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w => w.CreatedDate <= q.CreatedTo.Value);
-                }
-
-                if (q.CustomerFormStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        customerFormQuery.Any(cf =>
-                            cf.RequestNo == w.RequestNo &&
-                            cf.Status == q.CustomerFormStatus.Value));
-                }
-
-                if (q.CustomerFormServicesDateFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        customerFormQuery.Any(cf =>
-                            cf.RequestNo == w.RequestNo &&
-                            cf.ServicesDate >= q.CustomerFormServicesDateFrom.Value));
-                }
-
-                if (q.CustomerFormServicesDateTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        customerFormQuery.Any(cf =>
-                            cf.RequestNo == w.RequestNo &&
-                            cf.ServicesDate <= q.CustomerFormServicesDateTo.Value));
-                }
-
-                if (q.CustomerId.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.CustomerId == q.CustomerId.Value));
-                }
-
-                if (q.ServiceTypeId.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.ServiceTypeId == q.ServiceTypeId.Value));
-                }
-
-                if (q.ServicesRequestStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.ServicesRequestStatus == q.ServicesRequestStatus.Value));
-                }
-
-                if (q.ServicesCostStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.ServicesCostStatus == q.ServicesCostStatus.Value));
-                }
-
-                if (q.IsProductRequirement.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.IsProductRequirement == q.IsProductRequirement.Value));
-                }
-
-                if (q.ServicesDateFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.ServicesDate >= q.ServicesDateFrom.Value));
-                }
-
-                if (q.ServicesDateTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        srQuery.Any(sr =>
-                            sr.RequestNo == w.RequestNo &&
-                            sr.ServicesDate <= q.ServicesDateTo.Value));
-                }
-
-                if (q.TechnicalServiceStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        tsQuery.Any(ts =>
-                            ts.RequestNo == w.RequestNo &&
-                            ts.ServicesStatus == q.TechnicalServiceStatus.Value));
-                }
-
-                if (q.TechnicalStartFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        tsQuery.Any(ts =>
-                            ts.RequestNo == w.RequestNo &&
-                            ts.StartTime.HasValue &&
-                            ts.StartTime.Value >= q.TechnicalStartFrom.Value));
-                }
-
-                if (q.TechnicalStartTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        tsQuery.Any(ts =>
-                            ts.RequestNo == w.RequestNo &&
-                            ts.StartTime.HasValue &&
-                            ts.StartTime.Value <= q.TechnicalStartTo.Value));
-                }
-
-                if (q.TechnicalEndFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        tsQuery.Any(ts =>
-                            ts.RequestNo == w.RequestNo &&
-                            ts.EndTime.HasValue &&
-                            ts.EndTime.Value >= q.TechnicalEndFrom.Value));
-                }
-
-                if (q.TechnicalEndTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        tsQuery.Any(ts =>
-                            ts.RequestNo == w.RequestNo &&
-                            ts.EndTime.HasValue &&
-                            ts.EndTime.Value <= q.TechnicalEndTo.Value));
-                }
-
-                if (q.PricingStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        pricingQuery.Any(pr =>
-                            pr.RequestNo == w.RequestNo &&
-                            pr.Status == q.PricingStatus.Value));
-                }
-
-                if (q.FinalApprovalStatus.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        finalApprovalQuery.Any(fa =>
-                            fa.RequestNo == w.RequestNo &&
-                            fa.Status == q.FinalApprovalStatus.Value));
-                }
-
-                if (q.CustomerApprovedFrom.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        finalApprovalQuery.Any(fa =>
-                            fa.RequestNo == w.RequestNo &&
-                            fa.CustomerApprovedAt.HasValue &&
-                            fa.CustomerApprovedAt.Value >= q.CustomerApprovedFrom.Value));
-                }
-
-                if (q.CustomerApprovedTo.HasValue)
-                {
-                    wfQuery = wfQuery.Where(w =>
-                        finalApprovalQuery.Any(fa =>
-                            fa.RequestNo == w.RequestNo &&
-                            fa.CustomerApprovedAt.HasValue &&
-                            fa.CustomerApprovedAt.Value <= q.CustomerApprovedTo.Value));
-                }
-
-                var total = await wfQuery.CountAsync();
-
-                wfQuery = q.SortBy?.ToLowerInvariant() switch
-                {
-                    "requestno" => q.SortDesc
-                        ? wfQuery.OrderByDescending(w => w.RequestNo)
-                        : wfQuery.OrderBy(w => w.RequestNo),
-
-                    "priority" => q.SortDesc
-                        ? wfQuery.OrderByDescending(w => w.Priority)
-                        : wfQuery.OrderBy(w => w.Priority),
-
-                    "workflowstatus" => q.SortDesc
-                        ? wfQuery.OrderByDescending(w => w.WorkFlowStatus)
-                        : wfQuery.OrderBy(w => w.WorkFlowStatus),
-
-                    "currentstep" => q.SortDesc
-                        ? wfQuery.OrderByDescending(w => w.CurrentStep!.Code)
-                        : wfQuery.OrderBy(w => w.CurrentStep!.Code),
-
-                    _ => q.SortDesc
-                        ? wfQuery.OrderByDescending(w => w.CreatedDate)
-                        : wfQuery.OrderBy(w => w.CreatedDate)
-                };
-
-                var workflows = await wfQuery
-                    .Skip((q.Page - 1) * q.PageSize)
-                    .Take(q.PageSize)
-                    .Select(w => new
-                    {
-                        w.Id,
-                        w.RequestNo,
-                        w.RequestTitle,
-                        w.CurrentStepId,
-                        CurrentStepCode = w.CurrentStep != null ? w.CurrentStep.Code : null,
-                        CurrentStepName = w.CurrentStep != null ? w.CurrentStep.Name : null,
-                        w.Priority,
-                        w.WorkFlowStatus,
-                        w.CreatedDate,
-                        w.UpdatedDate,
-                        w.CreatedUser,
-                        w.ApproverTechnicianId,
-                        w.IsAgreement,
-                        w.IsLocationValid
-                    })
-                    .ToListAsync();
-
-                var requestNos = workflows
-                    .Select(x => x.RequestNo)
-                    .Distinct()
-                    .ToList();
-
-                if (requestNos.Count == 0)
-                {
-                    return ResponseModel<PagedResult<QnbBasicReportListDto>>.Success(
-                        new PagedResult<QnbBasicReportListDto>(
-                            new List<QnbBasicReportListDto>(),
-                            total,
-                            q.Page,
-                            q.PageSize
-                        )
-                    );
-                }
-
-                var customerForms = await customerFormQuery
-                    .Where(cf => requestNos.Contains(cf.RequestNo))
-                    .Select(cf => new
-                    {
-                        cf.Id,
-                        cf.RequestNo,
-                        cf.QnbServiceTrackNo,
-                        cf.ServicesDate,
-                        cf.PlannedCompletionDate,
-                        cf.CustomerId,
-                        CustomerCode = cf.Customer != null ? cf.Customer.SubscriberCode : null,
-                        CustomerName = cf.Customer != null ? cf.Customer.SubscriberCompany : null,
-                        CustomerCity = cf.Customer != null ? cf.Customer.City : null,
-                        CustomerDistrict = cf.Customer != null ? cf.Customer.District : null,
-                        cf.Status
-                    })
-                    .ToListAsync();
-
-                var servicesRequests = await srQuery
-                    .Where(sr => requestNos.Contains(sr.RequestNo))
-                    .Select(sr => new
-                    {
-                        sr.Id,
-                        sr.RequestNo,
-                        sr.QnbServiceTrackNo,
-                        sr.CustomerId,
-                        CustomerCode = sr.Customer != null ? sr.Customer.SubscriberCode : null,
-                        CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
-                        CustomerCity = sr.Customer != null ? sr.Customer.City : null,
-                        CustomerDistrict = sr.Customer != null ? sr.Customer.District : null,
-                        sr.ServiceTypeId,
-                        ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
-                        sr.ServicesDate,
-                        sr.PlannedCompletionDate,
-                        sr.IsProductRequirement,
-                        sr.ServicesCostStatus,
-                        sr.ServicesRequestStatus
-                    })
-                    .ToListAsync();
-
-                var warehouses = await whQuery
-                    .Where(wh => requestNos.Contains(wh.RequestNo))
-                    .Select(wh => new
-                    {
-                        wh.Id,
-                        wh.RequestNo,
-                        wh.WarehouseStatus,
-                        wh.DeliveryDate
-                    })
-                    .ToListAsync();
-
-                var technicalServices = await tsQuery
-                    .Where(ts => requestNos.Contains(ts.RequestNo))
-                    .Select(ts => new
-                    {
-                        ts.Id,
-                        ts.RequestNo,
-                        ts.ServicesStatus,
-                        ts.StartTime,
-                        ts.EndTime
-                    })
-                    .ToListAsync();
-
-                var pricings = await pricingQuery
-                    .Where(pr => requestNos.Contains(pr.RequestNo))
-                    .Select(pr => new
-                    {
-                        pr.RequestNo,
-                        pr.Status,
-                        pr.TotalAmount,
-                        pr.Currency
-                    })
-                    .ToListAsync();
-
-                var finalApprovals = await finalApprovalQuery
-                    .Where(fa => requestNos.Contains(fa.RequestNo))
-                    .Select(fa => new
-                    {
-                        fa.RequestNo,
-                        fa.Status,
-                        fa.DiscountPercent,
-                        fa.Notes,
-                        fa.CustomerNote,
-                        fa.CustomerApprovedBy,
-                        fa.CustomerApprovedAt
-                    })
-                    .ToListAsync();
-
-                var userIds = workflows
-                    .SelectMany(x => new long?[]
-                    {
-                x.CreatedUser,
-                x.ApproverTechnicianId
-                    })
-                    .Concat(finalApprovals.Select(x => x.CustomerApprovedBy))
-                    .Where(x => x.HasValue && x.Value > 0)
-                    .Select(x => x!.Value)
-                    .Distinct()
-                    .ToList();
-
-                var users = await userQuery
-                    .Where(u => userIds.Contains(u.Id))
-                    .Select(u => new
-                    {
-                        u.Id,
-                        u.TechnicianName,
-                        u.TechnicianEmail,
-                        u.City,
-                        u.District
-                    })
-                    .ToListAsync();
-
-                var customerFormDict = customerForms
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(
-                        x => x.Key,
-                        x => x.OrderByDescending(y => y.Id).First()
-                    );
-
-                var srDict = servicesRequests
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(
-                        x => x.Key,
-                        x => x.OrderByDescending(y => y.Id).First()
-                    );
-
-                var whDict = warehouses
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(
-                        x => x.Key,
-                        x => x.OrderByDescending(y => y.Id).First()
-                    );
-
-                var tsDict = technicalServices
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(
-                        x => x.Key,
-                        x => x.OrderByDescending(y => y.Id).First()
-                    );
-
-                var pricingDict = pricings
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(x => x.Key, x => x.First());
-
-                var finalApprovalDict = finalApprovals
-                    .GroupBy(x => x.RequestNo)
-                    .ToDictionary(x => x.Key, x => x.First());
-
-                var userDict = users
-                    .GroupBy(x => x.Id)
-                    .ToDictionary(x => x.Key, x => x.First());
-
-                var items = workflows.Select(w =>
-                {
-                    customerFormDict.TryGetValue(w.RequestNo, out var cf);
-                    srDict.TryGetValue(w.RequestNo, out var sr);
-                    whDict.TryGetValue(w.RequestNo, out var wh);
-                    tsDict.TryGetValue(w.RequestNo, out var ts);
-                    pricingDict.TryGetValue(w.RequestNo, out var pricing);
-                    finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
-
-                    userDict.TryGetValue(w.CreatedUser, out var createdUser);
-
-                    var technician = w.ApproverTechnicianId.HasValue &&
-                                     userDict.TryGetValue(w.ApproverTechnicianId.Value, out var techUser)
-                        ? techUser
-                        : null;
-
-                    var customerApprovedByUser = finalApproval?.CustomerApprovedBy.HasValue == true &&
-                                                 userDict.TryGetValue(finalApproval.CustomerApprovedBy.Value, out var customerUser)
-                        ? customerUser
-                        : null;
-
-                    double? durationMinutes = null;
-
-                    if (ts?.StartTime != null && ts?.EndTime != null)
-                    {
-                        durationMinutes = Math.Round(
-                            (ts.EndTime.Value - ts.StartTime.Value).TotalMinutes,
-                            2
-                        );
-                    }
-
-                    return new QnbBasicReportListDto
-                    {
-                        WorkFlowId = w.Id,
-
-                        RequestNo = w.RequestNo,
-                        RequestTitle = w.RequestTitle,
-
-                        QnbServiceTrackNo =
-                            !string.IsNullOrWhiteSpace(sr?.QnbServiceTrackNo)
-                                ? sr.QnbServiceTrackNo
-                                : cf?.QnbServiceTrackNo,
-
-                        CurrentStepId = w.CurrentStepId,
-                        CurrentStepCode = w.CurrentStepCode,
-                        CurrentStepName = w.CurrentStepName,
-
-                        Priority = w.Priority,
-                        WorkFlowStatus = w.WorkFlowStatus,
-
-                        CreatedDate = w.CreatedDate,
-                        UpdatedDate = w.UpdatedDate,
-
-                        CreatedUserId = w.CreatedUser,
-                        CreatedUserName = createdUser?.TechnicianName,
-
-                        ApproverTechnicianId = w.ApproverTechnicianId,
-                        ApproverTechnicianName = technician?.TechnicianName,
-                        ApproverTechnicianEmail = technician?.TechnicianEmail,
-                        TechnicianCity = technician?.City,
-                        TechnicianDistrict = technician?.District,
-
-                        CustomerId = sr?.CustomerId ?? cf?.CustomerId,
-                        CustomerCode = sr?.CustomerCode ?? cf?.CustomerCode,
-                        CustomerName = sr?.CustomerName ?? cf?.CustomerName,
-                        CustomerCity = sr?.CustomerCity ?? cf?.CustomerCity,
-                        CustomerDistrict = sr?.CustomerDistrict ?? cf?.CustomerDistrict,
-
-                        ServiceTypeId = sr?.ServiceTypeId,
-                        ServiceTypeName = sr?.ServiceTypeName,
-
-                        //CustomerFormStatus = cf?.Status,
-                        //CustomerFormServicesDate = cf?.ServicesDate,
-                        //CustomerFormPlannedCompletionDate = cf?.PlannedCompletionDate,
-
-                        ServicesDate = sr?.ServicesDate,
-                        PlannedCompletionDate = sr?.PlannedCompletionDate,
-
-                        IsAgreement = w.IsAgreement,
-                        IsLocationValid = w.IsLocationValid,
-                        IsProductRequirement = sr?.IsProductRequirement,
-
-                        ServicesCostStatus = sr?.ServicesCostStatus,
-                        ServicesRequestStatus = sr?.ServicesRequestStatus,
-
-                        WarehouseStatus = wh?.WarehouseStatus,
-                        WarehouseDeliveryDate = wh?.DeliveryDate,
-
-                        TechnicalServiceStatus = ts?.ServicesStatus,
-                        TechnicalStartTime = ts?.StartTime,
-                        TechnicalEndTime = ts?.EndTime,
-                        TechnicalServiceDurationMinutes = durationMinutes,
-
-                        PricingStatus = pricing?.Status,
-                        PricingTotalAmount = pricing?.TotalAmount,
-                        Currency = pricing?.Currency,
-
-                        FinalApprovalStatus = finalApproval?.Status,
-                        DiscountPercent = finalApproval?.DiscountPercent,
-                        FinalApprovalNotes = finalApproval?.Notes,
-
-                        //CustomerNote = finalApproval?.CustomerNote,
-                        //CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
-                        //CustomerApprovedByName = customerApprovedByUser?.TechnicianName,
-                        //CustomerApprovedAt = finalApproval?.CustomerApprovedAt
-                    };
-                }).ToList();
-
-                return ResponseModel<PagedResult<QnbBasicReportListDto>>.Success(
-                    new PagedResult<QnbBasicReportListDto>(
-                        items,
-                        total,
-                        q.Page,
-                        q.PageSize
-                    )
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetQnbBasicWorkFlowReportAsync");
-
-                return ResponseModel<PagedResult<QnbBasicReportListDto>>.Fail(
-                    $"QNB workflow raporu getirilirken hata oluştu: {ex.Message}",
-                    StatusCode.Error
-                );
-            }
-        }
-        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync( QnbBasicReportQueryParams q)
+        public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q)
         {
             try
             {
