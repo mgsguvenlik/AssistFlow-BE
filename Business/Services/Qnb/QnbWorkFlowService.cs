@@ -1136,7 +1136,7 @@ namespace Business.Services.Qnb
                 if (isTestEnabled)
                 {
                     var activeWorkingExists = await _uow.Repository
-                        .GetQueryable<YkbTechnicalServiceWorkSession>()
+                        .GetQueryable<QnbTechnicalServiceWorkSession>()
                         .AsNoTracking()
                         .AnyAsync(x =>
                             x.RequestNo == dto.RequestNo &&
@@ -1152,7 +1152,7 @@ namespace Business.Services.Qnb
                     }
 
                     var completedWorkingExists = await _uow.Repository
-                        .GetQueryable<YkbTechnicalServiceWorkSession>()
+                        .GetQueryable<QnbTechnicalServiceWorkSession>()
                         .AsNoTracking()
                         .AnyAsync(x =>
                             x.RequestNo == dto.RequestNo &&
