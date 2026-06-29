@@ -12,7 +12,8 @@ namespace Model.Dtos.WorkFlowDtos.TechnicalService
     {
         public long Id { get; set; }
         public string RequestNo { get; set; } = string.Empty;
-
+        public string ServiceTitle { get; set; } = string.Empty;
+        public string ServiceDescription { get; set; } = string.Empty;
         public long? ServiceTypeId { get; set; }
         public string? ServiceTypeName { get; set; }
 

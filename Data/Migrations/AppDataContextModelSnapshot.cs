@@ -222,6 +222,9 @@ namespace Data.Migrations
                     b.Property<string>("Phone2")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("SerialNo")
+                        .HasColumnType("int");
+
                     b.Property<string>("SubscriberAddress")
                         .HasColumnType("nvarchar(max)");
 
@@ -1129,6 +1132,21 @@ namespace Data.Migrations
                     b.ToTable("QnbServicesRequestProduct", "qnb");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Qnb.QnbServicesRequestWorkOrderType", b =>
+                {
+                    b.Property<long>("QnbServicesRequestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkOrderTypeId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("QnbServicesRequestId", "WorkOrderTypeId");
+
+                    b.HasIndex("WorkOrderTypeId");
+
+                    b.ToTable("QnbServicesRequestWorkOrderTypes", (string)null);
+                });
+
             modelBuilder.Entity("Model.Concrete.Qnb.QnbTechnicalService", b =>
                 {
                     b.Property<long>("Id")
@@ -1252,6 +1270,83 @@ namespace Data.Migrations
                     b.HasIndex("QnbTechnicalServiceId");
 
                     b.ToTable("QnbTechnicalServiceImage", "qnb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Qnb.QnbTechnicalServiceWorkSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ExtendCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FinishDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("HasMissingZoneOnFinish")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<long?>("ManitouLogSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MissingZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PlannedEndAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReceivedZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SerialNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("QnbTechnicalServiceWorkSessions", "qnb");
                 });
 
             modelBuilder.Entity("Model.Concrete.Qnb.QnbWarehouse", b =>
@@ -1643,6 +1738,9 @@ namespace Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1700,6 +1798,9 @@ namespace Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTechnicalServiceTestEnabled")
                         .HasColumnType("bit");
 
                     b.Property<string>("LogoUrl")
@@ -2334,6 +2435,83 @@ namespace Data.Migrations
                     b.HasIndex("TechnicalServiceId");
 
                     b.ToTable("TechnicalServiceImages");
+                });
+
+            modelBuilder.Entity("Model.Concrete.WorkFlows.TechnicalServiceWorkSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ExtendCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FinishDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("HasMissingZoneOnFinish")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<long?>("ManitouLogSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MissingZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PlannedEndAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReceivedZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SerialNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TechnicalServiceWorkSessions");
                 });
 
             modelBuilder.Entity("Model.Concrete.WorkFlows.Warehouse", b =>
@@ -3313,6 +3491,83 @@ namespace Data.Migrations
                     b.ToTable("YkbTechnicalServiceImage", "ykb");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Ykb.YkbTechnicalServiceWorkSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ExtendCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FinishDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("HasMissingZoneOnFinish")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<long?>("ManitouLogSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MissingZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PlannedEndAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReceivedZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SerialNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("YkbTechnicalServiceWorkSessions", "ykb");
+                });
+
             modelBuilder.Entity("Model.Concrete.Ykb.YkbWarehouse", b =>
                 {
                     b.Property<long>("Id")
@@ -3854,6 +4109,25 @@ namespace Data.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Qnb.QnbServicesRequestWorkOrderType", b =>
+                {
+                    b.HasOne("Model.Concrete.Qnb.QnbServicesRequest", "QnbServicesRequest")
+                        .WithMany("QnbServicesRequestWorkOrderTypes")
+                        .HasForeignKey("QnbServicesRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkOrderType", "WorkOrderType")
+                        .WithMany("QnbServicesRequestWorkOrderTypes")
+                        .HasForeignKey("WorkOrderTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("QnbServicesRequest");
+
+                    b.Navigation("WorkOrderType");
+                });
+
             modelBuilder.Entity("Model.Concrete.Qnb.QnbTechnicalService", b =>
                 {
                     b.HasOne("Model.Concrete.ServiceType", "ServiceType")
@@ -4338,6 +4612,11 @@ namespace Data.Migrations
                     b.Navigation("Products");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Qnb.QnbServicesRequest", b =>
+                {
+                    b.Navigation("QnbServicesRequestWorkOrderTypes");
+                });
+
             modelBuilder.Entity("Model.Concrete.Qnb.QnbTechnicalService", b =>
                 {
                     b.Navigation("QnbServiceRequestFormImages");
@@ -4387,6 +4666,8 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.WorkOrderType", b =>
                 {
+                    b.Navigation("QnbServicesRequestWorkOrderTypes");
+
                     b.Navigation("ServicesRequestWorkOrderTypes");
 
                     b.Navigation("YkbServicesRequestWorkOrderTypes");

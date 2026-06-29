@@ -2,6 +2,7 @@ using Core.Enums;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
+using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
 {
@@ -39,5 +40,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
         public List<QnbServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
         public List<QnbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
     }
 }

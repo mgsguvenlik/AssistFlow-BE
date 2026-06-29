@@ -10,5 +10,6 @@ namespace Model.Dtos.Tenant
         public IFormFile? LogoFile { get; set; }
         public string? Logo { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsTechnicalServiceTestEnabled { get; set; } = false;
     }
 }

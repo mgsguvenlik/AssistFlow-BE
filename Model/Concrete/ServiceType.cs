@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace Model.Concrete
 {
     // Servis Türü
-    public class ServiceType : BaseEntity
+    public class ServiceType : SoftDeleteEntity
     {
         [Key]
         public long Id { get; set; }

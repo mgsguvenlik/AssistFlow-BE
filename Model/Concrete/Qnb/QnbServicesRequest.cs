@@ -1,5 +1,6 @@
 using Core.Enums;
 using Model.Abstractions;
+using Model.Concrete.Ykb;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -40,5 +41,8 @@ namespace Model.Concrete.Qnb
 
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
+
+        public ICollection<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; }
+          = new List<QnbServicesRequestWorkOrderType>();
     }
 }

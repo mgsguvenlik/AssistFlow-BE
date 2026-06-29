@@ -57,6 +57,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
         public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
+        public DbSet<TechnicalServiceWorkSession> TechnicalServiceWorkSessions { get; set; }
 
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; } = null!;
         public DbSet<ServicesRequestWorkOrderType> ServicesRequestWorkOrderTypes { get; set; } = null!;
@@ -78,6 +79,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowActivityRecord> YkbWorkFlowActivityRecords { get; set; } = default!;
         public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
 
         #endregion  
 
@@ -96,6 +98,9 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<QnbWorkFlowActivityRecord> QnbWorkFlowActivityRecords { get; set; } = default!;
         public DbSet<QnbWorkFlowArchive> QnbWorkFlowArchives { get; set; } = default!;
         public DbSet<QnbWorkFlowReviewLog> QnbWorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } = default!;
+        public DbSet<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; } = default!;
+
         #endregion
 
         /// <summary>
@@ -709,6 +714,26 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<QnbCustomerForm>()
                         .HasIndex(x => x.RequestNo);
 
+            modelBuilder.Entity<QnbServicesRequestWorkOrderType>(entity =>
+            {
+                entity.ToTable("QnbServicesRequestWorkOrderTypes");
+
+                entity.HasKey(x => new
+                {
+                    x.QnbServicesRequestId,
+                    x.WorkOrderTypeId
+                });
+
+                entity.HasOne(x => x.QnbServicesRequest)
+                    .WithMany(x => x.QnbServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.QnbServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(x => x.WorkOrderType)
+                    .WithMany(x => x.QnbServicesRequestWorkOrderTypes)
+                    .HasForeignKey(x => x.WorkOrderTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
             #endregion
         }
     }

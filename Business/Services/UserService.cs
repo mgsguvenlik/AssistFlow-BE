@@ -313,6 +313,7 @@ public class UserService
             asNoTracking: false,
             whereExpression: u => u.TechnicianEmail == identifier || u.TechnicianCode == identifier,
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
+            .Include(u => u.Tenant)
         ).FirstOrDefault();
 
         if (user == null)
