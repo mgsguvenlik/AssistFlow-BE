@@ -101,7 +101,7 @@
         public const string NameMaxLength = "Ad en fazla 120 karakter olabilir.";
         public const string NameCannotBeWhitespace = "Ad yalnızca boşluklardan oluşamaz.";
         public const string PrimaryContactRequired = "Birincil iletişim için en az Telefon veya E-posta girilmelidir.";
-        public const string CustomerNameRequired = "Müşteri adı için 'Abone Firma' veya '1. Kişi Adı' alanlarından en az biri dolu olmalıdır.";
+        public const string CustomerNameRequired = "Müşteri adı için 'Abone Firma' alanı dolu olmalıdır.";
         public const string SubscriberCodeMaxLength = "Abone Kodu en fazla 64 karakter olabilir.";
         public const string SubscriberCodeInvalidChars = "Abone Kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.";
         public const string SubscriberCompanyMaxLength = "Abone Firma en fazla 200 karakter olabilir.";

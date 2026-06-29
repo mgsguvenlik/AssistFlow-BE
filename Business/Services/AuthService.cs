@@ -76,6 +76,7 @@ public class AuthService : IAuthService
         if (!string.IsNullOrWhiteSpace(user.TenantName))
             claims.Add(new Claim("tenant_name", user.TenantName));
 
+        claims.Add(new Claim("is_technical_service_test_enabled", user.IsTechnicalServiceTestEnabled.ToString()));
 
         // ROLLER
         if (user.Roles != null)
@@ -168,7 +169,8 @@ public class AuthService : IAuthService
             // 🔹 Tenant bilgisi: önce DB, yoksa token claim’inden
             TenantId = (u.TenantId > 0 ? u.TenantId : tenantIdFromToken),
             TenantCode = !string.IsNullOrWhiteSpace(u.TenantCode) ? u.TenantCode : tenantCodeFromToken,
-            TenantName = !string.IsNullOrWhiteSpace(u.TenantName) ? u.TenantName : tenantNameFromToken
+            TenantName = !string.IsNullOrWhiteSpace(u.TenantName) ? u.TenantName : tenantNameFromToken,
+            IsTechnicalServiceTestEnabled = u.IsTechnicalServiceTestEnabled
         };
 
         return ResponseModel<CurrentUserDto>.Success(dto);

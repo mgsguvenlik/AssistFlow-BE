@@ -1,9 +1,12 @@
 ﻿using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
+using Business.Interfaces.Business.Interfaces;
+using Business.Interfaces.Manitou;
 using Business.Interfaces.Qnb;
 using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Manitou;
 using Business.Services.Qnb;
 using Business.Services.Ykb;
 using Business.Utilities.Security;
@@ -64,10 +67,14 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkFlowSlaSettingService), typeof(WorkFlowSlaSettingService));
             services.AddScoped(typeof(IYkbOvertimeReportService), typeof(YkbOvertimeReportService));
             services.AddScoped(typeof(IQnbOvertimeReportService), typeof(QnbOvertimeReportService));
+            services.AddScoped(typeof(IManitouApiService), typeof(ManitouApiService));
+            services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
+
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
             services.AddHostedService<SlaNotificationDispatcher>();
+            services.AddHostedService<ManitouStagingSyncBackgroundService>();
 
             // ASP.NET Core Identity hasher kaydı
             services.AddScoped<IPasswordHasher<Model.Concrete.User>, PasswordHasher<Model.Concrete.User>>();

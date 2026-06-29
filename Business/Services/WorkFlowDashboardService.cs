@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 using Model.Dtos.Dashboard;
 
 namespace Business.Services
@@ -41,71 +42,91 @@ namespace Business.Services
                     .Where(x => !x.IsDeleted)
                     .ToListAsync();
 
+                var pendingWorkFlows = workFlows
+                    .Where(x => x.WorkFlowStatus == WorkFlowStatus.Pending)
+                    .ToList();
+
+                var normalPriorities = new HashSet<WorkFlowPriority>
+                    {
+                        WorkFlowPriority.Normal,
+                        WorkFlowPriority.Region1Normal,
+                        WorkFlowPriority.Region2Normal,
+                        WorkFlowPriority.Region3Normal
+                    };
+                    
+                                    var criticalPriorities = new HashSet<WorkFlowPriority>
+                    {
+                        WorkFlowPriority.Urgent,
+                        WorkFlowPriority.Region1Urgent,
+                        WorkFlowPriority.Region2Urgent,
+                        WorkFlowPriority.Region3Urgent
+                    };
+
                 var dto = new DashboardKpiDto
                 {
                     // Genel İstatistikler
-                    TotalActiveWorkFlows = workFlows.Count(x => x.WorkFlowStatus == WorkFlowStatus.Pending),
-                    TotalCompletedWorkFlows = workFlows.Count(x => x.WorkFlowStatus == WorkFlowStatus.Complated),
-                    TotalCancelledWorkFlows = workFlows.Count(x => x.WorkFlowStatus == WorkFlowStatus.Cancelled),
-                    TotalPendingWorkFlows = workFlows.Count(x => x.WorkFlowStatus == WorkFlowStatus.Pending),
+                    TotalActiveWorkFlows = pendingWorkFlows.Count,
+                    TotalCompletedWorkFlows = workFlows.Count(x =>
+                        x.WorkFlowStatus == WorkFlowStatus.Complated),
+
+                    TotalCancelledWorkFlows = workFlows.Count(x =>
+                        x.WorkFlowStatus == WorkFlowStatus.Cancelled),
+
+                    TotalPendingWorkFlows = pendingWorkFlows.Count,
 
                     // Adım Bazlı Dağılım
-                    InServiceRequest = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    InServiceRequest = pendingWorkFlows.Count(x =>
                         x.CurrentStep != null &&
                         x.CurrentStep.Code == "SR"),
 
-                    InWarehouse = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    InWarehouse = pendingWorkFlows.Count(x =>
                         x.CurrentStep != null &&
                         x.CurrentStep.Code == "WH"),
 
-                    InTechnicalService = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    InTechnicalService = pendingWorkFlows.Count(x =>
                         x.CurrentStep != null &&
                         x.CurrentStep.Code == "TS"),
 
-                    InPricing = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    InPricing = pendingWorkFlows.Count(x =>
                         x.CurrentStep != null &&
                         x.CurrentStep.Code == "PRC"),
 
-                    InFinalApproval = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    InFinalApproval = pendingWorkFlows.Count(x =>
                         x.CurrentStep != null &&
                         x.CurrentStep.Code == "APR"),
 
                     // Bugün/Bu Ay
-                    CreatedToday = workFlows.Count(x => x.CreatedDate.Date == todayStart),
+                    CreatedToday = workFlows.Count(x =>
+                        x.CreatedDate.Date == todayStart),
+
                     CompletedToday = workFlows.Count(x =>
                         x.WorkFlowStatus == WorkFlowStatus.Complated &&
                         x.UpdatedDate.HasValue &&
                         x.UpdatedDate.Value.Date == todayStart),
 
-                    CreatedThisMonth = workFlows.Count(x => x.CreatedDate >= monthStart),
+                    CreatedThisMonth = workFlows.Count(x =>
+                        x.CreatedDate >= monthStart),
+
                     CompletedThisMonth = workFlows.Count(x =>
                         x.WorkFlowStatus == WorkFlowStatus.Complated &&
                         x.UpdatedDate.HasValue &&
                         x.UpdatedDate.Value >= monthStart),
 
                     // Öncelik Dağılımı
-                    LowPriorityCount = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    LowPriorityCount = pendingWorkFlows.Count(x =>
                         x.Priority == WorkFlowPriority.Low),
 
-                    NormalPriorityCount = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
-                        x.Priority == WorkFlowPriority.Normal),
+                    // Normal + 1/2/3. Bölge Normal
+                    NormalPriorityCount = pendingWorkFlows.Count(x =>
+                        normalPriorities.Contains(x.Priority)),
 
-                    HighPriorityCount = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
+                    HighPriorityCount = pendingWorkFlows.Count(x =>
                         x.Priority == WorkFlowPriority.High),
 
-                    CriticalPriorityCount = workFlows.Count(x =>
-                        x.WorkFlowStatus == WorkFlowStatus.Pending &&
-                        x.Priority == WorkFlowPriority.Urgent)
+                    // Acil + 1/2/3. Bölge Acil
+                    CriticalPriorityCount = pendingWorkFlows.Count(x =>
+                        criticalPriorities.Contains(x.Priority))
                 };
-
                 // Zaman Metrikleri
                 var completedWfs = workFlows
                     .Where(x => x.WorkFlowStatus == WorkFlowStatus.Complated && x.UpdatedDate.HasValue)
@@ -250,6 +271,8 @@ namespace Business.Services
             }
         }
 
+
+        #region Bireysel Müşteri
         public async Task<ResponseModel<List<CustomerStatisticsDto>>> GetTopCustomersAsync(int count = 10)
         {
             try
@@ -931,6 +954,13 @@ namespace Business.Services
                     })
                     .ToList();
 
+                var urgentPriorities = new HashSet<WorkFlowPriority>
+                {
+                    WorkFlowPriority.Urgent,
+                    WorkFlowPriority.Region1Urgent,
+                    WorkFlowPriority.Region2Urgent,
+                    WorkFlowPriority.Region3Urgent
+                };
                 var dto = new CriticalAlertsDto
                 {
                     DelayedWorkFlows = delayedWorkFlows,
@@ -939,8 +969,8 @@ namespace Business.Services
                     PendingFinalApprovals = finalApprovals.Count,
                     PendingPricingApprovals = pricings.Count,
                     PendingWarehouseDeliveries = warehouses.Count,
-                    CriticalPriorityPending = workFlows.Count(x => x.Priority == WorkFlowPriority.Urgent),
-                    HighPriorityPending = workFlows.Count(x => x.Priority == WorkFlowPriority.High)
+                    CriticalPriorityPending = workFlows.Count(x => urgentPriorities.Contains(x.Priority)),
+                    HighPriorityPending = workFlows.Count(x => x.Priority == WorkFlowPriority.High),
                 };
 
                 return ResponseModel<CriticalAlertsDto>.Success(dto);
@@ -1043,6 +1073,88 @@ namespace Business.Services
                 _logger.LogError(ex, "GetGeographicDistributionAsync");
                 return ResponseModel<GeographicDistributionDto>.Fail(
                     $"Coğrafi dağılım verileri getirilirken hata: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        #endregion
+
+        public async Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null)
+        {
+            try
+            {
+                var query = _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                if (from.HasValue)
+                {
+                    query = query.Where(x => x.CreatedDate >= from.Value);
+                }
+
+                if (to.HasValue)
+                {
+                    // Eğer frontend sadece tarih gönderirse örn: 2026-06-13 00:00,
+                    // o günü komple dahil etmek için bitişi ertesi gün exclusive yapıyoruz.
+                    if (to.Value.TimeOfDay == TimeSpan.Zero)
+                    {
+                        var endExclusive = to.Value.AddDays(1);
+                        query = query.Where(x => x.CreatedDate < endExclusive);
+                    }
+                    else
+                    {
+                        query = query.Where(x => x.CreatedDate <= to.Value);
+                    }
+                }
+
+                var dto = await query
+                    .GroupBy(x => 1)
+                    .Select(g => new YkbDashboardKpiDto
+                    {
+                        TotalWorkFlows = g.Count(),
+
+                        CompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus == WorkFlowStatus.Complated),
+
+                        NotCompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus != WorkFlowStatus.Complated),
+
+                        InServiceRequest = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "SR"),
+
+                        InWarehouse = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "WH"),
+
+                        InTechnicalService = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "TS"),
+
+                        InPricing = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "PRC"),
+
+                        InFinalApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "APR"),
+
+                        InCustomerApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "CAPR")
+                    })
+                    .FirstOrDefaultAsync();
+
+                dto ??= new YkbDashboardKpiDto();
+                return ResponseModel<YkbDashboardKpiDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetYkbKpiAsync");
+
+                return ResponseModel<YkbDashboardKpiDto>.Fail(
+                    $"YKB dashboard KPI verileri getirilirken hata: {ex.Message}",
                     StatusCode.Error);
             }
         }

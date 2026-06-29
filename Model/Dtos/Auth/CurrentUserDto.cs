@@ -21,6 +21,7 @@ namespace Model.Dtos.Auth
         public long? TenantId { get; set; }
         public string? TenantCode { get; set; }
         public string? TenantName { get; set; }
+        public bool? IsTechnicalServiceTestEnabled { get; set; }
         public List<RoleGetDto> Roles { get; set; } = new();
     }
 }

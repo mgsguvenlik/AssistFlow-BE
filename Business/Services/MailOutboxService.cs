@@ -39,7 +39,15 @@ public class MailOutboxService
         // UI sort göndermediyse default: CreatedDate desc
         if (string.IsNullOrWhiteSpace(q.Sort))
         {
-            var q2 = q with { Sort = "CreatedDate", Desc = true };
+            var q2 = new QueryParams
+            {
+                Page = q.Page,
+                PageSize = q.PageSize,
+                Search = q.Search,
+                Sort = "CreatedDate",
+                Desc = true
+            };
+
             return base.GetPagedAsync(q2);
         }
 

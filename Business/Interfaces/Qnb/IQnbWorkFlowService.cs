@@ -1,5 +1,6 @@
 using Core.Common;
 using Core.Enums;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbCustomerForm;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval;
@@ -16,9 +17,14 @@ namespace Business.Interfaces.Qnb
 {
     public interface IQnbWorkFlowService
     {
+
+
         // -------------------- Customer Form / Services Request --------------------
         Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto);
         Task<ResponseModel<QnbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo);
+
+        //-------------------- Service Request Create--------------------
+        Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto);
 
         Task<ResponseModel<PagedResult<QnbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
         Task<ResponseModel<QnbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
@@ -72,10 +78,18 @@ namespace Business.Interfaces.Qnb
         Task<PagedResult<QnbWorkFlowReportListItemDto>> GetReportsAsync(QnbReportQueryParams q);
         Task<PagedResult<QnbWorkFlowReportLineDto>> GetReportLinesAsync(QnbReportQueryParams q);
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(QnbReportQueryParams q);
+        Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q);
 
         // -------------------- Archive --------------------
         Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+
+
+        //Manitou System Test Zone ile ilgili iþlemler eklenecek
+        Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
+        Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
+        Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
+        Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto);
     }
 }

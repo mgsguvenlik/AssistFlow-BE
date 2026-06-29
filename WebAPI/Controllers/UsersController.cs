@@ -89,6 +89,52 @@ namespace WebAPI.Controllers
             return StatusCode((int)resp.StatusCode, resp);
         }
 
+        [HttpGet]
+        public override async Task<IActionResult> GetPaged([FromQuery] QueryParams q)
+        {
+            var userQuery = new UserQueryParams
+            {
+                Page = q.Page,
+                PageSize = q.PageSize,
+                Search = q.Search,
+                Sort = q.Sort,
+                Desc = q.Desc,
+
+                City = GetStringQuery("city"),
+                District = GetStringQuery("district"),
+                RoleId = GetLongQuery("roleId"),
+                IsActive = GetBoolQuery("isActive")
+            };
+
+            var resp = await _service.GetPagedAsync(userQuery);
+            return ToActionResult(resp);
+        }
+
+        private string? GetStringQuery(string key)
+        {
+            if (!Request.Query.TryGetValue(key, out var value))
+                return null;
+
+            var text = value.ToString();
+
+            return string.IsNullOrWhiteSpace(text) ? null : text;
+        }
+
+        private long? GetLongQuery(string key)
+        {
+            if (!Request.Query.TryGetValue(key, out var value))
+                return null;
+
+            return long.TryParse(value, out var result) ? result : null;
+        }
+
+        private bool? GetBoolQuery(string key)
+        {
+            if (!Request.Query.TryGetValue(key, out var value))
+                return null;
+
+            return bool.TryParse(value, out var result) ? result : null;
+        }
 
 
         [HttpGet("technicians")]

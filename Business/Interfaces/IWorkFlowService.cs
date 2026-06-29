@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.Report;
@@ -6,6 +7,7 @@ using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
@@ -63,11 +65,10 @@ namespace Business.Interfaces
 
         //Task<ResponseModel<PagedResult<WorkFlowReportListItemDto>>> GetReportsAsync(ReportQueryParams q);
         Task<ResponseModel<WorkFlowReportDto>> GetReportAsync(string requestNo);
-
         Task<PagedResult<WorkFlowReportListItemDto>> GetReportsAsync(ReportQueryParams q);
         Task<PagedResult<WorkFlowReportLineDto>> GetReportLinesAsync(ReportQueryParams q);
-
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(ReportQueryParams q);
+        Task<ResponseModel<PagedResult<WorkFlowBasicReportListDto>>> GetBasicWorkFlowReportAsync(WorkFlowBasicReportQueryParams q);
 
 
         //Arşiv 
@@ -75,6 +76,14 @@ namespace Business.Interfaces
         Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+         
+
+
+        //Manitou System Test Zone ile ilgili işlemler eklenecek
+        Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
+        Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
+        Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
+        Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto);
 
     }
 }

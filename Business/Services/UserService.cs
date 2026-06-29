@@ -313,6 +313,7 @@ public class UserService
             asNoTracking: false,
             whereExpression: u => u.TechnicianEmail == identifier || u.TechnicianCode == identifier,
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
+            .Include(u => u.Tenant)
         ).FirstOrDefault();
 
         if (user == null)
@@ -386,7 +387,7 @@ public class UserService
                 Merhaba {user.TechnicianName},
                 <br/><br/>
                 Şifrenizi sıfırlamak için lütfen aşağıdaki bağlantıya tıklayın:<br/>
-                <a href='{appSettings.Value.AppUrl}/change-password/{tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
+                <a href='{appSettings.Value.AppUrl}/reset-password?code={tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
                 Eğer bu isteği siz yapmadıysanız, lütfen bu e-postayı dikkate almayın.<br/><br/>
                 Saygılarımızla,<br/>
             ";
@@ -628,7 +629,7 @@ public class UserService
               .Select(x => x.Value)
               .FirstOrDefaultAsync();
 
-            var technicianRoles =CommonFunctions.ParseRoleCodes(technicianRole);
+            var technicianRoles = CommonFunctions.ParseRoleCodes(technicianRole);
 
             var users = await _repo.GetQueryable<User>()
                 .Where(u => u.UserRoles.Any(ur =>
@@ -705,6 +706,103 @@ public class UserService
         }
     }
 
+    public override async Task<ResponseModel<PagedResult<UserGetDto>>> GetPagedAsync(QueryParams q)
+    {
+        var userQuery = q as UserQueryParams;
+
+        var page = q.Page <= 0 ? 1 : q.Page;
+        var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
+
+        var query = _repo.GetQueryable<User>()
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .AsQueryable();
+
+        query = ApplyTenantFilterIfNeeded(query);
+
+        query = query.Where(u => !u.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(q.Search))
+        {
+            var search = q.Search.Trim();
+
+            query = query.Where(u =>
+                (u.TechnicianName != null && u.TechnicianName.Contains(search)) ||
+                (u.TechnicianEmail != null && u.TechnicianEmail.Contains(search)) ||
+                (u.TechnicianCode != null && u.TechnicianCode.Contains(search)) ||
+                (u.TechnicianCompany != null && u.TechnicianCompany.Contains(search)) ||
+                (u.TechnicianPhone != null && u.TechnicianPhone.Contains(search))
+            );
+        }
+
+        if (userQuery != null)
+        {
+            if (userQuery.RoleId.HasValue && userQuery.RoleId.Value > 0)
+            {
+                query = query.Where(u =>
+                    u.UserRoles.Any(ur => ur.RoleId == userQuery.RoleId.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(userQuery.City))
+            {
+                var city = userQuery.City.Trim();
+                query = query.Where(u => u.City != null && u.City == city);
+            }
+
+            if (!string.IsNullOrWhiteSpace(userQuery.District))
+            {
+                var district = userQuery.District.Trim();
+                query = query.Where(u => u.District != null && u.District == district);
+            }
+
+            if (userQuery.IsActive.HasValue)
+            {
+                query = query.Where(u => u.IsActive == userQuery.IsActive.Value);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(q.Sort))
+        {
+            if (q.Sort.Equals("technicianName", StringComparison.OrdinalIgnoreCase))
+            {
+                query = q.Desc
+                    ? query.OrderByDescending(u => u.TechnicianName)
+                    : query.OrderBy(u => u.TechnicianName);
+            }
+            else if (q.Sort.Equals("technicianEmail", StringComparison.OrdinalIgnoreCase))
+            {
+                query = q.Desc
+                    ? query.OrderByDescending(u => u.TechnicianEmail)
+                    : query.OrderBy(u => u.TechnicianEmail);
+            }
+            else if (q.Sort.Equals("technicianCode", StringComparison.OrdinalIgnoreCase))
+            {
+                query = q.Desc
+                    ? query.OrderByDescending(u => u.TechnicianCode)
+                    : query.OrderBy(u => u.TechnicianCode);
+            }
+            else
+            {
+                query = query.OrderByDescending(u => u.Id);
+            }
+        }
+        else
+        {
+            query = query.OrderByDescending(u => u.Id);
+        }
+
+        var total = await query.CountAsync();
+
+        var items = await query
+            .AsNoTracking()
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ProjectToType<UserGetDto>(_config)
+            .ToListAsync();
+
+        return ResponseModel<PagedResult<UserGetDto>>.Success(
+            new PagedResult<UserGetDto>(items, total, page, pageSize));
+    }
     //Ortak kontrol helper’ı
     private async Task<ResponseModel<UserGetDto>?> EnsureUniqueTechnicianAsync(
     long currentUserId,

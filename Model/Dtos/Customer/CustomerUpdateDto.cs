@@ -75,6 +75,9 @@ namespace Model.Dtos.Customer
         public string? CashCenter { get; set; }
 
         public long? TenantId { get; set; }
+        public int? MonitoringStatus { get; set; }
+
+        public int? SerialNo { get; set; }
     }
 
 }

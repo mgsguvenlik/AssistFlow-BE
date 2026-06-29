@@ -105,6 +105,8 @@ namespace Model.Concrete
         // 🔹 Yeni kolonlar
         public string? LockType { get; set; }
         public string? CashCenter { get; set; }
+        public int? MonitoringStatus { get; set; }
+        public int? SerialNo { get; set; }
 
         /// <summary>
         /// </summary>

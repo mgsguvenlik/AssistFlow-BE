@@ -1,10 +1,13 @@
 ﻿using Azure.Core;
 using Business.Interfaces;
+using Business.Interfaces.Manitou;
+using Business.Services.Manitou;
 using Business.UnitOfWork;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
+using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
@@ -23,10 +26,12 @@ using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
+using Model.Dtos.Manitou;
 using Model.Dtos.Notification;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
 using Model.Dtos.WorkFlowDtos.Report;
@@ -36,13 +41,16 @@ using Model.Dtos.WorkFlowDtos.TechnicalService;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
+using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace Business.Services
 {
@@ -56,11 +64,11 @@ namespace Business.Services
         private readonly ICurrentUser _currentUser;
         private readonly INotificationService _notification;
         private readonly IMenuService _menuService;
+        private readonly IManitouApiService _manitouApiService;
         private readonly AppDataContext _ctx;
 
-
         public WorkFlowService(IUnitOfWork uow, TypeAdapterConfig config, IAuthService authService, IActivationRecordService activationRecord,
-            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService)
+            ILogger<WorkFlowService> logger, IMailPushService mailPush, ICurrentUser currentUser, AppDataContext ctx, INotificationService notification, IMenuService menuService, IManitouApiService manitouApiService)
         {
             _uow = uow;
             _config = config;
@@ -71,6 +79,7 @@ namespace Business.Services
             _ctx = ctx;
             _notification = notification;
             _menuService = menuService;
+            _manitouApiService = manitouApiService;
         }
 
         /// -------------------- ServicesRequest --------------------
@@ -113,6 +122,16 @@ namespace Business.Services
                 if (!customerApproverExist)
                     return ResponseModel<ServicesRequestGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
 
+               
+                var (workOrderTypeIds, workOrderTypeValidationError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (workOrderTypeValidationError is not null)
+                {
+                    return ResponseModel<ServicesRequestGetDto>.Fail(
+                        workOrderTypeValidationError,
+                        StatusCode.BadRequest
+                    );
+                }
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
@@ -120,9 +139,17 @@ namespace Business.Services
 
                 #region Servis talebi güncelleme 
                 var request = dto.Adapt<ServicesRequest>(_config);
+
                 request.CreatedDate = DateTime.Now;
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
+                request.ServicesRequestWorkOrderTypes = workOrderTypeIds
+                    .Select(workOrderTypeId => new ServicesRequestWorkOrderType
+                    {
+                        WorkOrderTypeId = workOrderTypeId
+                    })
+                    .ToList();
+
                 await _uow.Repository.AddAsync(request);
                 #endregion
 
@@ -912,6 +939,43 @@ namespace Business.Services
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
+
+                var isManitouTestEnabled =  await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (isManitouTestEnabled)
+                {
+                    var activeWorkingExists = await _uow.Repository
+                        .GetQueryable<TechnicalServiceWorkSession>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestNo == dto.RequestNo &&
+                            x.IsActive &&
+                            !x.IsCompleted &&
+                            !x.IsDeleted);
+
+                    if (activeWorkingExists)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(
+                            "Aktif Manitou çalışma/test kaydı bitirilmeden teknik servis tamamlanamaz.",
+                            StatusCode.Conflict);
+                    }
+
+                    var completedWorkingExists = await _uow.Repository
+                        .GetQueryable<TechnicalServiceWorkSession>()
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.RequestNo == dto.RequestNo &&
+                            x.IsCompleted &&
+                            !x.IsDeleted);
+
+                    if (!completedWorkingExists)
+                    {
+                        return ResponseModel<TechnicalServiceGetDto>.Fail(
+                            "Teknik servis tamamlanmadan önce Manitou çalışma/test işlemi tamamlanmalıdır.",
+                            StatusCode.Conflict);
+                    }
+                }
+
                 #endregion
 
                 #region Lokasyon kontrolü
@@ -944,6 +1008,7 @@ namespace Business.Services
                     }
                 }
                 #endregion
+
                 #region Teknik Servis Kaydı güncelle 
                 technicalService.EndTime = DateTime.Now;
                 technicalService.ServicesStatus = TechnicalServiceStatus.Completed;
@@ -1131,6 +1196,22 @@ namespace Business.Services
 
                 #endregion
 
+                #region İş Emri Türleri Güncellemesi  (ReadOnly yapıldı MZK )
+                //if (dto.WorkOrderTypeIds is not null)
+                //{
+                //    var srEntity = await _uow.Repository.GetQueryable<ServicesRequest>()
+                //        .Include(x => x.ServicesRequestWorkOrderTypes)
+                //        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+                //    if (srEntity is not null)
+                //    {
+                //        var (validatedWotIds, wotError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+                //        if (wotError is null)
+                //            SyncWorkOrderTypes(srEntity, validatedWotIds);
+                //    }
+                //}
+                #endregion
+
                 #region Hareket Kaydı
                 await _activationRecord.LogAsync(
                      WorkFlowActionType.TechnicalServiceFinished,
@@ -1184,6 +1265,7 @@ namespace Business.Services
 
 
         }
+
 
         // 4 Fiyatlama onay ve kontrole gönderim.
         public async Task<ResponseModel<PricingGetDto>> ApprovePricing(PricingUpdateDto dto)
@@ -1413,6 +1495,10 @@ namespace Business.Services
                     return ResponseModel<FinalApprovalGetDto>.Fail("Servis talebi bulunamadı.", StatusCode.NotFound);
 
 
+                var isTerminalStatus =
+                    dto.WorkFlowStatus == WorkFlowStatus.Complated ||
+                    dto.WorkFlowStatus == WorkFlowStatus.Cancelled;
+
                 var statusCode = dto.WorkFlowStatus switch
                 {
                     WorkFlowStatus.Cancelled => "CNC",
@@ -1537,9 +1623,29 @@ namespace Business.Services
                 );
                 #endregion
 
+                #region Aktif Çalışmayı Zorunlu Bitirme
+
+                if (isTerminalStatus)
+                {
+                    var forceFinishResult = await ForceFinishActiveWorkingByRequestNoAsync(
+                        dto.RequestNo,
+                        dto.WorkFlowStatus == WorkFlowStatus.Complated
+                            ? "Akış tamamlandığı için çalışma zorunlu olarak bitirildi."
+                            : "Akış iptal edildiği için çalışma zorunlu olarak bitirildi.");
+
+                    if (!forceFinishResult.Success)
+                    {
+                        return ResponseModel<FinalApprovalGetDto>.Fail(
+                            forceFinishResult.ErrorMessage!,
+                            StatusCode.Error);
+                    }
+                }
+
+                #endregion
+
                 #region Aeşivleme
                 // 🔹 Eğer süreç tamamlandıysa arşive at
-                if (dto.WorkFlowStatus == WorkFlowStatus.Complated || dto.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                if (isTerminalStatus)
                 {
                     var reason = dto.WorkFlowStatus == WorkFlowStatus.Complated ? "Tamamlandı" : "İptal";
                     await ArchiveWorkflowAsync(dto.RequestNo, reason);
@@ -1734,13 +1840,17 @@ namespace Business.Services
 
         // -------------------- Services Request --------------------
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
-            => q => q
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerProductPrices)
-                .Include(x => x.Customer).ThenInclude(x => x.CustomerGroup).ThenInclude(x => x.GroupProductPrices)
-                .Include(x => x.ServiceType)
-                .Include(x => x.CustomerApprover)
-                .Include(x => x.CustomerApprover)
-                .Include(x => x.WorkFlowStep);
+           => q => q
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerProductPrices)
+               .Include(x => x.Customer)
+                   .ThenInclude(x => x.CustomerGroup)
+                   .ThenInclude(x => x.GroupProductPrices)
+               .Include(x => x.ServiceType)
+               .Include(x => x.CustomerApprover)
+               .Include(x => x.WorkFlowStep)
+               .Include(x => x.ServicesRequestWorkOrderTypes)
+            .ThenInclude(x => x.WorkOrderType);
 
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
         {
@@ -1910,6 +2020,25 @@ namespace Business.Services
             if (baseDto is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+            baseDto.WorkOrderTypes = await _uow.Repository
+            .GetQueryable<ServicesRequestWorkOrderType>()
+            .AsNoTracking()
+            .Where(x => x.ServicesRequestId == baseDto.Id)
+            .OrderBy(x => x.WorkOrderType.Name)
+            .Select(x => new WorkOrderTypeGetDto
+            {
+                Id = x.WorkOrderTypeId,
+                Name = x.WorkOrderType.Name,
+                Code = x.WorkOrderType.Code
+            })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
+
+
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
                      .GetQueryable<ServicesRequestProduct>()
@@ -2070,6 +2199,22 @@ namespace Business.Services
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
 
+            baseDto.WorkOrderTypes = await _uow.Repository
+             .GetQueryable<ServicesRequestWorkOrderType>()
+             .AsNoTracking()
+             .Where(x => x.ServicesRequest.RequestNo == requestNo)
+             .OrderBy(x => x.WorkOrderType.Name)
+             .Select(x => new WorkOrderTypeGetDto
+             {
+                 Id = x.WorkOrderTypeId,
+                 Name = x.WorkOrderType.Name,
+                 Code = x.WorkOrderType.Code
+             })
+            .ToListAsync();
+
+            baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
             // NEW: CustomerGroup + ProgressApprovers (tek ek sorgu)
             if (baseDto.Customer?.CustomerGroupId is long cgId)
             {
@@ -2099,7 +2244,6 @@ namespace Business.Services
                     .FirstOrDefaultAsync() ?? new CustomerGroupGetDto();
             }
 
-            // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
@@ -2194,8 +2338,32 @@ namespace Business.Services
             _uow.Repository.Update(wf);
 
 
+            List<long>? validatedWorkOrderTypeIds = null;
+
+            if (dto.WorkOrderTypeIds is not null)
+            {
+                var (ids, validationError) =
+                    await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
+
+                if (validationError is not null)
+                {
+                    return ResponseModel<ServicesRequestGetDto>.Fail(
+                        validationError,
+                        StatusCode.BadRequest
+                    );
+                }
+
+                validatedWorkOrderTypeIds = ids;
+            }
+
             dto.Adapt(entity, _config);
+
             entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
+
+            if (validatedWorkOrderTypeIds is not null)
+            {
+                SyncWorkOrderTypes(entity, validatedWorkOrderTypeIds);
+            }
 
             // Mevcut ürünleri çek (RequestNo bazlı)
             var existingProducts = await _uow.Repository
@@ -2609,8 +2777,8 @@ namespace Business.Services
                 join u0 in qUsers on wf.ApproverTechnicianId equals u0.Id into uj
                 from u in uj.DefaultIfEmpty()
 
-                //CreatedUser
-                join cru  in qCreatedUsers on sr.CreatedUser equals cru.Id into  cruj
+                    //CreatedUser
+                join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
                 from cu in cruj.DefaultIfEmpty()
 
                 select new WarehouseGetDto
@@ -3029,11 +3197,29 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            dto.WorkOrderTypes = await _uow.Repository
+                 .GetQueryable<ServicesRequestWorkOrderType>()
+                 .AsNoTracking()
+                 .Where(x => x.ServicesRequest.RequestNo == requestNo)
+                 .OrderBy(x => x.WorkOrderType.Name)
+                 .Select(x => new WorkOrderTypeGetDto
+                 {
+                     Id = x.WorkOrderTypeId,
+                     Name = x.WorkOrderType.Name,
+                     Code = x.WorkOrderType.Code
+                 })
+                .ToListAsync();
+
+            dto.WorkOrderTypeIds = dto.WorkOrderTypes
+                .Select(x => x.Id)
+                .ToList();
+
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
                 .GetQueryable<ServicesRequest>()
                 .AsNoTracking()
                 .Where(sr => sr.RequestNo == requestNo && sr.Customer != null)
+                .Include(sr => sr.Customer).ThenInclude(c => c.Tenant)
                 .Select(sr => new CustomerGetDto
                 {
                     Id = sr.Customer!.Id,
@@ -3060,6 +3246,9 @@ namespace Business.Services
                     Note = sr.Customer.Note,
                     CashCenter = sr.Customer.CashCenter,
                     LockType = sr.Customer.LockType,
+                    SerialNo=sr.Customer.SerialNo,
+                    TenantId=sr.Customer.TenantId,
+                    IsTechnicalServiceTestEnabled = sr.Customer.Tenant.IsTechnicalServiceTestEnabled,
                     Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -3074,7 +3263,7 @@ namespace Business.Services
 
                                      // İstersen müşteri bilgilerini de doldurabiliriz:
                                      CustomerName = a.Customer.SubscriberCompany,
-                                     CustomerShortCode = a.Customer.CustomerShortCode
+                                     CustomerShortCode = a.Customer.CustomerShortCode,
                                  })
                                 .ToList()
                 })
@@ -3174,6 +3363,33 @@ namespace Business.Services
                 }
             }
             // --------------------------------------------------------------------
+
+
+            // Servis başlığı WorkFlow.RequestTitle'dan,
+            // servis açıklaması ServicesRequest.Description alanından alınır.
+            var serviceHeader = await (
+                from sr in _uow.Repository
+                    .GetQueryable<ServicesRequest>()
+                    .AsNoTracking()
+                join wf in _uow.Repository
+                    .GetQueryable<WorkFlow>()
+                    .AsNoTracking()
+
+                    on sr.RequestNo equals wf.RequestNo into workflowJoin
+
+                from wf in workflowJoin.DefaultIfEmpty()
+
+                where sr.RequestNo == dto.RequestNo
+
+                select new
+                {
+                    ServiceTitle = wf != null ? wf.RequestTitle : null,
+                    ServiceDescription = sr.Description
+                }
+            ).FirstOrDefaultAsync();
+
+            dto.ServiceTitle = serviceHeader?.ServiceTitle ?? string.Empty;
+            dto.ServiceDescription = serviceHeader?.ServiceDescription ?? string.Empty;
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
@@ -3845,128 +4061,6 @@ namespace Business.Services
             return ResponseModel<string>.Fail("Benzersiz RequestNo üretilemedi, lütfen tekrar deneyin.");
         }
 
-        public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync_(QueryParams q)
-        {
-            var me = await _currentUser.GetAsync();
-            //var me =  new User { Id=14};
-            if (me is null)
-                return ResponseModel<PagedResult<WorkFlowGetDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
-
-            var page = q.Page <= 0 ? 1 : q.Page;
-            var pageSize = q.PageSize <= 0 ? 20 : q.PageSize;
-
-            var pendingStatus = WorkFlowStatus.Pending;
-
-            // Permission step codes (WH, PRC, TS, ...)
-            var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
-            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            // “Teknisyen” rolüne sahip ise sadece kendi üzerindeki akışları görebilir
-            // Çoklu rol kodu desteği
-            var technicianRoleRaw = await _uow.Repository
-                .GetQueryable<Configuration>()
-                .AsNoTracking()
-                .Where(x => x.Name == "TechnicianRoleCode")
-                .Select(x => x.Value)
-                .FirstOrDefaultAsync();
-
-            var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
-
-            var isTechnician = technicianRoleCodes.Count > 0 &&
-                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
-                    StringComparer.OrdinalIgnoreCase)) ?? false);
-
-            // base query
-            var wfBase = _uow.Repository
-                .GetQueryable<WorkFlow>()
-                .AsNoTracking()
-                .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
-
-            // Teknisyen ise sadece kendi üzerindeki ve Teknik Servis adımındaki akışları görebilsin
-            var myId = me.Id;
-
-            if (!isTechnician && permittedSet.Count == 0)
-            {
-                wfBase = wfBase.Where(_ => false);
-            }
-            else
-            {
-                wfBase = wfBase.Where(w =>
-                    w.CurrentStep != null &&
-                    permittedSet.Contains(w.CurrentStep.Code) &&
-                    (!isTechnician || w.ApproverTechnicianId == myId)
-                );
-            }
-           
-
-            // search
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
-            }
-
-            // LEFT JOIN
-            var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                    on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
-
-            var total = await qJoined.CountAsync();
-
-            var items = await qJoined
-                .OrderByDescending(x => x.wf.CreatedDate)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(x => new WorkFlowGetDto
-                {
-                    Id = x.wf.Id,
-                    RequestTitle = x.wf.RequestTitle,
-                    RequestNo = x.wf.RequestNo,
-                    CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
-                    Priority = x.wf.Priority,
-                    WorkFlowStatus = x.wf.WorkFlowStatus,
-                    IsAgreement = x.wf.IsAgreement,
-                    CreatedDate = x.wf.CreatedDate,
-                    UpdatedDate = x.wf.UpdatedDate,
-                    CreatedUser = x.wf.CreatedUser,
-                    UpdatedUser = x.wf.UpdatedUser,
-                    IsDeleted = x.wf.IsDeleted,
-                    ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
-                        ? null
-                        : new UserGetDto
-                        {
-                            Id = x.wf.ApproverTechnician.Id,
-                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                            City = x.wf.ApproverTechnician.City,
-                            District = x.wf.ApproverTechnician.District,
-                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
-                        },
-
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
-
-                    CurrentStep = x.wf.CurrentStep == null
-                        ? null
-                        : new WorkFlowStepGetDto
-                        {
-                            Id = x.wf.CurrentStep.Id,
-                            Name = x.wf.CurrentStep.Name,
-                            Code = x.wf.CurrentStep.Code
-                        }
-                })
-                .ToListAsync();
-
-            return ResponseModel<PagedResult<WorkFlowGetDto>>
-                .Success(new PagedResult<WorkFlowGetDto>(items, total, page, pageSize));
-        }
-
         public async Task<ResponseModel<PagedResult<WorkFlowGetDto>>> GetWorkFlowsAsync(WorkFlowQueryParams q)
         {
             q.Normalize(maxPageSize: 200);
@@ -3979,12 +4073,16 @@ namespace Business.Services
             var pageSize = q.PageSize;
 
             var pendingStatus = WorkFlowStatus.Pending;
+            var myId = me.Id;
 
-            // Permission step codes (WH, PRC, TS, ...)
             var permittedSteps = await GetUserStepsByMenuPermission(me.Id) ?? new List<string>();
-            var permittedSet = permittedSteps.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            // Çoklu rol kodu desteği
+            var permittedStepCodes = permittedSteps
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct()
+                .ToList();
+
             var technicianRoleRaw = await _uow.Repository
                 .GetQueryable<Configuration>()
                 .AsNoTracking()
@@ -3995,58 +4093,57 @@ namespace Business.Services
             var technicianRoleCodes = CommonFunctions.ParseRoleCodes(technicianRoleRaw ?? "");
 
             var isTechnician = technicianRoleCodes.Count > 0 &&
-                (me.Roles?.Any(r => technicianRoleCodes.Contains(r.Code,
+                (me.Roles?.Any(r => technicianRoleCodes.Contains(
+                    r.Code,
                     StringComparer.OrdinalIgnoreCase)) ?? false);
 
-            // base query
             var wfBase = _uow.Repository
                 .GetQueryable<WorkFlow>()
                 .AsNoTracking()
                 .Where(w => !w.IsDeleted && w.WorkFlowStatus == pendingStatus);
 
-            var myId = me.Id;
-
-            if (!isTechnician && permittedSet.Count == 0)
+            if (!isTechnician && permittedStepCodes.Count == 0)
             {
                 wfBase = wfBase.Where(_ => false);
             }
             else
             {
                 wfBase = wfBase.Where(w =>
+                    w.CurrentStepId.HasValue &&
                     w.CurrentStep != null &&
-                    permittedSet.Contains(w.CurrentStep.Code) &&
+                    w.CurrentStep.Code != null &&
+                    permittedStepCodes.Contains(w.CurrentStep.Code) &&
                     (!isTechnician || w.ApproverTechnicianId == myId)
                 );
             }
 
-            // --- FİLTRELEME ÖZELLİKLERİ ---
-
-            // WorkFlowStep filtreleme (ID bazlı)
+            // WorkFlowStep filtreleme
             if (q.CurrentStepId.HasValue)
             {
                 wfBase = wfBase.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
             }
 
-            // WorkFlowStep filtreleme (Code bazlı)
             if (!string.IsNullOrWhiteSpace(q.StepCode))
             {
                 var stepCode = q.StepCode.Trim();
-                wfBase = wfBase.Where(w => w.CurrentStep != null && w.CurrentStep.Code == stepCode);
+                wfBase = wfBase.Where(w =>
+                    w.CurrentStep != null &&
+                    w.CurrentStep.Code == stepCode);
             }
 
-            // WorkFlowPriority filtreleme (tekil)
+            // Priority filtreleme
             if (q.Priority.HasValue)
             {
                 wfBase = wfBase.Where(w => w.Priority == q.Priority.Value);
             }
 
-            // Çoklu Priority filtreleme
-            if (q.Priorities != null && q.Priorities.Count > 0)
+            if (q.Priorities is { Count: > 0 })
             {
-                wfBase = wfBase.Where(w => q.Priorities.Contains(w.Priority));
+                var priorities = q.Priorities;
+                wfBase = wfBase.Where(w => priorities.Contains(w.Priority));
             }
 
-            // 🆕 Tarih filtreleri (CreatedDate)
+            // CreatedDate filtreleme
             if (q.StartDate.HasValue)
             {
                 wfBase = wfBase.Where(w => w.CreatedDate >= q.StartDate.Value);
@@ -4054,66 +4151,550 @@ namespace Business.Services
 
             if (q.EndDate.HasValue)
             {
-                wfBase = wfBase.Where(w => w.CreatedDate <= q.EndDate.Value);
+                var endDate = q.EndDate.Value;
+
+                // Frontend sadece tarih gönderirse, örn: 2026-06-14 00:00,
+                // bütün günü kapsaması için bir sonraki günün başına kadar alıyoruz.
+                if (endDate.TimeOfDay == TimeSpan.Zero)
+                {
+                    var endExclusive = new DateTimeOffset(endDate.Date.AddDays(1), endDate.Offset);
+                    wfBase = wfBase.Where(w => w.CreatedDate < endExclusive);
+                }
+                else
+                {
+                    wfBase = wfBase.Where(w => w.CreatedDate <= endDate);
+                }
             }
 
-            // Search
+            var usersQuery = _uow.Repository
+                .GetQueryable<User>()
+                .AsNoTracking();
+
+            var stepsQuery = _uow.Repository
+                .GetQueryable<WorkFlowStep>()
+                .AsNoTracking();
+
+            var serviceRequestsQuery = _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .AsNoTracking();
+
+            var customersQuery = _uow.Repository
+                .GetQueryable<Customer>()
+                .AsNoTracking();
+
+            var serviceTypesQuery = _uow.Repository
+                .GetQueryable<ServiceType>()
+                .AsNoTracking();
+
+            var customerGroupsQuery = _uow.Repository
+                .GetQueryable<CustomerGroup>()
+                .AsNoTracking();
+
+            var progressApproversQuery = _uow.Repository
+                .GetQueryable<ProgressApprover>()
+                .AsNoTracking();
+
+            var qJoined =
+                from wf in wfBase
+
+                join step0 in stepsQuery
+                    on wf.CurrentStepId equals (long?)step0.Id into stepJoin
+                from step in stepJoin.DefaultIfEmpty()
+
+                join sr0 in serviceRequestsQuery
+                    on wf.RequestNo equals sr0.RequestNo into srJoin
+                from sr in srJoin.DefaultIfEmpty()
+
+                join customer0 in customersQuery
+                    on sr.CustomerId equals customer0.Id into customerJoin
+                from customer in customerJoin.DefaultIfEmpty()
+
+                join customerGroup0 in customerGroupsQuery
+                    on customer.CustomerGroupId equals (long?)customerGroup0.Id into customerGroupJoin
+                from customerGroup in customerGroupJoin.DefaultIfEmpty()
+
+                join serviceType0 in serviceTypesQuery
+                    on sr.ServiceTypeId equals serviceType0.Id into serviceTypeJoin
+                from serviceType in serviceTypeJoin.DefaultIfEmpty()
+
+                join createdUser0 in usersQuery
+                    on wf.CreatedUser equals createdUser0.Id into createdUserJoin
+                from createdUser in createdUserJoin.DefaultIfEmpty()
+
+                join approverTechnician0 in usersQuery
+                    on wf.ApproverTechnicianId equals (long?)approverTechnician0.Id into approverTechnicianJoin
+                from approverTechnician in approverTechnicianJoin.DefaultIfEmpty()
+
+                select new
+                {
+                    wf,
+                    step,
+                    sr,
+                    customer,
+                    customerGroup,
+                    serviceType,
+                    createdUser,
+                    approverTechnician
+                };
+
+            // 1- Servis konfigurasyonu bazlı => ServicesRequest.ServicesCostStatus
+            if (q.ServicesCostStatus.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.ServicesCostStatus == q.ServicesCostStatus.Value);
+            }
+
+            if (q.ServicesCostStatuses is { Count: > 0 })
+            {
+                var costStatuses = q.ServicesCostStatuses;
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    costStatuses.Contains(x.sr.ServicesCostStatus));
+            }
+
+            // 3- Servis türü bazlı => ServicesRequest.ServiceTypeId
+            if (q.ServiceTypeId.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.ServiceTypeId == q.ServiceTypeId.Value);
+            }
+
+            if (q.ServiceTypeIds is { Count: > 0 })
+            {
+                var serviceTypeIds = q.ServiceTypeIds;
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    serviceTypeIds.Contains(x.sr.ServiceTypeId));
+            }
+
+            // 4- İl bazlı => Customer.City
+            if (!string.IsNullOrWhiteSpace(q.City))
+            {
+                var city = q.City.Trim();
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.City != null &&
+                    x.customer.City.Contains(city));
+            }
+
+            if (q.Cities is { Count: > 0 })
+            {
+                var cities = q.Cities;
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.City != null &&
+                    cities.Contains(x.customer.City));
+            }
+
+            // Opsiyonel: müşteri grubu bazlı filtre
+            if (q.CustomerGroupId.HasValue)
+            {
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId == q.CustomerGroupId.Value);
+            }
+
+            // 5- Hakediş temsilcisi bazlı => Customer.CustomerGroup.ProgressApprovers
+            if (q.ProgressApproverId.HasValue)
+            {
+                var progressApproverId = q.ProgressApproverId.Value;
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId.HasValue &&
+                    progressApproversQuery.Any(pa =>
+                        pa.Id == progressApproverId &&
+                        pa.CustomerGroupId == x.customer.CustomerGroupId.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(q.ProgressApproverSearch))
+            {
+                var progressApproverTerm = q.ProgressApproverSearch.Trim();
+
+                qJoined = qJoined.Where(x =>
+                    x.customer != null &&
+                    x.customer.CustomerGroupId.HasValue &&
+                    progressApproversQuery.Any(pa =>
+                        pa.CustomerGroupId == x.customer.CustomerGroupId.Value &&
+                        (
+                            pa.FullName.Contains(progressApproverTerm) ||
+                            pa.Email.Contains(progressApproverTerm) ||
+                            pa.Phone.Contains(progressApproverTerm)
+                        )));
+            }
+
+            // Detaylı Search
             if (!string.IsNullOrWhiteSpace(q.Search))
             {
                 var term = q.Search.Trim();
-                wfBase = wfBase.Where(x => x.RequestNo.Contains(term) || x.RequestTitle.Contains(term));
-            }
+                var priorityAliases = new Dictionary<WorkFlowPriority, string[]>
+                        {
+                            { WorkFlowPriority.Low, new[] { "Düşük", "Dusuk", "Low" } },
+                        
+                            { WorkFlowPriority.Normal, new[] { "Normal" } },
+                        
+                            { WorkFlowPriority.High, new[] { "Yüksek", "Yuksek", "High" } },
+                        
+                            { WorkFlowPriority.Urgent, new[] { "Acil", "Urgent" } },
+                        
+                            {
+                                WorkFlowPriority.Region1Urgent,
+                                new[]
+                                {
+                                    "1. Bölge Acil",
+                                    "1.Bölge Acil",
+                                    "1 Bolge Acil",
+                                    "1. Bolge Acil",
+                                    "Region1Urgent",
+                                    "Region 1 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region1Normal,
+                                new[]
+                                {
+                                    "1. Bölge Normal",
+                                    "1.Bölge Normal",
+                                    "1 Bolge Normal",
+                                    "1. Bolge Normal",
+                                    "Region1Normal",
+                                    "Region 1 Normal"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region2Urgent,
+                                new[]
+                                {
+                                    "2. Bölge Acil",
+                                    "2.Bölge Acil",
+                                    "2 Bolge Acil",
+                                    "2. Bolge Acil",
+                                    "Region2Urgent",
+                                    "Region 2 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region2Normal,
+                                new[]
+                                {
+                                    "2. Bölge Normal",
+                                    "2.Bölge Normal",
+                                    "2 Bolge Normal",
+                                    "2. Bolge Normal",
+                                    "Region2Normal",
+                                    "Region 2 Normal"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region3Urgent,
+                                new[]
+                                {
+                                    "3. Bölge Acil",
+                                    "3.Bölge Acil",
+                                    "3 Bolge Acil",
+                                    "3. Bolge Acil",
+                                    "Region3Urgent",
+                                    "Region 3 Urgent"
+                                }
+                            },
+                        
+                            {
+                                WorkFlowPriority.Region3Normal,
+                                new[]
+                                {
+                                    "3. Bölge Normal",
+                                    "3.Bölge Normal",
+                                    "3 Bolge Normal",
+                                    "3. Bolge Normal",
+                                    "Region3Normal",
+                                    "Region 3 Normal"
+                                }
+                            }
+                        };
 
-            // LEFT JOIN ServicesRequest
-            var qJoined =
-                from wf in wfBase
-                join sr0 in _uow.Repository.GetQueryable<ServicesRequest>().AsNoTracking()
-                    on wf.RequestNo equals sr0.RequestNo into srj
-                from sr in srj.DefaultIfEmpty()
-                select new { wf, sr };
+                var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
+                    {
+                        { WorkFlowStatus.Pending, new[] { "Beklemede", "Pending" } },
+                        { WorkFlowStatus.Complated, new[] { "Tamamlandı", "Tamamlandi", "Completed", "Complated" } },
+                        { WorkFlowStatus.Cancelled, new[] { "İptal", "Iptal", "İptal Edildi", "Iptal Edildi", "Cancelled" } }
+                    };
+
+                var serviceCostStatusAliases = new Dictionary<ServicesCostStatus, string[]>
+                    {
+                        { ServicesCostStatus.Unknown, new[] { "Belirtilmemiş", "Belirtilmemis", "Unknown" } },
+                        { ServicesCostStatus.NotRequired, new[] { "Ücret gerekmiyor", "Ucret gerekmiyor", "Ücretsiz", "Ucretsiz", "Not Required" } },
+                        { ServicesCostStatus.Chargeable, new[] { "Ücretli", "Ucretli", "Müşteri öder", "Musteri oder", "Chargeable" } },
+                        { ServicesCostStatus.Maintenance, new[] { "Bakım", "Bakim", "Bakım kapsamında", "Bakim kapsaminda", "Maintenance" } }
+                    };
+
+                var priorityMatches = CommonFunctions.MatchEnumValues(term, priorityAliases);
+                var workflowStatusMatches = CommonFunctions.MatchEnumValues(term, workflowStatusAliases);
+                var serviceCostStatusMatches = CommonFunctions.MatchEnumValues(term, serviceCostStatusAliases);
+
+                var hasPriorityMatches = priorityMatches.Count > 0;
+                var hasWorkflowStatusMatches = workflowStatusMatches.Count > 0;
+                var hasServiceCostStatusMatches = serviceCostStatusMatches.Count > 0;
+
+                var hasLong = long.TryParse(term, out var longValue);
+
+                var parsedDate = default(DateTimeOffset);
+
+                var hasDate =
+                    (term.Contains('.') || term.Contains('/') || term.Contains('-')) &&
+                    DateTimeOffset.TryParse(
+                        term,
+                        CultureInfo.GetCultureInfo("tr-TR"),
+                        DateTimeStyles.AssumeLocal,
+                        out parsedDate);
+
+                var searchDateStart = default(DateTimeOffset);
+                var searchDateEnd = default(DateTimeOffset);
+
+                if (hasDate)
+                {
+                    searchDateStart = new DateTimeOffset(parsedDate.Date, parsedDate.Offset);
+                    searchDateEnd = searchDateStart.AddDays(1);
+                }
+
+                qJoined = qJoined.Where(x =>
+                    // WorkFlow
+                    x.wf.RequestNo.Contains(term) ||
+                    x.wf.RequestTitle.Contains(term) ||
+
+                    // WorkFlowStep
+                    (
+                        x.step != null &&
+                        (
+                            x.step.Name.Contains(term) ||
+                            (x.step.Code != null && x.step.Code.Contains(term))
+                        )
+                    ) ||
+
+                    // ServicesRequest
+                    (
+                        x.sr != null &&
+                        (
+                            x.sr.RequestNo.Contains(term) ||
+                            (x.sr.OracleNo != null && x.sr.OracleNo.Contains(term)) ||
+                            (x.sr.Description != null && x.sr.Description.Contains(term))
+                        )
+                    ) ||
+
+                    // ServiceType
+                    (
+                        x.serviceType != null &&
+                        (
+                            x.serviceType.Name.Contains(term) ||
+                            (x.serviceType.ContractNumber != null && x.serviceType.ContractNumber.Contains(term))
+                        )
+                    ) ||
+
+                    // Customer
+                    (
+                        x.customer != null &&
+                        (
+                            (x.customer.SubscriberCode != null && x.customer.SubscriberCode.Contains(term)) ||
+                            (x.customer.SubscriberCompany != null && x.customer.SubscriberCompany.Contains(term)) ||
+                            (x.customer.SubscriberAddress != null && x.customer.SubscriberAddress.Contains(term)) ||
+                            (x.customer.City != null && x.customer.City.Contains(term)) ||
+                            (x.customer.District != null && x.customer.District.Contains(term)) ||
+                            (x.customer.LocationCode != null && x.customer.LocationCode.Contains(term)) ||
+                            (x.customer.ContactName1 != null && x.customer.ContactName1.Contains(term)) ||
+                            (x.customer.Phone1 != null && x.customer.Phone1.Contains(term)) ||
+                            (x.customer.Email1 != null && x.customer.Email1.Contains(term)) ||
+                            (x.customer.ContactName2 != null && x.customer.ContactName2.Contains(term)) ||
+                            (x.customer.Phone2 != null && x.customer.Phone2.Contains(term)) ||
+                            (x.customer.Email2 != null && x.customer.Email2.Contains(term)) ||
+                            (x.customer.CustomerShortCode != null && x.customer.CustomerShortCode.Contains(term)) ||
+                            (x.customer.CorporateLocationId != null && x.customer.CorporateLocationId.Contains(term)) ||
+                            (x.customer.Longitude != null && x.customer.Longitude.Contains(term)) ||
+                            (x.customer.Latitude != null && x.customer.Latitude.Contains(term)) ||
+                            (x.customer.Note != null && x.customer.Note.Contains(term)) ||
+                            (x.customer.LockType != null && x.customer.LockType.Contains(term)) ||
+                            (x.customer.CashCenter != null && x.customer.CashCenter.Contains(term))
+                        )
+                    ) ||
+
+                    // CustomerGroup
+                    (
+                        x.customerGroup != null &&
+                        (
+                            x.customerGroup.GroupName.Contains(term) ||
+                            x.customerGroup.Code.Contains(term)
+                        )
+                    ) ||
+
+                    // Created User
+                    (
+                        x.createdUser != null &&
+                        (
+                            (x.createdUser.TechnicianName != null && x.createdUser.TechnicianName.Contains(term)) ||
+                            (x.createdUser.TechnicianEmail != null && x.createdUser.TechnicianEmail.Contains(term)) ||
+                            (x.createdUser.TechnicianPhone != null && x.createdUser.TechnicianPhone.Contains(term)) ||
+                            (x.createdUser.City != null && x.createdUser.City.Contains(term)) ||
+                            (x.createdUser.District != null && x.createdUser.District.Contains(term))
+                        )
+                    ) ||
+
+                    // Approver Technician
+                    (
+                        x.approverTechnician != null &&
+                        (
+                            (x.approverTechnician.TechnicianName != null && x.approverTechnician.TechnicianName.Contains(term)) ||
+                            (x.approverTechnician.TechnicianEmail != null && x.approverTechnician.TechnicianEmail.Contains(term)) ||
+                            (x.approverTechnician.TechnicianPhone != null && x.approverTechnician.TechnicianPhone.Contains(term)) ||
+                            (x.approverTechnician.City != null && x.approverTechnician.City.Contains(term)) ||
+                            (x.approverTechnician.District != null && x.approverTechnician.District.Contains(term))
+                        )
+                    ) ||
+
+                    // ProgressApprovers
+                    (
+                        x.customer != null &&
+                        x.customer.CustomerGroupId.HasValue &&
+                        progressApproversQuery.Any(pa =>
+                            pa.CustomerGroupId == x.customer.CustomerGroupId.Value &&
+                            (
+                                pa.FullName.Contains(term) ||
+                                pa.Email.Contains(term) ||
+                                pa.Phone.Contains(term)
+                            ))
+                    ) ||
+
+                    // Enum aramaları
+                    (
+                        hasPriorityMatches &&
+                        priorityMatches.Contains(x.wf.Priority)
+                    ) ||
+
+                    (
+                        hasWorkflowStatusMatches &&
+                        workflowStatusMatches.Contains(x.wf.WorkFlowStatus)
+                    ) ||
+
+                    (
+                        x.sr != null &&
+                        hasServiceCostStatusMatches &&
+                        serviceCostStatusMatches.Contains(x.sr.ServicesCostStatus)
+                    ) ||
+
+                    // Sayısal arama
+                    (
+                        hasLong &&
+                        (
+                            x.wf.Id == longValue ||
+                            x.wf.CreatedUser == longValue ||
+                            x.wf.UpdatedUser == longValue ||
+                            x.wf.ApproverTechnicianId == longValue ||
+                            (x.sr != null && x.sr.Id == longValue) ||
+                            (x.sr != null && x.sr.CustomerId == longValue) ||
+                            (x.sr != null && x.sr.ServiceTypeId == longValue) ||
+                            (x.customer != null && x.customer.Id == longValue) ||
+                            (x.serviceType != null && x.serviceType.Id == longValue) ||
+                            (x.customerGroup != null && x.customerGroup.Id == longValue)
+                        )
+                    ) ||
+
+                    // Tarih arama
+                    (
+                        hasDate &&
+                        x.wf.CreatedDate >= searchDateStart &&
+                        x.wf.CreatedDate < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.wf.UpdatedDate.HasValue &&
+                        x.wf.UpdatedDate.Value >= searchDateStart &&
+                        x.wf.UpdatedDate.Value < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.sr != null &&
+                        x.sr.ServicesDate >= searchDateStart &&
+                        x.sr.ServicesDate < searchDateEnd
+                    ) ||
+
+                    (
+                        hasDate &&
+                        x.sr != null &&
+                        x.sr.PlannedCompletionDate.HasValue &&
+                        x.sr.PlannedCompletionDate.Value >= searchDateStart &&
+                        x.sr.PlannedCompletionDate.Value < searchDateEnd
+                    )
+                );
+            }
 
             var total = await qJoined.CountAsync();
 
-            // --- SIRALAMA ---
             var finalQuery = qJoined;
 
             if (!string.IsNullOrWhiteSpace(q.Sort))
             {
                 var sortLower = q.Sort.ToLowerInvariant();
 
-                if (sortLower == "requestno")
+                switch (sortLower)
                 {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.RequestNo)
-                        : qJoined.OrderBy(x => x.wf.RequestNo);
-                }
-                else if (sortLower == "requesttitle")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
-                        : qJoined.OrderBy(x => x.wf.RequestTitle);
-                }
-                else if (sortLower == "priority")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.Priority)
-                        : qJoined.OrderBy(x => x.wf.Priority);
-                }
-                else if (sortLower == "createddate")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
-                        : qJoined.OrderBy(x => x.wf.CreatedDate);
-                }
-                else if (sortLower == "updateddate")
-                {
-                    finalQuery = q.Desc
-                        ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
-                        : qJoined.OrderBy(x => x.wf.UpdatedDate);
-                }
-                else
-                {
-                    finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                    case "requestno":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.RequestNo)
+                            : qJoined.OrderBy(x => x.wf.RequestNo);
+                        break;
+
+                    case "requesttitle":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.RequestTitle)
+                            : qJoined.OrderBy(x => x.wf.RequestTitle);
+                        break;
+
+                    case "priority":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.Priority)
+                            : qJoined.OrderBy(x => x.wf.Priority);
+                        break;
+
+                    case "createddate":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.CreatedDate)
+                            : qJoined.OrderBy(x => x.wf.CreatedDate);
+                        break;
+
+                    case "updateddate":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.wf.UpdatedDate)
+                            : qJoined.OrderBy(x => x.wf.UpdatedDate);
+                        break;
+
+                    case "servicetype":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.serviceType != null ? x.serviceType.Name : string.Empty)
+                            : qJoined.OrderBy(x => x.serviceType != null ? x.serviceType.Name : string.Empty);
+                        break;
+
+                    case "city":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.customer != null ? x.customer.City : string.Empty)
+                            : qJoined.OrderBy(x => x.customer != null ? x.customer.City : string.Empty);
+                        break;
+
+                    case "servicescoststatus":
+                        finalQuery = q.Desc
+                            ? qJoined.OrderByDescending(x => x.sr != null ? (int)x.sr.ServicesCostStatus : -1)
+                            : qJoined.OrderBy(x => x.sr != null ? (int)x.sr.ServicesCostStatus : -1);
+                        break;
+
+                    default:
+                        finalQuery = qJoined.OrderByDescending(x => x.wf.CreatedDate);
+                        break;
                 }
             }
             else
@@ -4129,41 +4710,68 @@ namespace Business.Services
                     Id = x.wf.Id,
                     RequestTitle = x.wf.RequestTitle,
                     RequestNo = x.wf.RequestNo,
+
                     CurrentStepId = x.wf.CurrentStepId.GetValueOrDefault(),
+
                     Priority = x.wf.Priority,
                     WorkFlowStatus = x.wf.WorkFlowStatus,
                     IsAgreement = x.wf.IsAgreement,
+
                     CreatedDate = x.wf.CreatedDate,
                     UpdatedDate = x.wf.UpdatedDate,
+
                     CreatedUser = x.wf.CreatedUser,
+                    CreatedUserFullName = x.createdUser == null
+                        ? null
+                        : x.createdUser.TechnicianName,
+
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
+
                     ApproverTechnicianId = x.wf.ApproverTechnicianId,
-                    ApproverTechnician = x.wf.ApproverTechnician == null
+
+                    ApproverTechnician = x.approverTechnician == null
                         ? null
                         : new UserGetDto
                         {
-                            Id = x.wf.ApproverTechnician.Id,
-                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
-                            City = x.wf.ApproverTechnician.City,
-                            District = x.wf.ApproverTechnician.District,
-                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                            Id = x.approverTechnician.Id,
+                            TechnicianName = x.approverTechnician.TechnicianName,
+                            TechnicianPhone = x.approverTechnician.TechnicianPhone,
+                            TechnicianAddress = x.approverTechnician.TechnicianAddress,
+                            City = x.approverTechnician.City,
+                            District = x.approverTechnician.District,
+                            TechnicianEmail = x.approverTechnician.TechnicianEmail,
                         },
 
-                    CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
-                    CustomerName = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCompany),
-                    CustomerAddress = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberAddress),
+                    CustomerCode = x.customer == null
+                        ? null
+                        : x.customer.SubscriberCode,
 
-                    CurrentStep = x.wf.CurrentStep == null
+                    CustomerName = x.customer == null
+                        ? null
+                        : x.customer.SubscriberCompany,
+
+                    CustomerAddress = x.customer == null
+                        ? null
+                        : x.customer.SubscriberAddress,
+
+                    CurrentStep = x.step == null
                         ? null
                         : new WorkFlowStepGetDto
                         {
-                            Id = x.wf.CurrentStep.Id,
-                            Name = x.wf.CurrentStep.Name,
-                            Code = x.wf.CurrentStep.Code
+                            Id = x.step.Id,
+                            Name = x.step.Name,
+                            Code = x.step.Code
                         }
+
+                        // Eğer WorkFlowGetDto içinde aşağıdaki alanlar varsa bunları da açabilirsin:
+                        // CustomerCity = x.customer == null ? null : x.customer.City,
+                        // CustomerDistrict = x.customer == null ? null : x.customer.District,
+                        // ServiceTypeId = x.serviceType == null ? null : x.serviceType.Id,
+                        // ServiceTypeName = x.serviceType == null ? null : x.serviceType.Name,
+                        // ServicesCostStatus = x.sr == null ? null : x.sr.ServicesCostStatus,
+                        // CustomerGroupId = x.customerGroup == null ? null : x.customerGroup.Id,
+                        // CustomerGroupName = x.customerGroup == null ? null : x.customerGroup.GroupName,
                 })
                 .ToListAsync();
 
@@ -4172,24 +4780,50 @@ namespace Business.Services
         }
         public async Task<ResponseModel> DeleteWorkFlowAsync(long id)
         {
-            var me = await _currentUser.GetAsync();
-            var meId = me?.Id ?? 0;
-            // 1) Entity’yi getir (tracked olsun ki güncelleme/replace çalışsın)
-            var entity = await _uow.Repository.GetSingleAsync<Model.Concrete.WorkFlows.WorkFlow>(
-                asNoTracking: false,
-                x => x.Id == id);
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
 
-            if (entity is null)
-                return ResponseModel.Fail("Silinecek kayıt bulunamadı.", StatusCode.NotFound);
+                var entity = await _uow.Repository.GetSingleAsync<WorkFlow>(
+                    asNoTracking: false,
+                    x => x.Id == id);
 
-            // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
-            entity.IsDeleted = true;                // varsa
-            entity.UpdatedDate = DateTime.Now; // varsa
-            entity.UpdatedUser = meId;
-            _uow.Repository.Update(entity);
+                if (entity is null)
+                    return ResponseModel.Fail("Silinecek kayıt bulunamadı.", StatusCode.NotFound);
 
-            await _uow.Repository.CompleteAsync();
-            return ResponseModel.Success(status: StatusCode.NoContent);
+                if (!string.IsNullOrWhiteSpace(entity.RequestNo))
+                {
+                    var finishResult = await ForceFinishActiveWorkingByRequestNoAsync(
+                        entity.RequestNo,
+                        "Akış silindiği için çalışma zorunlu olarak bitirildi.");
+
+                    if (!finishResult.Success)
+                    {
+                        return ResponseModel.Fail(
+                            finishResult.ErrorMessage!,
+                            StatusCode.Error);
+                    }
+                }
+
+                entity.IsDeleted = true;
+                entity.UpdatedDate = DateTime.Now;
+                entity.UpdatedUser = meId;
+
+                _uow.Repository.Update(entity);
+
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel.Success(status: StatusCode.NoContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DeleteWorkFlowAsync hatası. Id={Id}", id);
+
+                return ResponseModel.Fail(
+                    $"Akış silinirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
         }
 
         public async Task<ResponseModel> CancelWorkFlowAsync(long id)
@@ -4203,6 +4837,13 @@ namespace Business.Services
             if (entity is null)
                 return ResponseModel.Fail("İptal edilecek kayıt bulunamadı.", StatusCode.NotFound);
 
+            var forceFinishResult = await ForceFinishActiveWorkingByRequestNoAsync(entity.RequestNo, "Akış iptal edildiği için çalışma zorunlu olarak bitirildi.");
+            if (!forceFinishResult.Success)
+            {
+                return ResponseModel.Fail(
+                    forceFinishResult.ErrorMessage!,
+                    StatusCode.Error);
+            }
             // 2) Soft-delete işaretleri (sizde BaseEntity/Auditable’da ne varsa)
             entity.WorkFlowStatus = WorkFlowStatus.Cancelled;                // varsa
             entity.UpdatedDate = DateTime.Now; // varsa
@@ -4252,6 +4893,8 @@ namespace Business.Services
                 .Include(x => x.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.ProgressApprovers)
+                .Include(x => x.ServicesRequestWorkOrderTypes)
+                    .ThenInclude(x => x.WorkOrderType)
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
 
             if (sr is not null)
@@ -4270,7 +4913,15 @@ namespace Business.Services
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType?.Name,
                     Priority = sr.Priority.ToString(),
-                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString()
+                    ServicesRequestStatus = sr.ServicesRequestStatus.ToString(),
+                    WorkOrderTypes = sr.ServicesRequestWorkOrderTypes
+                        .Select(x => new WorkOrderTypeLiteDto
+                        {
+                            Id = x.WorkOrderType.Id,
+                            Name = x.WorkOrderType.Name,
+                            Code = x.WorkOrderType.Code
+                        })
+                        .ToList()
                 };
 
                 if (sr.Customer is not null)
@@ -4852,6 +5503,573 @@ namespace Business.Services
             }
         }
 
+        //Basic Report 
+        public async Task<ResponseModel<PagedResult<WorkFlowBasicReportListDto>>> GetBasicWorkFlowReportAsync(WorkFlowBasicReportQueryParams q)
+        {
+            try
+            {
+                q ??= new WorkFlowBasicReportQueryParams();
+                q.Normalize(maxPageSize: 200);
+
+                var wfQuery = _uow.Repository
+                    .GetQueryable<WorkFlow>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var srQuery = _uow.Repository
+                    .GetQueryable<ServicesRequest>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var whQuery = _uow.Repository
+                    .GetQueryable<Warehouse>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var tsQuery = _uow.Repository
+                    .GetQueryable<TechnicalService>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var pricingQuery = _uow.Repository
+                    .GetQueryable<Pricing>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var finalApprovalQuery = _uow.Repository
+                    .GetQueryable<FinalApproval>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                var userQuery = _uow.Repository
+                    .GetQueryable<User>()
+                    .AsNoTracking();
+
+                // -------------------------
+                // WorkFlow ana filtreleri
+                // -------------------------
+
+                if (!string.IsNullOrWhiteSpace(q.Search))
+                {
+                    var term = q.Search.Trim();
+
+                    wfQuery = wfQuery.Where(w =>
+                        w.RequestNo.Contains(term) ||
+                        w.RequestTitle.Contains(term) ||
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            (
+                                (sr.Description != null && sr.Description.Contains(term)) ||
+                                (sr.Customer != null && sr.Customer.SubscriberCompany != null && sr.Customer.SubscriberCompany.Contains(term)) ||
+                                (sr.Customer != null && sr.Customer.SubscriberCode != null && sr.Customer.SubscriberCode.Contains(term))
+                            )
+                        ) ||
+                        userQuery.Any(u =>
+                            w.ApproverTechnicianId == u.Id &&
+                            u.TechnicianName != null &&
+                            u.TechnicianName.Contains(term)
+                        )
+                    );
+                }
+
+                if (!string.IsNullOrWhiteSpace(q.RequestNo))
+                {
+                    wfQuery = wfQuery.Where(w => w.RequestNo == q.RequestNo);
+                }
+
+                if (q.CurrentStepId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.CurrentStepId == q.CurrentStepId.Value);
+                }
+
+                if (!string.IsNullOrWhiteSpace(q.StepCode))
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        w.CurrentStep != null &&
+                        w.CurrentStep.Code == q.StepCode);
+                }
+
+                if (q.ApproverTechnicianId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.ApproverTechnicianId == q.ApproverTechnicianId.Value);
+                }
+
+                if (q.CreatedUserId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.CreatedUser == q.CreatedUserId.Value);
+                }
+
+                if (q.Priority.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.Priority == q.Priority.Value);
+                }
+
+                if (q.Priorities is { Count: > 0 })
+                {
+                    wfQuery = wfQuery.Where(w => q.Priorities.Contains(w.Priority));
+                }
+
+                if (q.WorkFlowStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.WorkFlowStatus == q.WorkFlowStatus.Value);
+                }
+
+                if (q.WorkFlowStatuses is { Count: > 0 })
+                {
+                    wfQuery = wfQuery.Where(w => q.WorkFlowStatuses.Contains(w.WorkFlowStatus));
+                }
+
+                if (q.IsAgreement.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.IsAgreement == q.IsAgreement.Value);
+                }
+
+                if (q.IsLocationValid.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.IsLocationValid == q.IsLocationValid.Value);
+                }
+
+                if (q.CreatedFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.CreatedDate >= q.CreatedFrom.Value);
+                }
+
+                if (q.CreatedTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.CreatedDate <= q.CreatedTo.Value);
+                }
+
+                // -------------------------
+                // ServicesRequest filtreleri
+                // -------------------------
+
+                if (q.CustomerId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.CustomerId == q.CustomerId.Value));
+                }
+
+                if (q.ServiceTypeId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServiceTypeId == q.ServiceTypeId.Value));
+                }
+
+                if (q.ServicesCostStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesCostStatus == q.ServicesCostStatus.Value));
+                }
+
+                if (q.IsProductRequirement.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.IsProductRequirement == q.IsProductRequirement.Value));
+                }
+
+                if (q.ServicesDateFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesDate >= q.ServicesDateFrom.Value));
+                }
+
+                if (q.ServicesDateTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServicesDate <= q.ServicesDateTo.Value));
+                }
+
+                // -------------------------
+                // TechnicalService filtreleri
+                // -------------------------
+
+                if (q.TechnicalServiceStatus.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.ServicesStatus == q.TechnicalServiceStatus.Value));
+                }
+
+                if (q.TechnicalStartFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.StartTime.HasValue &&
+                            ts.StartTime.Value >= q.TechnicalStartFrom.Value));
+                }
+
+                if (q.TechnicalStartTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.StartTime.HasValue &&
+                            ts.StartTime.Value <= q.TechnicalStartTo.Value));
+                }
+
+                if (q.TechnicalEndFrom.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.EndTime.HasValue &&
+                            ts.EndTime.Value >= q.TechnicalEndFrom.Value));
+                }
+
+                if (q.TechnicalEndTo.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w =>
+                        tsQuery.Any(ts =>
+                            ts.RequestNo == w.RequestNo &&
+                            ts.EndTime.HasValue &&
+                            ts.EndTime.Value <= q.TechnicalEndTo.Value));
+                }
+
+                // -------------------------
+                // Count artık sorunsuz çalışır
+                // -------------------------
+
+                var total = await wfQuery.CountAsync();
+
+                // -------------------------
+                // Sıralama
+                // -------------------------
+
+                wfQuery = q.SortBy?.ToLowerInvariant() switch
+                {
+                    "requestno" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.RequestNo)
+                        : wfQuery.OrderBy(w => w.RequestNo),
+
+                    "priority" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.Priority)
+                        : wfQuery.OrderBy(w => w.Priority),
+
+                    "workflowstatus" => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.WorkFlowStatus)
+                        : wfQuery.OrderBy(w => w.WorkFlowStatus),
+
+                    _ => q.SortDesc
+                        ? wfQuery.OrderByDescending(w => w.CreatedDate)
+                        : wfQuery.OrderBy(w => w.CreatedDate)
+                };
+
+                // -------------------------
+                // Sadece sayfalı Workflow kayıtlarını çek
+                // -------------------------
+
+                var workflows = await wfQuery
+                    .Skip((q.Page - 1) * q.PageSize)
+                    .Take(q.PageSize)
+                    .Select(w => new
+                    {
+                        w.Id,
+                        w.RequestNo,
+                        w.RequestTitle,
+                        w.CurrentStepId,
+                        CurrentStepCode = w.CurrentStep != null ? w.CurrentStep.Code : null,
+                        CurrentStepName = w.CurrentStep != null ? w.CurrentStep.Name : null,
+                        w.Priority,
+                        w.WorkFlowStatus,
+                        w.CreatedDate,
+                        w.UpdatedDate,
+                        w.CreatedUser,
+                        w.ApproverTechnicianId,
+                        w.IsAgreement,
+                        w.IsLocationValid
+                    })
+                    .ToListAsync();
+
+                var requestNos = workflows
+                    .Select(x => x.RequestNo)
+                    .Distinct()
+                    .ToList();
+
+                if (requestNos.Count == 0)
+                {
+                    return ResponseModel<PagedResult<WorkFlowBasicReportListDto>>.Success(
+                        new PagedResult<WorkFlowBasicReportListDto>(
+                            new List<WorkFlowBasicReportListDto>(),
+                            total,
+                            q.Page,
+                            q.PageSize
+                        )
+                    );
+                }
+
+                // -------------------------
+                // Sayfadaki RequestNo'lara ait detayları çek
+                // -------------------------
+
+                var servicesRequests = await srQuery
+                    .Where(sr => requestNos.Contains(sr.RequestNo))
+                    .Select(sr => new
+                    {
+                        sr.RequestNo,
+                        sr.CustomerId,
+                        CustomerCode = sr.Customer != null ? sr.Customer.SubscriberCode : null,
+                        CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
+                        CustomerCity = sr.Customer != null ? sr.Customer.City : null,
+                        CustomerDistrict = sr.Customer != null ? sr.Customer.District : null,
+                        sr.ServiceTypeId,
+                        ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                        sr.ServicesDate,
+                        sr.PlannedCompletionDate,
+                        sr.IsProductRequirement,
+                        sr.ServicesCostStatus,
+                        sr.ServicesRequestStatus
+                    })
+                    .ToListAsync();
+
+                var warehouses = await whQuery
+                    .Where(wh => requestNos.Contains(wh.RequestNo))
+                    .Select(wh => new
+                    {
+                        wh.Id,
+                        wh.RequestNo,
+                        wh.WarehouseStatus,
+                        wh.DeliveryDate
+                    })
+                    .ToListAsync();
+
+                var technicalServices = await tsQuery
+                    .Where(ts => requestNos.Contains(ts.RequestNo))
+                    .Select(ts => new
+                    {
+                        ts.Id,
+                        ts.RequestNo,
+                        ts.ServicesStatus,
+                        ts.StartTime,
+                        ts.EndTime
+                    })
+                    .ToListAsync();
+
+                var pricings = await pricingQuery
+                    .Where(pr => requestNos.Contains(pr.RequestNo))
+                    .Select(pr => new
+                    {
+                        pr.RequestNo,
+                        pr.Status,
+                        pr.TotalAmount,
+                        pr.Currency
+                    })
+                    .ToListAsync();
+
+                var finalApprovals = await finalApprovalQuery
+                    .Where(fa => requestNos.Contains(fa.RequestNo))
+                    .Select(fa => new
+                    {
+                        fa.RequestNo,
+                        fa.Status,
+                        fa.DiscountPercent
+                    })
+                    .ToListAsync();
+
+                var workOrderTypes = await _uow.Repository
+                    .GetQueryable<ServicesRequestWorkOrderType>()
+                    .AsNoTracking()
+                    .Where(x => requestNos.Contains(x.ServicesRequest.RequestNo))
+                    .Select(x => new
+                    {
+                        RequestNo = x.ServicesRequest.RequestNo,
+                        x.WorkOrderType.Id,
+                        x.WorkOrderType.Name,
+                        x.WorkOrderType.Code
+                    })
+                    .ToListAsync();
+
+                var wotDict = workOrderTypes
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.Select(w => new WorkOrderTypeLiteDto { Id = w.Id, Name = w.Name, Code = w.Code }).ToList()
+                    );
+
+                var userIds = workflows
+                    .SelectMany(x => new long?[]
+                    {
+                x.CreatedUser,
+                x.ApproverTechnicianId
+                    })
+                    .Where(x => x.HasValue && x.Value > 0)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var users = await userQuery
+                    .Where(u => userIds.Contains(u.Id))
+                    .Select(u => new
+                    {
+                        u.Id,
+                        u.TechnicianName,
+                        u.TechnicianEmail,
+                        u.City,
+                        u.District
+                    })
+                    .ToListAsync();
+
+                // -------------------------
+                // Dictionary hazırlığı
+                // -------------------------
+
+                var srDict = servicesRequests
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var whDict = warehouses
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.OrderByDescending(y => y.Id).First()
+                    );
+
+                var tsDict = technicalServices
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.OrderByDescending(y => y.Id).First()
+                    );
+
+                var pricingDict = pricings
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var finalApprovalDict = finalApprovals
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                var userDict = users
+                    .GroupBy(x => x.Id)
+                    .ToDictionary(x => x.Key, x => x.First());
+
+                // -------------------------
+                // DTO oluştur
+                // -------------------------
+
+                var items = workflows.Select(w =>
+                {
+                    srDict.TryGetValue(w.RequestNo, out var sr);
+                    whDict.TryGetValue(w.RequestNo, out var wh);
+                    tsDict.TryGetValue(w.RequestNo, out var ts);
+                    pricingDict.TryGetValue(w.RequestNo, out var pricing);
+                    finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
+
+                    userDict.TryGetValue(w.CreatedUser, out var createdUser);
+
+                    var technician = w.ApproverTechnicianId.HasValue &&
+                                     userDict.TryGetValue(w.ApproverTechnicianId.Value, out var techUser)
+                        ? techUser
+                        : null;
+
+                    double? durationMinutes = null;
+
+                    if (ts?.StartTime != null && ts?.EndTime != null)
+                    {
+                        durationMinutes = Math.Round(
+                            (ts.EndTime.Value - ts.StartTime.Value).TotalMinutes,
+                            2
+                        );
+                    }
+
+                    return new WorkFlowBasicReportListDto
+                    {
+                        WorkFlowId = w.Id,
+
+                        RequestNo = w.RequestNo,
+                        RequestTitle = w.RequestTitle,
+
+                        CurrentStepId = w.CurrentStepId,
+                        CurrentStepCode = w.CurrentStepCode,
+                        CurrentStepName = w.CurrentStepName,
+
+                        Priority = w.Priority,
+                        WorkFlowStatus = w.WorkFlowStatus,
+
+                        CreatedDate = w.CreatedDate,
+                        UpdatedDate = w.UpdatedDate,
+
+                        CreatedUserId = w.CreatedUser,
+                        CreatedUserName = createdUser?.TechnicianName,
+
+                        ApproverTechnicianId = w.ApproverTechnicianId,
+                        ApproverTechnicianName = technician?.TechnicianName,
+                        ApproverTechnicianEmail = technician?.TechnicianEmail,
+                        TechnicianCity = technician?.City,
+                        TechnicianDistrict = technician?.District,
+
+                        CustomerId = sr?.CustomerId,
+                        CustomerCode = sr?.CustomerCode,
+                        CustomerName = sr?.CustomerName,
+                        CustomerCity = sr?.CustomerCity,
+                        CustomerDistrict = sr?.CustomerDistrict,
+
+                        ServiceTypeId = sr?.ServiceTypeId,
+                        ServiceTypeName = sr?.ServiceTypeName,
+
+                        ServicesDate = sr?.ServicesDate,
+                        PlannedCompletionDate = sr?.PlannedCompletionDate,
+
+                        IsAgreement = w.IsAgreement,
+                        IsLocationValid = w.IsLocationValid,
+                        IsProductRequirement = sr?.IsProductRequirement,
+
+                        ServicesCostStatus = sr?.ServicesCostStatus,
+                        ServicesRequestStatus = sr?.ServicesRequestStatus,
+
+                        WarehouseStatus = wh?.WarehouseStatus,
+                        WarehouseDeliveryDate = wh?.DeliveryDate,
+
+                        TechnicalServiceStatus = ts?.ServicesStatus,
+                        TechnicalStartTime = ts?.StartTime,
+                        TechnicalEndTime = ts?.EndTime,
+                        TechnicalServiceDurationMinutes = durationMinutes,
+
+                        PricingStatus = pricing?.Status,
+                        PricingTotalAmount = pricing?.TotalAmount,
+                        Currency = pricing?.Currency,
+
+                        FinalApprovalStatus = finalApproval?.Status,
+                        DiscountPercent = finalApproval?.DiscountPercent,
+
+                        WorkOrderTypes = wotDict.TryGetValue(w.RequestNo, out var wotList)
+                            ? wotList
+                            : new List<WorkOrderTypeLiteDto>()
+                    };
+                }).ToList();
+
+                return ResponseModel<PagedResult<WorkFlowBasicReportListDto>>.Success(
+                    new PagedResult<WorkFlowBasicReportListDto>(
+                        items,
+                        total,
+                        q.Page,
+                        q.PageSize
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetBasicWorkFlowReportAsync");
+
+                return ResponseModel<PagedResult<WorkFlowBasicReportListDto>>.Fail(
+                    $"Workflow raporu getirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
         //Arşiv 
 
         public async Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter)
@@ -5384,6 +6602,76 @@ namespace Business.Services
             };
         }
 
+        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(  IEnumerable<long>? rawIds)
+        {
+            var ids = rawIds?.ToList() ?? new List<long>();
+
+            if (ids.Any(x => x <= 0))
+            {
+                return (new List<long>(),
+                    "İş emri türü listesinde geçersiz bir ID bulundu.");
+            }
+
+            var distinctIds = ids
+                .Distinct()
+                .ToList();
+
+            if (distinctIds.Count == 0)
+                return (distinctIds, null);
+
+            var existingIds = await _uow.Repository
+                .GetQueryable<WorkOrderType>()
+                .AsNoTracking()
+                .Where(x => distinctIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            var invalidIds = distinctIds
+                .Except(existingIds)
+                .ToList();
+
+            if (invalidIds.Count > 0)
+            {
+                return (new List<long>(),
+                    $"Geçersiz iş emri türü ID'leri: {string.Join(", ", invalidIds)}");
+            }
+
+            return (distinctIds, null);
+        }
+        private void SyncWorkOrderTypes(
+            ServicesRequest request,
+            IReadOnlyCollection<long> workOrderTypeIds)
+        {
+            var requestedIds = workOrderTypeIds.ToHashSet();
+
+            var currentRelations = request.ServicesRequestWorkOrderTypes
+                .ToList();
+
+            // Artık seçili olmayanları kaldır
+            foreach (var relation in currentRelations
+                         .Where(x => !requestedIds.Contains(x.WorkOrderTypeId))
+                         .ToList())
+            {
+                _uow.Repository.HardDelete(relation);
+            }
+
+            var currentIds = currentRelations
+                .Select(x => x.WorkOrderTypeId)
+                .ToHashSet();
+
+            // Yeni seçilenleri ekle
+            foreach (var workOrderTypeId in requestedIds
+                         .Where(x => !currentIds.Contains(x)))
+            {
+                _uow.Repository.Add(new ServicesRequestWorkOrderType
+                {
+                    ServicesRequestId = request.Id,
+                    WorkOrderTypeId = workOrderTypeId
+                });
+            }
+        }
+
+
         /// Servis Ürünleri Fiyat savbitleme
         private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
             string requestNo,
@@ -5435,7 +6723,6 @@ namespace Business.Services
             await _uow.Repository.CompleteAsync();
             return ResponseModel.Success();
         }
-
 
         /// --------------------- Arşivleme  ---------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
@@ -5618,5 +6905,1043 @@ namespace Business.Services
             public decimal Subtotal { get; set; }
             public string Currency { get; set; } = "TRY";
         }
+
+        //Manitou Test Zone ile ilgili işlemler 
+        public async Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                var isManitouTestEnabled = await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.NotFound);
+                }
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Cancelled)
+                    return ResponseModel<WorkingStatusDto>.Fail("İlgili akış iptal edilmiş.", StatusCode.Conflict);
+
+                if (wf.WorkFlowStatus == WorkFlowStatus.Complated)
+                    return ResponseModel<WorkingStatusDto>.Fail("İlgili akış tamamlanmış.", StatusCode.Conflict);
+
+                if (technicalService.ServicesStatus != TechnicalServiceStatus.InProgress)
+                    return ResponseModel<WorkingStatusDto>.Fail("Çalışma başlatmak için teknik servis önce başlatılmalıdır.", StatusCode.Conflict);
+
+                if (!customer.SerialNo.HasValue || customer.SerialNo.Value <= 0)
+                    return ResponseModel<WorkingStatusDto>.Fail("Müşteri için Manitou SerialNo bilgisi bulunamadı.", StatusCode.BadRequest);
+
+                var existingActiveSession = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (existingActiveSession is not null)
+                    return await GetWorkingStatus(dto.RequestNo);
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var serialNo = customer.SerialNo.Value;
+
+                // Aynı müşteri için aktif test var mı?
+                var expiredSessionCheck = await CompleteExpiredCustomerWorkingBeforeNewStartAsync( request.CustomerId, dto.RequestNo, accessToken);
+
+                if (!expiredSessionCheck.CanStart)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        expiredSessionCheck.Message!,
+                        expiredSessionCheck.StatusCode);
+                }
+
+                var nowUtc = DateTimeOffset.UtcNow;
+                var plannedEndUtc = nowUtc.AddHours(1);
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                        me?.TechnicianName ??
+                        me?.Name ??
+                        me?.Email ??
+                        "Bilinmeyen Teknisyen";
+
+                var startDescription = BuildManitouTestDescription(
+                    dto.RequestNo,
+                    technicianName,
+                    "başlatıldı");
+
+                await _manitouApiService.BeginSystemTestAsync(accessToken, serialNo);
+
+                await _manitouApiService.SetCustomerOnTestAsync(
+                    accessToken,
+                    new ManitouOnTestRequest
+                    {
+                        SerialNo = serialNo,
+                        Description = startDescription,
+                        UtcFrom = ToManitouUtcText(nowUtc),
+                        UtcTo = ToManitouUtcText(plannedEndUtc),
+                        IsNew = true
+                    });
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(accessToken, serialNo);
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(accessToken, serialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(outOfServiceRecords, serialNo, dto.RequestNo);
+
+                var session = new TechnicalServiceWorkSession
+                {
+                    RequestNo = dto.RequestNo,
+                    WorkFlowId = wf.Id,
+                    TechnicalServiceId = technicalService.Id,
+                    CustomerId = request.CustomerId,
+                    SerialNo = serialNo,
+                    StartedAtUtc = nowUtc,
+                    PlannedEndAtUtc = plannedEndUtc,
+                    IsActive = true,
+                    IsCompleted = false,
+                    ExtendCount = 0,
+                    ManitouLogSequence = relatedOutOfServiceRecord?.LogSequence,
+                    CreatedDate = DateTime.Now,
+                    CreatedUser = meId,
+                    IsDeleted = false
+                };
+
+                _uow.Repository.Add(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceStarted,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma/test başlatıldı",
+                    new
+                    {
+                        SerialNo = serialNo,
+                        StartedAtUtc = nowUtc,
+                        PlannedEndAtUtc = plannedEndUtc,
+                        ZoneCount = zones.Count
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetWorkingStatus(dto.RequestNo);
+            }
+            catch (ManitouApiException ex)
+            {
+                _logger.LogError(ex, "StartWorking Manitou hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Manitou çalışma başlatma sırasında hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "StartWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma başlatılırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<FinishWorkingResultDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(
+                    accessToken,
+                    session.SerialNo);
+
+                var receivedZones = GetReceivedZones(zones);
+                var missingZones = GetMissingZones(zones);
+
+                if (missingZones.Count > 0 && !dto.ForceFinish)
+                {
+                    return ResponseModel<FinishWorkingResultDto>.Success(
+                        new FinishWorkingResultDto
+                        {
+                            RequestNo = dto.RequestNo,
+                            SerialNo = session.SerialNo,
+                            IsFinished = false,
+                            NeedConfirmation = true,
+                            Message = "Uyarı, bütün bölgelerden alarm göndermediniz. Yine de çalışmayı bitirmek istiyor musunuz?",
+                            ReceivedZones = receivedZones,
+                            MissingZones = missingZones
+                        },
+                        "Eksik alarm bölgesi var. Kullanıcı onayı gerekiyor.",
+                        StatusCode.Ok);
+                }
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                        accessToken,
+                        session.SerialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                    outOfServiceRecords,
+                    session.SerialNo,
+                    dto.RequestNo);
+
+                var logSequence = relatedOutOfServiceRecord?.LogSequence
+                                  ?? session.ManitouLogSequence
+                                  ?? 0;
+
+                if (logSequence <= 0)
+                {
+                    return ResponseModel<FinishWorkingResultDto>.Fail(
+                        "Manitou çalışma kaydı logSequence bilgisi bulunamadı. Test kapatılamadı.",
+                        StatusCode.Error);
+                }
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                      me?.TechnicianName ??
+                      me?.Name ??
+                      me?.Email ??
+                      "Bilinmeyen Teknisyen";
+
+                var finishDescription = BuildManitouTestDescription(
+                       dto.RequestNo,
+                       technicianName,
+                       "bitirildi");
+                await _manitouApiService.SetCustomerOffTestAsync(
+                    accessToken,
+                    new ManitouOffTestRequest
+                    {
+                        SerialNo = session.SerialNo,
+                        LogSequence = logSequence,
+                        Description = finishDescription,
+                        IsNew = false,
+                        UtcFrom = ToManitouUtcText(session.StartedAtUtc),
+                        UtcTo = ToManitouUtcText(nowUtc)
+                    });
+
+                if (missingZones.Count > 0)
+                {
+                    await SendMissingZoneWarningMailAsync(
+                        technicianName,
+                        customer.SubscriberCompany ?? customer.ContactName1 ?? "-",
+                        dto.RequestNo,
+                        receivedZones,
+                        missingZones);
+                }
+
+
+                session.IsActive = false;
+                session.IsCompleted = true;
+                session.FinishedAtUtc = nowUtc;
+                session.ManitouLogSequence = logSequence;
+                session.HasMissingZoneOnFinish = missingZones.Count > 0;
+                session.ReceivedZonesText = string.Join(",", receivedZones);
+                session.MissingZonesText = string.Join(",", missingZones);
+                session.FinishDescription = missingZones.Count > 0
+                    ? "Eksik zone ile kullanıcı onayı sonrası çalışma bitirildi."
+                    : "Tüm zonlardan alarm alındı. Çalışma bitirildi.";
+                session.UpdatedDate = DateTime.Now;
+                session.UpdatedUser = meId;
+
+                _uow.Repository.Update(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceFinished,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma/test bitirildi",
+                    new
+                    {
+                        SerialNo = session.SerialNo,
+                        ReceivedZones = receivedZones,
+                        MissingZones = missingZones,
+                        ForceFinish = dto.ForceFinish,
+                        FinishedAtUtc = nowUtc
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel<FinishWorkingResultDto>.Success(
+                    new FinishWorkingResultDto
+                    {
+                        RequestNo = dto.RequestNo,
+                        SerialNo = session.SerialNo,
+                        IsFinished = true,
+                        NeedConfirmation = false,
+                        Message = "Çalışma başarıyla bitirildi. Müşteri test modundan çıkarıldı.",
+                        ReceivedZones = receivedZones,
+                        MissingZones = missingZones
+                    },
+                    "Çalışma başarıyla bitirildi.",
+                    StatusCode.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FinishWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<FinishWorkingResultDto>.Fail(
+                    $"Çalışma bitirilirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        private async Task<(WorkFlow wf, ServicesRequest request, Customer customer, TechnicalService technicalService)?> GetTechnicalServiceContextAsync(string requestNo)
+        {
+            var wf = await _uow.Repository
+                .GetQueryable<WorkFlow>()
+                .Include(x => x.ApproverTechnician)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (wf is null)
+                return null;
+
+            var request = await _uow.Repository
+                .GetQueryable<ServicesRequest>()
+                .Include(x => x.Customer)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (request is null || request.Customer is null)
+                return null;
+
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted);
+
+            if (technicalService is null)
+                return null;
+
+            return (wf, request, request.Customer, technicalService);
+        }
+        private static string ToManitouUtcText(DateTimeOffset value)
+        {
+            return value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+        private static List<string> GetReceivedZones(List<ManitouSystemTestZoneResult> zones)
+        {
+            return zones
+                .Where(x => x.TestSignalCount > 0)
+                .Select(x => string.IsNullOrWhiteSpace(x.ZoneId) ? "-" : x.ZoneId!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+        private static List<string> GetMissingZones(List<ManitouSystemTestZoneResult> zones)
+        {
+            return zones
+                .Where(x => x.TestSignalCount <= 0)
+                .Select(x => string.IsNullOrWhiteSpace(x.ZoneId) ? "-" : x.ZoneId!)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+        public async Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                var context = await GetTechnicalServiceContextAsync(requestNo);
+
+                if (context is null)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.",
+                        StatusCode.BadRequest);
+                }
+
+                var (_, _, customer, _) = context.Value;
+
+                var isManitouTestEnabled =
+                    await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.BadRequest);
+                }
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .AsNoTracking()
+                    .OrderByDescending(x => x.Id)
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == requestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var zones = await _manitouApiService.QuerySystemTestAsync(
+                    accessToken,
+                    session.SerialNo);
+
+                var activity = await _manitouApiService.GetCustomerActivityAsync(
+                    accessToken,
+                    session.SerialNo,
+                    days: 1);
+
+                var receivedZones = GetReceivedZones(zones);
+                var missingZones = GetMissingZones(zones);
+
+                var remainingSeconds = Convert.ToInt64(
+                    Math.Max(0, (session.PlannedEndAtUtc - DateTimeOffset.UtcNow).TotalSeconds));
+
+                var result = new WorkingStatusDto
+                {
+                    RequestId = session.WorkFlowId,
+                    RequestNo = session.RequestNo,
+                    SerialNo = session.SerialNo,
+                    IsActive = session.IsActive,
+                    IsCompleted = session.IsCompleted,
+                    StartedAtUtc = session.StartedAtUtc,
+                    PlannedEndAtUtc = session.PlannedEndAtUtc,
+                    RemainingSeconds = remainingSeconds,
+                    ExtendCount = session.ExtendCount,
+                    Zones = zones,
+                    Activity = activity,
+                    ReceivedZones = receivedZones,
+                    MissingZones = missingZones
+                };
+
+                return ResponseModel<WorkingStatusDto>.Success(
+                    result,
+                    "Çalışma durumu getirildi.",
+                    StatusCode.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetWorkingStatus hatası. RequestNo={RequestNo}", requestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma durumu alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto)
+        {
+            try
+            {
+                if (dto is null || string.IsNullOrWhiteSpace(dto.RequestNo))
+                    return ResponseModel<WorkingStatusDto>.Fail("Talep numarası zorunludur.", StatusCode.BadRequest);
+
+                if (dto.ExtendMinutes <= 0)
+                    dto.ExtendMinutes = 30;
+
+                var session = await _uow.Repository
+                    .GetQueryable<TechnicalServiceWorkSession>()
+                    .FirstOrDefaultAsync(x =>
+                        x.RequestNo == dto.RequestNo &&
+                        x.IsActive &&
+                        !x.IsCompleted &&
+                        !x.IsDeleted);
+
+                if (session is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Aktif çalışma kaydı bulunamadı.", StatusCode.NotFound);
+
+                var context = await GetTechnicalServiceContextAsync(dto.RequestNo);
+
+                if (context is null)
+                    return ResponseModel<WorkingStatusDto>.Fail("Akış / servis talebi / müşteri / teknik servis bilgisi bulunamadı.", StatusCode.NotFound);
+
+                var (wf, request, customer, technicalService) = context.Value;
+
+                var isManitouTestEnabled = await IsManitouTechnicalServiceTestEnabledAsync(customer.TenantId);
+
+                if (!isManitouTestEnabled)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou test alma özelliği bu tenant için aktif değildir.",
+                        StatusCode.NotFound);
+                }
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return ResponseModel<WorkingStatusDto>.Fail("Manitou oturum anahtarı alınamadı.", StatusCode.Error);
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                // Süre henüz bitmediyse uzatma yapılmasın.
+                // Frontend butonu zaten bu durumda pasif göstermeli.
+                if (session.PlannedEndAtUtc > nowUtc)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Çalışma süresi henüz dolmadı. Süre dolduktan sonra uzatma yapılabilir.",
+                        StatusCode.Conflict);
+                }
+
+                if (dto.ExtendMinutes <= 0)
+                    dto.ExtendMinutes = 30;
+
+                // Manitou tek işlemde en fazla 1 saat kabul ediyor.
+                if (dto.ExtendMinutes > 60)
+                {
+                    return ResponseModel<WorkingStatusDto>.Fail(
+                        "Manitou üzerinde çalışma süresi tek işlemde en fazla 60 dakika uzatılabilir.",
+                        StatusCode.BadRequest);
+                }
+
+                // Yeni çalışma periyodu şu andan itibaren başlar.
+                var newStartUtc = nowUtc;
+                var newEndUtc = newStartUtc.AddMinutes(dto.ExtendMinutes);
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+                var technicianName =
+                      me?.TechnicianName ??
+                      me?.Name ??
+                      me?.Email ??
+                      "Bilinmeyen Teknisyen";
+
+
+
+                var extendDescription = BuildManitouTestDescription(
+                dto.RequestNo,
+                technicianName,
+                "uzatıldı");
+
+                await _manitouApiService.SetCustomerOnTestAsync(
+                    accessToken,
+                    new ManitouOnTestRequest
+                    {
+                        SerialNo = session.SerialNo,
+                        Description = extendDescription,
+                        UtcFrom = ToManitouUtcText(newStartUtc),
+                        UtcTo = ToManitouUtcText(newEndUtc),
+                        IsNew = false
+                    });
+
+                var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                        accessToken,
+                        session.SerialNo);
+
+                var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                    outOfServiceRecords,
+                    session.SerialNo,
+                    dto.RequestNo);
+
+                if (relatedOutOfServiceRecord is not null)
+                {
+                    session.ManitouLogSequence = relatedOutOfServiceRecord.LogSequence;
+                }
+
+                session.PlannedEndAtUtc = newEndUtc;
+                session.ExtendCount += 1;
+                session.UpdatedDate = DateTime.Now;
+                session.UpdatedUser = meId;
+
+                _uow.Repository.Update(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceStarted,
+                    dto.RequestNo,
+                    wf.Id,
+                    request.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma süresi uzatıldı",
+                    new
+                    {
+                        SerialNo = session.SerialNo,
+                        ExtendMinutes = dto.ExtendMinutes,
+                        NewEndUtc = newEndUtc
+                    });
+
+                await _uow.Repository.CompleteAsync();
+
+                return await GetWorkingStatus(dto.RequestNo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExtendWorking hatası. RequestNo={RequestNo}", dto?.RequestNo);
+
+                return ResponseModel<WorkingStatusDto>.Fail(
+                    $"Çalışma uzatılırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        private async Task SendMissingZoneWarningMailAsync(string technicianName, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
+        {
+            var me = await _currentUser.GetAsync();
+
+            // Listelerin null olma ihtimalini ve dolu olup olmadığını kontrol ediyoruz.
+            bool hasReceived = receivedZones?.Count > 0;
+            bool hasMissing = missingZones?.Count > 0;
+
+            string receivedText = hasReceived ? string.Join(", ", receivedZones) : string.Empty;
+            string missingText = hasMissing ? string.Join(", ", missingZones) : string.Empty;
+
+            string messageDetail;
+
+            // Senaryolara göre cümlenin aksiyon bildiren kısmını oluşturuyoruz.
+            if (hasReceived && hasMissing)
+            {
+                // 1. Senaryo: Hem alınan hem de eksik bölgeler var.
+                messageDetail = $"{receivedText} bölgelerinden alarm aldı fakat {missingText} bölgelerinden alarm almadı.";
+            }
+            else if (!hasReceived && hasMissing)
+            {
+                // 2. Senaryo: Hiç alarm alınmadı ama eksik/beklenen bölgeler var. (Senin bahsettiğin senaryo)
+                messageDetail = $"hiçbir bölgeden alarm almadı. {missingText} bölgelerinden alarm bekleniyor.";
+            }
+            else if (hasReceived && !hasMissing)
+            {
+                // 3. Senaryo: Alarmlar geldi, eksik bölge yok.
+                messageDetail = $"{receivedText} bölgelerinden alarm aldı. Eksik veya beklenen alarm bölgesi bulunmamaktadır.";
+            }
+            else
+            {
+                // 4. Senaryo: İki liste de boş.
+                messageDetail = $"hiçbir bölgeden alarm almadı. Sistemde beklenen eksik alarm bölgesi de bulunmamaktadır.";
+            }
+
+            var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
+
+            // Ana gövde ile dinamik oluşturduğumuz detayı birleştiriyoruz.
+            var body = $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
+
+            var managerMails = new List<string>();
+            var managerMailConfig = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Name == "TechnicalServiceManagerEmails");
+
+            if (managerMailConfig is not null && !string.IsNullOrWhiteSpace(managerMailConfig.Value))
+            {
+                managerMails = managerMailConfig.Value
+                    .Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            if (managerMails.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Eksik zone uyarı maili gönderilemedi. TechnicalServiceManagerEmails tanımlı değil. RequestNo={RequestNo}",
+                    requestNo);
+
+                return;
+            }
+
+            await _mailPush.EnqueueAsync(new MailOutbox
+            {
+                RequestNo = requestNo,
+                FromStepCode = "TS",
+                ToStepCode = "TS",
+                ToRecipients = string.Join(";", managerMails),
+                Subject = subject,
+                BodyHtml = body,
+                CreatedUser = me?.Id
+            });
+        }
+        private static string BuildManitouTestDescription(string requestNo,string technicianName,string action)
+        {
+            return
+                $"FlowAssist Teknik Servis Testi [FA:{requestNo}] - " +
+                $"{technicianName} tarafından {action}.";
+        }
+        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records,int serialNo,string requestNo)
+        {
+            var requestMarker = $"[FA:{requestNo}]";
+
+            var customerRecords = records
+                .Where(x => x.SerialNo == serialNo)
+                .Where(x => x.AdvancedOnTest)
+                .Where(x => x.LogSequence > 0)
+                .ToList();
+
+            if (customerRecords.Count == 0)
+                return null;
+
+            // Sadece bu FlowAssist talebine ait kaydı bul.
+            return customerRecords
+                .Where(x => !string.IsNullOrWhiteSpace(x.Description))
+                .Where(x => x.Description!.Contains(
+                    requestMarker,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.UtcTo ?? DateTime.MinValue)
+                .ThenByDescending(x => x.LogSequence)
+                .FirstOrDefault();
+        }
+        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId,string newRequestNo,string accessToken)
+        {
+            var nowUtc = DateTimeOffset.UtcNow;
+
+            // Aynı müşterinin başka bir talebindeki aktif çalışma kaydını bul.
+            var activeCustomerSession = await _uow.Repository
+                .GetQueryable<TechnicalServiceWorkSession>()
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync(x =>
+                    x.CustomerId == customerId &&
+                    x.IsActive &&
+                    !x.IsCompleted &&
+                    !x.IsDeleted);
+
+            // Aktif kayıt yoksa yeni çalışma serbest.
+            if (activeCustomerSession is null)
+                return (true, StatusCode.Ok, null);
+
+            // Aynı talebin aktif kaydı varsa StartWorking zaten yukarıda GetWorkingStatus dönecek.
+            if (string.Equals(
+                    activeCustomerSession.RequestNo,
+                    newRequestNo,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return (true, StatusCode.Ok, null);
+            }
+
+            // Süresi devam eden başka bir test varsa yeni test başlatılamaz.
+            if (activeCustomerSession.PlannedEndAtUtc > nowUtc)
+            {
+                return (
+                    false,
+                    StatusCode.Conflict,
+                    $"Bu müşteri için '{activeCustomerSession.RequestNo}' numaralı talepte aktif bir çalışma bulunmaktadır. " +
+                    $"Planlanan bitiş zamanı: {activeCustomerSession.PlannedEndAtUtc:dd.MM.yyyy HH:mm}.");
+            }
+
+            // Buraya geldiyse başka talepteki çalışma aktif görünmekte,
+            // ancak planlanan süresi dolmuş.
+            var zones = await _manitouApiService.QuerySystemTestAsync(
+                accessToken,
+                activeCustomerSession.SerialNo);
+
+            var receivedZones = GetReceivedZones(zones);
+            var missingZones = GetMissingZones(zones);
+
+            var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                accessToken,
+                activeCustomerSession.SerialNo);
+
+            var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                outOfServiceRecords,
+                activeCustomerSession.SerialNo,
+                activeCustomerSession.RequestNo);
+
+            var logSequence = relatedOutOfServiceRecord?.LogSequence
+                              ?? activeCustomerSession.ManitouLogSequence
+                              ?? 0;
+
+            if (logSequence <= 0)
+            {
+                return (
+                    false,
+                    StatusCode.Error,
+                    $"'{activeCustomerSession.RequestNo}' numaralı süresi dolmuş çalışma için " +
+                    "Manitou logSequence bilgisi bulunamadı. Yeni çalışma başlatılamadı.");
+            }
+
+            var me = await _currentUser.GetAsync();
+            var meId = me?.Id ?? 0;
+
+            var technicianName =
+                me?.TechnicianName ??
+                me?.Name ??
+                me?.Email ??
+                "Bilinmeyen Teknisyen";
+
+            var autoFinishDescription = BuildManitouTestDescription(
+                activeCustomerSession.RequestNo,
+                technicianName,
+                $"planlanan süresi dolduğu için '{newRequestNo}' talebi başlatılmadan önce otomatik bitirildi");
+
+            // Önce Manitou tarafında test modundan çıkar.
+            await _manitouApiService.SetCustomerOffTestAsync(
+                accessToken,
+                new ManitouOffTestRequest
+                {
+                    SerialNo = activeCustomerSession.SerialNo,
+                    LogSequence = logSequence,
+                    Description = autoFinishDescription,
+                    IsNew = false,
+                    UtcFrom = ToManitouUtcText(activeCustomerSession.StartedAtUtc),
+                    UtcTo = ToManitouUtcText(nowUtc)
+                });
+
+            // Eski oturumu DB tarafında kapat.
+            activeCustomerSession.IsActive = false;
+            activeCustomerSession.IsCompleted = true;
+            activeCustomerSession.FinishedAtUtc = nowUtc;
+            activeCustomerSession.ManitouLogSequence = logSequence;
+            activeCustomerSession.HasMissingZoneOnFinish = missingZones.Count > 0;
+            activeCustomerSession.ReceivedZonesText = string.Join(",", receivedZones);
+            activeCustomerSession.MissingZonesText = string.Join(",", missingZones);
+            activeCustomerSession.FinishDescription =
+                $"Planlanan çalışma süresi dolduğu için '{newRequestNo}' talebi başlatılmadan önce otomatik bitirildi.";
+            activeCustomerSession.UpdatedDate = DateTime.Now;
+            activeCustomerSession.UpdatedUser = meId;
+
+            _uow.Repository.Update(activeCustomerSession);
+
+            await _activationRecord.LogAsync(
+                WorkFlowActionType.TechnicalServiceFinished,
+                activeCustomerSession.RequestNo,
+                activeCustomerSession.WorkFlowId,
+                activeCustomerSession.CustomerId,
+                "TS",
+                "TS",
+                "Manitou çalışma/test süresi dolduğu için otomatik bitirildi",
+                new
+                {
+                    SerialNo = activeCustomerSession.SerialNo,
+                    StartedAtUtc = activeCustomerSession.StartedAtUtc,
+                    PlannedEndAtUtc = activeCustomerSession.PlannedEndAtUtc,
+                    AutoFinishedAtUtc = nowUtc,
+                    NewRequestNo = newRequestNo,
+                    ReceivedZones = receivedZones,
+                    MissingZones = missingZones
+                });
+
+            // Eski kaydın gerçekten kapanmış olması önemli.
+            // Yeni StartWorking kaydı açılmadan önce DB'ye yazıyoruz.
+            await _uow.Repository.CompleteAsync();
+
+            return (true, StatusCode.Ok, null);
+        }
+        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo,string reason)
+        {
+            var activeSession = await _uow.Repository
+                .GetQueryable<TechnicalServiceWorkSession>()
+                .FirstOrDefaultAsync(x =>
+                    x.RequestNo == requestNo &&
+                    x.IsActive &&
+                    !x.IsCompleted &&
+                    !x.IsDeleted);
+
+            // Aktif çalışma yoksa normal şekilde devam edilebilir.
+            if (activeSession is null)
+                return (true, null);
+
+            return await CloseActiveWorkingSessionAsync(activeSession, reason);
+        }
+        private async Task<(bool Success, string? ErrorMessage)> CloseActiveWorkingSessionAsync(TechnicalServiceWorkSession session,string reason)
+        {
+            try
+            {
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                var technicianName =
+                    me?.TechnicianName ??
+                    me?.Name ??
+                    me?.Email ??
+                    "Bilinmeyen Teknisyen";
+
+                var accessToken = await _manitouApiService.LoginAsync();
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                {
+                    return (
+                        false,
+                        $"'{session.RequestNo}' numaralı çalışmanın kapatılması için Manitou oturum anahtarı alınamadı.");
+                }
+                List<ManitouSystemTestZoneResult> zones = new();
+                var zoneInfoAvailable = true;
+
+                try
+                {
+                    zones = await _manitouApiService.QuerySystemTestAsync(
+                        accessToken,
+                        session.SerialNo);
+                }
+                catch (Exception ex)
+                {
+                    zoneInfoAvailable = false;
+
+                    _logger.LogWarning(
+                        ex,
+                        "Zorunlu çalışma kapatma sırasında zone bilgisi alınamadı. RequestNo={RequestNo}, SerialNo={SerialNo}",
+                        session.RequestNo,
+                        session.SerialNo);
+                }
+
+                var receivedZones = zoneInfoAvailable
+                    ? GetReceivedZones(zones)
+                    : new List<string>();
+
+                var missingZones = zoneInfoAvailable
+                    ? GetMissingZones(zones)
+                    : new List<string>();
+
+
+                if (string.IsNullOrWhiteSpace(accessToken))
+                {
+                    return (
+                        false,
+                        $"'{session.RequestNo}' numaralı çalışmanın kapatılması için Manitou oturum anahtarı alınamadı.");
+                }
+
+                // Önce session'da saklanan logSequence kullanılır.
+                // Yoksa Manitou OutOfService listesinden bulunmaya çalışılır.
+                var logSequence = session.ManitouLogSequence ?? 0;
+
+                if (logSequence <= 0)
+                {
+                    var outOfServiceRecords = await _manitouApiService.GetOutOfServiceAsync(
+                        accessToken,
+                        session.SerialNo);
+
+                    var relatedOutOfServiceRecord = GetRelatedOutOfServiceRecord(
+                        outOfServiceRecords,
+                        session.SerialNo,
+                        session.RequestNo);
+
+                    logSequence = relatedOutOfServiceRecord?.LogSequence ?? 0;
+                }
+
+                if (logSequence <= 0)
+                {
+                    return (
+                        false,
+                        $"'{session.RequestNo}' numaralı aktif çalışma için Manitou logSequence bilgisi bulunamadı. " +
+                        "Çalışma kapatılamadığı için işleme devam edilmedi.");
+                }
+
+                var finishDescription = BuildManitouTestDescription(
+                    session.RequestNo,
+                    technicianName,
+                    reason);
+
+                await _manitouApiService.SetCustomerOffTestAsync(
+                    accessToken,
+                    new ManitouOffTestRequest
+                    {
+                        SerialNo = session.SerialNo,
+                        LogSequence = logSequence,
+                        Description = finishDescription,
+                        IsNew = false,
+                        UtcFrom = ToManitouUtcText(session.StartedAtUtc),
+                        UtcTo = ToManitouUtcText(nowUtc)
+                    });
+
+                session.IsActive = false;
+                session.IsCompleted = true;
+                session.FinishedAtUtc = nowUtc;
+                session.ManitouLogSequence = logSequence;
+                session.HasMissingZoneOnFinish = zoneInfoAvailable && missingZones.Count > 0;
+                session.ReceivedZonesText = zoneInfoAvailable
+                    ? string.Join(",", receivedZones)
+                    : null;
+                session.MissingZonesText = zoneInfoAvailable
+                    ? string.Join(",", missingZones)
+                    : null;
+                session.FinishDescription = zoneInfoAvailable
+                    ? reason
+                    : $"{reason} Zone bilgisi Manitou'dan alınamadı.";
+                session.UpdatedDate = DateTime.Now;
+                session.UpdatedUser = meId;
+
+                _uow.Repository.Update(session);
+
+                await _activationRecord.LogAsync(
+                    WorkFlowActionType.TechnicalServiceFinished,
+                    session.RequestNo,
+                    session.WorkFlowId,
+                    session.CustomerId,
+                    "TS",
+                    "TS",
+                    "Manitou çalışma/test zorunlu olarak bitirildi",
+                    new
+                    {
+                        session.SerialNo,
+                        session.StartedAtUtc,
+                        session.PlannedEndAtUtc,
+                        FinishedAtUtc = nowUtc,
+                        Reason = reason,
+                        ZoneInfoAvailable = zoneInfoAvailable,
+                        ReceivedZones = receivedZones,
+                        MissingZones = missingZones
+                    });
+
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Aktif çalışma zorunlu kapatma hatası. RequestNo={RequestNo}, SerialNo={SerialNo}",
+                    session.RequestNo,
+                    session.SerialNo);
+
+                return (
+                    false,
+                    $"'{session.RequestNo}' numaralı aktif çalışma kapatılırken hata oluştu: {ex.Message}");
+            }
+        }
+        private async Task<bool> IsManitouTechnicalServiceTestEnabledAsync( long? tenantId, CancellationToken cancellationToken = default)
+        {
+            if (!tenantId.HasValue || tenantId.Value <= 0)
+                return false;
+
+            return await _uow.Repository
+                .GetQueryable<Tenant>()
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id == tenantId.Value &&
+                    x.Code ==CommonConstants.ManitouTestTenantCodeMGS &&
+                    x.IsTechnicalServiceTestEnabled,
+                    cancellationToken);
+        }
+
     }
 }

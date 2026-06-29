@@ -109,6 +109,14 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public string? ServiceTypeName { get; set; }
         public string Priority { get; set; } = "Normal";
         public string ServicesRequestStatus { get; set; } = string.Empty;
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
+    }
+
+    public class WorkOrderTypeLiteDto
+    {
+        public long Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
     }
 
     public class TechnicalServiceSectionDto
