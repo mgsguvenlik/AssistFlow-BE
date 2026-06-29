@@ -2,6 +2,8 @@
 using Business.Services.Base;
 using Business.UnitOfWork;
 using Core.Common;
+using Core.Enums;
+using Core.Utilities.Constants;
 using Mapster;
 using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
@@ -156,6 +158,168 @@ namespace Business.Services
         }
 
 
+        public override async Task<ResponseModel<PagedResult<CustomerGetDto>>> GetPagedAsync(QueryParams q)
+        {
+            try
+            {
+                q ??= new QueryParams();
+
+                var page = q.Page < 1 ? 1 : q.Page;
+                var pageSize = q.PageSize < 1 ? 20 : q.PageSize;
+
+                var query = _unitOfWork.Repository
+                            .GetQueryable<Customer>()
+                            .Include(c => c.CustomerType)
+                            .Include(c => c.CustomerGroup)
+                            .Include(c => c.Tenant)
+                            .Include(c => c.CustomerSystemAssignments)
+                                .ThenInclude(a => a.CustomerSystem)
+                            .AsQueryable();
+
+                // Tenant filtresi BİLEREK uygulanmıyor.
+                // ApplyTenantFilterIfNeeded(query) çağrısı yok.
+
+                // Soft-delete kayıtları gösterme
+                query = query.Where(c => !c.IsDeleted);
+
+                // Arama
+                if (!string.IsNullOrWhiteSpace(q.Search))
+                {
+                    var searchText = q.Search.Trim();
+                    var searchTerm = searchText.ToLower();
+
+                    var isNumericSearch = int.TryParse(searchText, out var numericValue);
+
+                    query = query.Where(c =>
+                        // Müşteri temel bilgileri
+                        (c.SubscriberCode != null &&
+                            c.SubscriberCode.ToLower().Contains(searchTerm)) ||
+
+                        (c.SubscriberCompany != null &&
+                            c.SubscriberCompany.ToLower().Contains(searchTerm)) ||
+
+                        (c.SubscriberAddress != null &&
+                            c.SubscriberAddress.ToLower().Contains(searchTerm)) ||
+
+                        (c.City != null &&
+                            c.City.ToLower().Contains(searchTerm)) ||
+
+                        (c.District != null &&
+                            c.District.ToLower().Contains(searchTerm)) ||
+
+                        (c.LocationCode != null &&
+                            c.LocationCode.ToLower().Contains(searchTerm)) ||
+
+                        (c.CustomerShortCode != null &&
+                            c.CustomerShortCode.ToLower().Contains(searchTerm)) ||
+
+                        (c.CorporateLocationId != null &&
+                            c.CorporateLocationId.ToLower().Contains(searchTerm)) ||
+
+                        // İletişim bilgileri
+                        (c.ContactName1 != null &&
+                            c.ContactName1.ToLower().Contains(searchTerm)) ||
+
+                        (c.ContactName2 != null &&
+                            c.ContactName2.ToLower().Contains(searchTerm)) ||
+
+                        (c.Phone1 != null &&
+                            c.Phone1.Contains(searchText)) ||
+
+                        (c.Phone2 != null &&
+                            c.Phone2.Contains(searchText)) ||
+
+                        (c.Email1 != null &&
+                            c.Email1.ToLower().Contains(searchTerm)) ||
+
+                        (c.Email2 != null &&
+                            c.Email2.ToLower().Contains(searchTerm)) ||
+
+                        // Yeni müşteri alanları
+                        (c.LockType != null &&
+                            c.LockType.ToLower().Contains(searchTerm)) ||
+
+                        (c.CashCenter != null &&
+                            c.CashCenter.ToLower().Contains(searchTerm)) ||
+
+                        (c.Note != null &&
+                            c.Note.ToLower().Contains(searchTerm)) ||
+
+                        // Tenant bilgileri
+                        (c.Tenant != null &&
+                            c.Tenant.Code != null &&
+                            c.Tenant.Code.ToLower().Contains(searchTerm)) ||
+
+                        (c.Tenant != null &&
+                            c.Tenant.Name != null &&
+                            c.Tenant.Name.ToLower().Contains(searchTerm)) ||
+
+                        // Sayısal alanlar: örn. SerialNo veya MonitoringStatus
+                        (isNumericSearch &&
+                            (c.SerialNo == numericValue ||
+                             c.MonitoringStatus == numericValue))
+                    );
+                }
+
+                // Sıralama
+                var sort = q.Sort?.Trim().ToLowerInvariant();
+
+                query = sort switch
+                {
+                    "name" or "subscribercompany" =>
+                        q.Desc
+                            ? query.OrderByDescending(c => c.SubscriberCompany)
+                            : query.OrderBy(c => c.SubscriberCompany),
+
+                    "code" or "subscribercode" =>
+                        q.Desc
+                            ? query.OrderByDescending(c => c.SubscriberCode)
+                            : query.OrderBy(c => c.SubscriberCode),
+
+                    "city" =>
+                        q.Desc
+                            ? query.OrderByDescending(c => c.City)
+                            : query.OrderBy(c => c.City),
+
+                    "createddate" =>
+                        q.Desc
+                            ? query.OrderByDescending(c => c.CreatedDate)
+                            : query.OrderBy(c => c.CreatedDate),
+
+                    "id" =>
+                        q.Desc
+                            ? query.OrderByDescending(c => c.Id)
+                            : query.OrderBy(c => c.Id),
+
+                    _ => query.OrderByDescending(c => c.Id)
+                };
+
+                var total = await query.CountAsync();
+
+                var items = await query
+                    .AsNoTracking()
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ProjectToType<CustomerGetDto>(_config)
+                    .ToListAsync();
+
+                return ResponseModel<PagedResult<CustomerGetDto>>.Success(
+                    new PagedResult<CustomerGetDto>(
+                        items,
+                        total,
+                        page,
+                        pageSize
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                return ResponseModel<PagedResult<CustomerGetDto>>.Fail(
+                    $"{Messages.UnexpectedError}: {ex.Message}",
+                    StatusCode.Error
+                );
+            }
+        }
         public async Task<ResponseModel<int>> ImportFromFileAsync(string filePath)
         {
             var response = new ResponseModel<int>();

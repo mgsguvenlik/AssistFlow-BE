@@ -8,6 +8,7 @@ namespace Model.Dtos.User
         public long? TenantId { get; set; }
         public string? TenantCode { get; set; }
         public string? TenantName { get; set; }
+        public bool IsTechnicalServiceTestEnabled { get; set; } 
         public string TechnicianCode { get; set; } = string.Empty;
         public string? TechnicianCompany { get; set; }
         public string? TechnicianAddress { get; set; }

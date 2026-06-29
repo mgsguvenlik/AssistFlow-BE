@@ -18,6 +18,7 @@ namespace Model.Concrete
         public string? LogoUrl { get; set; }
          
         public bool IsActive { get; set; } = true;
+        public bool IsTechnicalServiceTestEnabled { get; set; } = false;
 
         // Navi. props
         public ICollection<Customer> Customers { get; set; } = new List<Customer>();

@@ -1,6 +1,9 @@
-﻿namespace Business.Interfaces
+﻿using Model.Dtos.CustomerSystem;
+using Model.Dtos.Tenant;
+
+namespace Business.Interfaces
 {
-    public interface ITenantService
+    public interface ITenantService : ICrudService<TenantCreateDto, TenantUpdateDto, TenantGetDto, long>
     {
     }
 }

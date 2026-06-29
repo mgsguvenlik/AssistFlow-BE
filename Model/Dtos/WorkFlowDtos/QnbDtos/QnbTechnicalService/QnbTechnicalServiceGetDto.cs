@@ -4,6 +4,7 @@ using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
 {
@@ -12,6 +13,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
         public long Id { get; set; }
         public string RequestNo { get; set; } = string.Empty;
 
+        public string ServiceTitle { get; set; } = string.Empty;
+        public string ServiceDescription { get; set; } = string.Empty;
         public long? ServiceTypeId { get; set; }
         public string? ServiceTypeName { get; set; }
 
@@ -35,5 +38,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
 
         public List<QnbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
     }
 }

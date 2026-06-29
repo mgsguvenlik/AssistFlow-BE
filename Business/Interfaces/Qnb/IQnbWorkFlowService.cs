@@ -1,5 +1,6 @@
 using Core.Common;
 using Core.Enums;
+using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbCustomerForm;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval;
@@ -83,5 +84,12 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+
+
+        //Manitou System Test Zone ile ilgili iþlemler eklenecek
+        Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
+        Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
+        Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
+        Task<ResponseModel<FinishWorkingResultDto>> FinishWorking(FinishWorkingDto dto);
     }
 }
