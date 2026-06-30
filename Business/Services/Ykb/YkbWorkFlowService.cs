@@ -2004,7 +2004,7 @@ namespace Business.Services.Ykb
                 return ResponseModel.Fail("İlgili teknik servis kaydı bulunamadı.", StatusCode.NotFound);
 
             if (technicalService.IsLocationCheckRequired == false)
-                return ResponseModel.Fail("Lokasyon kontrolü zaten devre dışı bırakılmış.", StatusCode.Conflict);
+                return ResponseModel.Success("Lokasyon kontrolü zaten devre dışı bırakılmış.");
 
             var me = await _currentUser.GetAsync();
             var techUserId = me?.Id ?? 0;
