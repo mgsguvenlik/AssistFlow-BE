@@ -3562,18 +3562,33 @@ namespace Business.Services.Ykb
             var query = _uow.Repository.GetQueryable<YkbTechnicalService>();
 
             // HEADER (mevcut mapster config'ine göre)
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .AsSplitQuery()
-                .Include(x => x.YkbServiceRequestFormImages)
-                .Include(x => x.YkbServicesImages)
-                .Include(x => x.ServiceType)
-                .ProjectToType<YkbTechnicalServiceGetDto>(_config)
-                .FirstOrDefaultAsync();
+            var entity = await query
+                     .AsNoTracking()
+                     .Where(x => x.RequestNo == requestNo)
+                     .AsSplitQuery()
+                     .Include(x => x.YkbServiceRequestFormImages)
+                     .Include(x => x.YkbServicesImages)
+                     .Include(x => x.ServiceType)
+                     .FirstOrDefaultAsync();
+
+            if (entity is null)
+            {
+                return ResponseModel<YkbTechnicalServiceGetDto>.Fail(
+                    "Kayıt bulunamadı.",
+                    StatusCode.NotFound);
+            }
+
+            var dto = entity.Adapt<YkbTechnicalServiceGetDto>(_config);
 
             if (dto is null)
                 return ResponseModel<YkbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            dto.ServiceRequestFormImages=entity.YkbServiceRequestFormImages
+                .Select(img => img.Adapt<YkbTechnicalServiceFormImageGetDto>(_config))
+                .ToList();
+            dto.ServicesImages = entity.YkbServicesImages
+                .Select(img => img.Adapt<YkbTechnicalServiceImageGetDto>(_config))
+                .ToList();
 
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
@@ -4151,7 +4166,7 @@ namespace Business.Services.Ykb
                 if (techService.YkbServiceRequestFormImages != null && techService.YkbServiceRequestFormImages.Any())
                 {
                     dto.ServiceRequestFormImages = techService.YkbServiceRequestFormImages
-                        .Select(img => new TechnicalServiceFormImageGetDto
+                        .Select(img => new YkbTechnicalServiceFormImageGetDto
                         {
                             Id = img.Id,
                             Url = NormalizeImageUrl(img.Url) ?? string.Empty,
@@ -4352,7 +4367,7 @@ namespace Business.Services.Ykb
                 if (techService.YkbServiceRequestFormImages != null && techService.YkbServiceRequestFormImages.Any())
                 {
                     dto.ServiceRequestFormImages = techService.YkbServiceRequestFormImages
-                        .Select(img => new TechnicalServiceFormImageGetDto
+                        .Select(img => new YkbTechnicalServiceFormImageGetDto
                         {
                             Id = img.Id,
                             Url = NormalizeImageUrl(img.Url) ?? string.Empty,
@@ -4643,7 +4658,7 @@ namespace Business.Services.Ykb
                 if (techService.YkbServiceRequestFormImages != null && techService.YkbServiceRequestFormImages.Any())
                 {
                     dto.ServiceRequestFormImages = techService.YkbServiceRequestFormImages
-                        .Select(img => new TechnicalServiceFormImageGetDto
+                        .Select(img => new YkbTechnicalServiceFormImageGetDto
                         {
                             Id = img.Id,
                             Url = NormalizeImageUrl(img.Url) ?? string.Empty,

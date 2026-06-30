@@ -48,6 +48,8 @@ using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlowStep;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
 using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.Data;
@@ -3529,19 +3531,48 @@ namespace Business.Services.Qnb
         {
             var query = _uow.Repository.GetQueryable<QnbTechnicalService>();
 
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .AsSplitQuery()
-                .Include(x => x.QnbServiceRequestFormImages)
-                .Include(x => x.QnbServicesImages)
-                .Include(x => x.ServiceType)
-                .ProjectToType<QnbTechnicalServiceGetDto>(_config)
-                .FirstOrDefaultAsync();
+            //var dto = await query
+            //    .AsNoTracking()
+            //    .Where(x => x.RequestNo == requestNo)
+            //    .AsSplitQuery()
+            //    .Include(x => x.QnbServiceRequestFormImages)
+            //    .Include(x => x.QnbServicesImages)
+            //    .Include(x => x.ServiceType)
+            //    .ProjectToType<QnbTechnicalServiceGetDto>(_config)
+            //    .FirstOrDefaultAsync();
+
+            //if (dto is null)
+            //    return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+
+            // HEADER (mevcut mapster config'ine göre)
+            var entity = await query
+                     .AsNoTracking()
+                     .Where(x => x.RequestNo == requestNo)
+                     .AsSplitQuery()
+                     .Include(x => x.QnbServiceRequestFormImages)
+                     .Include(x => x.QnbServicesImages)
+                     .Include(x => x.ServiceType)
+                     .FirstOrDefaultAsync();
+
+            if (entity is null)
+            {
+                return ResponseModel<QnbTechnicalServiceGetDto>.Fail(
+                    "Kayıt bulunamadı.",
+                    StatusCode.NotFound);
+            }
+
+            var dto = entity.Adapt<QnbTechnicalServiceGetDto>(_config);
 
             if (dto is null)
                 return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            dto.ServiceRequestFormImages = entity.QnbServiceRequestFormImages
+                .Select(img => img.Adapt<QnbTechnicalServiceFormImageGetDto>(_config))
+                .ToList();
+            dto.ServicesImages = entity.QnbServicesImages
+                .Select(img => img.Adapt<QnbTechnicalServiceImageGetDto>(_config))
+                .ToList();
 
             dto.WorkOrderTypes = await _uow.Repository
                  .GetQueryable<QnbServicesRequestWorkOrderType>()
@@ -3903,7 +3934,7 @@ namespace Business.Services.Qnb
                 if (techService.QnbServiceRequestFormImages != null && techService.QnbServiceRequestFormImages.Any())
                 {
                     dto.ServiceRequestFormImages = techService.QnbServiceRequestFormImages
-                        .Select(img => new TechnicalServiceFormImageGetDto
+                        .Select(img => new QnbTechnicalServiceFormImageGetDto
                         {
                             Id = img.Id,
                             Url = NormalizeImageUrlInternal(img.Url, baseUrl) ?? string.Empty,

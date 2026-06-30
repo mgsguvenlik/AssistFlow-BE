@@ -34,6 +34,8 @@ using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -3184,18 +3186,46 @@ namespace Business.Services
             var query = _uow.Repository.GetQueryable<TechnicalService>();
 
             // HEADER (mevcut mapster config'ine göre)
-            var dto = await query
-                .AsNoTracking()
-                .Where(x => x.RequestNo == requestNo)
-                .AsSplitQuery()
-                .Include(x => x.ServiceRequestFormImages)
-                .Include(x => x.ServicesImages)
-                .Include(x => x.ServiceType)
-                .ProjectToType<TechnicalServiceGetDto>(_config)
-                .FirstOrDefaultAsync();
+            //var dto = await query
+            //    .AsNoTracking()
+            //    .Where(x => x.RequestNo == requestNo)
+            //    .AsSplitQuery()
+            //    .Include(x => x.ServiceRequestFormImages)
+            //    .Include(x => x.ServicesImages)
+            //    .Include(x => x.ServiceType)
+            //    .ProjectToType<TechnicalServiceGetDto>(_config)
+            //    .FirstOrDefaultAsync();
+
+            //if (dto is null)
+            //    return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            var entity = await query
+                  .AsNoTracking()
+                  .Where(x => x.RequestNo == requestNo)
+                  .AsSplitQuery()
+                  .Include(x => x.ServiceRequestFormImages)
+                  .Include(x => x.ServicesImages)
+                  .Include(x => x.ServiceType)
+                  .FirstOrDefaultAsync();
+
+            if (entity is null)
+            {
+                return ResponseModel<TechnicalServiceGetDto>.Fail(
+                    "Kayıt bulunamadı.",
+                    StatusCode.NotFound);
+            }
+
+            var dto = entity.Adapt<TechnicalServiceGetDto>(_config);
 
             if (dto is null)
                 return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            dto.ServiceRequestFormImages = entity.ServiceRequestFormImages
+                .Select(img => img.Adapt<TechnicalServiceFormImageGetDto>(_config))
+                .ToList();
+            dto.ServicesImages = entity.ServicesImages
+                .Select(img => img.Adapt<TechnicalServiceImageGetDto>(_config))
+                .ToList();
 
             dto.WorkOrderTypes = await _uow.Repository
                  .GetQueryable<ServicesRequestWorkOrderType>()
