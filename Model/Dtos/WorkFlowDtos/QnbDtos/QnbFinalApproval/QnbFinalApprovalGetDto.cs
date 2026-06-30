@@ -3,7 +3,6 @@ using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
-using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
 {
@@ -20,6 +19,6 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
         public CustomerGetDto? Customer { get; set; }
 
         public List<QnbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
-        public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+        public List<QnbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
     }
 }
