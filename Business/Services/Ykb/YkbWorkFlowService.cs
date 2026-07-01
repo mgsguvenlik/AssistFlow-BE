@@ -55,6 +55,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
 using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -6573,6 +6574,8 @@ namespace Business.Services.Ykb
                     wfQuery = wfQuery.Where(w => w.CreatedDate <= q.CreatedTo.Value);
                 }
 
+
+
                 // -------------------------
                 // CustomerForm filtreleri - CF
                 // -------------------------
@@ -6749,6 +6752,26 @@ namespace Business.Services.Ykb
                             fa.RequestNo == w.RequestNo &&
                             fa.CustomerApprovedAt.HasValue &&
                             fa.CustomerApprovedAt.Value <= q.CustomerApprovedTo.Value));
+                }
+
+                // -------------------------
+                // WorkOrder Filtresi 
+                // -------------------------
+                if (q.WorkOrderTypeIds is { Count: > 0 })
+                {
+                    var workOrderTypeIds = q.WorkOrderTypeIds
+                        .Where(x => x > 0)
+                        .Distinct()
+                        .ToList();
+
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.YkbServicesRequestWorkOrderTypes.Any(wot =>
+                                workOrderTypeIds.Contains(wot.WorkOrderTypeId)
+                            )
+                        )
+                    );
                 }
 
                 // -------------------------
@@ -6961,6 +6984,8 @@ namespace Business.Services.Ykb
                         x => x.OrderByDescending(y => y.Id).First()
                     );
 
+
+
                 var whDict = warehouses
                     .GroupBy(x => x.RequestNo)
                     .ToDictionary(
@@ -7143,7 +7168,405 @@ namespace Business.Services.Ykb
             }
         }
 
+        public async Task<(byte[] Content, string FileName, string ContentType)>ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q)
+        {
+            q ??= new YkbBasicReportQueryParams();
 
+            /*
+             * Mevcut liste metodunuz Normalize(maxPageSize: 200) kullandığı için
+             * export sırasında da içeride 200'er kayıt çekiyoruz.
+             *
+             * Kullanıcıya pagination dönmüyor; tüm filtrelenmiş kayıtlar Excel'e yazılıyor.
+             * Bu yaklaşım büyük veri setlerinde tek seferde milyonlarca kaydı belleğe alma
+             * ve SQL parametre limiti risklerini azaltır.
+             */
+            const int internalPageSize = 200;
+
+            // Excel'de 1 başlık satırı dahil maksimum 1.048.576 satır bulunabilir.
+            const int excelMaxRow = 1_048_576;
+
+            try
+            {
+                using var workbook = new XLWorkbook();
+
+                var sheetNumber = 1;
+                var rowNumber = 2;
+                var sequenceNo = 1;
+
+                var worksheet = CreateBasicReportWorksheet(workbook, sheetNumber);
+
+                var page = 1;
+
+                while (true)
+                {
+                    // Request'ten gelen Page/PageSize export için dikkate alınmaz.
+                    q.Page = page;
+                    q.PageSize = internalPageSize;
+
+                    var result = await GetYkbBasicWorkFlowReportAsync(q);
+
+                    if (result.Data is null)
+                    {
+                        throw new InvalidOperationException(
+                            "YKB temel rapor verisi export için alınamadı.");
+                    }
+
+                    var items = result.Data.Items;
+
+                    if (items is null || items.Count == 0)
+                    {
+                        break;
+                    }
+
+                    foreach (var item in items)
+                    {
+                        // Bir sheet dolarsa yeni sheet aç.
+                        if (rowNumber > excelMaxRow)
+                        {
+                            sheetNumber++;
+                            worksheet = CreateBasicReportWorksheet(workbook, sheetNumber);
+                            rowNumber = 2;
+                        }
+
+                        WriteBasicReportRow(
+                            worksheet,
+                            rowNumber,
+                            sequenceNo,
+                            item);
+
+                        rowNumber++;
+                        sequenceNo++;
+                    }
+
+                    // Son sayfa geldiyse çık.
+                    if (items.Count < internalPageSize)
+                    {
+                        break;
+                    }
+
+                    page++;
+                }
+
+                // Çok büyük raporlarda tüm hücreler için AdjustToContents ciddi yavaşlık yaratır.
+                // Sadece ilk 100 satıra göre genişlik hesaplanır.
+                foreach (var ws in workbook.Worksheets)
+                {
+                    var lastRowForWidth = Math.Min(ws.LastRowUsed()?.RowNumber() ?? 1, 100);
+                    ws.Columns(1, 54).AdjustToContents(1, lastRowForWidth);
+
+                    ws.SheetView.FreezeRows(1);
+                    ws.Range(1, 1, 1, 54).SetAutoFilter();
+
+                    ws.Columns().Style.Alignment.Vertical =
+                        XLAlignmentVerticalValues.Center;
+                }
+
+                using var memoryStream = new MemoryStream();
+                workbook.SaveAs(memoryStream);
+
+                var fileName = $"YKB_Temel_Rapor_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+
+                const string contentType =
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+                return (memoryStream.ToArray(), fileName, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExportYkbBasicWorkFlowReportAsync");
+
+                throw;
+            }
+        }
+
+        private static IXLWorksheet CreateBasicReportWorksheet( XLWorkbook workbook, int sheetNumber)
+        {
+            var sheetName = sheetNumber == 1
+                ? "YKB Temel Rapor"
+                : $"YKB Temel Rapor {sheetNumber}";
+
+            var ws = workbook.Worksheets.Add(sheetName);
+
+            var headers = new[]
+            {
+                         "Sıra No",
+                         "Workflow Id",
+                         "Talep No",
+                         "Talep Başlığı",
+                         "YKB Servis Takip No",
+
+                         "Mevcut Adım Id",
+                         "Mevcut Adım Kodu",
+                         "Mevcut Adım Adı",
+                         "Mevcut Adım Gösterim Adı",
+
+                         "Öncelik",
+                         "İş Akışı Durumu",
+
+                         "Oluşturulma Tarihi",
+                         "Güncellenme Tarihi",
+
+                         "Oluşturan Kullanıcı Id",
+                         "Oluşturan Kullanıcı",
+
+                         "Onaylayan Teknisyen Id",
+                         "Onaylayan Teknisyen",
+                         "Onaylayan Teknisyen E-Posta",
+                         "Teknisyen İl",
+                         "Teknisyen İlçe",
+
+                         "Müşteri Id",
+                         "Müşteri Kodu",
+                         "Müşteri Adı",
+                         "Müşteri İl",
+                         "Müşteri İlçe",
+
+                         "Servis Türü Id",
+                         "Servis Türü",
+                         "İş Emri Türleri",
+
+                         "Müşteri Form Durumu",
+                         "Müşteri Form Servis Tarihi",
+                         "Müşteri Form Planlanan Tamamlanma",
+
+                         "Servis Talep Tarihi",
+                         "Planlanan Tamamlanma Tarihi",
+
+                         "Sözleşmeli Mi",
+                         "Konum Geçerli Mi",
+                         "Ürün Gereksinimi Var Mı",
+
+                         "Servis Maliyet Durumu",
+                         "Servis Talep Durumu",
+
+                         "Depo Durumu",
+                         "Depo Teslim Tarihi",
+
+                         "Teknik Servis Durumu",
+                         "Teknik Başlangıç Tarihi",
+                         "Teknik Bitiş Tarihi",
+                         "Teknik Servis Süresi (Dakika)",
+
+                         "Fiyatlandırma Durumu",
+                         "Fiyatlandırma Toplam Tutar",
+                         "Para Birimi",
+
+                         "Son Onay Durumu",
+                         "İndirim Oranı",
+
+                         "Son Onay Notu",
+                         "Müşteri Notu",
+
+                         "Müşteri Onaylayan Id",
+                         "Müşteri Onaylayan",
+                         "Müşteri Onay Tarihi",
+
+                         "Son Aktivite Tarihi"
+            };
+
+            for (var i = 0; i < headers.Length; i++)
+            {
+                ws.Cell(1, i + 1).Value = headers[i];
+            }
+
+            var headerRange = ws.Range(1, 1, 1, headers.Length);
+
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+            headerRange.Style.Font.FontColor = XLColor.Black;
+            headerRange.Style.Alignment.Horizontal =
+                XLAlignmentHorizontalValues.Center;
+            headerRange.Style.Alignment.Vertical =
+                XLAlignmentVerticalValues.Center;
+            headerRange.Style.Alignment.WrapText = true;
+            headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+            ws.Row(1).Height = 32;
+
+            return ws;
+        }
+
+        private static void WriteBasicReportRow( IXLWorksheet ws, int row,  int sequenceNo,  YkbBasicReportListDto x)
+        {
+            var c = 1;
+
+            ws.Cell(row, c++).Value = sequenceNo;
+            ws.Cell(row, c++).Value = x.WorkFlowId;
+
+            ws.Cell(row, c++).Value = x.RequestNo ?? string.Empty;
+            ws.Cell(row, c++).Value = x.RequestTitle ?? string.Empty;
+            ws.Cell(row, c++).Value = x.YkbServiceTrackNo ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.CurrentStepId);
+            ws.Cell(row, c++).Value = x.CurrentStepCode ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CurrentStepName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CurrentStepDisplayName ?? string.Empty;
+
+            ws.Cell(row, c++).Value = x.PriorityName;
+            ws.Cell(row, c++).Value = x.WorkFlowStatusName;
+
+            SetDateTime(ws.Cell(row, c++), x.CreatedDate);
+            SetDateTime(ws.Cell(row, c++), x.UpdatedDate);
+
+            ws.Cell(row, c++).Value = x.CreatedUserId;
+            ws.Cell(row, c++).Value = x.CreatedUserName ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.ApproverTechnicianId);
+            ws.Cell(row, c++).Value = x.ApproverTechnicianName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.ApproverTechnicianEmail ?? string.Empty;
+            ws.Cell(row, c++).Value = x.TechnicianCity ?? string.Empty;
+            ws.Cell(row, c++).Value = x.TechnicianDistrict ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.CustomerId);
+            ws.Cell(row, c++).Value = x.CustomerCode ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerCity ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerDistrict ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.ServiceTypeId);
+            ws.Cell(row, c++).Value = x.ServiceTypeName ?? string.Empty;
+
+            ws.Cell(row, c++).Value = FormatWorkOrderTypes(x.WorkOrderTypes);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.CustomerFormStatus);
+            SetDateTime(ws.Cell(row, c++), x.CustomerFormServicesDate);
+            SetDateTime(ws.Cell(row, c++), x.CustomerFormPlannedCompletionDate);
+
+            SetDateTime(ws.Cell(row, c++), x.ServicesDate);
+            SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
+
+            ws.Cell(row, c++).Value = BoolText(x.IsAgreement);
+            ws.Cell(row, c++).Value = BoolText(x.IsLocationValid);
+            ws.Cell(row, c++).Value = BoolText(x.IsProductRequirement);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.ServicesCostStatus);
+            ws.Cell(row, c++).Value = GetEnumText(x.ServicesRequestStatus);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.WarehouseStatus);
+            SetDateTime(ws.Cell(row, c++), x.WarehouseDeliveryDate);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.TechnicalServiceStatus);
+            SetDateTime(ws.Cell(row, c++), x.TechnicalStartTime);
+            SetDateTime(ws.Cell(row, c++), x.TechnicalEndTime);
+            SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
+
+            ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
+            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmount, "#,##0.00");
+            ws.Cell(row, c++).Value = x.Currency ?? string.Empty;
+
+            ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
+            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+
+            ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerNote ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.CustomerApprovedBy);
+            ws.Cell(row, c++).Value = x.CustomerApprovedByName ?? string.Empty;
+            SetDateTime(ws.Cell(row, c++), x.CustomerApprovedAt);
+
+            SetDateTime(ws.Cell(row, c++), x.LastActivityDate);
+
+            // Uzun not alanları için satır taşması.
+            ws.Cell(row, 51).Style.Alignment.WrapText = true;
+            ws.Cell(row, 52).Style.Alignment.WrapText = true;
+        }
+
+        private static void SetNullableLong(IXLCell cell, long? value)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+        }
+
+        private static void SetDateTime(IXLCell cell,DateTimeOffset? value,string format = "dd.MM.yyyy HH:mm")
+        {
+            if (!value.HasValue)
+                return;
+
+            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
+            cell.Value = value.Value.DateTime;
+            cell.Style.DateFormat.Format = format;
+        }
+        private static void SetDateTime(IXLCell cell,DateTime? value,string format = "dd.MM.yyyy HH:mm")
+        {
+            if (!value.HasValue)
+                return;
+
+            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
+            cell.Value = value.Value;
+            cell.Style.DateFormat.Format = format;
+        }
+
+        private static void SetDecimal(IXLCell cell,decimal? value, string format)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+            cell.Style.NumberFormat.Format = format;
+        }
+
+        private static void SetDouble( IXLCell cell, double? value, string format)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+            cell.Style.NumberFormat.Format = format;
+        }
+
+        private static string BoolText(bool? value)
+        {
+            return value switch
+            {
+                true => "Evet",
+                false => "Hayır",
+                _ => "-"
+            };
+        }
+
+        private static string GetEnumText<TEnum>(TEnum? value) where TEnum : struct, Enum
+        {
+            if (!value.HasValue)
+                return "-";
+
+            var enumValue = value.Value;
+
+            var member = typeof(TEnum)
+                .GetMember(enumValue.ToString())
+                .FirstOrDefault();
+
+            var displayName = member?
+                .GetCustomAttributes(typeof(DisplayAttribute), inherit: false)
+                .OfType<DisplayAttribute>()
+                .FirstOrDefault()?
+                .GetName();
+
+            return string.IsNullOrWhiteSpace(displayName)
+                ? enumValue.ToString()
+                : displayName;
+        }
+
+        private static string FormatWorkOrderTypes(
+            List<WorkOrderTypeLiteDto>? workOrderTypes)
+        {
+            if (workOrderTypes is null || workOrderTypes.Count == 0)
+                return string.Empty;
+
+            return string.Join(", ",
+                workOrderTypes.Select(x =>
+                {
+                    if (!string.IsNullOrWhiteSpace(x.Code) &&
+                        !string.IsNullOrWhiteSpace(x.Name))
+                    {
+                        return $"{x.Code} - {x.Name}";
+                    }
+
+                    return x.Name ?? x.Code ?? string.Empty;
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+        }
         //excel export 
         public async Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(YkbReportQueryParams q)
         {

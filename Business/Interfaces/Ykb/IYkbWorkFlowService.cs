@@ -77,6 +77,7 @@ namespace Business.Interfaces.Ykb
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(YkbReportQueryParams q);
 
         Task<ResponseModel<PagedResult<YkbBasicReportListDto>>> GetYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q);
+        Task<(byte[] Content, string FileName, string ContentType)> ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q);
 
         //Arşiv 
         Task<ResponseModel<PagedResult<YkbWorkFlowArchiveListDto>>> GetArchiveListAsync(YkbWorkFlowArchiveFilterDto filter);
