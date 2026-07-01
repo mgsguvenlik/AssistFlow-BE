@@ -106,16 +106,16 @@ namespace Business.Mapper
                   .Ignore(dest => dest.YkbServicesImages);
 
             config.NewConfig<YkbTechnicalService, YkbTechnicalServiceGetDto>()
-                  .Map(dest => dest.ServiceTypeName, src => src.ServiceType != null ? src.ServiceType.Name : null);
-
-            // TS Images
-            config.NewConfig<YkbTechnicalServiceImageCreateDto, YkbTechnicalServiceImage>()
-                  .Ignore(dest => dest.Id);
+                    .Map(dest => dest.ServiceTypeName,
+                         src => src.ServiceType != null
+                             ? src.ServiceType.Name
+                             : null)
+                    .Map(dest => dest.ServiceRequestFormImages,
+                         src => src.YkbServiceRequestFormImages)
+                    .Map(dest => dest.ServicesImages,
+                         src => src.YkbServicesImages);
 
             config.NewConfig<YkbTechnicalServiceImage, YkbTechnicalServiceImageGetDto>();
-
-            config.NewConfig<YkbTechnicalServiceFormImageCreateDto, YkbTechnicalServiceFormImage>()
-                  .Ignore(dest => dest.Id);
 
             config.NewConfig<YkbTechnicalServiceFormImage, YkbTechnicalServiceFormImageGetDto>();
 

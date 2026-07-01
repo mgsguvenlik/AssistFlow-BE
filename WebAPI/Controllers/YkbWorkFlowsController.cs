@@ -337,6 +337,14 @@ namespace WebAPI.Controllers
             return StatusCode((int)result.StatusCode, result);
         }
 
+        [HttpGet("basic-report/export")]
+        public async Task<IActionResult> ExportBasicReport([FromQuery] YkbBasicReportQueryParams q)
+        {
+            var (content, fileName, contentType) = await _workFlowService.ExportYkbBasicWorkFlowReportAsync(q);
+
+            return File(content, contentType, fileName);
+        }
+
 
         //---------Arşiv---------------
 

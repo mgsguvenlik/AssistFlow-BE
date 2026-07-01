@@ -3,7 +3,6 @@ using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
-using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkOrderType;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
@@ -33,7 +32,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
         public List<QnbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
-        public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+        public List<QnbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
         public List<QnbServicesRequestProductGetDto> Products { get; set; } = new();
 
         public List<QnbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
