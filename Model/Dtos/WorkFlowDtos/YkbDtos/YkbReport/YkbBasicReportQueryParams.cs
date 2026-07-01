@@ -1,10 +1,5 @@
 ﻿using Core.Enums;
 using Core.Enums.Ykb;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -63,6 +58,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 
         public string? SortBy { get; set; } = "createdDate";
         public bool SortDesc { get; set; } = true;
+
+        public List<long> WorkOrderTypeIds { get; set; } = new();
 
         public void Normalize(int maxPageSize = 200)
         {
