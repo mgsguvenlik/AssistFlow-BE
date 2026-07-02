@@ -9,8 +9,8 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting
         public string CustomerTypeName { get; set; } = string.Empty;
         public WorkFlowPriority Priority { get; set; }
         public string PriorityName { get; set; } = string.Empty;
-        public int SlaDurationDays { get; set; }
-        public int NotificationBeforeDays { get; set; }
+        public int SlaDurationHours { get; set; }
+        public int NotificationBeforeHours { get; set; }
         public string? NotificationEmails { get; set; }
         public bool IsActive { get; set; }
         public string? Description { get; set; }

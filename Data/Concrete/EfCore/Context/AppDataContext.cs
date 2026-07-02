@@ -168,13 +168,13 @@ namespace Data.Concrete.EfCore.Context
                     .IsRequired()
                     .HasComment("İş akışı öncelik seviyesi");
 
-                entity.Property(x => x.SlaDurationDays)
+                entity.Property(x => x.SlaDurationHours)
                     .IsRequired()
-                    .HasComment("SLA süresi (gün)");
+                    .HasComment("SLA süresi (saat)");
 
-                entity.Property(x => x.NotificationBeforeDays)
+                entity.Property(x => x.NotificationBeforeHours)
                     .IsRequired()
-                    .HasComment("Bildirim gönderilecek süre (gün önce)");
+                    .HasComment("Bildirim gönderilecek süre (saat önce)");
 
                 entity.Property(x => x.NotificationEmails)
                     .HasMaxLength(1000)
@@ -197,8 +197,7 @@ namespace Data.Concrete.EfCore.Context
 
                 entity.HasIndex(x => x.IsActive)
                     .HasDatabaseName("IX_WorkFlowSlaSettings_IsActive");
-            });
-
+            }); 
 
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
