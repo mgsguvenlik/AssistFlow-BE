@@ -60,8 +60,8 @@ namespace Business.Services
                     Core.Enums.StatusCode.Conflict);
             }
 
-            // 🔹 Validation: NotificationBeforeDays < SlaDurationDays
-            if (dto.NotificationBeforeDays >= dto.SlaDurationDays)
+            // 🔹 Validation: NotificationBeforeHours < SlaDurationHours
+            if (dto.NotificationBeforeHours >= dto.SlaDurationHours)
             {
                 return ResponseModel<WorkFlowSlaSettingGetDto>.Fail(
                     "Bildirim süresi, SLA süresinden küçük olmalıdır",
@@ -109,9 +109,8 @@ namespace Business.Services
                         Core.Enums.StatusCode.Conflict);
                 }
             }
-
-            // 🔹 Validation: NotificationBeforeDays < SlaDurationDays
-            if (dto.NotificationBeforeDays >= dto.SlaDurationDays)
+            // 🔹 Validation: NotificationBeforeHours < SlaDurationHours
+            if (dto.NotificationBeforeHours >= dto.SlaDurationHours)
             {
                 return ResponseModel<WorkFlowSlaSettingGetDto>.Fail(
                     "Bildirim süresi, SLA süresinden küçük olmalıdır",
