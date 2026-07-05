@@ -1,10 +1,5 @@
 ﻿using Core.Enums;
-using Core.Enums.Qnb;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
 {
@@ -84,7 +79,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public long? ServiceTypeId { get; set; }
         public string? ServiceTypeName { get; set; }
 
- 
+
         public DateTimeOffset? ServicesDate { get; set; }
         public DateTimeOffset? PlannedCompletionDate { get; set; }
 
@@ -112,5 +107,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
 
         public string? FinalApprovalNotes { get; set; }
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
+
+        public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
     }
 }

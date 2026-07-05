@@ -79,6 +79,7 @@ namespace Business.Interfaces.Qnb
         Task<PagedResult<QnbWorkFlowReportLineDto>> GetReportLinesAsync(QnbReportQueryParams q);
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(QnbReportQueryParams q);
         Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q);
+        Task<(byte[] Content, string FileName, string ContentType)> ExportQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q);
 
         // -------------------- Archive --------------------
         Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter);

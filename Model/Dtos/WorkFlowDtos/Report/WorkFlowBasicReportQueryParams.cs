@@ -52,6 +52,7 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public string? SortBy { get; set; } = "createdDate";
         public bool SortDesc { get; set; } = true;
 
+        public List<long> WorkOrderTypeIds { get; set; } = new();
         public void Normalize(int maxPageSize = 200)
         {
             Page = Page <= 0 ? 1 : Page;

@@ -12,6 +12,7 @@ using Model.Dtos.WorkFlowDtos.Warehouse;
 using Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
 using System.Net;
 
 namespace WebAPI.Controllers
@@ -305,6 +306,12 @@ namespace WebAPI.Controllers
             return StatusCode((int)result.StatusCode, result);
         }
 
+        [HttpGet("basic-report/export")]
+        public async Task<IActionResult> ExportBasicReport([FromQuery] WorkFlowBasicReportQueryParams q)
+        {
+            var (content, fileName, contentType) = await _workFlowService.ExportBasicWorkFlowReportAsync(q);
+            return File(content, contentType, fileName);
+        }
         //---------Arşiv---------------
 
 
