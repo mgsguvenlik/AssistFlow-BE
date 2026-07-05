@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
+using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
 
@@ -109,13 +110,23 @@ namespace Business.Services
             {
                 await ProcessYkbWorkFlowsAsync(uow, mailPush, slaSetting, notificationThresholdHours, now, stoppingToken);
             }
+            else if (slaSetting.CustomerType == WorkFlowCustomerType.QNB)
+            {
+                await ProcessQnbWorkFlowsAsync(
+                    uow,
+                    mailPush,
+                    slaSetting,
+                    notificationThresholdHours,
+                    now,
+                    stoppingToken);
+            }
             else
             {
                 _logger.LogWarning("Desteklenmeyen CustomerType: {CustomerType}", slaSetting.CustomerType);
             }
         }
 
-        #region Individual WorkFlow İşlemleri
+        #region Bireysel WorkFlow İşlemleri
 
         private async Task ProcessIndividualWorkFlowsAsync(
             IUnitOfWork uow,
@@ -197,8 +208,49 @@ namespace Business.Services
 
         #endregion
 
-        #region Mail Oluşturma
+        #region QNB WorkFlow İşlemleri
 
+        private async Task ProcessQnbWorkFlowsAsync(
+            IUnitOfWork uow,
+            IMailPushService mailPush,
+            WorkFlowSlaSetting slaSetting,
+            int notificationThresholdHours,
+            DateTimeOffset now,
+            CancellationToken stoppingToken)
+        {
+            var thresholdDate = now.AddHours(-notificationThresholdHours);
+
+            var qnbWorkFlows = await uow.Repository
+                .GetQueryable<QnbWorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted
+                    && x.WorkFlowStatus == WorkFlowStatus.Pending
+                    && x.Priority == slaSetting.Priority
+                    && x.CreatedDate <= thresholdDate)
+                .ToListAsync(stoppingToken);
+
+            _logger.LogDebug(
+                "QNB - Priority: {Priority}, Threshold: {Threshold}, WorkFlow Sayısı: {Count}",
+                slaSetting.Priority,
+                thresholdDate,
+                qnbWorkFlows.Count);
+
+            foreach (var qnbWorkFlow in qnbWorkFlows)
+            {
+                await CreateSlaNotificationMailAsync(
+                    uow,
+                    mailPush,
+                    qnbWorkFlow.RequestNo,
+                    slaSetting,
+                    qnbWorkFlow.CreatedDate,
+                    now,
+                    stoppingToken);
+            }
+        }
+
+        #endregion
+
+        #region Mail Oluşturma
         private async Task CreateSlaNotificationMailAsync(
             IUnitOfWork uow,
             IMailPushService mailPush,
