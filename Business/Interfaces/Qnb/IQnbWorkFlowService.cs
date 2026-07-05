@@ -20,7 +20,6 @@ namespace Business.Interfaces.Qnb
 
 
         // -------------------- Customer Form / Services Request --------------------
-        Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto);
         Task<ResponseModel<QnbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo);
 
         //-------------------- Service Request Create--------------------

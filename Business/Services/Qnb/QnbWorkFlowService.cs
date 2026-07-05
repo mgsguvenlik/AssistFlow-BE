@@ -93,158 +93,6 @@ namespace Business.Services.Qnb
         }
 
 
-        // 0 Müşteri kendi formunu oluşturulması ve Servis talebine gönderim.
-        public async Task<ResponseModel<QnbCustomerFormGetDto>> CreateCustomerForm(QnbCustomerFormCreateDto dto)
-        {
-            try
-            {
-                #region Validasyon/Kontroller
-                // Başlangıç WorkFlowStep'i Bul
-                var targetStep = await _uow.Repository.GetQueryable<QnbWorkFlowStep>()
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.Code == "SR");
-
-                if (targetStep is null)
-                    return ResponseModel<QnbCustomerFormGetDto>.Fail("İş akışı hedef adımı (SR) tanımlı değil.", StatusCode.BadRequest);
-
-                // RequestNo yoksa üret
-                if (string.IsNullOrWhiteSpace(dto.RequestNo))
-                {
-                    var rn = await GetRequestNoAsync("QNB");
-                    if (!rn.IsSuccess)
-                        return ResponseModel<QnbCustomerFormGetDto>.Fail(rn.Message, rn.StatusCode);
-                    dto.RequestNo = rn.Data!;
-                }
-
-                bool exists = await _uow.Repository
-                    .GetQueryable<QnbWorkFlow>()
-                    .Include(x => x.ApproverTechnician)
-                    .AsNoTracking()
-                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
-                if (exists)
-                    return ResponseModel<QnbCustomerFormGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
-
-                var customerExist = await _uow.Repository.GetQueryable<Customer>().AsNoTracking()
-                    .AnyAsync(c => c.Id == dto.CustomerId);
-                if (!customerExist)
-                    return ResponseModel<QnbCustomerFormGetDto>.Fail("Müşteri bulunamadı.", StatusCode.Conflict);
-
-                var customerApproverExist = dto.CustomerApproverId.HasValue
-                    ? await _uow.Repository.GetQueryable<ProgressApprover>().AsNoTracking().AnyAsync(ca => ca.Id == dto.CustomerApproverId.Value)
-                    : true;
-                if (!customerApproverExist)
-                    return ResponseModel<QnbCustomerFormGetDto>.Fail("Müşteri yetkilisi bulunamadı.", StatusCode.Conflict);
-
-
-                //var (workOrderTypeIds, workOrderTypeValidationError) = await ValidateWorkOrderTypeIdsAsync(dto.WorkOrderTypeIds);
-
-                //if (workOrderTypeValidationError is not null)
-                //{
-                //    return ResponseModel<ServicesRequestGetDto>.Fail(
-                //        workOrderTypeValidationError,
-                //        StatusCode.BadRequest
-                //    );
-                //}
-
-
-                var me = await _currentUser.GetAsync();
-                var meId = me?.Id ?? 0;
-                #endregion
-
-                #region Müşteri formu Oluşturma
-                var customerForm = dto.Adapt<QnbCustomerForm>(_config);
-                customerForm.CreatedDate = DateTime.Now;
-                customerForm.CreatedUser = meId;
-                customerForm.Status = QnbCustomerFormStatus.Draft;
-                await _uow.Repository.AddAsync(customerForm);
-                #endregion
-
-                #region WorkFlow oluştur (aynı RequestNo ile)
-                var wf = new QnbWorkFlow
-                {
-                    RequestNo = customerForm.RequestNo,
-                    RequestTitle = dto.Title ?? "",
-                    Priority = dto.Priority,
-                    CurrentStepId = targetStep.Id,
-                    CreatedDate = DateTime.Now,
-                    CreatedUser = meId,
-                    WorkFlowStatus = WorkFlowStatus.Pending,
-                    IsAgreement = null,
-                };
-                await _uow.Repository.AddAsync(wf);
-                #endregion
-
-                #region Servis talebi oluşturma
-                var request = customerForm.Adapt<QnbServicesRequest>(_config);
-                request.CreatedDate = DateTime.Now;
-                request.CreatedUser = meId;
-                request.ServicesRequestStatus = ServicesRequestStatus.Draft;
-                //request.QnbServicesRequestWorkOrderTypes = workOrderTypeIds
-                //     .Select(workOrderTypeId => new QnbServicesRequestWorkOrderType
-                //     {
-                //         WorkOrderTypeId = workOrderTypeId
-                //     })
-                //     .ToList();
-
-                request.Id = 0;
-                await _uow.Repository.AddAsync(request);
-                #endregion
-
-                #region Hareket Kaydı
-                await _activationRecord.LogQnbAsync(
-                    WorkFlowActionType.ServiceRequestCreated,
-                    request.RequestNo,
-                    null,
-                    dto.CustomerId,
-                    targetStep.Code,
-                    "CF",
-                    "Müşteri talap formu oluşturuldu ve servis talebine gönderildi",
-                    new
-                    {
-                        dto,
-                        request.Id,
-                    });
-                #endregion
-
-                await _uow.Repository.CompleteAsync();
-
-                #region Notification Kaydı
-                await _notification.CreateForUserAsync(
-                    new NotificationCreateDto
-                    {
-                        Type = NotificationType.GenericInfo,
-                        Title = $"Talep {dto.RequestNo} oluşturuldu",
-                        Message = $"{dto.RequestNo} numaralı talebiniz oluşturuldu ve servis talebine iletildi.",
-                        RequestNo = dto.RequestNo,
-                        FromStepCode = "CF",
-                        ToStepCode = "SR",
-                    },
-                    userId: meId
-                );
-
-                await _notification.CreateForRolesAsync(
-                    new NotificationCreateDto
-                    {
-                        Type = NotificationType.GenericInfo,
-                        Title = $"Talep {dto.RequestNo} oluşturuldu",
-                        Message = $"{dto.RequestNo} numaralı akış talebi müşteri tarafından iletildi.",
-                        RequestNo = dto.RequestNo,
-                        FromStepCode = "CF",
-                        ToStepCode = "SR",
-                    },
-                    roleCodes: ["PROJECTENGINEER", "ADMIN"]
-                );
-                #endregion
-
-                return await GetCustomerFormByRequestNoAsync(dto.RequestNo);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CreateCustomerForm");
-                return ResponseModel<QnbCustomerFormGetDto>.Fail($"CreateCustomerForm Oluşturma sırasında hata: {ex.Message}", StatusCode.Error);
-            }
-        }
-
         // 1 Servis Talebi oluşturma akışı
         public async Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto)
         {
@@ -412,6 +260,34 @@ namespace Business.Services.Qnb
                 #endregion
 
                 await _uow.Repository.CompleteAsync();
+
+                #region Notification Kaydı 
+                await _notification.CreateForUserAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.GenericInfo,
+                        Title = $"Talep {dto.RequestNo} oluşturuldu",
+                        Message = $"{dto.RequestNo} numaralı talebiniz oluşturuldu.",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "SR",
+                    },
+                    userId: meId
+                );
+
+                await _notification.CreateForRolesAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.GenericInfo,
+                        Title = $"Talep {dto.RequestNo} oluşturuldu",
+                        Message = $"{dto.RequestNo}  numaralı talebiniz oluşturuldu.",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "SR",
+                    },
+                    roleCodes: ["PROJECTENGINEER", "ADMIN"]
+                );
+                #endregion
 
                 return await GetServiceRequestByIdAsync(request.Id);
             }
@@ -753,7 +629,7 @@ namespace Business.Services.Qnb
                             Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
                             Message = $"Akış {"WH"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
                             RequestNo = dto.RequestNo,
-                            FromStepCode = "SR",
+                            FromStepCode = "WH",
                             ToStepCode = "TS",
                             Payload = new { wfId = wf.Id }
                         },
@@ -5649,7 +5525,7 @@ namespace Business.Services.Qnb
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
-                        WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList)? qnbWotList: new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>()
+                        WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList) ? qnbWotList : new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>()
                     };
                 }).ToList();
 
