@@ -212,6 +212,34 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
+                #region Notification Kaydı 
+                await _notification.CreateForUserAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.GenericInfo,
+                        Title = $"Talep {dto.RequestNo} oluşturuldu",
+                        Message = $"{dto.RequestNo} numaralı talebiniz oluşturuldu.",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "SR",
+                    },
+                    userId: meId
+                );
+
+                await _notification.CreateForRolesAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.GenericInfo,
+                        Title = $"Talep {dto.RequestNo} oluşturuldu",
+                        Message = $"{dto.RequestNo}  numaralı talebiniz oluşturuldu.",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "SR",
+                    },
+                    roleCodes: ["PROJECTENGINEER", "ADMIN"]
+                );
+                #endregion
+
                 return await GetServiceRequestByIdAsync(request.Id);
             }
             catch (Exception ex)
@@ -356,7 +384,7 @@ namespace Business.Services
                 await _uow.Repository.CompleteAsync();
 
                 #region Notiification Kayıd
-                await _notification.CreateForRoleAsync(
+                await _notification.CreateForRolesAsync(
                     new NotificationCreateDto
                     {
                         Type = NotificationType.WorkflowStepChanged,
@@ -371,7 +399,7 @@ namespace Business.Services
                             deliveryDate = dto.DeliveryDate
                         }
                     },
-                    roleCode: "WAREHOUSE" // sizin depocu rol kodunuz (ResolveWarehouseEmailsAsync'teki gibi)
+                    roleCodes: ["WAREHOUSE", "ADMIN"]
                 );
                 #endregion
 
@@ -401,12 +429,6 @@ namespace Business.Services
                 if (wf is null)
                     return ResponseModel<WarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                //var exists = await _uow.Repository
-                //    .GetQueryable<TechnicalService>()
-                //    .AsNoTracking()
-                //    .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
-                //if (exists is not null && exists.ServicesStatus != TechnicalServiceStatus.AwaitingReview)
-                //    return ResponseModel<WarehouseGetDto>.Fail("Aynı akış numarası ile başka bir kayıt zaten var.", StatusCode.Conflict);
 
                 var request = await _uow.Repository
                     .GetQueryable<ServicesRequest>()
@@ -587,15 +609,28 @@ namespace Business.Services
                         {
                             Type = NotificationType.WorkflowStepChanged,
                             Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
-                            Message = $"Akış {"SR"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                            Message = $"Akış {"WH"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
                             RequestNo = dto.RequestNo,
                             FromStepCode = "SR",
                             ToStepCode = "TS",
-                            Payload = new { wfId = wf.Id }
+                            Payload = new { wfId = wf.Id } 
                         },
                         wf.ApproverTechnicianId.Value
                     );
                 }
+                await _notification.CreateForRolesAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.WorkflowStepChanged,
+                        Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
+                        Message = $"Akış {"WH"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "WH",
+                        ToStepCode = "TS",
+                        Payload = new { wfId = wf.Id }
+                    },
+                    roleCodes: ["TECHNICIAN", "ADMIN"]
+                );
                 #endregion
 
                 // 🔹 Son durumu döndür
@@ -877,6 +912,23 @@ namespace Business.Services
                 #endregion
 
                 await _uow.Repository.CompleteAsync();
+
+                #region Notification Kaydı
+                await _notification.CreateForRolesAsync(
+                    new NotificationCreateDto
+                    {
+                        Type = NotificationType.WorkflowStepChanged,
+                        Title = $"{dto.RequestNo} Servis başladı",
+                        Message = $"{dto.RequestNo} Numaralı talep servisi başladı",
+                        RequestNo = dto.RequestNo,
+                        FromStepCode = "SR",
+                        ToStepCode = "SR",
+                        Payload = new { wfId = wf.Id }
+                    },
+                    roleCodes: ["PROJECTENGINEER", "TECHNICIAN", "ADMIN"]
+                );
+                #endregion
+
                 return await GetTechnicalServiceByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -1243,18 +1295,19 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
-                #region Notification Kaydı 
-                await _notification.CreateForRoleAsync(
+
+                #region Notification Kaydı
+                await _notification.CreateForRolesAsync(
                     new NotificationCreateDto
                     {
                         Type = NotificationType.WorkflowStepChanged,
-                        Title = $"Talep {dto.RequestNo} fiyatlamaya gönderildi",
+                        Title = $"Talep {dto.RequestNo}  Servis işlemi tamamlandı ve fiyatlamaya gönderildi",
                         Message = $"Akış {"TS"} → {"PRC"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
                         RequestNo = dto.RequestNo,
                         FromStepCode = "TS",
                         ToStepCode = "PRC",
                     },
-                    roleCode: "PROJECTENGINEER"
+                    roleCodes: ["PROJECTENGINEER", "TECHNICIAN", "ADMIN"]
                 );
                 #endregion
 
@@ -1443,8 +1496,8 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
-                #region Notification Kaydı 
-                await _notification.CreateForRoleAsync(
+                #region Notification Kaydı
+                await _notification.CreateForRolesAsync(
                     new NotificationCreateDto
                     {
                         Type = NotificationType.WorkflowStepChanged,
@@ -1454,7 +1507,7 @@ namespace Business.Services
                         FromStepCode = "PRC",
                         ToStepCode = "APR",
                     },
-                    roleCode: "PROJECTENGINEER"
+                    roleCodes: ["PROJECTENGINEER", "ADMIN"]
                 );
                 #endregion
 
@@ -1539,6 +1592,12 @@ namespace Business.Services
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
                     wf.WorkFlowStatus = dto.WorkFlowStatus;
+                    wf.IsAgreement = dto.WorkFlowStatus switch
+                    {
+                        WorkFlowStatus.Complated => true,
+                        WorkFlowStatus.Cancelled => false,
+                        _ => null
+                    };
                     _uow.Repository.Update(wf);
                 }
                 #endregion
@@ -5926,7 +5985,8 @@ namespace Business.Services
                     {
                         fa.RequestNo,
                         fa.Status,
-                        fa.DiscountPercent
+                        fa.DiscountPercent,
+                        fa.Notes,
                     })
                     .ToListAsync();
 
@@ -6094,6 +6154,7 @@ namespace Business.Services
                         Currency = pricing?.Currency,
 
                         FinalApprovalStatus = finalApproval?.Status,
+                        FinalApprovalNotes = finalApproval?.Notes,
                         DiscountPercent = finalApproval?.DiscountPercent,
 
                         WorkOrderTypes = wotDict.TryGetValue(w.RequestNo, out var wotList)

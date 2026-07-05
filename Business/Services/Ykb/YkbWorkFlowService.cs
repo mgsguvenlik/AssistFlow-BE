@@ -221,6 +221,7 @@ namespace Business.Services.Ykb
                     roleCodes: ["PROJECTENGINEER", "ADMIN"]
                 );
                 #endregion
+
                 return await GetCustomerFormByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -488,8 +489,7 @@ namespace Business.Services.Ykb
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
-
-
+                 
 
                 // Commit
                 await _uow.Repository.CompleteAsync();
@@ -722,7 +722,7 @@ namespace Business.Services.Ykb
                             Title = $"Talep {dto.RequestNo} teknik servise gönderildi",
                             Message = $"Akış {"WH"} → {"TS"} geçti. Müşteri: {request.Customer?.ContactName1 ?? "-"}",
                             RequestNo = dto.RequestNo,
-                            FromStepCode = "SR",
+                            FromStepCode = "WH",
                             ToStepCode = "TS",
                             Payload = new { wfId = wf.Id }
                         },
@@ -1043,12 +1043,12 @@ namespace Business.Services.Ykb
                 await _notification.CreateForRolesAsync(
                  new NotificationCreateDto
                  {
-                     Type = NotificationType.WorkflowStepChanged,
-                     Title = $"{dto.RequestNo} Servis başladı",
-                     Message = $"{dto.RequestNo} Numaralı talep servisi başladı",
+                     Type = NotificationType.GenericInfo,
+                     FromStepCode = "TS",
+                     ToStepCode = "TS",
+                     Title = $"Talep {dto.RequestNo} için teknik servis başlatıldı",
+                     Message = $"{dto.RequestNo} numaralı talebin teknik servis işlemi başlatıldı.",
                      RequestNo = dto.RequestNo,
-                     FromStepCode = "SR",
-                     ToStepCode = "SR",
                      Payload = new { wfId = wf.Id }
                  },
                  roleCodes: ["PROJECTENGINEER", "TECHNICIAN", "ADMIN"]
@@ -1721,6 +1721,12 @@ namespace Business.Services.Ykb
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
                     wf.WorkFlowStatus = dto.FinalApprovalStatus == FinalApprovalStatus.CustomerApproval ? WorkFlowStatus.Pending : dto.WorkFlowStatus;
+                    wf.IsAgreement = wf.WorkFlowStatus switch
+                    {
+                        WorkFlowStatus.Complated => true,
+                        WorkFlowStatus.Cancelled => false,
+                        _ => null
+                    };
                     _uow.Repository.Update(wf);
                 }
                 #endregion

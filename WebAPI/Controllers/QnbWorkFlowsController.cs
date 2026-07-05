@@ -49,13 +49,6 @@ namespace WebAPI.Controllers
         }
 
 
-        [HttpPost("create-customer-form")]
-        public async Task<IActionResult> CreateCustomerForm([FromBody] QnbCustomerFormCreateDto dto)
-        {
-            var result = await _workFlowService.CreateCustomerForm(dto);
-            return Ok(result);
-        }
-
         [HttpPost("send-warehouse")]
         public async Task<IActionResult> SendWarehouse([FromBody] QnbSendWarehouseDto dto)
         {
