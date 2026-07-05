@@ -91,6 +91,7 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public string? Currency { get; set; }
 
         public FinalApprovalStatus? FinalApprovalStatus { get; set; }
+        public string? FinalApprovalNotes { get; set; }
         public decimal? DiscountPercent { get; set; }
 
         public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
