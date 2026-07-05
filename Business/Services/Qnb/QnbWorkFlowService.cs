@@ -1572,7 +1572,12 @@ namespace Business.Services.Qnb
                 wf.UpdatedDate = DateTime.Now;
                 wf.UpdatedUser = meId;
                 wf.WorkFlowStatus = dto.WorkFlowStatus;
-
+                wf.IsAgreement = dto.WorkFlowStatus switch
+                {
+                    WorkFlowStatus.Complated => true,
+                    WorkFlowStatus.Cancelled => false,
+                    _ => null
+                };
                 _uow.Repository.Update(wf);
 
                 #endregion
@@ -5522,8 +5527,8 @@ namespace Business.Services.Qnb
                         Currency = pricing?.Currency,
 
                         FinalApprovalStatus = finalApproval?.Status,
-                        DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
+                        DiscountPercent = finalApproval?.DiscountPercent,
 
                         WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList) ? qnbWotList : new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>()
                     };

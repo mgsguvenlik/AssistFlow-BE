@@ -1592,6 +1592,12 @@ namespace Business.Services
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
                     wf.WorkFlowStatus = dto.WorkFlowStatus;
+                    wf.IsAgreement = dto.WorkFlowStatus switch
+                    {
+                        WorkFlowStatus.Complated => true,
+                        WorkFlowStatus.Cancelled => false,
+                        _ => null
+                    };
                     _uow.Repository.Update(wf);
                 }
                 #endregion
@@ -5979,7 +5985,8 @@ namespace Business.Services
                     {
                         fa.RequestNo,
                         fa.Status,
-                        fa.DiscountPercent
+                        fa.DiscountPercent,
+                        fa.Notes,
                     })
                     .ToListAsync();
 
@@ -6147,6 +6154,7 @@ namespace Business.Services
                         Currency = pricing?.Currency,
 
                         FinalApprovalStatus = finalApproval?.Status,
+                        FinalApprovalNotes = finalApproval?.Notes,
                         DiscountPercent = finalApproval?.DiscountPercent,
 
                         WorkOrderTypes = wotDict.TryGetValue(w.RequestNo, out var wotList)

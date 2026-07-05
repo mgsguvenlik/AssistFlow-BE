@@ -1721,6 +1721,12 @@ namespace Business.Services.Ykb
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
                     wf.WorkFlowStatus = dto.FinalApprovalStatus == FinalApprovalStatus.CustomerApproval ? WorkFlowStatus.Pending : dto.WorkFlowStatus;
+                    wf.IsAgreement = wf.WorkFlowStatus switch
+                    {
+                        WorkFlowStatus.Complated => true,
+                        WorkFlowStatus.Cancelled => false,
+                        _ => null
+                    };
                     _uow.Repository.Update(wf);
                 }
                 #endregion
