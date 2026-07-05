@@ -7137,6 +7137,8 @@ namespace Business.Services.Ykb
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
+                      
+
                         CustomerNote = finalApproval?.CustomerNote,
                         CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
                         CustomerApprovedByName = customerApprovedByUser?.TechnicianName,
@@ -7548,8 +7550,7 @@ namespace Business.Services.Ykb
                 : displayName;
         }
 
-        private static string FormatWorkOrderTypes(
-            List<WorkOrderTypeLiteDto>? workOrderTypes)
+        private static string FormatWorkOrderTypes(List<WorkOrderTypeLiteDto>? workOrderTypes)
         {
             if (workOrderTypes is null || workOrderTypes.Count == 0)
                 return string.Empty;

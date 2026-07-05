@@ -22,8 +22,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
-using Model.Concrete.WorkFlows;
-using Model.Concrete.Ykb;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -46,12 +44,10 @@ using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWarehouse;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlowStep;
-using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
-using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
-using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
 using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -4415,7 +4411,7 @@ namespace Business.Services.Qnb
             var dto = new QnbWorkFlowReportDto
             {
                 RequestNo = requestNo,
-                Header = new HeaderSectionDto
+                Header = new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.HeaderSectionDto
                 {
                     Title = wf.RequestTitle,
                     WorkFlowStatus = wf.WorkFlowStatus.ToString(),
@@ -4443,7 +4439,7 @@ namespace Business.Services.Qnb
 
             if (sr is not null)
             {
-                dto.ServiceRequest = new ServiceRequestSectionDto
+                dto.ServiceRequest = new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.ServiceRequestSectionDto
                 {
                     Id = sr.Id,
                     OracleNo = sr.QnbServiceTrackNo,
@@ -4462,7 +4458,7 @@ namespace Business.Services.Qnb
 
                 if (sr.Customer is not null)
                 {
-                    dto.Customer = new CustomerSectionDto
+                    dto.Customer = new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.CustomerSectionDto
                     {
                         Id = sr.Customer.Id,
                         SubscriberCode = sr.Customer.SubscriberCode,
@@ -4484,14 +4480,14 @@ namespace Business.Services.Qnb
 
                     if (sr.Customer.CustomerGroup is not null)
                     {
-                        dto.Customer.CustomerGroup = new CustomerGroupLiteDto
+                        dto.Customer.CustomerGroup = new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.CustomerGroupLiteDto
                         {
                             Id = sr.Customer.CustomerGroup.Id,
                             GroupName = sr.Customer.CustomerGroup.GroupName,
                             Code = sr.Customer.CustomerGroup.Code,
                             ParentGroupId = sr.Customer.CustomerGroup.ParentGroupId,
                             ProgressApprovers = sr.Customer.CustomerGroup.ProgressApprovers?
-                                .Select(p => new ProgressApproverLiteDto
+                                .Select(p => new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.ProgressApproverLiteDto
                                 {
                                     Id = p.Id,
                                 }).ToList() ?? new()
@@ -4537,7 +4533,7 @@ namespace Business.Services.Qnb
                        : p.Customer?.Tenant?.TenantProductPrices?.Any(t => t.ProductId == p.ProductId) == true ? "Tenant"
                        : "Standard");
 
-                dto.Products.Add(new ProductLineDto
+                dto.Products.Add(new Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport.ProductLineDto
                 {
                     Id = p.Id,
                     ProductId = p.ProductId,
@@ -5054,7 +5050,6 @@ namespace Business.Services.Qnb
             public string Currency { get; set; } = "TRY";
         }
 
-
         public async Task<ResponseModel<PagedResult<QnbBasicReportListDto>>> GetQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q)
         {
             try
@@ -5337,6 +5332,26 @@ namespace Business.Services.Qnb
                             fa.Status == q.FinalApprovalStatus.Value));
                 }
 
+                // -------------------------
+                // WorkOrder Filtresi
+                // -------------------------
+                if (q.WorkOrderTypeIds is { Count: > 0 })
+                {
+                    var workOrderTypeIds = q.WorkOrderTypeIds
+                        .Where(x => x > 0)
+                        .Distinct()
+                        .ToList();
+
+                    wfQuery = wfQuery.Where(w =>
+                        srQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.QnbServicesRequestWorkOrderTypes.Any(wot =>
+                                workOrderTypeIds.Contains(wot.WorkOrderTypeId)
+                            )
+                        )
+                    );
+                }
+
                 #endregion
 
                 var total = await wfQuery.CountAsync();
@@ -5469,6 +5484,27 @@ namespace Business.Services.Qnb
                         fa.Notes
                     })
                     .ToListAsync();
+
+                var qnbWorkOrderTypes = await _uow.Repository
+                        .GetQueryable<QnbServicesRequestWorkOrderType>()
+                        .AsNoTracking()
+                        .Where(x => requestNos.Contains(x.QnbServicesRequest.RequestNo))
+                        .Select(x => new
+                        {
+                            RequestNo = x.QnbServicesRequest.RequestNo,
+                            x.WorkOrderType.Id,
+                            x.WorkOrderType.Name,
+                            x.WorkOrderType.Code
+                        })
+                        .ToListAsync();
+
+                var qnbWotDict = qnbWorkOrderTypes
+                    .GroupBy(x => x.RequestNo)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.Select(w => new Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto { Id = w.Id, Name = w.Name, Code = w.Code }).ToList()
+                    );
+
 
                 var userIds = workflows
                     .SelectMany(x => new long?[]
@@ -5611,7 +5647,9 @@ namespace Business.Services.Qnb
 
                         FinalApprovalStatus = finalApproval?.Status,
                         DiscountPercent = finalApproval?.DiscountPercent,
-                        FinalApprovalNotes = finalApproval?.Notes
+                        FinalApprovalNotes = finalApproval?.Notes,
+
+                        WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList)? qnbWotList: new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>()
                     };
                 }).ToList();
 
@@ -5634,6 +5672,364 @@ namespace Business.Services.Qnb
                 );
             }
         }
+
+        public async Task<(byte[] Content, string FileName, string ContentType)> ExportQnbBasicWorkFlowReportAsync(QnbBasicReportQueryParams q)
+        {
+            q ??= new QnbBasicReportQueryParams();
+
+            const int internalPageSize = 200;
+            const int excelMaxRow = 1_048_576;
+
+            try
+            {
+                using var workbook = new XLWorkbook();
+                var sheetNumber = 1;
+                var rowNumber = 2;
+                var sequenceNo = 1;
+                var worksheet = CreateQnbBasicReportWorksheet(workbook, sheetNumber);
+                var page = 1;
+
+                while (true)
+                {
+                    q.Page = page;
+                    q.PageSize = internalPageSize;
+
+                    var result = await GetQnbBasicWorkFlowReportAsync(q);
+
+                    if (result.Data is null)
+                    {
+                        throw new InvalidOperationException(
+                            "QNB temel rapor verisi export için alınamadı.");
+                    }
+
+                    var items = result.Data.Items;
+
+                    if (items is null || items.Count == 0)
+                    {
+                        break;
+                    }
+
+                    foreach (var item in items)
+                    {
+                        if (rowNumber > excelMaxRow)
+                        {
+                            sheetNumber++;
+                            worksheet = CreateQnbBasicReportWorksheet(workbook, sheetNumber);
+                            rowNumber = 2;
+                        }
+
+                        WriteQnbBasicReportRow(
+                            worksheet,
+                            rowNumber,
+                            sequenceNo,
+                            item);
+
+                        rowNumber++;
+                        sequenceNo++;
+                    }
+
+                    if (items.Count < internalPageSize)
+                    {
+                        break;
+                    }
+
+                    page++;
+                }
+
+                foreach (var ws in workbook.Worksheets)
+                {
+                    var lastRowForWidth = Math.Min(ws.LastRowUsed()?.RowNumber() ?? 1, 100);
+                    ws.Columns(1, 54).AdjustToContents(1, lastRowForWidth);
+                    ws.SheetView.FreezeRows(1);
+                    ws.Range(1, 1, 1, 54).SetAutoFilter();
+                    ws.Columns().Style.Alignment.Vertical =
+                        XLAlignmentVerticalValues.Center;
+                }
+
+                using var memoryStream = new MemoryStream();
+                workbook.SaveAs(memoryStream);
+
+                var fileName = $"QNB_Temel_Rapor_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+                const string contentType =
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+                return (memoryStream.ToArray(), fileName, contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExportQnbBasicWorkFlowReportAsync");
+                throw;
+            }
+        }
+
+        private static IXLWorksheet CreateQnbBasicReportWorksheet(XLWorkbook workbook, int sheetNumber)
+        {
+            var sheetName = sheetNumber == 1
+                ? "QNB Temel Rapor"
+                : $"QNB Temel Rapor {sheetNumber}";
+
+            var ws = workbook.Worksheets.Add(sheetName);
+
+            var headers = new[]
+            {
+                 "Sıra No",
+                 "Workflow Id",
+                 "Talep No",
+                 "Talep Başlığı",
+                 "QNB Servis Takip No",
+
+                 "Mevcut Adım Id",
+                 "Mevcut Adım Kodu",
+                 "Mevcut Adım Adı",
+                 "Mevcut Adım Gösterim Adı",
+
+                 "Öncelik",
+                 "İş Akışı Durumu",
+
+                 "Oluşturulma Tarihi",
+                 "Güncellenme Tarihi",
+
+                 "Oluşturan Kullanıcı Id",
+                 "Oluşturan Kullanıcı",
+
+                 "Onaylayan Teknisyen Id",
+                 "Onaylayan Teknisyen",
+                 "Onaylayan Teknisyen E-Posta",
+                 "Teknisyen İl",
+                 "Teknisyen İlçe",
+
+                 "Müşteri Id",
+                 "Müşteri Kodu",
+                 "Müşteri Adı",
+                 "Müşteri İl",
+                 "Müşteri İlçe",
+
+                 "Servis Türü Id",
+                 "Servis Türü",
+                 "İş Emri Türleri",
+
+                 "Servis Talep Tarihi",
+                 "Planlanan Tamamlanma Tarihi",
+
+                 "Sözleşmeli Mi",
+                 "Konum Geçerli Mi",
+                 "Ürün Gereksinimi Var Mı",
+
+                 "Servis Maliyet Durumu",
+                 "Servis Talep Durumu",
+
+                 "Depo Durumu",
+                 "Depo Teslim Tarihi",
+
+                 "Teknik Servis Durumu",
+                 "Teknik Başlangıç Tarihi",
+                 "Teknik Bitiş Tarihi",
+                 "Teknik Servis Süresi (Dakika)",
+
+                 "Fiyatlandırma Durumu",
+                 "Fiyatlandırma Toplam Tutar",
+                 "Para Birimi",
+
+                 "Son Onay Durumu",
+                 "İndirim Oranı",
+                 "Son Onay Notu",
+
+                 "Son Aktivite Tarihi"
+    };
+
+            for (var i = 0; i < headers.Length; i++)
+            {
+                ws.Cell(1, i + 1).Value = headers[i];
+            }
+
+            var headerRange = ws.Range(1, 1, 1, headers.Length);
+
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+            headerRange.Style.Font.FontColor = XLColor.Black;
+            headerRange.Style.Alignment.Horizontal =
+                XLAlignmentHorizontalValues.Center;
+            headerRange.Style.Alignment.Vertical =
+                XLAlignmentVerticalValues.Center;
+            headerRange.Style.Alignment.WrapText = true;
+            headerRange.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+            ws.Row(1).Height = 32;
+
+            return ws;
+        }
+        private static void WriteQnbBasicReportRow(IXLWorksheet ws, int row, int sequenceNo, QnbBasicReportListDto x)
+        {
+            var c = 1;
+
+            ws.Cell(row, c++).Value = sequenceNo;
+            ws.Cell(row, c++).Value = x.WorkFlowId;
+
+            ws.Cell(row, c++).Value = x.RequestNo ?? string.Empty;
+            ws.Cell(row, c++).Value = x.RequestTitle ?? string.Empty;
+            ws.Cell(row, c++).Value = x.QnbServiceTrackNo ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.CurrentStepId);
+            ws.Cell(row, c++).Value = x.CurrentStepCode ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CurrentStepName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CurrentStepDisplayName ?? string.Empty;
+
+            ws.Cell(row, c++).Value = x.PriorityName;
+            ws.Cell(row, c++).Value = x.WorkFlowStatusName;
+
+            SetDateTime(ws.Cell(row, c++), x.CreatedDate);
+            SetDateTime(ws.Cell(row, c++), x.UpdatedDate);
+
+            ws.Cell(row, c++).Value = x.CreatedUserId;
+            ws.Cell(row, c++).Value = x.CreatedUserName ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.ApproverTechnicianId);
+            ws.Cell(row, c++).Value = x.ApproverTechnicianName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.ApproverTechnicianEmail ?? string.Empty;
+            ws.Cell(row, c++).Value = x.TechnicianCity ?? string.Empty;
+            ws.Cell(row, c++).Value = x.TechnicianDistrict ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.CustomerId);
+            ws.Cell(row, c++).Value = x.CustomerCode ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerName ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerCity ?? string.Empty;
+            ws.Cell(row, c++).Value = x.CustomerDistrict ?? string.Empty;
+
+            SetNullableLong(ws.Cell(row, c++), x.ServiceTypeId);
+            ws.Cell(row, c++).Value = x.ServiceTypeName ?? string.Empty;
+
+            ws.Cell(row, c++).Value = FormatWorkOrderTypes(x.WorkOrderTypes);
+
+            SetDateTime(ws.Cell(row, c++), x.ServicesDate);
+            SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
+
+            ws.Cell(row, c++).Value = BoolText(x.IsAgreement);
+            ws.Cell(row, c++).Value = BoolText(x.IsLocationValid);
+            ws.Cell(row, c++).Value = BoolText(x.IsProductRequirement);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.ServicesCostStatus);
+            ws.Cell(row, c++).Value = GetEnumText(x.ServicesRequestStatus);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.WarehouseStatus);
+            SetDateTime(ws.Cell(row, c++), x.WarehouseDeliveryDate);
+
+            ws.Cell(row, c++).Value = GetEnumText(x.TechnicalServiceStatus);
+            SetDateTime(ws.Cell(row, c++), x.TechnicalStartTime);
+            SetDateTime(ws.Cell(row, c++), x.TechnicalEndTime);
+            SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
+
+            ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
+            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmount, "#,##0.00");
+            ws.Cell(row, c++).Value = x.Currency ?? string.Empty;
+
+            ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
+            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+            ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
+
+            var notesColumn = c - 1;
+
+            SetDateTime(ws.Cell(row, c++), x.LastActivityDate);
+
+            // Uzun not alanı için satır taşması.
+            ws.Cell(row, notesColumn).Style.Alignment.WrapText = true;
+        }
+
+        private static void SetNullableLong(IXLCell cell, long? value)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+        }
+
+        private static void SetDateTime(IXLCell cell, DateTimeOffset? value, string format = "dd.MM.yyyy HH:mm")
+        {
+            if (!value.HasValue)
+                return;
+
+            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
+            cell.Value = value.Value.DateTime;
+            cell.Style.DateFormat.Format = format;
+        }
+        private static void SetDateTime(IXLCell cell, DateTime? value, string format = "dd.MM.yyyy HH:mm")
+        {
+            if (!value.HasValue)
+                return;
+
+            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
+            cell.Value = value.Value;
+            cell.Style.DateFormat.Format = format;
+        }
+
+        private static void SetDecimal(IXLCell cell, decimal? value, string format)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+            cell.Style.NumberFormat.Format = format;
+        }
+
+        private static void SetDouble(IXLCell cell, double? value, string format)
+        {
+            if (!value.HasValue)
+                return;
+
+            cell.Value = value.Value;
+            cell.Style.NumberFormat.Format = format;
+        }
+
+        private static string BoolText(bool? value)
+        {
+            return value switch
+            {
+                true => "Evet",
+                false => "Hayır",
+                _ => "-"
+            };
+        }
+
+        private static string GetEnumText<TEnum>(TEnum? value) where TEnum : struct, Enum
+        {
+            if (!value.HasValue)
+                return "-";
+
+            var enumValue = value.Value;
+
+            var member = typeof(TEnum)
+                .GetMember(enumValue.ToString())
+                .FirstOrDefault();
+
+            var displayName = member?
+                .GetCustomAttributes(typeof(DisplayAttribute), inherit: false)
+                .OfType<DisplayAttribute>()
+                .FirstOrDefault()?
+                .GetName();
+
+            return string.IsNullOrWhiteSpace(displayName)
+                ? enumValue.ToString()
+                : displayName;
+        }
+
+        private static string FormatWorkOrderTypes(List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>? workOrderTypes)
+        {
+            if (workOrderTypes is null || workOrderTypes.Count == 0)
+                return string.Empty;
+
+            return string.Join(", ",
+                workOrderTypes.Select(x =>
+                {
+                    if (!string.IsNullOrWhiteSpace(x.Code) &&
+                        !string.IsNullOrWhiteSpace(x.Name))
+                    {
+                        return $"{x.Code} - {x.Name}";
+                    }
+
+                    return x.Name ?? x.Code ?? string.Empty;
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+        }
+
         // ------------------------ Archive — public ------------------------
         public async Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter)
         {

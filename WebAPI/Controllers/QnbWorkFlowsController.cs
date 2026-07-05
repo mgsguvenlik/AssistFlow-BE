@@ -332,6 +332,13 @@ namespace WebAPI.Controllers
             var result = await _workFlowService.GetQnbBasicWorkFlowReportAsync(q);
             return StatusCode((int)result.StatusCode, result);
         }
+
+        [HttpGet("basic-report/export")]
+        public async Task<IActionResult> ExportQnbBasicReport([FromQuery] QnbBasicReportQueryParams q)
+        {
+            var (content, fileName, contentType) = await _workFlowService.ExportQnbBasicWorkFlowReportAsync(q);
+            return File(content, contentType, fileName);
+        }
         // ---------- Helpers ----------
         private IActionResult ToActionResult(ResponseModel resp)
         {

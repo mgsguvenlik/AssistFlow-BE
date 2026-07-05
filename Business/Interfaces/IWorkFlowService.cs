@@ -11,6 +11,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
 
 namespace Business.Interfaces
 {
@@ -69,6 +70,7 @@ namespace Business.Interfaces
         Task<PagedResult<WorkFlowReportLineDto>> GetReportLinesAsync(ReportQueryParams q);
         Task<(byte[] Content, string FileName, string ContentType)> ExportReportLinesAsync(ReportQueryParams q);
         Task<ResponseModel<PagedResult<WorkFlowBasicReportListDto>>> GetBasicWorkFlowReportAsync(WorkFlowBasicReportQueryParams q);
+        Task<(byte[] Content, string FileName, string ContentType)> ExportBasicWorkFlowReportAsync(WorkFlowBasicReportQueryParams q);
 
 
         //Arşiv 
