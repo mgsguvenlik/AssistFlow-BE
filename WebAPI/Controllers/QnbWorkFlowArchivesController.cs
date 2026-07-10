@@ -1,3 +1,4 @@
+using Autofac.Core;
 using Business.Interfaces.Qnb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -67,7 +68,23 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportArchiveList([FromQuery] QnbWorkFlowArchiveFilterDto filter, CancellationToken ct)
+        {
+            var result = await _workFlowService.ExportArchiveListToExcelAsync(filter, ct);
 
-        
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            var fileName = $"QnbWorkFlowArsiv_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return File(
+                result.Data,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName
+            );
+        }
+
+
+
     }
 }

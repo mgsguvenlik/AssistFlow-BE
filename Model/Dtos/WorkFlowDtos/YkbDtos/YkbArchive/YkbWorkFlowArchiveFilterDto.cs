@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
+﻿namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
 {
     public class YkbWorkFlowArchiveFilterDto
     {
@@ -12,6 +6,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
         public string? CustomerName { get; set; }       // JSON içinden filtrelenecek
         public string? TechnicianName { get; set; }     // JSON içinden filtrelenecek
         public string? ArchiveReason { get; set; }      // Completed / Cancelled vb.
+        public string? WorkOrderType { get; set; }      
+        public string? ServiceTypeName { get; set; } 
         public DateTime? ArchivedFrom { get; set; }
         public DateTime? ArchivedTo { get; set; }
 

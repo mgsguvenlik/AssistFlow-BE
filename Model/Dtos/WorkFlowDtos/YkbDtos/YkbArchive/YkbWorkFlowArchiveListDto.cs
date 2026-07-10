@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
+﻿namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
 {
     public class YkbWorkFlowArchiveListDto
     {
@@ -14,6 +8,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
         public string? TechnicianName { get; set; }
         public string? WorkFlowStatus { get; set; }
         public string ArchiveReason { get; set; } = default!;
+        public List<string> WorkOrderTypes { get; set; } = new(); 
+        public string ServiceTypeName { get; set; }   = default!;
         public DateTime ArchivedAt { get; set; }
     }
 }

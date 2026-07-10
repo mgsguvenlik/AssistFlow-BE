@@ -3,6 +3,7 @@ using Business.Interfaces.Manitou;
 using Business.Interfaces.Qnb;
 using Business.Services.Manitou;
 using Business.UnitOfWork;
+using Business.Utilities.Export;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
@@ -22,6 +23,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
+using Model.Dtos.ArchiveExport;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -5947,7 +5949,9 @@ namespace Business.Services.Qnb
                         a.ArchivedAt,
                         a.CustomerJson,
                         a.ApproverTechnicianJson,
-                        a.QnbWorkFlowJson
+                        a.QnbWorkFlowJson,
+                        a.WorkOrderTypesJson,         
+                        a.QnbServicesRequestJson      
                     })
                     .OrderByDescending(x => x.ArchivedAt);
 
@@ -5968,6 +5972,8 @@ namespace Business.Services.Qnb
                     string? customerName = null;
                     string? technicianName = null;
                     string? wfStatus = null;
+                    List<string> workOrderTypeNames = new();
+                    string? serviceTypeName = null;
 
                     try
                     {
@@ -5990,6 +5996,20 @@ namespace Business.Services.Qnb
                     }
                     catch { }
 
+                    try
+                    {
+                        var wots = JsonConvert.DeserializeObject<List<WorkOrderType>>(a.WorkOrderTypesJson ?? "[]");
+                        if (wots != null)
+                            workOrderTypeNames = wots.Select(w => w.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                    }
+                    catch { }
+
+                    try
+                    {
+                        var sr = JsonConvert.DeserializeObject<QnbServicesRequest>(a.QnbServicesRequestJson);
+                        serviceTypeName = sr?.ServiceType?.Name;
+                    }
+                    catch { }
                     list.Add(new QnbWorkFlowArchiveListDto
                     {
                         Id = a.Id,
@@ -5998,7 +6018,9 @@ namespace Business.Services.Qnb
                         ArchivedAt = a.ArchivedAt,
                         CustomerName = customerName,
                         TechnicianName = technicianName,
-                        WorkFlowStatus = wfStatus
+                        WorkFlowStatus = wfStatus,
+                        WorkOrderTypes = workOrderTypeNames, 
+                        ServiceTypeName = serviceTypeName    
                     });
                 }
 
@@ -6017,6 +6039,23 @@ namespace Business.Services.Qnb
                     list = list
                         .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
                                     x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.WorkOrderType))
+                {
+                    var wot = filter.WorkOrderType.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => x.WorkOrderTypes.Any(w => w.ToLowerInvariant().Contains(wot)))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.ServiceTypeName))
+                {
+                    var stn = filter.ServiceTypeName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.ServiceTypeName) &&
+                                    x.ServiceTypeName!.ToLowerInvariant().Contains(stn))
                         .ToList();
                 }
 
@@ -6111,12 +6150,130 @@ namespace Business.Services.Qnb
             }
         }
 
+        public async Task<ResponseModel<byte[]>> ExportArchiveListToExcelAsync(QnbWorkFlowArchiveFilterDto filter, CancellationToken ct = default)
+        {
+            try
+            {
+                var q = _uow.Repository.GetQueryable<QnbWorkFlowArchive>().AsNoTracking();
+
+                if (!string.IsNullOrWhiteSpace(filter.RequestNo))
+                {
+                    var rn = filter.RequestNo.Trim();
+                    q = q.Where(x => x.RequestNo.Contains(rn));
+                }
+                if (!string.IsNullOrWhiteSpace(filter.ArchiveReason))
+                {
+                    var reason = filter.ArchiveReason.Trim();
+                    q = q.Where(x => x.ArchiveReason == reason);
+                }
+                if (filter.ArchivedFrom.HasValue) q = q.Where(x => x.ArchivedAt >= filter.ArchivedFrom.Value);
+                if (filter.ArchivedTo.HasValue) q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
+
+                // Sayfalama yok — filtreye uyan tüm kayıtlar
+                var archives = await q.OrderByDescending(x => x.ArchivedAt).ToListAsync(ct);
+
+                var summaryRows = new List<ArchiveExportSummaryRow>();
+                var detailRows = new List<ArchiveExportDetailRow>();
+                var imageRows = new List<ArchiveExportImageRow>();
+
+                foreach (var a in archives)
+                {
+                    // Mevcut BuildArchiveDetailDto'yu aynen kullanıyoruz:
+                    // - JSON deserialize
+                    // - image URL normalizasyonu
+                    // hepsi zaten burada yapılıyor, tekrar yazmıyoruz.
+                    var detailDto = BuildArchiveDetailDto(a);
+                    var snap = detailDto.Snapshot;
+
+                    List<string> workOrderTypeNames = new();
+                    try
+                    {
+                        var wots = JsonConvert.DeserializeObject<List<WorkOrderType>>(a.WorkOrderTypesJson ?? "[]");
+                        if (wots != null)
+                            workOrderTypeNames = wots.Select(w => w.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                    }
+                    catch { }
+
+                    var customerName = snap.Customer?.ContactName1 ?? snap.Customer?.SubscriberCompany;
+                    var technicianName = snap.ApproverTechnician?.TechnicianName;
+                    var wfStatus = snap.WorkFlow?.WorkFlowStatus.ToString();
+                    var serviceTypeName = snap.ServicesRequest?.ServiceType?.Name;
+
+                    // --- Listeleme ekranıyla aynı in-memory filtreler ---
+                    if (!string.IsNullOrWhiteSpace(filter.CustomerName) &&
+                        (string.IsNullOrEmpty(customerName) || !customerName.Contains(filter.CustomerName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.TechnicianName) &&
+                        (string.IsNullOrEmpty(technicianName) || !technicianName.Contains(filter.TechnicianName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.ServiceTypeName) &&
+                        (string.IsNullOrEmpty(serviceTypeName) || !serviceTypeName.Contains(filter.ServiceTypeName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.WorkOrderType) &&
+                        !workOrderTypeNames.Any(w => w.Contains(filter.WorkOrderType.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    summaryRows.Add(new ArchiveExportSummaryRow
+                    {
+                        Id = a.Id,
+                        RequestNo = a.RequestNo,
+                        CustomerName = customerName,
+                        TechnicianName = technicianName,
+                        WorkFlowStatus = wfStatus,
+                        ServiceTypeName = serviceTypeName,
+                        WorkOrderTypes = string.Join(", ", workOrderTypeNames),
+                        ArchiveReason = a.ArchiveReason,
+                        ArchivedAt = a.ArchivedAt
+                    });
+
+                    ArchiveExcelExportHelper.AddSnapshotDetailRows(a.RequestNo, snap, detailRows);
+
+                    // Snapshot içindeki image URL'leri BuildArchiveDetailDto tarafından
+                    // zaten normalize edilmiş durumda — tekrar normalize etmiyoruz.
+                    foreach (var img in snap.ServiceImages ?? new())
+                    {
+                        imageRows.Add(new ArchiveExportImageRow
+                        {
+                            RequestNo = a.RequestNo,
+                            ImageGroup = "Servis Resmi",
+                            ImageId = img.Id,
+                            Caption = img.Caption,
+                            NormalizedUrl = img.Url
+                        });
+                    }
+                    foreach (var img in snap.FormImages ?? new())
+                    {
+                        imageRows.Add(new ArchiveExportImageRow
+                        {
+                            RequestNo = a.RequestNo,
+                            ImageGroup = "Form Resmi",
+                            ImageId = img.Id,
+                            Caption = img.Caption,
+                            NormalizedUrl = img.Url
+                        });
+                    }
+                }
+
+                var fileBytes = ArchiveExcelExportHelper.BuildWorkbook(summaryRows, detailRows, imageRows);
+                return ResponseModel<byte[]>.Success(fileBytes);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExportArchiveListToExcelAsync");
+                return ResponseModel<byte[]>.Fail($"Excel export sırasında hata oluştu: {ex.Message}", StatusCode.Error);
+            }
+        }
+
         // ------------------------ Archive — internal ------------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
             var servicesRequest = await _uow.Repository
                 .GetQueryable<QnbServicesRequest>()
                 .Include(x => x.Customer)
+                .Include(x => x.ServiceType)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
 
@@ -6135,6 +6292,15 @@ namespace Business.Services.Qnb
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(ct);
+
+            // İş emri türleri (WorkOrderType) — yeni
+            var workOrderTypes = await _uow.Repository
+                .GetQueryable<QnbServicesRequestWorkOrderType>()
+                .Include(x => x.WorkOrderType)
+                .AsNoTracking()
+                .Where(x => x.QnbServicesRequestId == servicesRequest.Id)
+                .Select(x => x.WorkOrderType)
                 .ToListAsync(ct);
 
             ProgressApprover? customerApprover = null;
@@ -6223,7 +6389,8 @@ namespace Business.Services.Qnb
                 QnbTechnicalServiceFormImagesJson = JsonConvert.SerializeObject(formImageDtos),
                 QnbWarehouseJson = JsonConvert.SerializeObject(warehouse),
                 QnbPricingJson = JsonConvert.SerializeObject(pricing),
-                QnbFinalApprovalJson = JsonConvert.SerializeObject(finalApproval)
+                QnbFinalApprovalJson = JsonConvert.SerializeObject(finalApproval),
+                WorkOrderTypesJson = JsonConvert.SerializeObject(workOrderTypes)  
             };
 
             await _uow.Repository.AddAsync(archive);

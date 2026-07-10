@@ -4,6 +4,7 @@ using Business.Interfaces.Manitou;
 using Business.Interfaces.Ykb;
 using Business.Services.Manitou;
 using Business.UnitOfWork;
+using Business.Utilities.Export;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
@@ -27,6 +28,7 @@ using Model.Concrete;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Dtos.ArchiveExport;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -7103,6 +7105,7 @@ namespace Business.Services.Ykb
                         ApproverTechnicianEmail = technician?.TechnicianEmail,
                         TechnicianCity = technician?.City,
                         TechnicianDistrict = technician?.District,
+                       
 
                         CustomerId = sr?.CustomerId ?? cf?.CustomerId,
                         CustomerCode = sr?.CustomerCode ?? cf?.CustomerCode,
@@ -7796,7 +7799,9 @@ namespace Business.Services.Ykb
                         a.ArchivedAt,
                         a.CustomerJson,
                         a.ApproverTechnicianJson,
-                        a.YkbWorkFlowJson
+                        a.YkbWorkFlowJson,
+                        a.WorkOrderTypesJson,        
+                        a.YkbServicesRequestJson     
                     })
                     .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
 
@@ -7821,7 +7826,8 @@ namespace Business.Services.Ykb
                     string? customerName = null;
                     string? technicianName = null;
                     string? wfStatus = null;
-
+                    List<string> workOrderTypeNames = new();
+                    string? serviceTypeName = null;
                     // Müşteri adı
                     try
                     {
@@ -7853,6 +7859,23 @@ namespace Business.Services.Ykb
                     {
                     }
 
+                 
+
+                    try
+                    {
+                        var wots = JsonConvert.DeserializeObject<List<WorkOrderType>>(a.WorkOrderTypesJson ?? "[]");
+                        if (wots != null)
+                            workOrderTypeNames = wots.Select(w => w.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                    }
+                    catch { }
+
+                    try
+                    {
+                        var sr = JsonConvert.DeserializeObject<YkbServicesRequest>(a.YkbServicesRequestJson);
+                        serviceTypeName = sr?.ServiceType?.Name;
+                    }
+                    catch { }
+
                     list.Add(new YkbWorkFlowArchiveListDto
                     {
                         Id = a.Id,
@@ -7861,7 +7884,9 @@ namespace Business.Services.Ykb
                         ArchivedAt = a.ArchivedAt,
                         CustomerName = customerName,
                         TechnicianName = technicianName,
-                        WorkFlowStatus = wfStatus
+                        WorkFlowStatus = wfStatus,
+                        WorkOrderTypes = workOrderTypeNames,   
+                        ServiceTypeName = serviceTypeName      
                     });
                 }
 
@@ -7882,6 +7907,23 @@ namespace Business.Services.Ykb
                     list = list
                         .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
                                     x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.WorkOrderType))
+                {
+                    var wot = filter.WorkOrderType.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => x.WorkOrderTypes.Any(w => w.ToLowerInvariant().Contains(wot)))
+                        .ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(filter.ServiceTypeName))
+                {
+                    var stn = filter.ServiceTypeName.Trim().ToLowerInvariant();
+                    list = list
+                        .Where(x => !string.IsNullOrEmpty(x.ServiceTypeName) &&
+                                    x.ServiceTypeName!.ToLowerInvariant().Contains(stn))
                         .ToList();
                 }
 
@@ -7977,6 +8019,123 @@ namespace Business.Services.Ykb
             }
         }
 
+        public async Task<ResponseModel<byte[]>> ExportArchiveListToExcelAsync(YkbWorkFlowArchiveFilterDto filter, CancellationToken ct = default)
+        {
+            try
+            {
+                var q = _uow.Repository.GetQueryable<YkbWorkFlowArchive>().AsNoTracking();
+
+                if (!string.IsNullOrWhiteSpace(filter.RequestNo))
+                {
+                    var rn = filter.RequestNo.Trim();
+                    q = q.Where(x => x.RequestNo.Contains(rn));
+                }
+                if (!string.IsNullOrWhiteSpace(filter.ArchiveReason))
+                {
+                    var reason = filter.ArchiveReason.Trim();
+                    q = q.Where(x => x.ArchiveReason == reason);
+                }
+                if (filter.ArchivedFrom.HasValue) q = q.Where(x => x.ArchivedAt >= filter.ArchivedFrom.Value);
+                if (filter.ArchivedTo.HasValue) q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
+
+                // Sayfalama yok — filtreye uyan tüm kayıtlar
+                var archives = await q.OrderByDescending(x => x.ArchivedAt).ToListAsync(ct);
+
+                var summaryRows = new List<ArchiveExportSummaryRow>();
+                var detailRows = new List<ArchiveExportDetailRow>();
+                var imageRows = new List<ArchiveExportImageRow>();
+
+                foreach (var a in archives)
+                {
+                    // Mevcut BuildArchiveDetailDto'yu aynen kullanıyoruz:
+                    // - JSON deserialize
+                    // - image URL normalizasyonu
+                    // hepsi zaten burada yapılıyor, tekrar yazmıyoruz.
+                    var detailDto = BuildArchiveDetailDto(a);
+                    var snap = detailDto.Snapshot;
+
+                    List<string> workOrderTypeNames = new();
+                    try
+                    {
+                        var wots = JsonConvert.DeserializeObject<List<WorkOrderType>>(a.WorkOrderTypesJson ?? "[]");
+                        if (wots != null)
+                            workOrderTypeNames = wots.Select(w => w.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                    }
+                    catch { }
+
+                    var customerName = snap.Customer?.ContactName1 ?? snap.Customer?.SubscriberCompany;
+                    var technicianName = snap.ApproverTechnician?.TechnicianName;
+                    var wfStatus = snap.WorkFlow?.WorkFlowStatus.ToString();
+                    var serviceTypeName = snap.ServicesRequest?.ServiceType?.Name;
+
+                    // --- Listeleme ekranıyla aynı in-memory filtreler ---
+                    if (!string.IsNullOrWhiteSpace(filter.CustomerName) &&
+                        (string.IsNullOrEmpty(customerName) || !customerName.Contains(filter.CustomerName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.TechnicianName) &&
+                        (string.IsNullOrEmpty(technicianName) || !technicianName.Contains(filter.TechnicianName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.ServiceTypeName) &&
+                        (string.IsNullOrEmpty(serviceTypeName) || !serviceTypeName.Contains(filter.ServiceTypeName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(filter.WorkOrderType) &&
+                        !workOrderTypeNames.Any(w => w.Contains(filter.WorkOrderType.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    summaryRows.Add(new ArchiveExportSummaryRow
+                    {
+                        Id = a.Id,
+                        RequestNo = a.RequestNo,
+                        CustomerName = customerName,
+                        TechnicianName = technicianName,
+                        WorkFlowStatus = wfStatus,
+                        ServiceTypeName = serviceTypeName,
+                        WorkOrderTypes = string.Join(", ", workOrderTypeNames),
+                        ArchiveReason = a.ArchiveReason,
+                        ArchivedAt = a.ArchivedAt
+                    });
+
+                    ArchiveExcelExportHelper.AddSnapshotDetailRows(a.RequestNo, snap, detailRows);
+
+                    // Snapshot içindeki image URL'leri BuildArchiveDetailDto tarafından
+                    // zaten normalize edilmiş durumda — tekrar normalize etmiyoruz.
+                    foreach (var img in snap.ServiceImages ?? new())
+                    {
+                        imageRows.Add(new ArchiveExportImageRow
+                        {
+                            RequestNo = a.RequestNo,
+                            ImageGroup = "Servis Resmi",
+                            ImageId = img.Id,
+                            Caption = img.Caption,
+                            NormalizedUrl = img.Url
+                        });
+                    }
+                    foreach (var img in snap.FormImages ?? new())
+                    {
+                        imageRows.Add(new ArchiveExportImageRow
+                        {
+                            RequestNo = a.RequestNo,
+                            ImageGroup = "Form Resmi",
+                            ImageId = img.Id,
+                            Caption = img.Caption,
+                            NormalizedUrl = img.Url
+                        });
+                    }
+                }
+
+                var fileBytes = ArchiveExcelExportHelper.BuildWorkbook(summaryRows, detailRows, imageRows);
+                return ResponseModel<byte[]>.Success(fileBytes);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ExportArchiveListToExcelAsync");
+                return ResponseModel<byte[]>.Fail($"Excel export sırasında hata oluştu: {ex.Message}", StatusCode.Error);
+            }
+        }
+
         /// --------------------- Arşivleme  ---------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
@@ -7984,6 +8143,7 @@ namespace Business.Services.Ykb
             var servicesRequest = await _uow.Repository
                 .GetQueryable<YkbServicesRequest>()
                 .Include(x => x.Customer)
+                .Include(x => x.ServiceType)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
 
@@ -8003,6 +8163,16 @@ namespace Business.Services.Ykb
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
                 .ToListAsync(ct);
+
+            // İş emri türleri (WorkOrderType) — yeni
+            var workOrderTypes = await _uow.Repository
+                .GetQueryable<YkbServicesRequestWorkOrderType>()
+                .Include(x => x.WorkOrderType)
+                .AsNoTracking()
+                .Where(x => x.YkbServicesRequestId == servicesRequest.Id)
+                .Select(x => x.WorkOrderType)
+                .ToListAsync(ct);
+
 
             // CustomerApprover
             ProgressApprover? customerApprover = null;
@@ -8112,6 +8282,7 @@ namespace Business.Services.Ykb
             var warehouseJson = JsonConvert.SerializeObject(warehouse);
             var pricingJson = JsonConvert.SerializeObject(pricing);
             var finalApprovalJson = JsonConvert.SerializeObject(finalApproval);
+            var workOrderTypesJson = JsonConvert.SerializeObject(workOrderTypes);
 
             // 4) Arşiv kaydı oluştur
             var archive = new YkbWorkFlowArchive
@@ -8132,7 +8303,8 @@ namespace Business.Services.Ykb
                 YkbTechnicalServiceFormImagesJson = techServiceFormImagesJson,
                 YkbWarehouseJson = warehouseJson,
                 YkbPricingJson = pricingJson,
-                YkbFinalApprovalJson = finalApprovalJson
+                YkbFinalApprovalJson = finalApprovalJson,
+                WorkOrderTypesJson = workOrderTypesJson
             };
 
             await _uow.Repository.AddAsync(archive);

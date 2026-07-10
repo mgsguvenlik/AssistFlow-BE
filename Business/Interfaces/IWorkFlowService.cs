@@ -78,7 +78,8 @@ namespace Business.Interfaces
         Task<ResponseModel<PagedResult<WorkFlowArchiveListDto>>> GetArchiveListAsync(WorkFlowArchiveFilterDto filter);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
-         
+        Task<ResponseModel<byte[]>> ExportArchiveListToExcelAsync(WorkFlowArchiveFilterDto filter, CancellationToken ct = default);
+
 
 
         //Manitou System Test Zone ile ilgili işlemler eklenecek

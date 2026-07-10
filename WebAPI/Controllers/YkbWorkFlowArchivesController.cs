@@ -3,6 +3,7 @@ using Business.Interfaces.Ykb;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
 
@@ -68,5 +69,22 @@ namespace WebAPI.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportArchiveList([FromQuery] YkbWorkFlowArchiveFilterDto filter, CancellationToken ct)
+        {
+            var result = await _workFlowService.ExportArchiveListToExcelAsync(filter, ct);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            var fileName = $"YkbWorkFlowArsiv_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return File(
+                result.Data,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName
+            );
+        }
+
     }
 }

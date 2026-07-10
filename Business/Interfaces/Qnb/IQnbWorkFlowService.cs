@@ -84,6 +84,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<PagedResult<QnbWorkFlowArchiveListDto>>> GetArchiveListAsync(QnbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
+        Task<ResponseModel<byte[]>> ExportArchiveListToExcelAsync(QnbWorkFlowArchiveFilterDto filter, CancellationToken ct = default);
 
 
         //Manitou System Test Zone ile ilgili iþlemler eklenecek

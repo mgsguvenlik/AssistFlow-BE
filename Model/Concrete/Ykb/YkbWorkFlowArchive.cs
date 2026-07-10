@@ -54,5 +54,7 @@ namespace Model.Concrete.Ykb
 
         /// <summary>Son onay (FinalApproval)</summary>
         public string YkbFinalApprovalJson { get; set; } = default!;
+
+        public string WorkOrderTypesJson { get; set; }  = default!;
     }
 }

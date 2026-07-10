@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Autofac.Core;
+using Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -65,6 +66,27 @@ namespace WebAPI.Controllers
                 return StatusCode((int)result.StatusCode, result);
 
             return Ok(result);
+        }
+
+
+        /// <summary>
+        /// Filtrelenmiş arşiv sonuçlarını Excel (.xlsx) olarak dışa aktarır.
+        /// Sayfalama uygulanmaz; filtreye uyan tüm kayıtlar export edilir.
+        /// </summary>
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportArchiveList([FromQuery] WorkFlowArchiveFilterDto filter, CancellationToken ct)
+        {
+            var result = await _workFlowService.ExportArchiveListToExcelAsync(filter, ct);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            var fileName = $"WorkFlowArsiv_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            return File(
+                result.Data,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName
+            );
         }
     }
 }

@@ -6,6 +6,9 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive
         public string? CustomerName { get; set; }       // JSON içinden filtrelenecek
         public string? TechnicianName { get; set; }     // JSON içinden filtrelenecek
         public string? ArchiveReason { get; set; }      // Completed / Cancelled vb.
+
+        public string? WorkOrderType { get; set; }   
+        public string? ServiceTypeName { get; set; } 
         public DateTime? ArchivedFrom { get; set; }
         public DateTime? ArchivedTo { get; set; }
 

@@ -83,7 +83,7 @@ namespace Business.Interfaces.Ykb
         Task<ResponseModel<PagedResult<YkbWorkFlowArchiveListDto>>> GetArchiveListAsync(YkbWorkFlowArchiveFilterDto filter);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id);
         Task<ResponseModel<YkbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
-
+        Task<ResponseModel<byte[]>> ExportArchiveListToExcelAsync(YkbWorkFlowArchiveFilterDto filter, CancellationToken ct = default);
 
         //Manitou System Test Zone ile ilgili işlemler eklenecek
         Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
