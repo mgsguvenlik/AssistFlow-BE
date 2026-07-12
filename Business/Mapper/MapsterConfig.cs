@@ -18,6 +18,7 @@ using Model.Dtos.Menu;
 using Model.Dtos.Model;
 using Model.Dtos.Notification;
 using Model.Dtos.Product;
+using Model.Dtos.ProductPriceAdjustmentRule;
 using Model.Dtos.ProductType;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Region;
@@ -300,20 +301,27 @@ namespace Business.Mapper
                   .Ignore(d => d.Brand)
                   .Ignore(d => d.Model)
                   .Ignore(d => d.CurrencyType)
-                  .Ignore(d => d.ProductType);
+                  .Ignore(d => d.ProductType)
+                  .Ignore(d => d.CustomerProductPrices)
+                  .Ignore(d => d.GroupProductPrices)
+                  .Ignore(d => d.TenantProductPrices)
+                  .Ignore(d => d.PriceAdjustmentRules);
 
             config.NewConfig<ProductUpdateDto, Product>()
                   .IgnoreNullValues(true)
                   .Ignore(d => d.Brand)
                   .Ignore(d => d.Model)
                   .Ignore(d => d.CurrencyType)
-                  .Ignore(d => d.ProductType);
+                  .Ignore(d => d.ProductType)
+                  .Ignore(d => d.CustomerProductPrices)
+                  .Ignore(d => d.GroupProductPrices)
+                  .Ignore(d => d.TenantProductPrices)
+                  .Ignore(d => d.PriceAdjustmentRules);
 
             config.NewConfig<Product, ProductGetDto>();
 
-            // Küçük özet
-            config.NewConfig<Product, ProductGetDto>();
 
+            // ---------------- City ----------------
             config.NewConfig<City, CityGetDto>()
                   .Map(d => d.Regions,
                        s => s.Regions.Select(r => new RegionGetDto
@@ -672,6 +680,62 @@ namespace Business.Mapper
                   .Map(d => d.TenantCode, s => s.Tenant != null ? s.Tenant.Code : null)
                   .Map(d => d.ProductCode, s => s.Product != null ? s.Product.ProductCode : null)
                   .Map(d => d.ProductDescription, s => s.Product != null ? s.Product.Description : null);
+
+
+            // ---------------- ProductPriceAdjustmentRule ----------------
+            // Create DTO -> Entity
+            config.NewConfig<
+                    ProductPriceAdjustmentRuleCreateDto,
+                    ProductPriceAdjustmentRule>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.Product)
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser)
+                  .Ignore(d => d.IsDeleted);
+
+            // Update DTO -> Entity
+            config.NewConfig<
+                    ProductPriceAdjustmentRuleUpdateDto,
+                    ProductPriceAdjustmentRule>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.Product)
+                  .Ignore(d => d.CreatedDate)
+                  .Ignore(d => d.CreatedUser)
+                  .Ignore(d => d.UpdatedDate)
+                  .Ignore(d => d.UpdatedUser)
+                  .Ignore(d => d.IsDeleted);
+
+            // Entity -> Get DTO
+            config.NewConfig<
+                      ProductPriceAdjustmentRule,
+                      ProductPriceAdjustmentRuleGetDto>()
+                    .Map(
+                        d => d.TenantName,
+                        s => s.Tenant != null
+                            ? s.Tenant.Name
+                            : null)
+                    .Map(
+                        d => d.TenantCode,
+                        s => s.Tenant != null
+                            ? s.Tenant.Code
+                            : null)
+                    .Map(
+                        d => d.ProductCode,
+                        s => s.Product != null
+                            ? s.Product.ProductCode
+                            : null)
+                    .Map(
+                        d => d.ProductName,
+                        s => s.Product != null
+                            ? s.Product.Description
+                            : null);
+
+
 
             // ---------------- WorkingHourPolicy ----------------
             config.NewConfig<WorkingHourPolicyCreateDto, WorkingHourPolicy>()

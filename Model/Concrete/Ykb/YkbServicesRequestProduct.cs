@@ -84,5 +84,18 @@ namespace Model.Concrete.Ykb
 
         /// <summary>Fiyatın sabitlendiği zaman</summary>
         public DateTime? CapturedAt { get; set; }
+
+
+        /// <summary>
+        /// Bu servis talebi ürününe özel fiyat kuralı uygulandı mı?
+        /// </summary>
+        public bool IsPriceAdjustmentApplied { get; set; }
+
+        /// <summary>
+        /// Uygulanan yüzde veya sabit tutar değeri.
+        /// Örnek: yüzde 10 için 10, sabit 250 TL için 250.
+        /// </summary>
+        [Precision(18, 4)]
+        public decimal? AppliedPriceAdjustmentValue { get; set; }
     }
 }

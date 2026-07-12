@@ -32,6 +32,7 @@ using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.Manitou;
 using Model.Dtos.Notification;
+using Model.Dtos.ProductPriceAdjustmentRule;
 using Model.Dtos.ProgressApprover;
 using Model.Dtos.Role;
 using Model.Dtos.User;
@@ -489,7 +490,7 @@ namespace Business.Services.Ykb
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
-                 
+
 
                 // Commit
                 await _uow.Repository.CompleteAsync();
@@ -540,7 +541,7 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbWarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                
+
                 var request = await _uow.Repository
                     .GetQueryable<YkbServicesRequest>()
                     .Include(x => x.Customer)
@@ -1534,10 +1535,26 @@ namespace Business.Services.Ykb
 
                 foreach (var existing in existingProducts)
                 {
-                    if (deliveredDict.TryGetValue(existing.ProductId, out var delivered))
+                    if (deliveredDict.TryGetValue(
+                            existing.ProductId,
+                            out var delivered))
                     {
                         existing.Quantity = delivered.Quantity;
+
+                        /*
+                         * Daha önce uygulanmamışsa ve kullanıcı uygulamak istiyorsa
+                         * flag ile uygulanan değeri kaydet.
+                         */
+                        if (!existing.IsPriceAdjustmentApplied &&
+                            delivered.ApplyPriceAdjustment)
+                        {
+                            existing.IsPriceAdjustmentApplied = true;
+                            existing.AppliedPriceAdjustmentValue =
+                                delivered.PriceAdjustmentValue;
+                        }
+
                         _uow.Repository.Update(existing);
+
                         deliveredDict.Remove(existing.ProductId);
                     }
                     else
@@ -1747,6 +1764,12 @@ namespace Business.Services.Ykb
                     {
                         existing.Quantity = delivered.Quantity;
                         existing.CapturedUnitPrice = delivered.Price;
+
+                        if (!existing.IsPriceAdjustmentApplied &&   delivered.ApplyPriceAdjustment)
+                        {
+                            existing.IsPriceAdjustmentApplied = true;
+                            existing.AppliedPriceAdjustmentValue = delivered.PriceAdjustmentValue;
+                        }
                         _uow.Repository.Update(existing);
                         deliveredDict.Remove(existing.ProductId);
                     }
@@ -2202,7 +2225,7 @@ namespace Business.Services.Ykb
                         Note = sr.Customer.Note,
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
-                        
+
                         Systems = sr.Customer.CustomerSystemAssignments
                             .Select(a => new CustomerSystemAssignmentGetDto
                             {
@@ -2414,7 +2437,7 @@ namespace Business.Services.Ykb
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            
+
 
             var myId = me.Id;
 
@@ -3183,7 +3206,7 @@ namespace Business.Services.Ykb
                 join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
 
-                //CreatedUser
+                    //CreatedUser
                 join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
                 from cu in cruj.DefaultIfEmpty()
                     // 🔹 ApproverTechnician (User) join
@@ -3221,7 +3244,7 @@ namespace Business.Services.Ykb
                               CustomerApproverId = sr.CustomerApproverId,
                               CustomerApproverName = wf.CustomerApproverName,
                               CustomerId = sr.CustomerId,
-                              CustomerName = sr.Customer.ContactName1 ??"",
+                              CustomerName = sr.Customer.ContactName1 ?? "",
                               ServiceTypeId = sr.ServiceTypeId,
                               CreatedDate = sr.CreatedDate,
                               UpdatedDate = sr.UpdatedDate,
@@ -3590,7 +3613,7 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            dto.ServiceRequestFormImages=entity.YkbServiceRequestFormImages
+            dto.ServiceRequestFormImages = entity.YkbServiceRequestFormImages
                 .Select(img => img.Adapt<YkbTechnicalServiceFormImageGetDto>(_config))
                 .ToList();
             dto.ServicesImages = entity.YkbServicesImages
@@ -3631,7 +3654,7 @@ namespace Business.Services.Ykb
                     LockType = sr.Customer.LockType,
                     TenantId = sr.Customer.TenantId,
                     IsTechnicalServiceTestEnabled = sr.Customer.Tenant.IsTechnicalServiceTestEnabled,
-                    SerialNo=sr.Customer.SerialNo,
+                    SerialNo = sr.Customer.SerialNo,
                     Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -3853,6 +3876,7 @@ namespace Business.Services.Ykb
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
+                            TenantId = sr.Customer.TenantId,
                             Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -3894,79 +3918,71 @@ namespace Business.Services.Ykb
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
-            dto.Products = productEntities
-                .Select(p =>
-                {
-                    // Fiyat sabitlenmiş mi?
-                    bool captured = p.IsPriceCaptured;
-
-                    // 1) Birim fiyat (GetEffectivePrice artık Tenant'ı da içeriyor)
-                    decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)
-                        : p.GetEffectivePrice();
-
-                    // 2) Para birimi
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
-
-                    // 3) DTO doldur
-                    return new YkbServicesRequestProductGetDto
-                    {
-                        Id = p.Id,
-                        RequestNo = p.RequestNo,
-                        ProductId = p.ProductId,
-                        Quantity = p.Quantity,
-
-                        ProductName = p.Product?.Description,
-                        ProductCode = p.Product?.ProductCode,
-                        PriceCurrency = currency,
-                        ProductPrice = effectivePrice,
-                        EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
-                    };
-                })
-                .ToList();
+            var specialPriceRulesByProduct = await GetYkbSpecialPriceRulesAsync(productEntities.Select(x => x.ProductId));
 
             dto.Products = productEntities
-                .Select(p =>
-                {
-                    // Fiyat sabitlenmiş mi?
-                    bool captured = p.IsPriceCaptured;
+                 .Select(p =>
+                 {
+                     bool captured = p.IsPriceCaptured;
 
-                    // 1) Birim fiyat
-                    decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
-                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
+                     decimal effectivePrice = captured
+                         ? (p.CapturedUnitPrice ?? 0m)
+                         : p.GetEffectivePrice();
 
-                    // 2) Para birimi
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                     string? currency = captured
+                         ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                         : p.Product?.PriceCurrency;
 
-                    // 3) DTO doldur
-                    return new YkbServicesRequestProductGetDto
-                    {
-                        Id = p.Id,
-                        RequestNo = p.RequestNo,
-                        ProductId = p.ProductId,
-                        Quantity = p.Quantity,
 
-                        ProductName = p.Product?.Description,
-                        ProductCode = p.Product?.ProductCode,
+                     specialPriceRulesByProduct.TryGetValue(
+                            p.ProductId,
+                            out var priceAdjustmentRule);
 
-                        // Para birimi: sabitse Captured, değilse Product
-                        PriceCurrency = currency,
+                     var baseTotal = effectivePrice * p.Quantity;
 
-                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
-                        ProductPrice = effectivePrice,
+                     var adjustedTotal = baseTotal;
 
-                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
-                        EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
-                    };
-                })
-                .ToList();
+                     if (p.IsPriceAdjustmentApplied &&
+                         priceAdjustmentRule != null &&
+                         p.AppliedPriceAdjustmentValue.HasValue)
+                     {
+                         adjustedTotal = CalculateAdjustedTotal(
+                                     effectivePrice,
+                                     p.Quantity,
+                                     priceAdjustmentRule.AdjustmentType,
+                                     priceAdjustmentRule.Direction,
+                                     priceAdjustmentRule.CalculationBasis,
+                                     p.AppliedPriceAdjustmentValue.Value);
+                     }
+
+                     return new YkbServicesRequestProductGetDto
+                     {
+                         Id = p.Id,
+                         RequestNo = p.RequestNo,
+                         ProductId = p.ProductId,
+                         Quantity = p.Quantity,
+
+                         ProductName = p.Product?.Description,
+                         ProductCode = p.Product?.ProductCode,
+                         PriceCurrency = currency,
+
+                         ProductPrice = effectivePrice,
+                         EffectivePrice = effectivePrice,
+
+                         TotalPrice = adjustedTotal,
+
+                         IsSpecialPriceProduct =priceAdjustmentRule != null,
+
+                         IsPriceAdjustmentApplied = p.IsPriceAdjustmentApplied,
+
+                         AppliedPriceAdjustmentValue = p.AppliedPriceAdjustmentValue,
+
+                         CanApplyPriceAdjustment =priceAdjustmentRule != null && !p.IsPriceAdjustmentApplied,
+
+                         PriceAdjustmentRule = priceAdjustmentRule
+                     };
+                 })
+                 .ToList();
 
             // REVIEW LOG’LARI (Pricing adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -4031,6 +4047,7 @@ namespace Business.Services.Ykb
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
+                            TenantId = sr.Customer.TenantId,
                             Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -4073,35 +4090,74 @@ namespace Business.Services.Ykb
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
+
+            var specialPriceRulesByProduct =
+                await GetYkbSpecialPriceRulesAsync(
+                    productEntities.Select(x => x.ProductId));
+
+
             dto.Products = productEntities
-                .Select(p =>
-                {
-                    bool captured = p.IsPriceCaptured;
-                    decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)
-                        : p.GetEffectivePrice(); // 🆕 Tenant dahil hesaplar
+                     .Select(p =>
+                     {
+                         bool captured = p.IsPriceCaptured;
 
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                         decimal effectivePrice = captured
+                             ? (p.CapturedUnitPrice ?? 0m)
+                             : p.GetEffectivePrice();
 
-                    return new YkbServicesRequestProductGetDto
-                    {
-                        Id = p.Id,
-                        RequestNo = p.RequestNo,
-                        ProductId = p.ProductId,
-                        Quantity = p.Quantity,
+                         string? currency = captured
+                             ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
+                             : p.Product?.PriceCurrency;
 
-                        ProductName = p.Product?.Description,
-                        ProductCode = p.Product?.ProductCode,
-                        PriceCurrency = currency,
-                        ProductPrice = effectivePrice,
-                        EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
-                    };
-                })
-                .ToList();
+                         specialPriceRulesByProduct.TryGetValue(
+                            p.ProductId,
+                            out var priceAdjustmentRule);
 
+                         var baseTotal = effectivePrice * p.Quantity;
+
+                         var adjustedTotal = baseTotal;
+
+                         if (p.IsPriceAdjustmentApplied &&
+                             priceAdjustmentRule != null &&
+                             p.AppliedPriceAdjustmentValue.HasValue)
+                         {
+                             adjustedTotal = CalculateAdjustedTotal(
+                                         effectivePrice,
+                                         p.Quantity,
+                                         priceAdjustmentRule.AdjustmentType,
+                                         priceAdjustmentRule.Direction,
+                                         priceAdjustmentRule.CalculationBasis,
+                                         p.AppliedPriceAdjustmentValue.Value);
+                         }
+
+                         return new YkbServicesRequestProductGetDto
+                         {
+                             Id = p.Id,
+                             RequestNo = p.RequestNo,
+                             ProductId = p.ProductId,
+                             Quantity = p.Quantity,
+
+                             ProductName = p.Product?.Description,
+                             ProductCode = p.Product?.ProductCode,
+                             PriceCurrency = currency,
+
+                             ProductPrice = effectivePrice,
+                             EffectivePrice = effectivePrice,
+
+                             TotalPrice = adjustedTotal,
+
+                             IsSpecialPriceProduct = priceAdjustmentRule != null,
+
+                             IsPriceAdjustmentApplied = p.IsPriceAdjustmentApplied,
+
+                             AppliedPriceAdjustmentValue = p.AppliedPriceAdjustmentValue,
+
+                             CanApplyPriceAdjustment = priceAdjustmentRule != null && !p.IsPriceAdjustmentApplied,
+
+                             PriceAdjustmentRule = priceAdjustmentRule
+                         };
+                     })
+                     .ToList();
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -4232,6 +4288,7 @@ namespace Business.Services.Ykb
                             Note = sr.Customer.Note,
                             CashCenter = sr.Customer.CashCenter,
                             LockType = sr.Customer.LockType,
+                            TenantId = sr.Customer.TenantId,
                             Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -4273,17 +4330,26 @@ namespace Business.Services.Ykb
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
+            var specialPriceRulesByProduct =
+              await GetYkbSpecialPriceRulesAsync(
+                  productEntities.Select(x => x.ProductId));
+
             dto.Products = productEntities
                 .Select(p =>
                 {
                     bool captured = p.IsPriceCaptured;
+
                     decimal effectivePrice = captured
                         ? (p.CapturedUnitPrice ?? 0m)
-                        : p.GetEffectivePrice(); // 🆕 Tenant dahil hesaplar
+                        : p.GetEffectivePrice();
 
                     string? currency = captured
                         ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
                         : p.Product?.PriceCurrency;
+
+                    specialPriceRulesByProduct.TryGetValue(
+                        p.ProductId,
+                        out var priceAdjustmentRule);
 
                     return new YkbServicesRequestProductGetDto
                     {
@@ -4294,10 +4360,23 @@ namespace Business.Services.Ykb
 
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
+
                         PriceCurrency = currency,
+
+                        IsPriceCaptured = p.IsPriceCaptured,
+                        CapturedUnitPrice = p.CapturedUnitPrice,
+                        CapturedCurrency = p.CapturedCurrency,
+                        CapturedTotal = p.CapturedTotal,
+
                         ProductPrice = effectivePrice,
                         EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
+
+                        // Henüz özel fiyat uygulanmadı.
+                        TotalPrice = effectivePrice * p.Quantity,
+
+                        // Yeni alanlar
+                        IsSpecialPriceProduct = priceAdjustmentRule != null,
+                        PriceAdjustmentRule = priceAdjustmentRule
                     };
                 })
                 .ToList();
@@ -4566,6 +4645,9 @@ namespace Business.Services.Ykb
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
 
+            var specialPriceRulesByProduct =
+               await GetYkbSpecialPriceRulesAsync(
+                   productEntities.Select(x => x.ProductId));
             dto.Products = productEntities
                 .Select(p =>
                 {
@@ -4578,6 +4660,27 @@ namespace Business.Services.Ykb
                         ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
                         : p.Product?.PriceCurrency;
 
+                    specialPriceRulesByProduct.TryGetValue(
+                           p.ProductId,
+                           out var priceAdjustmentRule);
+
+                    var baseTotal = effectivePrice * p.Quantity;
+
+                    var adjustedTotal = baseTotal;
+
+                    if (p.IsPriceAdjustmentApplied &&
+                        priceAdjustmentRule != null &&
+                        p.AppliedPriceAdjustmentValue.HasValue)
+                    {
+                        adjustedTotal = CalculateAdjustedTotal(
+                                    effectivePrice,
+                                    p.Quantity,
+                                    priceAdjustmentRule.AdjustmentType,
+                                    priceAdjustmentRule.Direction,
+                                    priceAdjustmentRule.CalculationBasis,
+                                    p.AppliedPriceAdjustmentValue.Value);
+                    }
+
                     return new YkbServicesRequestProductGetDto
                     {
                         Id = p.Id,
@@ -4588,9 +4691,21 @@ namespace Business.Services.Ykb
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
                         PriceCurrency = currency,
+
                         ProductPrice = effectivePrice,
                         EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
+
+                        TotalPrice = adjustedTotal,
+
+                        IsSpecialPriceProduct = priceAdjustmentRule != null,
+
+                        IsPriceAdjustmentApplied = p.IsPriceAdjustmentApplied,
+
+                        AppliedPriceAdjustmentValue = p.AppliedPriceAdjustmentValue,
+
+                        CanApplyPriceAdjustment = priceAdjustmentRule != null && !p.IsPriceAdjustmentApplied,
+
+                        PriceAdjustmentRule = priceAdjustmentRule
                     };
                 })
                 .ToList();
@@ -4890,7 +5005,7 @@ namespace Business.Services.Ykb
                    sr,
                    createdUser
                };
-         
+
 
             var total = await qJoined.CountAsync();
 
@@ -5430,7 +5545,7 @@ namespace Business.Services.Ykb
             "Region3Normal"
         }
     }
-}; 
+};
 
                 var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
         {
@@ -7143,7 +7258,7 @@ namespace Business.Services.Ykb
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
-                      
+
 
                         CustomerNote = finalApproval?.CustomerNote,
                         CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
@@ -7176,7 +7291,7 @@ namespace Business.Services.Ykb
             }
         }
 
-        public async Task<(byte[] Content, string FileName, string ContentType)>ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q)
+        public async Task<(byte[] Content, string FileName, string ContentType)> ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q)
         {
             q ??= new YkbBasicReportQueryParams();
 
@@ -7287,7 +7402,73 @@ namespace Business.Services.Ykb
             }
         }
 
-        private static IXLWorksheet CreateBasicReportWorksheet( XLWorkbook workbook, int sheetNumber)
+
+        private const string YkbTenantCode = "YKB";
+        private async Task<Dictionary<long, ProductPriceAdjustmentRuleGetDto>>
+            GetYkbSpecialPriceRulesAsync(IEnumerable<long> productIds)
+        {
+            var distinctProductIds = productIds
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (!distinctProductIds.Any())
+            {
+                return new Dictionary<long, ProductPriceAdjustmentRuleGetDto>();
+            }
+
+            var rules = await _uow.Repository
+                .GetQueryable<ProductPriceAdjustmentRule>()
+                .AsNoTracking()
+                .Where(x =>
+                    x.Tenant.Code == YkbTenantCode &&
+                    distinctProductIds.Contains(x.ProductId) &&
+                    x.IsActive &&
+                    !x.IsDeleted)
+                .ProjectToType<ProductPriceAdjustmentRuleGetDto>(_config)
+                .ToListAsync();
+
+            return rules.ToDictionary(
+                x => x.ProductId,
+                x => x);
+        }
+
+        private static decimal CalculateAdjustedTotal(
+        decimal effectiveUnitPrice,
+        int quantity,
+        PriceAdjustmentType adjustmentType,
+        PriceAdjustmentDirection direction,
+        PriceAdjustmentCalculationBasis calculationBasis,
+        decimal appliedValue)
+        {
+            var baseTotal = effectiveUnitPrice * quantity;
+
+            decimal adjustmentAmount;
+
+            if (adjustmentType == PriceAdjustmentType.Percentage)
+            {
+                adjustmentAmount =
+                    baseTotal * appliedValue / 100m;
+            }
+            else
+            {
+                adjustmentAmount =
+                    calculationBasis == PriceAdjustmentCalculationBasis.UnitPrice
+                        ? appliedValue * quantity
+                        : appliedValue;
+            }
+
+            var adjustedTotal =
+                direction == PriceAdjustmentDirection.Increase
+                    ? baseTotal + adjustmentAmount
+                    : baseTotal - adjustmentAmount;
+
+            return Math.Round(
+                adjustedTotal,
+                2,
+                MidpointRounding.AwayFromZero);
+        }
+        private static IXLWorksheet CreateBasicReportWorksheet(XLWorkbook workbook, int sheetNumber)
         {
             var sheetName = sheetNumber == 1
                 ? "YKB Temel Rapor"
@@ -7394,7 +7575,7 @@ namespace Business.Services.Ykb
             return ws;
         }
 
-        private static void WriteBasicReportRow( IXLWorksheet ws, int row,  int sequenceNo,  YkbBasicReportListDto x)
+        private static void WriteBasicReportRow(IXLWorksheet ws, int row, int sequenceNo, YkbBasicReportListDto x)
         {
             var c = 1;
 
@@ -7487,7 +7668,7 @@ namespace Business.Services.Ykb
             cell.Value = value.Value;
         }
 
-        private static void SetDateTime(IXLCell cell,DateTimeOffset? value,string format = "dd.MM.yyyy HH:mm")
+        private static void SetDateTime(IXLCell cell, DateTimeOffset? value, string format = "dd.MM.yyyy HH:mm")
         {
             if (!value.HasValue)
                 return;
@@ -7496,7 +7677,7 @@ namespace Business.Services.Ykb
             cell.Value = value.Value.DateTime;
             cell.Style.DateFormat.Format = format;
         }
-        private static void SetDateTime(IXLCell cell,DateTime? value,string format = "dd.MM.yyyy HH:mm")
+        private static void SetDateTime(IXLCell cell, DateTime? value, string format = "dd.MM.yyyy HH:mm")
         {
             if (!value.HasValue)
                 return;
@@ -7506,7 +7687,7 @@ namespace Business.Services.Ykb
             cell.Style.DateFormat.Format = format;
         }
 
-        private static void SetDecimal(IXLCell cell,decimal? value, string format)
+        private static void SetDecimal(IXLCell cell, decimal? value, string format)
         {
             if (!value.HasValue)
                 return;
@@ -7515,7 +7696,7 @@ namespace Business.Services.Ykb
             cell.Style.NumberFormat.Format = format;
         }
 
-        private static void SetDouble( IXLCell cell, double? value, string format)
+        private static void SetDouble(IXLCell cell, double? value, string format)
         {
             if (!value.HasValue)
                 return;
@@ -9271,13 +9452,13 @@ namespace Business.Services.Ykb
                 CreatedUser = me?.Id
             });
         }
-        private static string BuildManitouTestDescription( string requestNo, string technicianName,string action)
+        private static string BuildManitouTestDescription(string requestNo, string technicianName, string action)
         {
             return
                 $"FlowAssist YKB Teknik Servis Testi [FA:{requestNo}] - " +
                 $"{technicianName} tarafından {action}.";
         }
-        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord( IEnumerable<ManitouOutOfServiceResult> records,int serialNo, string requestNo)
+        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records, int serialNo, string requestNo)
         {
             var requestMarker = $"[FA:{requestNo}]";
 
@@ -9300,7 +9481,7 @@ namespace Business.Services.Ykb
                 .ThenByDescending(x => x.LogSequence)
                 .FirstOrDefault();
         }
-        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId,string newRequestNo, string accessToken)
+        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId, string newRequestNo, string accessToken)
         {
             var nowUtc = DateTimeOffset.UtcNow;
 
@@ -9435,7 +9616,7 @@ namespace Business.Services.Ykb
 
             return (true, StatusCode.Ok, null);
         }
-        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo,string reason)
+        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo, string reason)
         {
             var activeSession = await _uow.Repository
                 .GetQueryable<YkbTechnicalServiceWorkSession>()

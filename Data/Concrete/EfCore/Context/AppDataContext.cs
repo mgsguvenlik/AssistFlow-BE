@@ -1,8 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Core.Enums;
+using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
+using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
-using Model.Concrete.Qnb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -61,6 +62,7 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; } = null!;
         public DbSet<ServicesRequestWorkOrderType> ServicesRequestWorkOrderTypes { get; set; } = null!;
+        public DbSet<ProductPriceAdjustmentRule> ProductPriceAdjustmentRules { get; set; } = null!;
 
 
         #region YKB
@@ -80,7 +82,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
         public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
-
+     
         #endregion  
 
         #region QNB
@@ -318,12 +320,136 @@ namespace Data.Concrete.EfCore.Context
                  .HasForeignKey(tp => tp.ProductId)
                  .OnDelete(DeleteBehavior.Cascade);
 
+             
                 // Indexler
                 e.HasIndex(x => x.ProductCode).IsUnique(false);
                 e.HasIndex(x => x.OracleProductCode).IsUnique(false);
                 e.HasIndex(x => new { x.BrandId, x.ModelId });
                 e.HasIndex(x => new { x.ProductTypeId, x.CurrencyTypeId });
             });
+
+            // ---------------- ProductPriceAdjustmentRule ----------------
+            modelBuilder.Entity<ProductPriceAdjustmentRule>(entity =>
+            {
+                entity.ToTable("ProductPriceAdjustmentRule");
+
+                entity.HasKey(x => x.Id);
+
+                // Tenant
+                entity.Property(x => x.TenantId)
+                      .IsRequired();
+
+                // Product
+                entity.Property(x => x.ProductId)
+                      .IsRequired();
+
+                // Kural kodu
+                entity.Property(x => x.Code)
+                      .IsRequired()
+                      .HasMaxLength(64);
+
+                // Kural adı
+                entity.Property(x => x.Name)
+                      .IsRequired()
+                      .HasMaxLength(250);
+
+                // Yüzde / sabit tutar
+                entity.Property(x => x.AdjustmentType)
+                      .IsRequired()
+                      .HasConversion<int>();
+
+                // Ekleme / çıkarma
+                entity.Property(x => x.Direction)
+                      .IsRequired()
+                      .HasConversion<int>();
+
+                // Satır toplamı / adet bazlı
+                entity.Property(x => x.CalculationBasis)
+                      .IsRequired()
+                      .HasConversion<int>()
+                      .HasDefaultValue(PriceAdjustmentCalculationBasis.LineTotal);
+
+                // Varsayılan oran veya tutar
+                entity.Property(x => x.DefaultValue)
+                      .HasPrecision(18, 4);
+
+                // Kullanıcı değiştirebilir mi?
+                entity.Property(x => x.IsValueEditable)
+                      .IsRequired()
+                      .HasDefaultValue(true);
+
+                // Minimum değer
+                entity.Property(x => x.MinimumValue)
+                      .HasPrecision(18, 4);
+
+                // Maksimum değer
+                entity.Property(x => x.MaximumValue)
+                      .HasPrecision(18, 4);
+
+                // Aktiflik
+                entity.Property(x => x.IsActive)
+                      .IsRequired()
+                      .HasDefaultValue(true);
+
+                // Açıklama
+                entity.Property(x => x.Description)
+                      .HasMaxLength(500);
+
+                // Tenant ilişkisi
+                entity.HasOne(x => x.Tenant)
+                      .WithMany(x => x.ProductPriceAdjustmentRules)
+                      .HasForeignKey(x => x.TenantId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                // Product ilişkisi
+                entity.HasOne(x => x.Product)
+                      .WithMany(x => x.PriceAdjustmentRules)
+                      .HasForeignKey(x => x.ProductId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                /*
+                 * Aynı tenant ve ürün için aynı kural kodundan
+                 * birden fazla aktif/soft delete edilmemiş kayıt oluşmasını engeller.
+                 *
+                 * PostgreSQL filtresidir.
+                 */
+                entity.HasIndex(x => new
+                {
+                    x.TenantId,
+                    x.ProductId,
+                    x.Code
+                })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0")
+                .HasDatabaseName(
+                    "UX_ProductPriceAdjustmentRule_TenantId_ProductId_Code");
+
+                // Aktif kural sorguları için performans index'i
+                entity.HasIndex(x => new
+                {
+                    x.TenantId,
+                    x.ProductId,
+                    x.IsActive,
+                    x.IsDeleted
+                })
+                .HasDatabaseName(
+                    "IX_ProductPriceAdjustmentRule_TenantId_ProductId_IsActive");
+
+                /*
+                 * Fiyatlama ekranında tenant ve ürün üzerinden
+                 * aktif kural sorgulanacağı için performans index'i.
+                 */
+                entity.HasIndex(x => new
+                {
+                    x.TenantId,
+                    x.ProductId,
+                    x.IsActive,
+                    x.IsDeleted
+                })
+                .HasDatabaseName(
+                    "IX_ProductPriceAdjustmentRule_TenantId_ProductId_IsActive");
+            });
+
 
             /// SystemType Entity Configuration
             modelBuilder.Entity<SystemType>(e =>
@@ -343,7 +469,6 @@ namespace Data.Concrete.EfCore.Context
             });
 
 
-            base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<Data.Seeding.Infrastructure.SeedHistory>()
                         .HasIndex(x => x.Key)
                         .IsUnique();

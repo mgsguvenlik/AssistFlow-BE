@@ -24,5 +24,6 @@ namespace Model.Concrete
         public ICollection<Customer> Customers { get; set; } = new List<Customer>();
         public ICollection<User> Users { get; set; } = new List<User>();
         public ICollection<TenantProductPrice> TenantProductPrices { get; set; } = new List<TenantProductPrice>(); // 🆕
+        public ICollection<ProductPriceAdjustmentRule> ProductPriceAdjustmentRules { get; set; }  = new List<ProductPriceAdjustmentRule>();
     }
 }

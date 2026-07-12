@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260711121725_SonModelDegisiklikleri")]
+    partial class SonModelDegisiklikleri
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3399,10 +3402,6 @@ namespace Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<decimal?>("AppliedPriceAdjustmentValue")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
                     b.Property<DateTime?>("CapturedAt")
                         .HasColumnType("datetime2");
 
@@ -3423,9 +3422,6 @@ namespace Data.Migrations
 
                     b.Property<long?>("CustomerId")
                         .HasColumnType("bigint");
-
-                    b.Property<bool>("IsPriceAdjustmentApplied")
-                        .HasColumnType("bit");
 
                     b.Property<bool>("IsPriceCaptured")
                         .HasColumnType("bit");

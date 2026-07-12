@@ -1,4 +1,6 @@
-﻿namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct
+﻿using Model.Dtos.ProductPriceAdjustmentRule;
+
+namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct
 {
     public class YkbServicesRequestProductGetDto
     {
@@ -18,5 +20,27 @@
         public decimal EffectivePrice { get; set; }
         public string? ProductCode { get; set; }
         public string? PriceCurrency { get; set; }
+
+        /// <summary>
+        /// Bu ürün YKB tenantı için özel ürün olarak tanımlanmış mı?
+        /// </summary>
+        public bool IsSpecialPriceProduct { get; set; }
+
+        /// <summary>
+        /// Bu talepte özel fiyat daha önce uygulanmış mı?
+        /// </summary>
+        public bool IsPriceAdjustmentApplied { get; set; }
+
+        /// <summary>
+        /// Uygulanan yüzde veya tutar.
+        /// </summary>
+        public decimal? AppliedPriceAdjustmentValue { get; set; }
+
+        /// <summary>
+        /// Kullanıcı bu ekranda özel fiyat uygulayabilir mi?
+        /// </summary>
+        public bool CanApplyPriceAdjustment { get; set; }
+
+        public ProductPriceAdjustmentRuleGetDto? PriceAdjustmentRule { get; set; }
     }
 }

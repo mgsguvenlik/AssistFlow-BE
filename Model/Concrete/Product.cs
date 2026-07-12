@@ -36,5 +36,7 @@ namespace Model.Concrete
         public ICollection<CustomerProductPrice> CustomerProductPrices { get; set; } = new List<CustomerProductPrice>();
         public ICollection<CustomerGroupProductPrice> GroupProductPrices { get; set; } = new List<CustomerGroupProductPrice>();
         public ICollection<TenantProductPrice> TenantProductPrices { get; set; } = new List<TenantProductPrice>(); // 🆕
+
+        public ICollection<ProductPriceAdjustmentRule> PriceAdjustmentRules { get; set; } = new List<ProductPriceAdjustmentRule>();
     }
 }

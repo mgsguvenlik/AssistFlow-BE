@@ -19,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.MailOutbox;
+using Model.Dtos.ProductPriceAdjustmentRule;
 using Model.Dtos.Tenant;
 
 namespace Business.DependencyResolvers.Autofac
@@ -69,6 +70,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IQnbOvertimeReportService), typeof(QnbOvertimeReportService));
             services.AddScoped(typeof(IManitouApiService), typeof(ManitouApiService));
             services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
+            services.AddScoped(typeof(IProductPriceAdjustmentRuleService), typeof(ProductPriceAdjustmentRuleService));
 
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
@@ -273,7 +275,15 @@ namespace Business.DependencyResolvers.Autofac
                     long>,
                 WorkFlowSlaSettingService>();
 
-            
+
+            services.AddScoped<
+             ICrudService<
+                 ProductPriceAdjustmentRuleCreateDto,
+                 ProductPriceAdjustmentRuleUpdateDto,
+                 ProductPriceAdjustmentRuleGetDto,
+                 long>,
+             ProductPriceAdjustmentRuleService>(); 
+
         }
         protected override void Load(ContainerBuilder builder)
         {
