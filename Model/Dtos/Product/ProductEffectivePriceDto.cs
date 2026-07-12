@@ -10,5 +10,8 @@
         public decimal ProductPrice { get; set; }
         public decimal EffectivePrice { get; set; }
         public string? EffectiveCurrency { get; set; }
+        public bool? IsServiceFeeProduct { get; set; }        // Hizmet bedeli ürünü mü?
+        public decimal? ServiceFeePercentage { get; set; }  // Uygulanacak yüzde oranı
+
     }
 }

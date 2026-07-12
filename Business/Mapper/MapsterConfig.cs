@@ -311,8 +311,6 @@ namespace Business.Mapper
 
             config.NewConfig<Product, ProductGetDto>();
 
-            // Küçük özet
-            config.NewConfig<Product, ProductGetDto>();
 
             config.NewConfig<City, CityGetDto>()
                   .Map(d => d.Regions,

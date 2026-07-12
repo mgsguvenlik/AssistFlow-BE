@@ -489,7 +489,7 @@ namespace Business.Services.Ykb
                     customerName: request.Customer?.ContactName1
                 );
                 #endregion
-                 
+
 
                 // Commit
                 await _uow.Repository.CompleteAsync();
@@ -540,7 +540,7 @@ namespace Business.Services.Ykb
                 if (wf is null)
                     return ResponseModel<YkbWarehouseGetDto>.Fail("İlgili akış kaydı bulunamadı.", StatusCode.NotFound);
 
-                
+
                 var request = await _uow.Repository
                     .GetQueryable<YkbServicesRequest>()
                     .Include(x => x.Customer)
@@ -1559,10 +1559,6 @@ namespace Business.Services.Ykb
                 }
                 #endregion
 
-                #region Ürün Fiyat Sabitleme (4. Adım)
-                // 🔹 Artık fiyatı dto.Products listesinden alıyoruz
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
-                #endregion
 
                 #region Son Onaya Gönderim 
                 var finalApproval = await _uow.Repository
@@ -1619,6 +1615,12 @@ namespace Business.Services.Ykb
                 #endregion
 
                 await _uow.Repository.CompleteAsync();
+
+
+                #region Ürün Fiyat Sabitleme (4. Adım)
+                // 🔹 Artık fiyatı dto.Products listesinden alıyoruz
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                #endregion
 
                 #region Notification Kaydı 
                 await _notification.CreateForRolesAsync(
@@ -1769,10 +1771,7 @@ namespace Business.Services.Ykb
                 }
                 #endregion
 
-                #region Ürün Fiyat Sabitleme (5. Adım)
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
-                #endregion
-
+             
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
                 existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
@@ -1846,6 +1845,12 @@ namespace Business.Services.Ykb
                 #endregion 
 
                 await _uow.Repository.CompleteAsync();
+
+                #region Ürün Fiyat Sabitleme (5. Adım)  
+                ///MZK Not: Yeni eklenen ürünlerin işlenmesi için CompleteAsync() sonrasına alındı
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                #endregion
+
 
                 #region Notification Kaydı 
 
@@ -2202,7 +2207,7 @@ namespace Business.Services.Ykb
                         Note = sr.Customer.Note,
                         CashCenter = sr.Customer.CashCenter,
                         LockType = sr.Customer.LockType,
-                        
+
                         Systems = sr.Customer.CustomerSystemAssignments
                             .Select(a => new CustomerSystemAssignmentGetDto
                             {
@@ -2414,7 +2419,7 @@ namespace Business.Services.Ykb
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted);
 
-            
+
 
             var myId = me.Id;
 
@@ -3183,7 +3188,7 @@ namespace Business.Services.Ykb
                 join sr0 in qServices on w.RequestNo equals sr0.RequestNo into srj
                 from sr in srj.DefaultIfEmpty()
 
-                //CreatedUser
+                    //CreatedUser
                 join cru in qCreatedUsers on sr.CreatedUser equals cru.Id into cruj
                 from cu in cruj.DefaultIfEmpty()
                     // 🔹 ApproverTechnician (User) join
@@ -3221,7 +3226,7 @@ namespace Business.Services.Ykb
                               CustomerApproverId = sr.CustomerApproverId,
                               CustomerApproverName = wf.CustomerApproverName,
                               CustomerId = sr.CustomerId,
-                              CustomerName = sr.Customer.ContactName1 ??"",
+                              CustomerName = sr.Customer.ContactName1 ?? "",
                               ServiceTypeId = sr.ServiceTypeId,
                               CreatedDate = sr.CreatedDate,
                               UpdatedDate = sr.UpdatedDate,
@@ -3590,7 +3595,7 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
-            dto.ServiceRequestFormImages=entity.YkbServiceRequestFormImages
+            dto.ServiceRequestFormImages = entity.YkbServiceRequestFormImages
                 .Select(img => img.Adapt<YkbTechnicalServiceFormImageGetDto>(_config))
                 .ToList();
             dto.ServicesImages = entity.YkbServicesImages
@@ -3631,7 +3636,7 @@ namespace Business.Services.Ykb
                     LockType = sr.Customer.LockType,
                     TenantId = sr.Customer.TenantId,
                     IsTechnicalServiceTestEnabled = sr.Customer.Tenant.IsTechnicalServiceTestEnabled,
-                    SerialNo=sr.Customer.SerialNo,
+                    SerialNo = sr.Customer.SerialNo,
                     Systems = sr.Customer.CustomerSystemAssignments
                                  .Select(a => new CustomerSystemAssignmentGetDto
                                  {
@@ -3880,93 +3885,67 @@ namespace Business.Services.Ykb
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
-                .GetQueryable<YkbServicesRequestProduct>()
-                .AsNoTracking()
-                .Include(p => p.Product)
-                .Include(p => p.Customer)                           // 🆕
-                    .ThenInclude(c => c.Tenant)                     // 🆕
-                        .ThenInclude(t => t.TenantProductPrices)    // 🆕
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerGroup)
-                        .ThenInclude(g => g.GroupProductPrices)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerProductPrices)
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ToListAsync();
+                        .GetQueryable<YkbServicesRequestProduct>()
+                        .AsNoTracking()
+                        .Include(p => p.Product)
+                        .Include(p => p.Customer)
+                            .ThenInclude(c => c.Tenant)
+                                .ThenInclude(t => t.TenantProductPrices)
+                        .Include(p => p.Customer)
+                            .ThenInclude(c => c.CustomerGroup)
+                                .ThenInclude(g => g.GroupProductPrices)
+                        .Include(p => p.Customer)
+                            .ThenInclude(c => c.CustomerProductPrices)
+                        .Where(p => p.RequestNo == dto.RequestNo)
+                        .ToListAsync();
 
             dto.Products = productEntities
                 .Select(p =>
                 {
-                    // Fiyat sabitlenmiş mi?
-                    bool captured = p.IsPriceCaptured;
+                    var captured = p.IsPriceCaptured;
 
-                    // 1) Birim fiyat (GetEffectivePrice artık Tenant'ı da içeriyor)
-                    decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)
+                    var effectivePrice = captured
+                        ? p.CapturedUnitPrice ?? 0m
                         : p.GetEffectivePrice();
 
-                    // 2) Para birimi
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                    var currency = captured
+                        ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
+                        : p.Product?.PriceCurrency ?? "TRY";
 
-                    // 3) DTO doldur
+                    var totalPrice = captured
+                        ? p.CapturedTotal ?? effectivePrice * p.Quantity
+                        : effectivePrice * p.Quantity;
+
                     return new YkbServicesRequestProductGetDto
                     {
                         Id = p.Id,
                         RequestNo = p.RequestNo,
                         ProductId = p.ProductId,
-                        Quantity = p.Quantity,
-
-                        ProductName = p.Product?.Description,
-                        ProductCode = p.Product?.ProductCode,
-                        PriceCurrency = currency,
-                        ProductPrice = effectivePrice,
-                        EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
-                    };
-                })
-                .ToList();
-
-            dto.Products = productEntities
-                .Select(p =>
-                {
-                    // Fiyat sabitlenmiş mi?
-                    bool captured = p.IsPriceCaptured;
-
-                    // 1) Birim fiyat
-                    decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
-                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla
-
-                    // 2) Para birimi
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
-
-                    // 3) DTO doldur
-                    return new YkbServicesRequestProductGetDto
-                    {
-                        Id = p.Id,
-                        RequestNo = p.RequestNo,
-                        ProductId = p.ProductId,
+                        CustomerId = p.CustomerId ?? 0,
+                        CustomerName = p.Customer?.SubscriberCompany,
                         Quantity = p.Quantity,
 
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
 
-                        // Para birimi: sabitse Captured, değilse Product
                         PriceCurrency = currency,
 
-                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
                         ProductPrice = effectivePrice,
-
-                        // EffectivePrice: her zaman ekranda görünen “esas” fiyat
                         EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
+                        TotalPrice = totalPrice,
+
+                        IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+
+                        ServiceFeePercentage =p.Product?.ServiceFeePercentage,
+
+                        IsPriceCaptured = p.IsPriceCaptured,
+                        CapturedUnitPrice = p.CapturedUnitPrice,
+                        CapturedCurrency = p.CapturedCurrency,
+                        CapturedTotal = p.CapturedTotal
                     };
                 })
                 .ToList();
+
 
             // REVIEW LOG’LARI (Pricing adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -4091,6 +4070,9 @@ namespace Business.Services.Ykb
                         RequestNo = p.RequestNo,
                         ProductId = p.ProductId,
                         Quantity = p.Quantity,
+
+                        IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+                        ServiceFeePercentage = p.Product?.ServiceFeePercentage,
 
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
@@ -4291,6 +4273,9 @@ namespace Business.Services.Ykb
                         RequestNo = p.RequestNo,
                         ProductId = p.ProductId,
                         Quantity = p.Quantity,
+
+                        IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+                        ServiceFeePercentage = p.Product?.ServiceFeePercentage,
 
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
@@ -4890,7 +4875,7 @@ namespace Business.Services.Ykb
                    sr,
                    createdUser
                };
-         
+
 
             var total = await qJoined.CountAsync();
 
@@ -5430,7 +5415,7 @@ namespace Business.Services.Ykb
             "Region3Normal"
         }
     }
-}; 
+};
 
                 var workflowStatusAliases = new Dictionary<WorkFlowStatus, string[]>
         {
@@ -7143,7 +7128,7 @@ namespace Business.Services.Ykb
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
-                      
+
 
                         CustomerNote = finalApproval?.CustomerNote,
                         CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
@@ -7176,7 +7161,7 @@ namespace Business.Services.Ykb
             }
         }
 
-        public async Task<(byte[] Content, string FileName, string ContentType)>ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q)
+        public async Task<(byte[] Content, string FileName, string ContentType)> ExportYkbBasicWorkFlowReportAsync(YkbBasicReportQueryParams q)
         {
             q ??= new YkbBasicReportQueryParams();
 
@@ -7287,7 +7272,7 @@ namespace Business.Services.Ykb
             }
         }
 
-        private static IXLWorksheet CreateBasicReportWorksheet( XLWorkbook workbook, int sheetNumber)
+        private static IXLWorksheet CreateBasicReportWorksheet(XLWorkbook workbook, int sheetNumber)
         {
             var sheetName = sheetNumber == 1
                 ? "YKB Temel Rapor"
@@ -7394,7 +7379,7 @@ namespace Business.Services.Ykb
             return ws;
         }
 
-        private static void WriteBasicReportRow( IXLWorksheet ws, int row,  int sequenceNo,  YkbBasicReportListDto x)
+        private static void WriteBasicReportRow(IXLWorksheet ws, int row, int sequenceNo, YkbBasicReportListDto x)
         {
             var c = 1;
 
@@ -7487,7 +7472,7 @@ namespace Business.Services.Ykb
             cell.Value = value.Value;
         }
 
-        private static void SetDateTime(IXLCell cell,DateTimeOffset? value,string format = "dd.MM.yyyy HH:mm")
+        private static void SetDateTime(IXLCell cell, DateTimeOffset? value, string format = "dd.MM.yyyy HH:mm")
         {
             if (!value.HasValue)
                 return;
@@ -7496,7 +7481,7 @@ namespace Business.Services.Ykb
             cell.Value = value.Value.DateTime;
             cell.Style.DateFormat.Format = format;
         }
-        private static void SetDateTime(IXLCell cell,DateTime? value,string format = "dd.MM.yyyy HH:mm")
+        private static void SetDateTime(IXLCell cell, DateTime? value, string format = "dd.MM.yyyy HH:mm")
         {
             if (!value.HasValue)
                 return;
@@ -7506,7 +7491,7 @@ namespace Business.Services.Ykb
             cell.Style.DateFormat.Format = format;
         }
 
-        private static void SetDecimal(IXLCell cell,decimal? value, string format)
+        private static void SetDecimal(IXLCell cell, decimal? value, string format)
         {
             if (!value.HasValue)
                 return;
@@ -7515,7 +7500,7 @@ namespace Business.Services.Ykb
             cell.Style.NumberFormat.Format = format;
         }
 
-        private static void SetDouble( IXLCell cell, double? value, string format)
+        private static void SetDouble(IXLCell cell, double? value, string format)
         {
             if (!value.HasValue)
                 return;
@@ -8449,56 +8434,142 @@ namespace Business.Services.Ykb
         }
 
         /// Servis Ürünleri Fiyat savbitleme
-        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
-            string requestNo,
-            IEnumerable<YkbServicesRequestProductCreateDto>? productsDto
-        )
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<YkbServicesRequestProductCreateDto>? productsDto)
         {
-            // DTO boş ise iş yapma
-            var dtoDict = (productsDto ?? Enumerable.Empty<YkbServicesRequestProductCreateDto>())
+            var dtoDict = (productsDto ??
+                           Enumerable.Empty<YkbServicesRequestProductCreateDto>())
                 .ToDictionary(x => x.ProductId, x => x);
 
             if (!dtoDict.Any())
                 return ResponseModel.Success();
 
-            // İlgili request’in ürünlerini çek
-            var list = await _uow.Repository.GetQueryable<YkbServicesRequestProduct>()
-                .Include(x => x.Product) // Para birimi vs için
+            // Talebe ait ürünleri ve ürün bilgilerini getir.
+            var list = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .Include(x => x.Product)
                 .Where(x => x.RequestNo == requestNo)
                 .ToListAsync();
 
             if (list.Count == 0)
                 return ResponseModel.Success();
 
-            foreach (var p in list)
+            /*
+             * Hizmet bedeli olmayan ürünlerin toplamlarını
+             * para birimi bazında hesapla.
+             *
+             * Hizmet bedeli ürünleri hiçbir şekilde
+             * başka bir hizmet bedelinin matrahına dahil edilmez.
+             */
+            var baseTotalsByCurrency =
+                new Dictionary<string, decimal>(
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+            foreach (var product in list)
             {
-                // DTO’da karşılığı yoksa o satırı atla (istersen burada 0 fiyat da yazabilirsin)
-                if (!dtoDict.TryGetValue(p.ProductId, out var dtoItem))
+                // Gönderilen ürün listesinde bulunmayan satırı hesaba katma.
+                if (!dtoDict.TryGetValue(product.ProductId, out var dtoItem))
                     continue;
 
-                // 1) Birim fiyat: artık DTO’dan geliyor
-                var unit = dtoItem.Price; // ← DTO’daki Price
+                // Hizmet bedeli ürünleri matraha dahil edilmez.
+                if (product.Product?.IsServiceFeeProduct == true)
+                    continue;
 
-                // 2) Para birimi: eskisi gibi ürün tablosundan
-                var currency = p.Product?.PriceCurrency ?? "TRY";
+                var currency = string.IsNullOrWhiteSpace(
+                    product.Product?.PriceCurrency
+                )
+                    ? "TRY"
+                    : product.Product.PriceCurrency
+                        .Trim()
+                        .ToUpperInvariant();
 
-                var total = unit * p.Quantity;
+                // Normal ürünlerin fiyatı mevcut davranışta olduğu gibi DTO'dan gelir.
+                var unitPrice = dtoItem.Price ?? 0m;
 
-                // İstersen CapturedSource için yeni enum (Manual) ekleyebilirsin,
-                // şimdilik mevcut enum’lardan birini kullanıyorum.
-                p.CapturedSource = CapturedPriceSource.Standard; // veya CapturedPriceSource.CustomerGroupPriceManual vs
-                p.CapturedUnitPrice = unit;
-                p.CapturedCurrency = currency;
-                p.CapturedTotal = total;
-                p.CapturedAt = DateTime.Now;
-                p.IsPriceCaptured = true;
+                var lineTotal = unitPrice * product.Quantity;
 
-                _uow.Repository.Update(p);
+                baseTotalsByCurrency[currency] =
+                    baseTotalsByCurrency.TryGetValue(
+                        currency,
+                        out var currentTotal
+                    )
+                        ? currentTotal + lineTotal
+                        : lineTotal;
+            }
+
+            /*
+             * Normal ürünlerin fiyatlarını DTO'dan al,
+             * hizmet bedeli ürünlerini ise hesaplayarak sabitle.
+             */
+            foreach (var product in list)
+            {
+                if (!dtoDict.TryGetValue(product.ProductId, out var dtoItem))
+                    continue;
+
+                var currency = string.IsNullOrWhiteSpace(
+                    product.Product?.PriceCurrency
+                )
+                    ? "TRY"
+                    : product.Product.PriceCurrency
+                        .Trim()
+                        .ToUpperInvariant();
+
+                decimal? unitPrice;
+
+                if (product.Product?.IsServiceFeeProduct == true)
+                {
+                    var percentage =
+                        product.Product.ServiceFeePercentage ?? 0m;
+
+                    var currencyBaseTotal =
+                        baseTotalsByCurrency.TryGetValue(
+                            currency,
+                            out var calculatedBaseTotal
+                        )
+                            ? calculatedBaseTotal
+                            : 0m;
+
+                    /*
+                     * Hizmet Bedeli Birim Fiyatı =
+                     * Aynı para birimindeki normal ürünlerin toplamı
+                     * × Hizmet bedeli yüzdesi
+                     * ÷ 100
+                     */
+                    unitPrice = Math.Round(
+                        currencyBaseTotal * percentage / 100m,
+                        2,
+                        MidpointRounding.AwayFromZero
+                    );
+                }
+                else
+                {
+                    // Normal ürünlerde mevcut davranış korunur.
+                    unitPrice = dtoItem.Price;
+                }
+
+                /*
+                 * Hizmet bedeli için hesaplanan değer birim fiyattır.
+                 * Satır toplamı yine adet × birim fiyat şeklindedir.
+                 */
+                var totalPrice = unitPrice * product.Quantity;
+
+                product.CapturedSource =
+                    CapturedPriceSource.Standard;
+
+                product.CapturedUnitPrice = unitPrice;
+                product.CapturedCurrency = currency;
+                product.CapturedTotal = totalPrice;
+                product.CapturedAt = DateTime.Now;
+                product.IsPriceCaptured = true;
+
+                _uow.Repository.Update(product);
             }
 
             await _uow.Repository.CompleteAsync();
+
             return ResponseModel.Success();
         }
+
 
         private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(
             IEnumerable<long>? rawIds)
@@ -9271,13 +9342,13 @@ namespace Business.Services.Ykb
                 CreatedUser = me?.Id
             });
         }
-        private static string BuildManitouTestDescription( string requestNo, string technicianName,string action)
+        private static string BuildManitouTestDescription(string requestNo, string technicianName, string action)
         {
             return
                 $"FlowAssist YKB Teknik Servis Testi [FA:{requestNo}] - " +
                 $"{technicianName} tarafından {action}.";
         }
-        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord( IEnumerable<ManitouOutOfServiceResult> records,int serialNo, string requestNo)
+        private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records, int serialNo, string requestNo)
         {
             var requestMarker = $"[FA:{requestNo}]";
 
@@ -9300,7 +9371,7 @@ namespace Business.Services.Ykb
                 .ThenByDescending(x => x.LogSequence)
                 .FirstOrDefault();
         }
-        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId,string newRequestNo, string accessToken)
+        private async Task<(bool CanStart, StatusCode StatusCode, string? Message)> CompleteExpiredCustomerWorkingBeforeNewStartAsync(long customerId, string newRequestNo, string accessToken)
         {
             var nowUtc = DateTimeOffset.UtcNow;
 
@@ -9435,7 +9506,7 @@ namespace Business.Services.Ykb
 
             return (true, StatusCode.Ok, null);
         }
-        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo,string reason)
+        private async Task<(bool Success, string? ErrorMessage)> ForceFinishActiveWorkingByRequestNoAsync(string requestNo, string reason)
         {
             var activeSession = await _uow.Repository
                 .GetQueryable<YkbTechnicalServiceWorkSession>()
