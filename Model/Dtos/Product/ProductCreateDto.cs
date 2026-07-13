@@ -7,11 +7,9 @@ namespace Model.Dtos.Product
     public class ProductCreateDto
     {
         [StringLength(64, ErrorMessage = Messages.ProductCodeMaxLength)]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.ProductCodeInvalidChars)]
         public string? ProductCode { get; set; }
 
         [StringLength(64, ErrorMessage = Messages.OracleCodeMaxLength)]
-        [RegexIfNotEmpty(@"^[A-Za-z0-9._-]+$", ErrorMessage = Messages.OracleCodeInvalidChars)]
         public string? OracleProductCode { get; set; }
 
         [StringLength(64, ErrorMessage = Messages.SystemTypeMaxLength)]
@@ -32,6 +30,14 @@ namespace Model.Dtos.Product
 
         [NonNegativeDecimalIfHasValue(ErrorMessage = Messages.PriceCannotBeNegative)]
         public decimal? Price { get; set; }
+
+
+        /// Ürün, diğer ürünlerin toplamı üzerinden hesaplanan hizmet bedeli ürünü mü?
+        public bool? IsServiceFeeProduct { get; set; }
+
+        /// Diğer ürünlerin toplamına uygulanacak yüzdelik oran.
+        /// Örneğin 10 değeri, toplam tutarın %10'u anlamına gelir.
+        public decimal? ServiceFeePercentage { get; set; }
 
         [RangeIfHasValue(1, long.MaxValue, ErrorMessage = Messages.SelectValidCurrency)]
         public long? CurrencyTypeId { get; set; }
@@ -174,6 +180,59 @@ namespace Model.Dtos.Product
             if (brandId.HasValue && brandId.Value > 0) return ValidationResult.Success;
 
             return new ValidationResult(ErrorMessage ?? Messages.BrandRequiredIfModelSelected);
+        }
+    }
+
+
+    /// IsServiceFeeProduct true ise ServiceFeePercentage zorunlu ve 0'dan büyük olmalıdır.
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class ServiceFeePercentageRequiredWhenEnabledAttribute
+        : ValidationAttribute
+    {
+        public string EnabledProperty { get; }
+        public string PercentageProperty { get; }
+
+        public ServiceFeePercentageRequiredWhenEnabledAttribute(
+            string enabledProperty,
+            string percentageProperty)
+        {
+            EnabledProperty = enabledProperty;
+            PercentageProperty = percentageProperty;
+        }
+
+        protected override ValidationResult? IsValid(
+            object? value,
+            ValidationContext validationContext)
+        {
+            if (value is null)
+                return ValidationResult.Success;
+
+            var enabledPropertyInfo =
+                validationContext.ObjectType.GetProperty(EnabledProperty);
+
+            var percentagePropertyInfo =
+                validationContext.ObjectType.GetProperty(PercentageProperty);
+
+            if (enabledPropertyInfo is null || percentagePropertyInfo is null)
+                return ValidationResult.Success;
+
+            var isServiceFeeProduct =
+                enabledPropertyInfo.GetValue(value) as bool?;
+
+            // null veya false ise oran zorunlu değildir.
+            if (isServiceFeeProduct != true)
+                return ValidationResult.Success;
+
+            var percentage =
+                percentagePropertyInfo.GetValue(value) as decimal?;
+
+            if (percentage.HasValue && percentage.Value > 0)
+                return ValidationResult.Success;
+
+            return new ValidationResult(
+                ErrorMessage
+                ?? "Hizmet bedeli ürünü seçildiğinde yüzde oranı 0'dan büyük olmalıdır.",
+                new[] { PercentageProperty });
         }
     }
 

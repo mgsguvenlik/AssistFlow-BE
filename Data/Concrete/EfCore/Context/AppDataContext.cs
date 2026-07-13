@@ -287,6 +287,8 @@ namespace Data.Concrete.EfCore.Context
                 e.Property(x => x.Price).HasPrecision(18, 2);
                 e.Property(x => x.CorporateCustomerShortCode).HasMaxLength(50);
                 e.Property(x => x.OracleCustomerCode).HasMaxLength(100);
+                e.Property(x => x.ServiceFeePercentage).HasPrecision(18, 2);
+
 
                 // Brand ilişkisi
                 e.HasOne(x => x.Brand)

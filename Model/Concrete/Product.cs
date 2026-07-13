@@ -23,6 +23,9 @@ namespace Model.Concrete
         public string? PriceCurrency { get; set; }        // Fiyat Para Birimi (örn: TRY)
         public decimal? Price { get; set; }               // Fiyat
 
+        public bool? IsServiceFeeProduct { get; set; }        // Hizmet bedeli ürünü mü?
+        public decimal? ServiceFeePercentage { get; set; }  // Uygulanacak yüzde oranı
+
         public long? CurrencyTypeId { get; set; }         // Döviz Türü Id
         public CurrencyType? CurrencyType { get; set; }
 
