@@ -149,7 +149,10 @@ namespace Business.Services
                     BaseCurrency = product.PriceCurrency,
                     ProductPrice = product.Price ?? 0m,
                     EffectivePrice = effectivePrice,
-                    EffectiveCurrency = effectiveCurrency
+                    EffectiveCurrency = effectiveCurrency,
+                    IsServiceFeeProduct = product.IsServiceFeeProduct,
+                    ServiceFeePercentage = product.ServiceFeePercentage
+
                 });
             }
 
@@ -238,7 +241,9 @@ namespace Business.Services
                 BaseCurrency = product.PriceCurrency,
                 ProductPrice = product.Price ?? 0m,
                 EffectivePrice = effectivePrice,
-                EffectiveCurrency = effectiveCurrency
+                EffectiveCurrency = effectiveCurrency,
+                IsServiceFeeProduct = product.IsServiceFeeProduct,
+                ServiceFeePercentage = product.ServiceFeePercentage
             };
 
             return ResponseModel<ProductEffectivePriceDto>.Success(dto);
@@ -333,7 +338,9 @@ namespace Business.Services
                     BaseCurrency = product.PriceCurrency,
                     ProductPrice = product.Price ?? 0m,
                     EffectivePrice = effectivePrice,
-                    EffectiveCurrency = effectiveCurrency
+                    EffectiveCurrency = effectiveCurrency,
+                    IsServiceFeeProduct = product.IsServiceFeeProduct,
+                    ServiceFeePercentage = product.ServiceFeePercentage
                 });
             }
 
@@ -362,7 +369,10 @@ namespace Business.Services
                     BaseCurrency = p.PriceCurrency,
                     ProductPrice = p.Price ?? 0m,
                     EffectivePrice = p.Price ?? 0m,
-                    EffectiveCurrency = p.PriceCurrency
+                    EffectiveCurrency = p.PriceCurrency,
+                    IsServiceFeeProduct=p.IsServiceFeeProduct,
+                    ServiceFeePercentage=p.ServiceFeePercentage
+
                 }).ToList();
 
                 return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
@@ -510,7 +520,9 @@ namespace Business.Services
                     BaseCurrency = product.PriceCurrency,
                     ProductPrice = product.Price ?? 0m,
                     EffectivePrice = effectivePrice,
-                    EffectiveCurrency = effectiveCurrency
+                    EffectiveCurrency = effectiveCurrency,
+                    IsServiceFeeProduct = product.IsServiceFeeProduct,
+                    ServiceFeePercentage = product.ServiceFeePercentage
                 });
             }
 
