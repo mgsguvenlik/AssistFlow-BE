@@ -239,6 +239,15 @@ namespace Business.Services
                 var customerTypeId = GetCustomerTypeIdByDealerCode(dealerCode);
                 var tenantId = GetTenantIdByDealerCode(dealerCode);
 
+                var isNewCustomer = !await CustomerExistsAsync(connection, item.SerialNo, ct);
+
+                object masterpassValue = DBNull.Value;
+
+                if (isNewCustomer)
+                {
+                    masterpassValue = await GenerateUniqueMasterpassAsync(connection, ct);
+                }
+
                 await using var command = connection.CreateCommand();
 
                 command.CommandText = @"
@@ -273,7 +282,8 @@ namespace Business.Services
                             @LockType AS LockType,
                             @TenantId AS TenantId,
                             @MonitoringStatus AS MonitoringStatus,
-                            @IsDeleted AS IsDeleted
+                            @IsDeleted AS IsDeleted,
+                            @Masterpass AS Masterpass
                     ) AS S
                     ON T.Id = S.Id
 
@@ -350,7 +360,8 @@ namespace Business.Services
                             SyncStatus,
                             SyncMessage,
                             ProcessedDate,
-                            CreatedAtStg
+                            CreatedAtStg,
+                            Masterpass
                         )
                         VALUES
                         (
@@ -389,7 +400,8 @@ namespace Business.Services
                             0,
                             NULL,
                             NULL,
-                            GETDATE()
+                            GETDATE(),
+                            S.Masterpass    
                         );";
 
                 AddParam(command, "@Id", SqlDbType.Int, item.SerialNo);
@@ -441,6 +453,8 @@ namespace Business.Services
                         : DBNull.Value);
 
                 AddParam(command, "@IsDeleted", SqlDbType.Bit, item.Hidden);
+
+                AddParam(command, "@Masterpass", SqlDbType.VarChar, masterpassValue, 15);
 
                 await command.ExecuteNonQueryAsync(ct);
             }
@@ -565,6 +579,52 @@ namespace Business.Services
                 parameter.Size = size.Value;
 
             parameter.Value = value ?? DBNull.Value;
+        }
+
+
+        private static async Task<bool> CustomerExistsAsync(
+                SqlConnection connection,
+                int id,
+                CancellationToken ct)
+        {
+            await using var command = connection.CreateCommand();
+
+            command.CommandText = @"
+                     SELECT 1
+                     FROM stg.stg_Customers WITH (NOLOCK)
+                     WHERE Id = @Id;";
+
+            AddParam(command, "@Id", SqlDbType.Int, id);
+
+            var result = await command.ExecuteScalarAsync(ct);
+
+            return result != null;
+        }
+
+        private static async Task<string> GenerateUniqueMasterpassAsync(
+            SqlConnection connection,
+            CancellationToken ct)
+        {
+            var random = Random.Shared;
+
+            while (true)
+            {
+                var candidate = random.Next(100000, 1000000).ToString();
+
+                await using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                      SELECT 1
+                      FROM stg.stg_Customers WITH (NOLOCK)
+                      WHERE Masterpass = @Masterpass;";
+
+                AddParam(command, "@Masterpass", SqlDbType.VarChar, candidate, 15);
+
+                var exists = await command.ExecuteScalarAsync(ct);
+
+                if (exists == null)
+                    return candidate;
+            }
         }
     }
 }
