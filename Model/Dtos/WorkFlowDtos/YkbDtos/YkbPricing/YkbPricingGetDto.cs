@@ -1,5 +1,6 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAttachment;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 
@@ -26,5 +27,12 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing
         public List<YkbServicesRequestProductGetDto> Products { get; set; } = new();
         public List<YkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<YkbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
+
+        /// <summary>
+        /// Frontend dosya ekleme/silme/değiştirme alanlarını buna göre açabilir.
+        /// </summary>
+        public bool CanEditAttachments { get; set; }
     }
 }

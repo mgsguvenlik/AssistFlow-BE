@@ -1,5 +1,6 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAttachment;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReviewLog;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage;
@@ -21,6 +22,14 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval
         // Resim listeleri
         public List<YkbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
         public List<YkbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+
+
+        public List<YkbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
+
+        /// <summary>
+        /// Frontend dosya ekleme/silme/değiştirme alanlarını buna göre açabilir.
+        /// </summary>
+        public bool CanEditAttachments { get; set; }
     }
 
 }
