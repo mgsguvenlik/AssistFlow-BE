@@ -80,6 +80,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowArchive> YkbWorkFlowArchives { get; set; } = default!;
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
         public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
+        public DbSet<YkbWorkflowAttachment> YkbWorkflowAttachments { get; set; }
 
         #endregion  
 
@@ -151,6 +152,9 @@ namespace Data.Concrete.EfCore.Context
                 .WithMany(x => x.YkbServicesRequestWorkOrderTypes)
                 .HasForeignKey(x => x.WorkOrderTypeId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<YkbWorkflowAttachment>()
+                .HasIndex(x => x.RequestNo);
             #endregion
 
 
