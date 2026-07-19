@@ -126,7 +126,7 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-   
+
 
         [HttpPost("update-services-request/{id:long}")]
         public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] QnbServicesRequestUpdateDto dto)
@@ -170,7 +170,10 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("approve-pricing")]
-        public async Task<IActionResult> ApprovePricingAsync([FromBody] QnbPricingUpdateDto dto)
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(275_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000, ValueCountLimit = 2048)]
+        public async Task<IActionResult> ApprovePricing([FromForm] QnbPricingUpdateDto dto)
         {
             var result = await _workFlowService.ApprovePricing(dto);
             return Ok(result);
@@ -184,7 +187,10 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("final-approve")]
-        public async Task<IActionResult> FinalApprove([FromBody] QnbFinalApprovalUpdateDto dto)
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(275_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000, ValueCountLimit = 2048)]
+        public async Task<IActionResult> FinalApprove([FromForm] QnbFinalApprovalUpdateDto dto)
         {
             var result = await _workFlowService.FinalApprovalAsync(dto);
             return Ok(result);

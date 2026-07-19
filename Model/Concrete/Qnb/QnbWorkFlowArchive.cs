@@ -26,5 +26,6 @@ namespace Model.Concrete.Qnb
         public string QnbFinalApprovalJson { get; set; } = default!;
 
         public string? QnbWorkflowAttachmentsJson { get; set; }
+
     }
 }

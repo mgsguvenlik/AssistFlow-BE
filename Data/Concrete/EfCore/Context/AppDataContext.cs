@@ -54,7 +54,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<CustomerSystemAssignment> CustomerSystemAssignments { get; set; }
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
         public DbSet<Tenant> Tenants { get; set; } = null!;
-        public DbSet<UserFeedback>  UserFeedbacks { get; set; } = null!;
+        public DbSet<UserFeedback> UserFeedbacks { get; set; } = null!;
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
         public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
         public DbSet<TechnicalServiceWorkSession> TechnicalServiceWorkSessions { get; set; }
@@ -101,6 +101,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<QnbWorkFlowReviewLog> QnbWorkFlowReviewLogs { get; set; } = default!;
         public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } = default!;
         public DbSet<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; } = default!;
+        public DbSet<QnbWorkflowAttachment> QnbWorkflowAttachments { get; set; }
 
         #endregion
 
@@ -201,7 +202,7 @@ namespace Data.Concrete.EfCore.Context
 
                 entity.HasIndex(x => x.IsActive)
                     .HasDatabaseName("IX_WorkFlowSlaSettings_IsActive");
-            }); 
+            });
 
             /// ProgressApprover Entity Configuration
             modelBuilder.Entity<ProgressApprover>(b =>
@@ -741,6 +742,8 @@ namespace Data.Concrete.EfCore.Context
                     .HasForeignKey(x => x.WorkOrderTypeId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+
+            modelBuilder.Entity<QnbWorkflowAttachment>().HasIndex(x => x.RequestNo);
             #endregion
         }
     }

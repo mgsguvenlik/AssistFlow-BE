@@ -1,5 +1,6 @@
 using Core.Enums;
 using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 
@@ -25,5 +26,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbPricing
         public List<QnbServicesRequestProductGetDto> Products { get; set; } = new();
         public List<QnbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<QnbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
+        public bool CanEditAttachments { get; set; }
     }
 }
