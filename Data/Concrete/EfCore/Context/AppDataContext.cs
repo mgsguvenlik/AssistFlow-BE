@@ -61,7 +61,7 @@ namespace Data.Concrete.EfCore.Context
 
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; } = null!;
         public DbSet<ServicesRequestWorkOrderType> ServicesRequestWorkOrderTypes { get; set; } = null!;
-
+        public DbSet<WorkflowAttachment> WorkflowAttachments { get; set; }
 
         #region YKB
         public DbSet<YkbCustomerForm> YkbCustomerForms { get; set; } = default!;
@@ -691,6 +691,8 @@ namespace Data.Concrete.EfCore.Context
                     .HasForeignKey(x => x.WorkOrderTypeId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+
+            modelBuilder.Entity<WorkflowAttachment>().HasIndex(x => x.RequestNo);
 
             // DbSet ekleyin:
             #region QNB

@@ -1,6 +1,7 @@
 ﻿using Core.Enums;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 using System;
 using System.Collections.Generic;
@@ -31,6 +32,10 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+
+        public List<WorkflowAttachmentGetDto> Attachments { get; set; } = new();
+        public bool CanEditAttachments { get; set; }
 
 
     }

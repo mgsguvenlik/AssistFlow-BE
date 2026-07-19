@@ -1821,7 +1821,6 @@ namespace Business.Services.Ykb
                 }
                 #endregion
 
-
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
                 existsFinalApproval.Status = dto.WorkFlowStatus == WorkFlowStatus.Complated
@@ -1847,7 +1846,6 @@ namespace Business.Services.Ykb
                          replacedAttachments: dto.ReplacedAttachments,
                          stepCode: "PRC");
                 #endregion
-
 
                 #region Hareket Kaydı
                 await _activationRecord.LogYkbAsync(
@@ -1913,7 +1911,7 @@ namespace Business.Services.Ykb
                     // Eski dosyalar ancak DB commit başarılı olduktan sonra silinir.
                     DeleteWorkflowAttachmentPhysicalFiles(attachmentChangeSet.OldStoredFileNames);
                 }
-                #endregion
+                #endregion 
 
                 #region Ürün Fiyat Sabitleme (5. Adım)  
                 ///MZK Not: Yeni eklenen ürünlerin işlenmesi için CompleteAsync() sonrasına alındı
@@ -9560,17 +9558,14 @@ namespace Business.Services.Ykb
         }
 
 
-        /// <summary>
-        /// Kontrol ve Onaylama adımında dosya yükleme /silme/değiştirme işlemleri için gerekli validasyonlar ve fiziksel dosya yönetimi.
-        /// </summary>
-
+        
+        // Kontrol ve Onaylama adımında dosya yükleme /silme/değiştirme işlemleri için gerekli validasyonlar ve fiziksel dosya yönetimi.
         private sealed class WorkflowAttachmentChangeSet
         {
             public List<string> NewStoredFileNames { get; } = new();
 
             public List<string> OldStoredFileNames { get; } = new();
         }
-
         private sealed class WorkflowAttachmentSettings
         {
             public int MaxFileCount { get; init; }
