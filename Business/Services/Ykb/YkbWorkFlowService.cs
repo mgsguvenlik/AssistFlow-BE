@@ -7829,12 +7829,22 @@ namespace Business.Services.Ykb
         /// --------------------- Arşivleme  ---------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
+
+            // Arşiv kaydı var mı? 
+            var hasAnyArchive = await _uow.Repository
+                .GetQueryable<YkbWorkFlowArchive>()
+                .AsNoTracking()
+                .AnyAsync(x => x.RequestNo == requestNo);
+            if (hasAnyArchive)
+                return;
+
             // 1) Ana kayıtlar
             var servicesRequest = await _uow.Repository
                 .GetQueryable<YkbServicesRequest>()
                 .Include(x => x.Customer)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo, ct);
+      
 
             if (servicesRequest is null)
                 return; // veya exception/log

@@ -1,5 +1,4 @@
-﻿using Azure.Core;
-using Business.Interfaces;
+﻿using Business.Interfaces;
 using Business.Interfaces.Manitou;
 using Business.Services.Manitou;
 using Business.UnitOfWork;
@@ -11,7 +10,6 @@ using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
-using DocumentFormat.OpenXml.Office2016.Excel;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -22,10 +20,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
-using Model.Concrete.Ykb;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
-using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.Manitou;
 using Model.Dtos.Notification;
@@ -35,8 +31,6 @@ using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
 using Model.Dtos.WorkFlowDtos.Pricing;
-using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService;
-using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
 using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.ServicesRequest;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -55,7 +49,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace Business.Services
 {
@@ -7339,6 +7332,13 @@ namespace Business.Services
         /// --------------------- Arşivleme  ---------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
+            // Arşiv kaydı var mı? 
+            var hasAnyArchive = await _uow.Repository
+                .GetQueryable<WorkFlowArchive>()
+                .AsNoTracking()
+                .AnyAsync(x => x.RequestNo == requestNo);
+            if (hasAnyArchive)
+                return;
             // 1) Ana kayıtlar
             var servicesRequest = await _uow.Repository
                 .GetQueryable<ServicesRequest>()

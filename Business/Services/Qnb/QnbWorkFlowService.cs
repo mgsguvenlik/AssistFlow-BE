@@ -22,6 +22,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -5844,6 +5845,15 @@ namespace Business.Services.Qnb
         // ------------------------ Archive — internal ------------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
+
+            // Arşiv kaydı var mı? 
+            var hasAnyArchive = await _uow.Repository
+                .GetQueryable<QnbWorkFlowArchive>()
+                .AsNoTracking()
+                .AnyAsync(x => x.RequestNo == requestNo);
+            if (hasAnyArchive)
+                return;
+
             var servicesRequest = await _uow.Repository
                 .GetQueryable<QnbServicesRequest>()
                 .Include(x => x.Customer)
