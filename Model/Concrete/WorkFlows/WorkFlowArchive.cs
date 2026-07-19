@@ -56,6 +56,8 @@ namespace Model.Concrete.WorkFlows
 
         /// <summary>Son onay (FinalApproval)</summary>
         public string FinalApprovalJson { get; set; } = default!;
+
+        public string? WorkflowAttachmentsJson { get; set; }
     }
 
 }

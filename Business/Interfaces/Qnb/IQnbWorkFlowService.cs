@@ -18,10 +18,6 @@ namespace Business.Interfaces.Qnb
     public interface IQnbWorkFlowService
     {
 
-
-        // -------------------- Customer Form / Services Request --------------------
-        Task<ResponseModel<QnbCustomerFormGetDto>> GetCustomerFormByRequestNoAsync(string requestNo);
-
         //-------------------- Service Request Create--------------------
         Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto);
 
@@ -44,15 +40,12 @@ namespace Business.Interfaces.Qnb
         // -------------------- Location override / Review --------------------
         Task<ResponseModel> RequestLocationOverrideAsync(QnbOverrideLocationCheckDto dto);
         Task<ResponseModel<QnbWorkFlowGetDto>> SendBackForReviewAsync(string requestNo, string reviewNotes);
-        Task<ResponseModel> SendReviewMessage(QnbCustomerReviewMessageDto dto);
 
         // -------------------- Final Approval --------------------
         Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto);
         Task<ResponseModel<QnbFinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo);
         Task<ResponseModel<QnbFinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id);
-        Task<ResponseModel<QnbFinalApprovalGetDto>> CustomerAgreementAsync(QnbCustomerAgreementDto dto);
-        Task<ResponseModel<QnbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo, FinalApprovalStatus status = FinalApprovalStatus.CustomerApproval);
-
+       
         // -------------------- WorkFlow Steps --------------------
         Task<ResponseModel<PagedResult<QnbWorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
         Task<ResponseModel<QnbWorkFlowStepGetDto>> GetStepByIdAsync(long id);

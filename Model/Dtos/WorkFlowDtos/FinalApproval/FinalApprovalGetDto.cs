@@ -2,6 +2,7 @@
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
 
 namespace Model.Dtos.WorkFlowDtos.FinalApproval
@@ -27,5 +28,9 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
 
         public List<TechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
         public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+
+        public List<WorkflowAttachmentGetDto> Attachments { get; set; } = new();
+
+        public bool CanEditAttachments { get; set; }
     }
 }
