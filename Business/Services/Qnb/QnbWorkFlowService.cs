@@ -5484,16 +5484,6 @@ namespace Business.Services.Qnb
             cell.Value = value.Value.DateTime;
             cell.Style.DateFormat.Format = format;
         }
-        private static void SetDateTime(IXLCell cell, DateTime? value, string format = "dd.MM.yyyy HH:mm")
-        {
-            if (!value.HasValue)
-                return;
-
-            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
-            cell.Value = value.Value;
-            cell.Style.DateFormat.Format = format;
-        }
-
         private static void SetDecimal(IXLCell cell, decimal? value, string format)
         {
             if (!value.HasValue)
