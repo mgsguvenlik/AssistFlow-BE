@@ -22,6 +22,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.WorkFlows;
+using Model.Concrete.Ykb;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystem;
@@ -7089,6 +7090,7 @@ namespace Business.Services
             Warehouse? warehouse = null;
             Pricing? pricing = null;
             FinalApproval? finalApproval = null;
+            List<WorkflowAttachment> workflowAttachments = new();
 
             try { servicesRequest = JsonConvert.DeserializeObject<ServicesRequest>(archive.ServicesRequestJson); } catch { }
             try { products = JsonConvert.DeserializeObject<List<ServicesRequestProduct>>(archive.ServicesRequestProductsJson) ?? new(); } catch { }
@@ -7103,7 +7105,7 @@ namespace Business.Services
             try { warehouse = JsonConvert.DeserializeObject<Warehouse>(archive.WarehouseJson); } catch { }
             try { pricing = JsonConvert.DeserializeObject<Pricing>(archive.PricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<FinalApproval>(archive.FinalApprovalJson); } catch { }
-
+            try { workflowAttachments = JsonConvert.DeserializeObject<List<WorkflowAttachment>>(archive.WorkflowAttachmentsJson) ?? new(); } catch { workflowAttachments = new(); }
 
 
             // --------------------------------------------------------------------
@@ -7159,6 +7161,31 @@ namespace Business.Services
             }
             // --------------------------------------------------------------------
 
+            var attachmentDtos = workflowAttachments
+                .Select(x =>
+                {
+                    var relativeUrl =
+                        $"/uploads/{x.StoredFileName}";
+
+                    var url = string.IsNullOrWhiteSpace(baseUrl)
+                        ? relativeUrl
+                        : $"{baseUrl}{relativeUrl}";
+
+                    return new WorkflowAttachmentGetDto
+                    {
+                        Id = x.Id,
+                        RequestNo = x.RequestNo,
+                        OriginalFileName = x.OriginalFileName,
+                        ContentType = x.ContentType,
+                        Extension = x.Extension,
+                        SizeBytes = x.SizeBytes,
+                        UploadedStepCode = x.UploadedStepCode,
+                        LastUpdatedStepCode = x.LastUpdatedStepCode,
+                        Url = url
+                    };
+                })
+                .ToList();
+
             var snapshot = new WorkFlowArchiveSnapshotDto
             {
                 ServicesRequest = servicesRequest,
@@ -7173,7 +7200,8 @@ namespace Business.Services
                 FormImages = formImages,
                 Warehouse = warehouse,
                 Pricing = pricing,
-                FinalApproval = finalApproval
+                FinalApproval = finalApproval,
+                Attachments = attachmentDtos,
             };
 
             return new WorkFlowArchiveDetailDto
@@ -7395,6 +7423,7 @@ namespace Business.Services
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
                 .ToListAsync(ct);
+
 
             // 2) Resimleri base64'e çevir
             var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");

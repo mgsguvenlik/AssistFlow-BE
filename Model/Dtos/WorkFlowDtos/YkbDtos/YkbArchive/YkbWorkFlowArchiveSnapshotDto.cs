@@ -1,4 +1,5 @@
 ﻿using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAttachment;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
 {
@@ -17,5 +18,6 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive
         public Concrete.Ykb.YkbWarehouse? Warehouse { get; set; }
         public Concrete.Ykb.YkbPricing? Pricing { get; set; }
         public Concrete.Ykb.YkbFinalApproval? FinalApproval { get; set; }
+        public List<YkbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
     }
 }

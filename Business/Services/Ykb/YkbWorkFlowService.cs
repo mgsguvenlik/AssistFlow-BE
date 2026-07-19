@@ -7907,6 +7907,13 @@ namespace Business.Services.Ykb
                 .OrderBy(x => x.CreatedDate)
                 .ToListAsync(ct);
 
+            //Attachment
+            var workflowAttachments = await _uow.Repository
+                .GetQueryable<YkbWorkflowAttachment>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(ct);
+
             // 2) Resimleri base64'e çevir
             var uploadRoot = Path.Combine(Directory.GetCurrentDirectory(), "UploadsStorage");
 
@@ -7961,6 +7968,7 @@ namespace Business.Services.Ykb
             var warehouseJson = JsonConvert.SerializeObject(warehouse);
             var pricingJson = JsonConvert.SerializeObject(pricing);
             var finalApprovalJson = JsonConvert.SerializeObject(finalApproval);
+            var workflowAttachmentsJson = JsonConvert.SerializeObject(workflowAttachments);
 
             // 4) Arşiv kaydı oluştur
             var archive = new YkbWorkFlowArchive
@@ -7968,7 +7976,6 @@ namespace Business.Services.Ykb
                 RequestNo = requestNo,
                 ArchivedAt = DateTime.Now,
                 ArchiveReason = archiveReason,
-
                 YkbServicesRequestJson = servicesRequestJson,
                 YkbServicesRequestProductsJson = productsJson,
                 CustomerJson = customerJson,
@@ -7981,9 +7988,9 @@ namespace Business.Services.Ykb
                 YkbTechnicalServiceFormImagesJson = techServiceFormImagesJson,
                 YkbWarehouseJson = warehouseJson,
                 YkbPricingJson = pricingJson,
-                YkbFinalApprovalJson = finalApprovalJson
+                YkbFinalApprovalJson = finalApprovalJson,
+                YkbWorkflowAttachmentsJson = workflowAttachmentsJson
             };
-
             await _uow.Repository.AddAsync(archive);
             // Commit’i dışarıda (çağıran methodda) yapacağız.
         }
@@ -8202,6 +8209,7 @@ namespace Business.Services.Ykb
             YkbWarehouse? warehouse = null;
             YkbPricing? pricing = null;
             YkbFinalApproval? finalApproval = null;
+            List<YkbWorkflowAttachment> workflowAttachments = new();
 
             try { servicesRequest = JsonConvert.DeserializeObject<YkbServicesRequest>(archive.YkbServicesRequestJson); } catch { }
             try { products = JsonConvert.DeserializeObject<List<YkbServicesRequestProduct>>(archive.YkbServicesRequestProductsJson) ?? new(); } catch { }
@@ -8216,6 +8224,8 @@ namespace Business.Services.Ykb
             try { warehouse = JsonConvert.DeserializeObject<YkbWarehouse>(archive.YkbWarehouseJson); } catch { }
             try { pricing = JsonConvert.DeserializeObject<YkbPricing>(archive.YkbPricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<YkbFinalApproval>(archive.YkbFinalApprovalJson); } catch { }
+            try { workflowAttachments = JsonConvert.DeserializeObject<List<YkbWorkflowAttachment>>(archive.YkbWorkflowAttachmentsJson) ?? new(); } catch { workflowAttachments = new(); }
+
 
             // --------------------------------------------------------------------
             //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
@@ -8270,6 +8280,21 @@ namespace Business.Services.Ykb
             }
             // --------------------------------------------------------------------
 
+            var attachmentDtos = workflowAttachments
+              .Select(x => new YkbWorkflowAttachmentGetDto
+              {
+                  Id = x.Id,
+                  RequestNo = x.RequestNo,
+                  OriginalFileName = x.OriginalFileName,
+                  ContentType = x.ContentType,
+                  Extension = x.Extension,
+                  SizeBytes = x.SizeBytes,
+                  UploadedStepCode = x.UploadedStepCode,
+                  LastUpdatedStepCode = x.LastUpdatedStepCode,
+                  Url = NormalizeImageUrl(x.StoredFileName) ?? $"/uploads/{x.StoredFileName}"
+              })
+              .ToList();
+
             var snapshot = new YkbWorkFlowArchiveSnapshotDto
             {
                 ServicesRequest = servicesRequest,
@@ -8284,7 +8309,8 @@ namespace Business.Services.Ykb
                 FormImages = formImages,
                 Warehouse = warehouse,
                 Pricing = pricing,
-                FinalApproval = finalApproval
+                FinalApproval = finalApproval,
+                Attachments = attachmentDtos,
             };
 
             return new YkbWorkFlowArchiveDetailDto
@@ -8324,10 +8350,7 @@ namespace Business.Services.Ykb
              * Hizmet bedeli ürünleri hiçbir şekilde
              * başka bir hizmet bedelinin matrahına dahil edilmez.
              */
-            var baseTotalsByCurrency =
-                new Dictionary<string, decimal>(
-                    StringComparer.OrdinalIgnoreCase
-                );
+            var baseTotalsByCurrency = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var product in list)
             {
@@ -8435,8 +8458,7 @@ namespace Business.Services.Ykb
         }
 
 
-        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(
-            IEnumerable<long>? rawIds)
+        private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(IEnumerable<long>? rawIds)
         {
             var ids = (rawIds ?? Enumerable.Empty<long>())
                 .Where(x => x > 0)
@@ -9558,7 +9580,7 @@ namespace Business.Services.Ykb
         }
 
 
-        
+
         // Kontrol ve Onaylama adımında dosya yükleme /silme/değiştirme işlemleri için gerekli validasyonlar ve fiziksel dosya yönetimi.
         private sealed class WorkflowAttachmentChangeSet
         {
@@ -9577,7 +9599,7 @@ namespace Business.Services.Ykb
             public HashSet<string> AllowedExtensions { get; init; } =
                 new(StringComparer.OrdinalIgnoreCase);
         }
-       
+
         private static void ValidateWorkflowAttachment(IFormFile file, WorkflowAttachmentSettings settings)
         {
             if (file is null || file.Length <= 0)
@@ -9695,7 +9717,7 @@ namespace Business.Services.Ykb
                 throw new InvalidDataException(
                     "Dosya değişikliği yalnızca PRC veya APR adımında yapılabilir.");
             }
-            var attachmentSettings =await GetWorkflowAttachmentSettings();
+            var attachmentSettings = await GetWorkflowAttachmentSettings();
             var newFiles = attachments?
                 .Where(x => x is not null && x.Length > 0)
                 .ToList() ?? new List<IFormFile>();
