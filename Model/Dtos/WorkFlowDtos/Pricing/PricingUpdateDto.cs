@@ -1,5 +1,7 @@
 ﻿using Core.Enums;
+using Microsoft.AspNetCore.Http;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.WorkFlowDtos.Pricing
@@ -26,5 +28,11 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
+
+        public List<IFormFile>? Attachments { get; set; }
+
+        public List<long>? DeletedAttachmentIds { get; set; }
+
+        public List<WorkflowAttachmentReplaceDto>? ReplacedAttachments { get; set; }
     }
 }

@@ -170,12 +170,14 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("approve-pricing")]
-        public async Task<IActionResult> ApprovePricingAsync([FromBody] YkbPricingUpdateDto dto)
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(275_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000)]
+        public async Task<IActionResult> ApprovePricingAsync([FromForm] YkbPricingUpdateDto dto)
         {
             var result = await _workFlowService.ApprovePricing(dto);
             return Ok(result);
         }
-
 
         [HttpGet("get-pricing-by-requestno")]
         public async Task<IActionResult> GetPricingByRequestNoAsync([FromQuery] string requestNo)
@@ -184,14 +186,16 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-
         [HttpPost("final-approve")]
-        public async Task<IActionResult> FinalApprove([FromBody] YkbFinalApprovalUpdateDto dto)
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(275_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000)]
+        public async Task<IActionResult> FinalApprove(
+            [FromForm] YkbFinalApprovalUpdateDto dto)
         {
             var result = await _workFlowService.FinalApprovalAsync(dto);
             return Ok(result);
         }
-
 
         [HttpPost("customer-agreement")]
         public async Task<IActionResult> CustomerAgreementAsync([FromBody] YkbCustomerAgreementDto dto)

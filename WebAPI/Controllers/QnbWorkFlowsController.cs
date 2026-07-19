@@ -126,12 +126,7 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpGet("get-customerform-byrequestno")]
-        public async Task<IActionResult> GetCustomerFormByRequestNoAsync([FromQuery] string requestNo)
-        {
-            var result = await _workFlowService.GetCustomerFormByRequestNoAsync(requestNo);
-            return Ok(result);
-        }
+   
 
         [HttpPost("update-services-request/{id:long}")]
         public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] QnbServicesRequestUpdateDto dto)
@@ -195,24 +190,10 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpPost("customer-agreement")]
-        public async Task<IActionResult> CustomerAgreementAsync([FromBody] QnbCustomerAgreementDto dto)
-        {
-            var result = await _workFlowService.CustomerAgreementAsync(dto);
-            return Ok(result);
-        }
-
         [HttpGet("get-finalapproval-by-requestno")]
         public async Task<IActionResult> GetFinalApprovalByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetFinalApprovalByRequestNoAsync(requestNo);
-            return Ok(result);
-        }
-
-        [HttpGet("get-customeragreement-by-requestno")]
-        public async Task<IActionResult> GetCustomerAgreementByRequestNoAsync([FromQuery] string requestNo)
-        {
-            var result = await _workFlowService.GetCustomerAgreementByRequestNoAsync(requestNo);
             return Ok(result);
         }
 
@@ -237,12 +218,6 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
-        [HttpPost("send-review-message")]
-        public async Task<IActionResult> SendReviewMessage([FromBody] QnbCustomerReviewMessageDto dto)
-        {
-            var result = await _workFlowService.SendReviewMessage(dto);
-            return Ok(result);
-        }
 
         [HttpGet("activity-records/{requestNo}")]
         public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)

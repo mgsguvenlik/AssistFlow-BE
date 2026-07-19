@@ -1,5 +1,7 @@
 ﻿using Core.Enums;
+using Microsoft.AspNetCore.Http;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
 
 namespace Model.Dtos.WorkFlowDtos.FinalApproval
 {
@@ -11,5 +13,10 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
         public FinalApprovalStatus FinalApprovalStatus { get; set; }
         public decimal DiscountPercent { get; set; }
         public List<ServicesRequestProductCreateDto>? Products { get; set; }
+        public List<IFormFile>? Attachments { get; set; }
+
+        public List<long>? DeletedAttachmentIds { get; set; }
+
+        public List<WorkflowAttachmentReplaceDto>? ReplacedAttachments { get; set; }
     }
 }
