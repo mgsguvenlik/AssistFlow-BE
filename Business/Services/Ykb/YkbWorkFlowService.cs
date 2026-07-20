@@ -2014,7 +2014,7 @@ namespace Business.Services.Ykb
                         new { dto.CustomerNote }
                     );
 
-                    await ArchiveWorkflowAsync(dto.RequestNo, "Completed");
+                    await ArchiveWorkflowAsync(dto.RequestNo, "Tamamlandı");
 
                     await _notification.CreateForRolesAsync(
                         new NotificationCreateDto
