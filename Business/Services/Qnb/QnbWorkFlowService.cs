@@ -22,6 +22,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
+using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -32,6 +33,7 @@ using Model.Dtos.Role;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbCustomerForm;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbPricing;
@@ -818,7 +820,7 @@ namespace Business.Services.Qnb
                 return ResponseModel<QnbTechnicalServiceGetDto>.Fail($"Teknik Servis Gönderim  sırasında hata: {ex.Message}", StatusCode.Error);
             }
         }
-        
+
         // 3 Teknik Servis Servisi Başlatma
         public async Task<ResponseModel<QnbTechnicalServiceGetDto>> StartService(QnbStartTechnicalServiceDto dto)
         {
@@ -1303,6 +1305,10 @@ namespace Business.Services.Qnb
         // 4 Fiyatlama onay ve kontrole gönderim.
         public async Task<ResponseModel<QnbPricingGetDto>> ApprovePricing(QnbPricingUpdateDto dto)
         {
+            WorkflowAttachmentChangeSet? attachmentChangeSet = null;
+
+            var attachmentsCommitted = false;
+
             try
             {
                 #region Validasyonlar/Kontroller
@@ -1437,6 +1443,19 @@ namespace Business.Services.Qnb
                 }
                 #endregion
 
+                #region Dosya Ekleme/Silme/Değiştirme
+                attachmentChangeSet =
+                    await ApplyWorkflowAttachmentChangesAsync(
+                        requestNo: dto.RequestNo,
+                        attachments: dto.Attachments,
+                        deletedAttachmentIds:
+                            dto.DeletedAttachmentIds,
+                        replacedAttachments:
+                            dto.ReplacedAttachments,
+                        stepCode: "PRC");
+
+                #endregion
+
                 #region Hareket Kaydı
                 await _activationRecord.LogQnbAsync(
                     WorkFlowActionType.PricingApproved,
@@ -1465,6 +1484,15 @@ namespace Business.Services.Qnb
 
                 await _uow.Repository.CompleteAsync();
 
+                #region Dosya Silme
+                attachmentsCommitted = true;
+                if (attachmentChangeSet is not null)
+                {
+                    DeleteWorkflowAttachmentPhysicalFiles(
+                        attachmentChangeSet.OldStoredFileNames);
+                }
+                #endregion
+
                 #region Notification Kaydı
                 await _notification.CreateForRolesAsync(
                     new NotificationCreateDto
@@ -1482,16 +1510,49 @@ namespace Business.Services.Qnb
 
                 return await GetPricingByRequestNoAsync(dto.RequestNo);
             }
+            catch (InvalidDataException ex)
+            {
+                if (!attachmentsCommitted &&
+                    attachmentChangeSet is not null)
+                {
+                    DeleteWorkflowAttachmentPhysicalFiles(
+                        attachmentChangeSet.NewStoredFileNames);
+                }
+
+                _logger.LogWarning(
+                    ex,
+                    "QNB ApprovePricing dosya doğrulama hatası. " +
+                    "RequestNo: {RequestNo}",
+                    dto?.RequestNo);
+
+                return ResponseModel<QnbPricingGetDto>.Fail(
+                    ex.Message,
+                    StatusCode.BadRequest);
+            }
             catch (Exception ex)
             {
+                if (!attachmentsCommitted &&
+                    attachmentChangeSet is not null)
+                {
+                    DeleteWorkflowAttachmentPhysicalFiles(
+                        attachmentChangeSet.NewStoredFileNames);
+                }
+
                 _logger.LogError(ex, "ApprovePricing");
-                return ResponseModel<QnbPricingGetDto>.Fail($" Fiyatlama onay ve kontrole gönderim  sırasında hata: {ex.Message}", StatusCode.Error);
+
+                return ResponseModel<QnbPricingGetDto>.Fail(
+                    $"Fiyatlama onay ve kontrole gönderim " +
+                    $"sırasında hata: {ex.Message}",
+                    StatusCode.Error);
             }
         }
 
         // 5 Kontrol ve Son Onay (FinalApproval)
         public async Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto)
         {
+            WorkflowAttachmentChangeSet? attachmentChangeSet = null;
+            var attachmentsCommitted = false;
+
             try
             {
                 #region Validasyonlar/Kontroller
@@ -1650,6 +1711,20 @@ namespace Business.Services.Qnb
 
                 #endregion
 
+                #region Dosya Ekleme/Silme/Değiştirme
+                attachmentChangeSet =
+                    await ApplyWorkflowAttachmentChangesAsync(
+                        requestNo: dto.RequestNo,
+                        attachments: dto.Attachments,
+                        deletedAttachmentIds:
+                            dto.DeletedAttachmentIds,
+                        replacedAttachments:
+                            dto.ReplacedAttachments,
+                        stepCode: "APR");
+
+                #endregion
+
+
                 #region Hareket Kaydı
 
                 await _activationRecord.LogQnbAsync(
@@ -1712,6 +1787,14 @@ namespace Business.Services.Qnb
 
                 await _uow.Repository.CompleteAsync();
 
+                #region Dosya Silme
+                attachmentsCommitted = true;
+                if (attachmentChangeSet is not null)
+                {
+                    DeleteWorkflowAttachmentPhysicalFiles(
+                        attachmentChangeSet.OldStoredFileNames);
+                }
+                #endregion
                 return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -1724,7 +1807,7 @@ namespace Business.Services.Qnb
             }
         }
 
-      
+
         // Lokasyon Kontrolü Ezme Maili
         public async Task<ResponseModel> RequestLocationOverrideAsync(QnbOverrideLocationCheckDto dto)
         {
@@ -2112,7 +2195,7 @@ namespace Business.Services.Qnb
             );
         }
 
-    
+
         // -------------------- Services Request --------------------
 
         // 1 Servis Talebi güncelleme adımı
@@ -3397,6 +3480,9 @@ namespace Business.Services.Qnb
                 .ProjectToType<QnbWorkFlowReviewLogDto>(_config)
                 .ToListAsync();
 
+            dto.Attachments = await GetWorkflowAttachmentsAsync(dto.RequestNo);
+            dto.CanEditAttachments = true;
+
             return ResponseModel<QnbPricingGetDto>.Success(dto);
         }
 
@@ -3494,6 +3580,9 @@ namespace Business.Services.Qnb
                         .ToList();
                 }
             }
+
+            dto.Attachments = await GetWorkflowAttachmentsAsync(dto.RequestNo);
+            dto.CanEditAttachments = true;
         }
 
         private static QnbFinalApprovalGetDto? BuildFinalApprovalHeaderFromCustomer(
@@ -3598,7 +3687,7 @@ namespace Business.Services.Qnb
             return ResponseModel<QnbFinalApprovalGetDto>.Success(dto);
         }
 
-      
+
 
         // -------------------- WorkFlowStep CRUD --------------------
         public async Task<ResponseModel<PagedResult<QnbWorkFlowStepGetDto>>> GetStepsAsync(QueryParams q)
@@ -5756,6 +5845,15 @@ namespace Business.Services.Qnb
         // ------------------------ Archive — internal ------------------------
         private async Task ArchiveWorkflowAsync(string requestNo, string archiveReason, CancellationToken ct = default)
         {
+
+            // Arşiv kaydı var mı? 
+            var hasAnyArchive = await _uow.Repository
+                .GetQueryable<QnbWorkFlowArchive>()
+                .AsNoTracking()
+                .AnyAsync(x => x.RequestNo == requestNo);
+            if (hasAnyArchive)
+                return;
+
             var servicesRequest = await _uow.Repository
                 .GetQueryable<QnbServicesRequest>()
                 .Include(x => x.Customer)
@@ -5831,6 +5929,12 @@ namespace Business.Services.Qnb
                 .OrderBy(x => x.CreatedDate)
                 .ToListAsync(ct);
 
+            var workflowAttachments = await _uow.Repository
+                    .GetQueryable<QnbWorkflowAttachment>()
+                    .AsNoTracking()
+                    .Where(x => x.RequestNo == requestNo)
+                    .ToListAsync(ct);
+
             // Resim DTO'ları (Base64 kapalı)
             var serviceImageDtos = serviceImages.Select(img => new ArchiveImageDto
             {
@@ -5865,7 +5969,8 @@ namespace Business.Services.Qnb
                 QnbTechnicalServiceFormImagesJson = JsonConvert.SerializeObject(formImageDtos),
                 QnbWarehouseJson = JsonConvert.SerializeObject(warehouse),
                 QnbPricingJson = JsonConvert.SerializeObject(pricing),
-                QnbFinalApprovalJson = JsonConvert.SerializeObject(finalApproval)
+                QnbFinalApprovalJson = JsonConvert.SerializeObject(finalApproval),
+                QnbWorkflowAttachmentsJson = JsonConvert.SerializeObject(workflowAttachments)
             };
 
             await _uow.Repository.AddAsync(archive);
@@ -5887,6 +5992,7 @@ namespace Business.Services.Qnb
             QnbWarehouse? warehouse = null;
             QnbPricing? pricing = null;
             QnbFinalApproval? finalApproval = null;
+            List<QnbWorkflowAttachment> attachments = new();
 
             try { servicesRequest = JsonConvert.DeserializeObject<QnbServicesRequest>(archive.QnbServicesRequestJson); } catch { }
             try { products = JsonConvert.DeserializeObject<List<QnbServicesRequestProduct>>(archive.QnbServicesRequestProductsJson) ?? new(); } catch { }
@@ -5901,7 +6007,7 @@ namespace Business.Services.Qnb
             try { warehouse = JsonConvert.DeserializeObject<QnbWarehouse>(archive.QnbWarehouseJson); } catch { }
             try { pricing = JsonConvert.DeserializeObject<QnbPricing>(archive.QnbPricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<QnbFinalApproval>(archive.QnbFinalApprovalJson); } catch { }
-
+            try { attachments = JsonConvert.DeserializeObject<List<QnbWorkflowAttachment>>(archive.QnbWorkflowAttachmentsJson) ?? new(); } catch { attachments = new(); }
 
             // --------------------------------------------------------------------
             //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
@@ -5957,6 +6063,27 @@ namespace Business.Services.Qnb
             // --------------------------------------------------------------------
 
 
+            var attachmentDtos = attachments
+                    .Select(x =>
+                    {
+                        var relativeUrl =
+                            $"/uploads/{x.StoredFileName}";
+
+                        return new QnbWorkflowAttachmentGetDto
+                        {
+                            Id = x.Id,
+                            RequestNo = x.RequestNo,
+                            OriginalFileName = x.OriginalFileName,
+                            ContentType = x.ContentType,
+                            Extension = x.Extension,
+                            SizeBytes = x.SizeBytes,
+                            UploadedStepCode = x.UploadedStepCode,
+                            LastUpdatedStepCode = x.LastUpdatedStepCode,
+                            Url = string.IsNullOrWhiteSpace(baseUrl) ? relativeUrl : $"{baseUrl}{relativeUrl}"
+                        };
+                    })
+                     .ToList();
+
             var snapshot = new QnbWorkFlowArchiveSnapshotDto
             {
                 ServicesRequest = servicesRequest,
@@ -5969,6 +6096,7 @@ namespace Business.Services.Qnb
                 TechnicalService = technicalService,
                 ServiceImages = serviceImages,
                 FormImages = formImages,
+                Attachments = attachmentDtos,
                 Warehouse = warehouse,
                 Pricing = pricing,
                 FinalApproval = finalApproval
@@ -7259,7 +7387,468 @@ namespace Business.Services.Qnb
                     x.IsTechnicalServiceTestEnabled,
                     cancellationToken);
         }
+
+
+
+        //Fiyatlama ve onay ekranında dosya ekleme silme işlemleri 
+        private sealed class WorkflowAttachmentChangeSet
+        {
+            public List<string> NewStoredFileNames { get; } = new();
+
+            public List<string> OldStoredFileNames { get; } = new();
+        }
+
+        private sealed class WorkflowAttachmentSettings
+        {
+            public int MaxFileCount { get; init; }
+
+            public long MaxFileSizeMb { get; init; }
+
+            public long MaxFileSizeBytes { get; init; }
+
+            public HashSet<string> AllowedExtensions { get; init; }
+                = new(StringComparer.OrdinalIgnoreCase);
+        }
+        private static void ValidateWorkflowAttachment(IFormFile file, WorkflowAttachmentSettings settings)
+        {
+            if (file is null || file.Length <= 0)
+                throw new InvalidDataException("Boş dosya yüklenemez.");
+
+            if (file.Length > settings.MaxFileSizeBytes)
+            {
+                throw new InvalidDataException(
+                    $"{Path.GetFileName(file.FileName)} dosyası " +
+                    $"{settings.MaxFileSizeMb} MB sınırını aşamaz.");
+            }
+
+            var originalFileName =
+                Path.GetFileName(file.FileName);
+
+            if (string.IsNullOrWhiteSpace(originalFileName))
+                throw new InvalidDataException("Dosya adı geçersiz.");
+
+            var extension = NormalizeFileExtension(
+                Path.GetExtension(originalFileName));
+
+            if (string.IsNullOrWhiteSpace(extension) ||
+                !settings.AllowedExtensions.Contains(extension))
+            {
+                var allowedExtensionText = string.Join(
+                    ", ",
+                    settings.AllowedExtensions.OrderBy(x => x));
+
+                throw new InvalidDataException(
+                    $"Desteklenmeyen dosya türü: {originalFileName}. " +
+                    $"Desteklenen türler: {allowedExtensionText}");
+            }
+        }
+        private static string GetWorkflowAttachmentUploadRoot()
+        {
+            var uploadRoot = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "UploadsStorage");
+
+            Directory.CreateDirectory(uploadRoot);
+
+            return uploadRoot;
+        }
+
+        private static async Task<string> SaveWorkflowAttachmentAsync(IFormFile file, CancellationToken cancellationToken)
+        {
+            var extension = NormalizeFileExtension(
+                Path.GetExtension(file.FileName));
+
+            var storedFileName =
+                $"{Guid.NewGuid():N}{extension}";
+
+            var physicalPath = Path.Combine(
+                GetWorkflowAttachmentUploadRoot(),
+                storedFileName);
+
+            await using var inputStream =
+                file.OpenReadStream();
+
+            await using var outputStream = new FileStream(
+                physicalPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 1024 * 64,
+                options:
+                    FileOptions.Asynchronous |
+                    FileOptions.SequentialScan);
+
+            await inputStream.CopyToAsync(
+                outputStream,
+                1024 * 64,
+                cancellationToken);
+
+            return storedFileName;
+        }
+        private void DeleteWorkflowAttachmentPhysicalFiles(IEnumerable<string> storedFileNames)
+        {
+            var uploadRoot =
+                GetWorkflowAttachmentUploadRoot();
+
+            foreach (var storedFileName in storedFileNames
+                         .Where(x => !string.IsNullOrWhiteSpace(x))
+                         .Distinct())
+            {
+                try
+                {
+                    var safeFileName =
+                        Path.GetFileName(storedFileName);
+
+                    var physicalPath = Path.Combine(
+                        uploadRoot,
+                        safeFileName);
+
+                    if (File.Exists(physicalPath))
+                        File.Delete(physicalPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "QNB akış dosyası fiziksel olarak silinemedi. " +
+                        "FileName: {FileName}",
+                        storedFileName);
+                }
+            }
+        }
+        private async Task<WorkflowAttachmentChangeSet> ApplyWorkflowAttachmentChangesAsync(
+                string requestNo,
+                IEnumerable<IFormFile>? attachments,
+                IEnumerable<long>? deletedAttachmentIds,
+                IEnumerable<QnbWorkflowAttachmentReplaceDto>?
+                    replacedAttachments,
+                string stepCode,
+                CancellationToken cancellationToken = default)
+        {
+            if (stepCode is not ("PRC" or "APR"))
+            {
+                throw new InvalidDataException(
+                    "Dosya değişikliği yalnızca PRC veya APR adımında yapılabilir.");
+            }
+
+            var settings =
+                await GetWorkflowAttachmentSettings();
+
+            var newFiles = attachments?
+                .Where(x => x is not null && x.Length > 0)
+                .ToList() ?? new List<IFormFile>();
+
+            var deleteIds = deletedAttachmentIds?
+                .Where(x => x > 0)
+                .Distinct()
+                .ToHashSet() ?? new HashSet<long>();
+
+            var replacements = replacedAttachments?
+                .Where(x =>
+                    x is not null &&
+                    x.AttachmentId > 0 &&
+                    x.File is not null)
+                .GroupBy(x => x.AttachmentId)
+                .Select(x => x.First())
+                .ToList()
+                ?? new List<QnbWorkflowAttachmentReplaceDto>();
+
+            foreach (var file in newFiles)
+                ValidateWorkflowAttachment(file, settings);
+
+            foreach (var replacement in replacements)
+                ValidateWorkflowAttachment(replacement.File, settings);
+
+            var replacementIds = replacements
+                .Select(x => x.AttachmentId)
+                .ToHashSet();
+
+            if (deleteIds.Overlaps(replacementIds))
+            {
+                throw new InvalidDataException(
+                    "Aynı dosya hem silme hem değiştirme listesinde bulunamaz.");
+            }
+
+            var existingAttachments = await _uow.Repository
+                .GetQueryable<QnbWorkflowAttachment>()
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(cancellationToken);
+
+            var existingIds = existingAttachments
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            var requestedIds = deleteIds
+                .Concat(replacementIds)
+                .ToHashSet();
+
+            if (requestedIds.Except(existingIds).Any())
+            {
+                throw new InvalidDataException(
+                    "Silinmek veya değiştirilmek istenen dosyalardan biri bulunamadı.");
+            }
+
+            var finalAttachmentCount =
+                existingAttachments.Count -
+                deleteIds.Count +
+                newFiles.Count;
+
+            if (finalAttachmentCount > settings.MaxFileCount)
+            {
+                throw new InvalidDataException(
+                    $"Bir talebe en fazla " +
+                    $"{settings.MaxFileCount} adet dosya eklenebilir.");
+            }
+
+            var changeSet =
+                new WorkflowAttachmentChangeSet();
+
+            try
+            {
+                foreach (var replacement in replacements)
+                {
+                    var entity = existingAttachments.First(
+                        x => x.Id ==
+                             replacement.AttachmentId);
+
+                    var newStoredFileName =
+                        await SaveWorkflowAttachmentAsync(
+                            replacement.File,
+                            cancellationToken);
+
+                    changeSet.NewStoredFileNames.Add(
+                        newStoredFileName);
+
+                    changeSet.OldStoredFileNames.Add(
+                        entity.StoredFileName);
+
+                    entity.OriginalFileName =
+                        Path.GetFileName(
+                            replacement.File.FileName);
+
+                    entity.StoredFileName =
+                        newStoredFileName;
+
+                    entity.Extension =
+                        NormalizeFileExtension(
+                            Path.GetExtension(
+                                replacement.File.FileName));
+
+                    entity.ContentType =
+                        string.IsNullOrWhiteSpace(
+                            replacement.File.ContentType)
+                            ? "application/octet-stream"
+                            : replacement.File.ContentType;
+
+                    entity.SizeBytes =
+                        replacement.File.Length;
+
+                    entity.LastUpdatedStepCode =
+                        stepCode;
+
+
+                    _uow.Repository.Update(entity);
+                }
+
+                foreach (var file in newFiles)
+                {
+                    var storedFileName =
+                        await SaveWorkflowAttachmentAsync(
+                            file,
+                            cancellationToken);
+
+                    changeSet.NewStoredFileNames.Add(
+                        storedFileName);
+
+                    await _uow.Repository.AddAsync(
+                        new QnbWorkflowAttachment
+                        {
+                            RequestNo = requestNo,
+                            OriginalFileName =
+                                Path.GetFileName(file.FileName),
+                            StoredFileName = storedFileName,
+                            Extension =
+                                NormalizeFileExtension(
+                                    Path.GetExtension(
+                                        file.FileName)),
+                            ContentType =
+                                string.IsNullOrWhiteSpace(
+                                    file.ContentType)
+                                    ? "application/octet-stream"
+                                    : file.ContentType,
+                            SizeBytes = file.Length,
+                            UploadedStepCode = stepCode,
+                            LastUpdatedStepCode = stepCode,
+                        });
+                }
+
+                foreach (var entity in existingAttachments
+                             .Where(x =>
+                                 deleteIds.Contains(x.Id)))
+                {
+                    changeSet.OldStoredFileNames.Add(
+                        entity.StoredFileName);
+
+                    _uow.Repository.HardDelete(entity);
+                }
+
+                return changeSet;
+            }
+            catch
+            {
+                DeleteWorkflowAttachmentPhysicalFiles(
+                    changeSet.NewStoredFileNames);
+
+                throw;
+            }
+        }
+        private async Task<List<QnbWorkflowAttachmentGetDto>> GetWorkflowAttachmentsAsync(string requestNo, CancellationToken cancellationToken = default)
+        {
+            var entities = await _uow.Repository
+                .GetQueryable<QnbWorkflowAttachment>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync(cancellationToken);
+
+            var appSettings =
+                ServiceTool.ServiceProvider
+                    .GetService<IOptionsSnapshot<AppSettings>>();
+
+            var baseUrl =
+                appSettings?.Value.FileUrl?.TrimEnd('/')
+                ?? string.Empty;
+
+            return entities.Select(x =>
+            {
+                var relativeUrl =
+                    $"/uploads/{x.StoredFileName}";
+
+                return new QnbWorkflowAttachmentGetDto
+                {
+                    Id = x.Id,
+                    RequestNo = x.RequestNo,
+                    OriginalFileName =
+                        x.OriginalFileName,
+                    ContentType = x.ContentType,
+                    Extension = x.Extension,
+                    SizeBytes = x.SizeBytes,
+                    UploadedStepCode =
+                        x.UploadedStepCode,
+                    LastUpdatedStepCode =
+                        x.LastUpdatedStepCode,
+                    Url = string.IsNullOrWhiteSpace(baseUrl)
+                        ? relativeUrl
+                        : $"{baseUrl}{relativeUrl}"
+                };
+            }).ToList();
+        }
+        private async Task<WorkflowAttachmentSettings> GetWorkflowAttachmentSettings()
+        {
+            var maxCountValue = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Name ==
+                         "MaxWorkflowAttachmentCount");
+
+            if (!int.TryParse(
+                    maxCountValue?.Value?.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var maxFileCount) ||
+                maxFileCount <= 0)
+            {
+                throw new InvalidOperationException(
+                    "MaxWorkflowAttachmentCount parametresi " +
+                    "pozitif bir tam sayı olmalıdır.");
+            }
+
+            var maxSizeValue = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Name ==
+                         "MaxWorkflowAttachmentSize");
+
+            if (!long.TryParse(
+                    maxSizeValue?.Value?.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var maxFileSizeMb) ||
+                maxFileSizeMb <= 0)
+            {
+                throw new InvalidOperationException(
+                    "MaxWorkflowAttachmentSize parametresi " +
+                    "pozitif bir tam sayı olmalıdır.");
+            }
+
+            var allowedExtensionsValue =
+                await _uow.Repository
+                    .GetQueryable<Configuration>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Name ==
+                             "AllowedWorkflowAttachmentExtensions");
+
+            var allowedExtensions =
+                (allowedExtensionsValue?.Value ??
+                 string.Empty)
+                .Split(
+                    new[] { ';', ',' },
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                .Select(NormalizeFileExtension)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(
+                    StringComparer.OrdinalIgnoreCase);
+
+            if (allowedExtensions.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "AllowedWorkflowAttachmentExtensions " +
+                    "parametresinde en az bir dosya uzantısı tanımlanmalıdır.");
+            }
+
+            long maxFileSizeBytes;
+
+            try
+            {
+                maxFileSizeBytes = checked(
+                    maxFileSizeMb * 1024L * 1024L);
+            }
+            catch (OverflowException)
+            {
+                throw new InvalidOperationException(
+                    "Dosya boyutu parametresi desteklenen " +
+                    "sınırların üzerindedir.");
+            }
+
+            return new WorkflowAttachmentSettings
+            {
+                MaxFileCount = maxFileCount,
+                MaxFileSizeMb = maxFileSizeMb,
+                MaxFileSizeBytes = maxFileSizeBytes,
+                AllowedExtensions = allowedExtensions
+            };
+        }
+
+        private static string NormalizeFileExtension(
+           string extension)
+        {
+            extension = extension
+                .Trim()
+                .ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(extension))
+                return string.Empty;
+
+            return extension.StartsWith('.')
+                ? extension
+                : $".{extension}";
+        }
+
     }
+
 }
 
 

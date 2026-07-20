@@ -1,4 +1,6 @@
-﻿namespace Model.Dtos.WorkFlowDtos.WorkFlowArchive
+﻿using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
+
+namespace Model.Dtos.WorkFlowDtos.WorkFlowArchive
 {
     public class WorkFlowArchiveSnapshotDto
     {
@@ -15,5 +17,6 @@
         public Concrete.WorkFlows.Warehouse? Warehouse { get; set; }
         public Concrete.WorkFlows.Pricing? Pricing { get; set; }
         public Concrete.WorkFlows.FinalApproval? FinalApproval { get; set; }
+        public List<WorkflowAttachmentGetDto> Attachments { get; set; } = new();
     }
 }

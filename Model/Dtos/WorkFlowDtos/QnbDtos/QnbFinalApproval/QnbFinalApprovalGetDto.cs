@@ -1,5 +1,6 @@
 using Core.Enums;
 using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
@@ -20,5 +21,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
 
         public List<QnbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
         public List<QnbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+
+        public List<QnbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
+        public bool CanEditAttachments { get; set; }
     }
 }
