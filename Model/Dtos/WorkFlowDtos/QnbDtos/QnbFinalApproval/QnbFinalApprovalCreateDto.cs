@@ -1,4 +1,6 @@
 using Core.Enums;
+using Microsoft.AspNetCore.Http;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
@@ -13,5 +15,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
         public WorkFlowStatus WorkFlowStatus { get; set; }
         public FinalApprovalStatus FinalApprovalStatus { get; set; }
         public List<QnbServicesRequestProductCreateDto>? Products { get; set; }
+        public IEnumerable<IFormFile>? Attachments { get; set; }
+        public IEnumerable<long>? DeletedAttachmentIds { get; set; }
+        public IEnumerable<QnbWorkflowAttachmentReplaceDto>? ReplacedAttachments { get; set; }
     }
 }

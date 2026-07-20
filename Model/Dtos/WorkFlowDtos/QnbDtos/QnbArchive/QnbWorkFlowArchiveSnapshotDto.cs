@@ -1,3 +1,4 @@
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive
@@ -17,5 +18,6 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive
         public Concrete.Qnb.QnbWarehouse? Warehouse { get; set; }
         public Concrete.Qnb.QnbPricing? Pricing { get; set; }
         public Concrete.Qnb.QnbFinalApproval? FinalApproval { get; set; }
+        public List<QnbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
     }
 }
