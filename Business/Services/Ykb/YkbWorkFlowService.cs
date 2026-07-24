@@ -6315,6 +6315,8 @@ namespace Business.Services.Ykb
                     .GetQueryable<User>()
                     .AsNoTracking();
 
+             
+
                 // -------------------------
                 // WorkFlow ana filtreleri
                 // -------------------------
@@ -6713,6 +6715,22 @@ namespace Business.Services.Ykb
                     );
                 }
 
+                var products = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .AsNoTracking()
+                .Include(p => p.Product)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerGroup)
+                        .ThenInclude(g => g.GroupProductPrices)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.CustomerProductPrices)
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.Tenant)
+                        .ThenInclude(t => t.TenantProductPrices)
+                .Where(p => requestNos.Contains(p.RequestNo))
+                .AsSplitQuery()
+                .ToListAsync();
+
                 // -------------------------
                 // Sayfadaki RequestNo detayları
                 // -------------------------
@@ -6895,6 +6913,46 @@ namespace Business.Services.Ykb
                     .GroupBy(x => x.Id)
                     .ToDictionary(x => x.Key, x => x.First());
 
+                var productDict = products
+                         .GroupBy(p => p.RequestNo)
+                         .ToDictionary(
+                             g => g.Key,
+                             g => g.Select(p =>
+                             {
+                                 var captured = p.IsPriceCaptured;
+                                 var effectivePrice = captured
+                                     ? p.CapturedUnitPrice ?? 0m
+                                     : p.GetEffectivePrice();
+                                 var currency = captured
+                                     ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
+                                     : p.Product?.PriceCurrency ?? "TRY";
+                                 var totalPrice = captured
+                                     ? p.CapturedTotal ?? (effectivePrice * p.Quantity)
+                                     : effectivePrice * p.Quantity;
+                                 return new YkbServicesRequestProductGetDto
+                                 {
+                                     Id = p.Id,
+                                     RequestNo = p.RequestNo,
+                                     ProductId = p.ProductId,
+                                     CustomerId = p.CustomerId ?? 0,
+                                     CustomerName = p.Customer?.SubscriberCompany,
+                                     Quantity = p.Quantity,
+                                     ProductName = p.Product?.Description,
+                                     ProductCode = p.Product?.ProductCode,
+                                     PriceCurrency = currency,
+                                     ProductPrice = effectivePrice,
+                                     EffectivePrice = effectivePrice,
+                                     TotalPrice = totalPrice,
+                                     IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+                                     ServiceFeePercentage = p.Product?.ServiceFeePercentage,
+                                     IsPriceCaptured = p.IsPriceCaptured,
+                                     CapturedUnitPrice = p.CapturedUnitPrice,
+                                     CapturedCurrency = p.CapturedCurrency,
+                                     CapturedTotal = p.CapturedTotal,
+                                 };
+                             }).ToList()
+                         );
+
                 // -------------------------
                 // DTO oluştur
                 // -------------------------
@@ -6996,7 +7054,7 @@ namespace Business.Services.Ykb
                         PricingTotalAmount = pricing?.TotalAmount,
                         Currency = pricing?.Currency,
 
-                        FinalApprovalStatus = finalApproval?.Status,
+                        FinalApprovalStatus = finalApproval?.Status,    
                         DiscountPercent = finalApproval?.DiscountPercent,
                         FinalApprovalNotes = finalApproval?.Notes,
 
@@ -7009,7 +7067,10 @@ namespace Business.Services.Ykb
 
                         WorkOrderTypes = ykbWotDict.TryGetValue(w.RequestNo, out var ykbWotList)
                             ? ykbWotList
-                            : new List<WorkOrderTypeLiteDto>()
+                            : new List<WorkOrderTypeLiteDto>(),
+                        Products = productDict.TryGetValue(w.RequestNo, out var productList)
+                            ? productList
+                            : new List<YkbServicesRequestProductGetDto>()
                     };
                 }).ToList();
 
