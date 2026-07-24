@@ -1,6 +1,7 @@
 ﻿using Core.Enums;
 using Core.Enums.Ykb;
 using Model.Dtos.WorkFlowDtos.Report;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -118,5 +119,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
 
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
+
+        public List<YkbServicesRequestProductGetDto>? Products { get; set; }
     }
 }
