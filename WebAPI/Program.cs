@@ -1,4 +1,8 @@
+using Amazon.Runtime;
+using Amazon.S3;
 using Business.DependencyResolvers.Autofac;
+using Business.Interfaces.Storage;
+using Business.Services.Storage;
 using Business.UnitOfWork;
 using Core.Extensions;
 using Core.Settings.Concrete;
@@ -12,7 +16,9 @@ using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Model.Concrete;
 using Scalar.AspNetCore;
 using Serilog;
 using System.Security.Claims;
@@ -87,6 +93,51 @@ builder.Services.AddDependencyResolvers(new ICoreModule[]
 {
     new AutofacBusinessModule()
 });
+
+
+
+builder.Services
+    .AddOptions<R2StorageOptions>()
+    .Bind(builder.Configuration.GetSection(R2StorageOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(
+        x => Uri.TryCreate(
+            x.Endpoint,
+            UriKind.Absolute,
+            out _),
+        "R2 Endpoint geçerli bir URL olmalýdýr.")
+    .Validate(
+        x => Uri.TryCreate(
+            x.PublicBaseUrl,
+            UriKind.Absolute,
+            out _),
+        "R2 PublicBaseUrl geçerli bir URL olmalýdýr.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IAmazonS3>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<IOptions<R2StorageOptions>>()
+        .Value;
+
+    var credentials = new BasicAWSCredentials(
+        options.AccessKeyId,
+        options.SecretAccessKey);
+
+    var config = new AmazonS3Config
+    {
+        ServiceURL = options.Endpoint,
+
+        // Bucket adý URL host'una eklenmek yerine
+        // endpoint/bucket/key biçimi kullanýlýr.
+        ForcePathStyle = true
+    };
+
+    return new AmazonS3Client(
+        credentials,
+        config);
+});
+
 
 #region Mapper
 
