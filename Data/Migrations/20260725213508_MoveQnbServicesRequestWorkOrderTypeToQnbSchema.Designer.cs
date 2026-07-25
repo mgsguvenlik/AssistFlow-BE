@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260725213508_MoveQnbServicesRequestWorkOrderTypeToQnbSchema")]
+    partial class MoveQnbServicesRequestWorkOrderTypeToQnbSchema
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1728,7 +1731,7 @@ namespace Data.Migrations
 
                     b.HasIndex("RequestNo");
 
-                    b.ToTable("QnbWorkflowAttachment", "qnb");
+                    b.ToTable("QnbWorkflowAttachment");
                 });
 
             modelBuilder.Entity("Model.Concrete.Region", b =>

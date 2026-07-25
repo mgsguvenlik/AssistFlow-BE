@@ -724,7 +724,7 @@ namespace Data.Concrete.EfCore.Context
 
             modelBuilder.Entity<QnbServicesRequestWorkOrderType>(entity =>
             {
-                entity.ToTable("QnbServicesRequestWorkOrderTypes");
+                entity.ToTable("QnbServicesRequestWorkOrderTypes", "qnb");
 
                 entity.HasKey(x => new
                 {
@@ -743,7 +743,12 @@ namespace Data.Concrete.EfCore.Context
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<QnbWorkflowAttachment>().HasIndex(x => x.RequestNo);
+            modelBuilder.Entity<QnbWorkflowAttachment>(entity =>
+            {
+                entity.ToTable("QnbWorkflowAttachment", "qnb");
+
+                entity.HasIndex(x => x.RequestNo);
+            });
             #endregion
         }
     }
