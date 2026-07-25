@@ -5,6 +5,7 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
@@ -401,5 +402,28 @@ namespace WebAPI.Controllers
             return ToActionResult(result);
         }
 
+
+        // ----------- Muhasebe ile ilgili işlemler ------------
+
+        [HttpGet("accounting-service-report")]
+        public async Task<IActionResult> GetAccountingServiceReport(
+            [FromQuery] YkbAccountingReportQueryParams q)
+        {
+            var result = await _workFlowService
+                .GetAccountingServiceReportAsync(q);
+
+            return ToActionResult(result);
+        }
+
+
+        [HttpPost("accounting-service-report/{requestNo}/toggle")]
+        public async Task<IActionResult> ToggleAccountingProcess(
+            [FromRoute] string requestNo)
+        {
+            var result = await _workFlowService
+                .ToggleAccountingProcessAsync(requestNo);
+
+            return ToActionResult(result);
+        }
     }
 }
