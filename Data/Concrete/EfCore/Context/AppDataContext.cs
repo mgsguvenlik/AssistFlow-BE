@@ -81,6 +81,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbWorkFlowReviewLog> YkbWorkFlowReviewLogs { get; set; } = default!;
         public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
         public DbSet<YkbWorkflowAttachment> YkbWorkflowAttachments { get; set; }
+        public DbSet<YkbAccountingProcess>  YkbAccountingProcesses { get; set; }
 
         #endregion  
 
@@ -156,6 +157,22 @@ namespace Data.Concrete.EfCore.Context
 
             modelBuilder.Entity<YkbWorkflowAttachment>()
                 .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<YkbAccountingProcess>(entity =>
+            {
+                entity.ToTable("YkbAccountingProcesses", "ykb");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.RequestNo)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.HasIndex(x => x.RequestNo)
+                    .IsUnique();
+
+                entity.HasIndex(x => x.IsProcessed);
+            });
             #endregion
 
 
@@ -724,7 +741,7 @@ namespace Data.Concrete.EfCore.Context
 
             modelBuilder.Entity<QnbServicesRequestWorkOrderType>(entity =>
             {
-                entity.ToTable("QnbServicesRequestWorkOrderTypes");
+                entity.ToTable("QnbServicesRequestWorkOrderTypes", "qnb");
 
                 entity.HasKey(x => new
                 {
@@ -743,7 +760,12 @@ namespace Data.Concrete.EfCore.Context
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
-            modelBuilder.Entity<QnbWorkflowAttachment>().HasIndex(x => x.RequestNo);
+            modelBuilder.Entity<QnbWorkflowAttachment>(entity =>
+            {
+                entity.ToTable("QnbWorkflowAttachment", "qnb");
+
+                entity.HasIndex(x => x.RequestNo);
+            });
             #endregion
         }
     }

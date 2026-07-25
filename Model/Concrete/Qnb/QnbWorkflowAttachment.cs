@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Model.Concrete.Qnb
 {
-    [Table("QnbWorkflowAttachment")]
+    [Table("QnbWorkflowAttachment", Schema = "qnb")]
     public class QnbWorkflowAttachment : BaseEntity
     {
         [Key]
