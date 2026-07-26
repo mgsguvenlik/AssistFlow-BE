@@ -38,5 +38,9 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         public bool CanEditAttachments { get; set; }
 
 
+        public string? ProblemDescription { get; set; }
+        public string? ResolutionAndActions { get; set; }
+
+
     }
 }

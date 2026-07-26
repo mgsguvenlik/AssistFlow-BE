@@ -32,5 +32,8 @@ namespace Model.Dtos.WorkFlowDtos.FinalApproval
         public List<WorkflowAttachmentGetDto> Attachments { get; set; } = new();
 
         public bool CanEditAttachments { get; set; }
+
+        public string? ProblemDescription { get; set; }
+        public string? ResolutionAndActions { get; set; }
     }
 }
