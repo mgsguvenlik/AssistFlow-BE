@@ -7,7 +7,6 @@ using Business.UnitOfWork;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
-using Core.Enums.Qnb;
 using Core.Settings.Concrete;
 using Core.Utilities.Constants;
 using Core.Utilities.IoC;
@@ -23,8 +22,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Qnb;
-using Model.Concrete.WorkFlows;
-using Model.Concrete.Qnb;
+using Model.Concrete.Ykb;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
 using Model.Dtos.CustomerSystemAssignment;
@@ -36,7 +34,6 @@ using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
-using Model.Dtos.WorkFlowDtos.QnbDtos.QnbCustomerForm;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbPricing;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport;
@@ -49,7 +46,6 @@ using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWarehouse;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlowStep;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
-using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkOrderType;
 using Newtonsoft.Json;
 using System.ComponentModel.DataAnnotations;
@@ -3445,6 +3441,27 @@ namespace Business.Services.Qnb
             if (dto is null)
                 return ResponseModel<QnbPricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+
+
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<QnbTechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
+
+            //Ürünler 
             var productEntities = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
@@ -3488,6 +3505,7 @@ namespace Business.Services.Qnb
                 })
                 .ToList();
 
+            //Gözden geçir  mesajları 
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<QnbWorkFlowReviewLog>(x =>
                     x.RequestNo == dto.RequestNo &&
@@ -3506,6 +3524,24 @@ namespace Business.Services.Qnb
         // -------------------- FinalApproval shared helpers --------------------
         private async Task FillFinalApprovalDetailsAsync(QnbFinalApprovalGetDto dto)
         {
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<QnbTechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
+
             // Ürünler
             var productEntities = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
