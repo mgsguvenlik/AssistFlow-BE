@@ -3691,6 +3691,24 @@ namespace Business.Services
             if (dto is null)
                 return ResponseModel<PricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
+
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
@@ -3835,6 +3853,24 @@ namespace Business.Services
 
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
@@ -4055,6 +4091,25 @@ namespace Business.Services
 
             if (dto is null)
                 return ResponseModel<FinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
 
             // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
             dto.Products = await _uow.Repository
@@ -9065,472 +9120,6 @@ namespace Business.Services
                 ? extension
                 : $".{extension}";
         }
-
-        //// Kontrol ve Onaylama adımında dosya yükleme /silme/değiştirme işlemleri için gerekli validasyonlar ve fiziksel dosya yönetimi.
-        //private sealed class WorkflowAttachmentChangeSet
-        //{
-        //    public List<string> NewStoredFileNames { get; } = new();
-
-        //    public List<string> OldStoredFileNames { get; } = new();
-        //}
-
-        //private sealed class WorkflowAttachmentSettings
-        //{
-        //    public int MaxFileCount { get; init; }
-
-        //    public long MaxFileSizeMb { get; init; }
-
-        //    public long MaxFileSizeBytes { get; init; }
-
-        //    public HashSet<string> AllowedExtensions { get; init; } =
-        //        new(StringComparer.OrdinalIgnoreCase);
-        //}
-
-        //private static void ValidateWorkflowAttachment(IFormFile file, WorkflowAttachmentSettings settings)
-        //{
-        //    if (file is null || file.Length <= 0)
-        //        throw new InvalidDataException("Boş dosya yüklenemez.");
-
-        //    if (file.Length > settings.MaxFileSizeBytes)
-        //    {
-        //        throw new InvalidDataException(
-        //            $"{Path.GetFileName(file.FileName)} dosyası " +
-        //            $"{settings.MaxFileSizeMb} MB sınırını aşamaz.");
-        //    }
-
-        //    var originalFileName = Path.GetFileName(file.FileName);
-
-        //    if (string.IsNullOrWhiteSpace(originalFileName))
-        //        throw new InvalidDataException("Dosya adı geçersiz.");
-
-        //    var extension = NormalizeFileExtension(
-        //        Path.GetExtension(originalFileName));
-
-        //    if (string.IsNullOrWhiteSpace(extension) ||
-        //        !settings.AllowedExtensions.Contains(extension))
-        //    {
-        //        var allowedExtensionText = string.Join(
-        //            ", ",
-        //            settings.AllowedExtensions.OrderBy(x => x));
-
-        //        throw new InvalidDataException(
-        //            $"Desteklenmeyen dosya türü: {originalFileName}. " +
-        //            $"Desteklenen türler: {allowedExtensionText}");
-        //    }
-        //}
-
-
-        //private static string GetWorkflowAttachmentUploadRoot()
-        //{
-        //    var uploadRoot = Path.Combine(
-        //        Directory.GetCurrentDirectory(),
-        //        "UploadsStorage");
-
-        //    Directory.CreateDirectory(uploadRoot);
-
-        //    return uploadRoot;
-        //}
-        //private static async Task<string> SaveWorkflowAttachmentAsync(
-        //    IFormFile file,
-        //    CancellationToken cancellationToken)
-        //{
-        //    var extension = NormalizeFileExtension(
-        //        Path.GetExtension(file.FileName));
-
-        //    var storedFileName = $"{Guid.NewGuid():N}{extension}";
-
-        //    var physicalPath = Path.Combine(
-        //        GetWorkflowAttachmentUploadRoot(),
-        //        storedFileName);
-
-        //    await using var inputStream = file.OpenReadStream();
-
-        //    await using var outputStream = new FileStream(
-        //        physicalPath,
-        //        FileMode.CreateNew,
-        //        FileAccess.Write,
-        //        FileShare.None,
-        //        bufferSize: 1024 * 64,
-        //        options:
-        //            FileOptions.Asynchronous |
-        //            FileOptions.SequentialScan);
-
-        //    await inputStream.CopyToAsync(
-        //        outputStream,
-        //        1024 * 64,
-        //        cancellationToken);
-
-        //    return storedFileName;
-        //}
-
-
-        //private void DeleteWorkflowAttachmentPhysicalFiles(IEnumerable<string> storedFileNames)
-        //{
-        //    var uploadRoot = GetWorkflowAttachmentUploadRoot();
-
-        //    foreach (var storedFileName in storedFileNames
-        //                 .Where(x => !string.IsNullOrWhiteSpace(x))
-        //                 .Distinct())
-        //    {
-        //        try
-        //        {
-        //            var safeFileName = Path.GetFileName(storedFileName);
-
-        //            var physicalPath = Path.Combine(
-        //                uploadRoot,
-        //                safeFileName);
-
-        //            if (File.Exists(physicalPath))
-        //                File.Delete(physicalPath);
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _logger.LogWarning(
-        //                ex,
-        //                "Bireysel akış dosyası fiziksel olarak silinemedi. " +
-        //                "FileName: {FileName}",
-        //                storedFileName);
-        //        }
-        //    }
-        //}
-
-        //private async Task<WorkflowAttachmentChangeSet> ApplyWorkflowAttachmentChangesAsync(
-        //string requestNo,
-        //IEnumerable<IFormFile>? attachments,
-        //IEnumerable<long>? deletedAttachmentIds,
-        //IEnumerable<WorkflowAttachmentReplaceDto>? replacedAttachments,
-        //string stepCode,
-        //CancellationToken cancellationToken = default)
-        //{
-        //    if (stepCode is not ("PRC" or "APR"))
-        //    {
-        //        throw new InvalidDataException(
-        //            "Dosya değişikliği yalnızca PRC veya APR adımında yapılabilir.");
-        //    }
-
-        //    var attachmentSettings =
-        //        await GetWorkflowAttachmentSettings();
-
-        //    var newFiles = attachments?
-        //        .Where(x => x is not null && x.Length > 0)
-        //        .ToList() ?? new List<IFormFile>();
-
-        //    var deleteIds = deletedAttachmentIds?
-        //        .Where(x => x > 0)
-        //        .Distinct()
-        //        .ToHashSet() ?? new HashSet<long>();
-
-        //    var replacements = replacedAttachments?
-        //        .Where(x =>
-        //            x is not null &&
-        //            x.AttachmentId > 0 &&
-        //            x.File is not null)
-        //        .GroupBy(x => x.AttachmentId)
-        //        .Select(x => x.First())
-        //        .ToList() ?? new List<WorkflowAttachmentReplaceDto>();
-
-        //    foreach (var file in newFiles)
-        //    {
-        //        ValidateWorkflowAttachment(
-        //            file,
-        //            attachmentSettings);
-        //    }
-
-        //    foreach (var replacement in replacements)
-        //    {
-        //        ValidateWorkflowAttachment(
-        //            replacement.File,
-        //            attachmentSettings);
-        //    }
-
-        //    var replacementIds = replacements
-        //        .Select(x => x.AttachmentId)
-        //        .ToHashSet();
-
-        //    if (deleteIds.Overlaps(replacementIds))
-        //    {
-        //        throw new InvalidDataException(
-        //            "Aynı dosya hem silme hem değiştirme listesinde bulunamaz.");
-        //    }
-
-        //    var existingAttachments = await _uow.Repository
-        //        .GetQueryable<WorkflowAttachment>()
-        //        .Where(x => x.RequestNo == requestNo)
-        //        .ToListAsync(cancellationToken);
-
-        //    var existingIds = existingAttachments
-        //        .Select(x => x.Id)
-        //        .ToHashSet();
-
-        //    var requestedExistingIds = deleteIds
-        //        .Concat(replacementIds)
-        //        .ToHashSet();
-
-        //    var invalidIds = requestedExistingIds
-        //        .Except(existingIds)
-        //        .ToList();
-
-        //    if (invalidIds.Count > 0)
-        //    {
-        //        throw new InvalidDataException(
-        //            "Silinmek veya değiştirilmek istenen dosyalardan biri bulunamadı.");
-        //    }
-
-        //    var finalAttachmentCount =
-        //        existingAttachments.Count -
-        //        deleteIds.Count +
-        //        newFiles.Count;
-
-        //    if (finalAttachmentCount >
-        //        attachmentSettings.MaxFileCount)
-        //    {
-        //        throw new InvalidDataException(
-        //            $"Bir talebe en fazla " +
-        //            $"{attachmentSettings.MaxFileCount} adet dosya eklenebilir.");
-        //    }
-
-        //    var changeSet = new WorkflowAttachmentChangeSet();
-
-        //    try
-        //    {
-        //        // Mevcut dosyaları değiştir.
-        //        foreach (var replacement in replacements)
-        //        {
-        //            var entity = existingAttachments.First(
-        //                x => x.Id == replacement.AttachmentId);
-
-        //            var newStoredFileName =
-        //                await SaveWorkflowAttachmentAsync(
-        //                    replacement.File,
-        //                    cancellationToken);
-
-        //            changeSet.NewStoredFileNames.Add(
-        //                newStoredFileName);
-
-        //            changeSet.OldStoredFileNames.Add(
-        //                entity.StoredFileName);
-
-        //            entity.OriginalFileName =
-        //                Path.GetFileName(
-        //                    replacement.File.FileName);
-
-        //            entity.StoredFileName = newStoredFileName;
-
-        //            entity.Extension = NormalizeFileExtension(
-        //                Path.GetExtension(
-        //                    replacement.File.FileName));
-
-        //            entity.ContentType =
-        //                string.IsNullOrWhiteSpace(
-        //                    replacement.File.ContentType)
-        //                    ? "application/octet-stream"
-        //                    : replacement.File.ContentType;
-
-        //            entity.SizeBytes =
-        //                replacement.File.Length;
-
-        //            entity.LastUpdatedStepCode =
-        //                stepCode;
-
-        //            _uow.Repository.Update(entity);
-        //        }
-
-        //        // Yeni dosyaları ekle.
-        //        foreach (var file in newFiles)
-        //        {
-        //            var storedFileName =
-        //                await SaveWorkflowAttachmentAsync(
-        //                    file,
-        //                    cancellationToken);
-
-        //            changeSet.NewStoredFileNames.Add(
-        //                storedFileName);
-
-        //            var entity = new WorkflowAttachment
-        //            {
-        //                RequestNo = requestNo,
-        //                OriginalFileName =
-        //                    Path.GetFileName(file.FileName),
-        //                StoredFileName = storedFileName,
-        //                Extension = NormalizeFileExtension(
-        //                    Path.GetExtension(file.FileName)),
-        //                ContentType =
-        //                    string.IsNullOrWhiteSpace(file.ContentType)
-        //                        ? "application/octet-stream"
-        //                        : file.ContentType,
-        //                SizeBytes = file.Length,
-        //                UploadedStepCode = stepCode,
-        //                LastUpdatedStepCode = stepCode
-        //            };
-
-        //            await _uow.Repository.AddAsync(entity);
-        //        }
-
-        //        // Silinecek kayıtları kaldır.
-        //        foreach (var entity in existingAttachments
-        //                     .Where(x => deleteIds.Contains(x.Id)))
-        //        {
-        //            changeSet.OldStoredFileNames.Add(
-        //                entity.StoredFileName);
-
-        //            _uow.Repository.HardDelete(entity);
-        //        }
-
-        //        return changeSet;
-        //    }
-        //    catch
-        //    {
-        //        DeleteWorkflowAttachmentPhysicalFiles(
-        //            changeSet.NewStoredFileNames);
-
-        //        throw;
-        //    }
-        //}
-
-        //private async Task<List<WorkflowAttachmentGetDto>> GetWorkflowAttachmentsAsync(
-        //string requestNo,
-        //CancellationToken cancellationToken = default)
-        //{
-        //    var entities = await _uow.Repository
-        //        .GetQueryable<WorkflowAttachment>()
-        //        .AsNoTracking()
-        //        .Where(x => x.RequestNo == requestNo)
-        //        .ToListAsync(cancellationToken);
-
-        //    var appSettings =
-        //        ServiceTool.ServiceProvider
-        //            .GetService<IOptionsSnapshot<AppSettings>>();
-
-        //    var baseUrl =
-        //        appSettings?.Value.FileUrl?.TrimEnd('/') ??
-        //        string.Empty;
-
-        //    return entities.Select(x =>
-        //    {
-        //        var relativeUrl =
-        //            $"/uploads/{x.StoredFileName}";
-
-        //        return new WorkflowAttachmentGetDto
-        //        {
-        //            Id = x.Id,
-        //            RequestNo = x.RequestNo,
-        //            OriginalFileName = x.OriginalFileName,
-        //            ContentType = x.ContentType,
-        //            Extension = x.Extension,
-        //            SizeBytes = x.SizeBytes,
-        //            UploadedStepCode = x.UploadedStepCode,
-        //            LastUpdatedStepCode =
-        //                x.LastUpdatedStepCode,
-        //            Url = string.IsNullOrWhiteSpace(baseUrl)
-        //                ? relativeUrl
-        //                : $"{baseUrl}{relativeUrl}"
-        //        };
-        //    }).ToList();
-        //}
-
-        //private async Task<WorkflowAttachmentSettings> GetWorkflowAttachmentSettings()
-        //{
-        //    var maxCountValue = await _uow.Repository
-        //        .GetQueryable<Configuration>()
-        //        .AsNoTracking()
-        //        .FirstOrDefaultAsync(
-        //            x => x.Name ==
-        //                 "MaxWorkflowAttachmentCount");
-
-        //    if (!int.TryParse(
-        //            maxCountValue?.Value?.Trim(),
-        //            NumberStyles.Integer,
-        //            CultureInfo.InvariantCulture,
-        //            out var maxFileCount) ||
-        //        maxFileCount <= 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "MaxWorkflowAttachmentCount parametresi " +
-        //            "pozitif bir tam sayı olmalıdır.");
-        //    }
-
-        //    var maxSizeValue = await _uow.Repository
-        //        .GetQueryable<Configuration>()
-        //        .AsNoTracking()
-        //        .FirstOrDefaultAsync(
-        //            x => x.Name ==
-        //                 "MaxWorkflowAttachmentSize");
-
-        //    if (!long.TryParse(
-        //            maxSizeValue?.Value?.Trim(),
-        //            NumberStyles.Integer,
-        //            CultureInfo.InvariantCulture,
-        //            out var maxFileSizeMb) ||
-        //        maxFileSizeMb <= 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "MaxWorkflowAttachmentSize parametresi " +
-        //            "pozitif bir tam sayı olmalıdır.");
-        //    }
-
-        //    var allowedExtensionsValue =
-        //        await _uow.Repository
-        //            .GetQueryable<Configuration>()
-        //            .AsNoTracking()
-        //            .FirstOrDefaultAsync(
-        //                x => x.Name ==
-        //                     "AllowedWorkflowAttachmentExtensions");
-
-        //    var allowedExtensions =
-        //        (allowedExtensionsValue?.Value ??
-        //         string.Empty)
-        //        .Split(
-        //            new[] { ';', ',' },
-        //            StringSplitOptions.RemoveEmptyEntries |
-        //            StringSplitOptions.TrimEntries)
-        //        .Select(NormalizeFileExtension)
-        //        .Where(x => !string.IsNullOrWhiteSpace(x))
-        //        .ToHashSet(
-        //            StringComparer.OrdinalIgnoreCase);
-
-        //    if (allowedExtensions.Count == 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "AllowedWorkflowAttachmentExtensions " +
-        //            "parametresinde en az bir dosya uzantısı tanımlanmalıdır.");
-        //    }
-
-        //    long maxFileSizeBytes;
-
-        //    try
-        //    {
-        //        maxFileSizeBytes = checked(
-        //            maxFileSizeMb * 1024L * 1024L);
-        //    }
-        //    catch (OverflowException)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "Dosya boyutu parametresi desteklenen " +
-        //            "sınırların üzerindedir.");
-        //    }
-
-        //    return new WorkflowAttachmentSettings
-        //    {
-        //        MaxFileCount = maxFileCount,
-        //        MaxFileSizeMb = maxFileSizeMb,
-        //        MaxFileSizeBytes = maxFileSizeBytes,
-        //        AllowedExtensions = allowedExtensions
-        //    };
-        //}
-
-        //private static string NormalizeFileExtension(
-        //    string extension)
-        //{
-        //    extension = extension
-        //        .Trim()
-        //        .ToLowerInvariant();
-
-        //    if (string.IsNullOrWhiteSpace(extension))
-        //        return string.Empty;
-
-        //    return extension.StartsWith('.')
-        //        ? extension
-        //        : $".{extension}";
-        //}
+       
     }
 }

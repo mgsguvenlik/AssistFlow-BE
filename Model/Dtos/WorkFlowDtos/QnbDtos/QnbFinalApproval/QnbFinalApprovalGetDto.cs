@@ -24,5 +24,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbFinalApproval
 
         public List<QnbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
         public bool CanEditAttachments { get; set; }
+
+        public string? ProblemDescription { get; set; }
+        public string? ResolutionAndActions { get; set; }
     }
 }

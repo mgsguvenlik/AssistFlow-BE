@@ -3954,6 +3954,24 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbPricingGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<YkbTechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
+
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
                         .GetQueryable<YkbServicesRequestProduct>()
@@ -4110,6 +4128,23 @@ namespace Business.Services.Ykb
             if (dto is null)
                 return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<YkbTechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır (Tenant eklendi)
             var productEntities = await _uow.Repository
@@ -4318,6 +4353,24 @@ namespace Business.Services.Ykb
 
             if (dto is null)
                 return ResponseModel<YkbFinalApprovalGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
+
+            // Teknik servis bilgileri
+            var technicalServiceInfo = await _uow.Repository
+                .GetQueryable<YkbTechnicalService>()
+                .AsNoTracking()
+                .Where(x => x.RequestNo == dto.RequestNo)
+                .Select(x => new
+                {
+                    x.ProblemDescription,
+                    x.ResolutionAndActions
+                })
+                .FirstOrDefaultAsync();
+
+            if (technicalServiceInfo is not null)
+            {
+                dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
+                dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
+            }
 
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır (Tenant eklendi)
             var productEntities = await _uow.Repository

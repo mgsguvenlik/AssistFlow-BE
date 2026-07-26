@@ -30,6 +30,9 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval
         /// Frontend dosya ekleme/silme/değiştirme alanlarını buna göre açabilir.
         /// </summary>
         public bool CanEditAttachments { get; set; }
+
+        public string? ProblemDescription { get; set; }
+        public string? ResolutionAndActions { get; set; }
     }
 
 }
