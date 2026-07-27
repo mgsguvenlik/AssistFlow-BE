@@ -534,7 +534,7 @@ namespace Business.Mapper
                   .Map(d => d.Status, s => s.Status)
                   .Map(d => d.Currency, s => s.Currency)
                   .Map(d => d.Notes, s => s.Notes)
-                  .Map(d => d.TotalAmount, s => s.TotalAmount)
+                  //.Map(d => d.TotalAmount, s => s.TotalAmount)
                   // audit
                   .Map(d => d.CreatedDate, s => s.CreatedDate)
                   .Map(d => d.CreatedUser, s => s.CreatedUser)
