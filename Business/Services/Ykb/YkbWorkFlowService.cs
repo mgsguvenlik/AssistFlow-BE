@@ -1218,7 +1218,7 @@ namespace Business.Services.Ykb
                         Status = PricingStatus.Pending,
                         Currency = "TRY", ///İncelencek
                         Notes = string.Empty,
-                        TotalAmount = 0,
+                        //TotalAmount = 0,
                         CreatedDate = DateTime.Now,
                         CreatedUser = meId,
                     };
@@ -1519,7 +1519,7 @@ namespace Business.Services.Ykb
                 pricing.UpdatedDate = DateTime.Now;
                 pricing.UpdatedUser = meId;
                 pricing.Notes = dto.Notes;
-                pricing.TotalAmount = dto.TotalAmount;
+                //pricing.TotalAmount = dto.TotalAmount;
                 _uow.Repository.Update(pricing);
 
                 wf.CurrentStepId = targetStep.Id;
@@ -3889,7 +3889,7 @@ namespace Business.Services.Ykb
                     Status = pr.Status,
                     Currency = pr.Currency,
                     Notes = pr.Notes,
-                    TotalAmount = pr.TotalAmount,
+                    //TotalAmount = pr.TotalAmount,
 
                     // Audit (Pricing)
                     CreatedDate = pr.CreatedDate,
@@ -6056,7 +6056,7 @@ namespace Business.Services.Ykb
                     Status = pr.Status.ToString(),
                     Currency = pr.Currency,
                     Notes = pr.Notes,
-                    TotalAmount = pr.TotalAmount
+                    //TotalAmount = pr.TotalAmount
                 };
             }
 
@@ -6778,6 +6778,50 @@ namespace Business.Services.Ykb
                 .AsSplitQuery()
                 .ToListAsync();
 
+                var productTotalDict = products
+                  .GroupBy(p => p.RequestNo)
+                  .ToDictionary(
+                      group => group.Key,
+                      group =>
+                      {
+                          decimal totalUsd = 0m;
+                          decimal totalTry = 0m;
+
+                          foreach (var productItem in group)
+                          {
+                              var useCapturedPrice =
+                                  productItem.IsPriceCaptured &&
+                                  productItem.CapturedTotal.HasValue;
+
+                              var total = useCapturedPrice
+                                  ? productItem.CapturedTotal!.Value
+                                  : (productItem.Product?.Price ?? 0m) * productItem.Quantity;
+
+                              var currency = useCapturedPrice
+                                  ? productItem.CapturedCurrency
+                                  : productItem.Product?.PriceCurrency;
+
+                              switch (currency?.Trim().ToUpperInvariant())
+                              {
+                                  case "USD":
+                                      totalUsd += total;
+                                      break;
+
+                                  case "TRY":
+                                  case "TL":
+                                  case "₺":
+                                      totalTry += total;
+                                      break;
+                              }
+                          }
+
+                          return new
+                          {
+                              TotalUsd = totalUsd,
+                              TotalTry = totalTry
+                          };
+                      });
+
                 // -------------------------
                 // Sayfadaki RequestNo detayları
                 // -------------------------
@@ -6846,15 +6890,13 @@ namespace Business.Services.Ykb
                     .ToListAsync();
 
                 var pricings = await pricingQuery
-                    .Where(pr => requestNos.Contains(pr.RequestNo))
-                    .Select(pr => new
-                    {
-                        pr.RequestNo,
-                        pr.Status,
-                        pr.TotalAmount,
-                        pr.Currency
-                    })
-                    .ToListAsync();
+                      .Where(pr => requestNos.Contains(pr.RequestNo))
+                      .Select(pr => new
+                      {
+                          pr.RequestNo,
+                          pr.Status
+                      })
+                      .ToListAsync();
 
                 var finalApprovals = await finalApprovalQuery
                     .Where(fa => requestNos.Contains(fa.RequestNo))
@@ -7012,6 +7054,7 @@ namespace Business.Services.Ykb
                     tsDict.TryGetValue(w.RequestNo, out var ts);
                     pricingDict.TryGetValue(w.RequestNo, out var pricing);
                     finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
+                    productTotalDict.TryGetValue(w.RequestNo, out var productTotals);
 
                     userDict.TryGetValue(w.CreatedUser, out var createdUser);
 
@@ -7098,8 +7141,9 @@ namespace Business.Services.Ykb
                         TechnicalServiceDurationMinutes = durationMinutes,
 
                         PricingStatus = pricing?.Status,
-                        PricingTotalAmount = pricing?.TotalAmount,
-                        Currency = pricing?.Currency,
+
+                        PricingTotalAmountUsd = productTotals?.TotalUsd ?? 0m,
+                        PricingTotalAmountTry = productTotals?.TotalTry ?? 0m,
 
                         FinalApprovalStatus = finalApproval?.Status,
                         DiscountPercent = finalApproval?.DiscountPercent,
@@ -7319,8 +7363,8 @@ namespace Business.Services.Ykb
                          "Teknik Servis Süresi (Dakika)",
 
                          "Fiyatlandırma Durumu",
-                         "Fiyatlandırma Toplam Tutar",
-                         "Para Birimi",
+                         "Fiyatlandırma Toplam Tutar (USD)",
+                         "Fiyatlandırma Toplam Tutar (TL)",
 
                          "Son Onay Durumu",
                          "İndirim Oranı",
@@ -7421,8 +7465,8 @@ namespace Business.Services.Ykb
             SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
-            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmount, "#,##0.00");
-            ws.Cell(row, c++).Value = x.Currency ?? string.Empty;
+            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountUsd, "#,##0.00");
+            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountTry, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
             SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
@@ -10360,7 +10404,7 @@ namespace Business.Services.Ykb
                     .Select(pr => new
                     {
                         pr.RequestNo,
-                        pr.TotalAmount,
+                        //pr.TotalAmount,
                         pr.Currency
                     })
                     .ToListAsync();
@@ -10546,7 +10590,7 @@ namespace Business.Services.Ykb
 
                         CustomerName = sr?.CustomerName,
 
-                        TotalAmount = pricing?.TotalAmount,
+                        //TotalAmount = pricing?.TotalAmount,
 
                         Currency = pricing?.Currency,
 

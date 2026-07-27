@@ -13,7 +13,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing
         public PricingStatus Status { get; set; }
         public string Currency { get; set; } = "TRY";
         public string? Notes { get; set; }
-        public decimal TotalAmount { get; set; }
+        //public decimal TotalAmount { get; set; }
 
         public string? OracleNo { get; set; }
         public ServicesCostStatus ServicesCostStatus { get; set; }

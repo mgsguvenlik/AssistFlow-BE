@@ -107,6 +107,9 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public decimal? PricingTotalAmount { get; set; }
         public string? Currency { get; set; }
 
+        public decimal PricingTotalAmountUsd { get; set; }
+        public decimal PricingTotalAmountTry { get; set; }
+
         public FinalApprovalStatus? FinalApprovalStatus { get; set; }
         public decimal? DiscountPercent { get; set; }
 
