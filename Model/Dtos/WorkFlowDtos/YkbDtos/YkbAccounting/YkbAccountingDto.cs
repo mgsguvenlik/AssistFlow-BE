@@ -31,7 +31,15 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
 
         public string? ProcessedByName { get; set; }
 
+        public string? ServiceRequestDescription { get; set; }
+        public long? CustomerApprovedBy { get; set; }
+
+        public string? CustomerApprovedByName { get; set; }
+
         public List<YkbAccountingProductDto> Products { get; set; } = new();
+
+        public YkbAccountingServiceTypeDto? ServiceType { get; set; }
+        public List<YkbAccountingWorkOrderTypeDto> YkbServicesRequestWorkOrderTypes { get; set; } = new();
     }
 
     public class YkbAccountingProductDto
@@ -92,6 +100,9 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
 
         public DateTime? CustomerApprovedTo { get; set; }
 
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public long? ServiceTypeId { get; set; }
+
         public void Normalize(int maxPageSize = 200)
         {
             if (Page <= 0)
@@ -105,5 +116,22 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
 
             Search = Search?.Trim();
         }
+    }
+    public class YkbAccountingServiceTypeDto
+    {
+        public long Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? ContractNumber { get; set; }
+    }
+
+    public class YkbAccountingWorkOrderTypeDto
+    {
+        public long Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? Code { get; set; }
     }
 }
