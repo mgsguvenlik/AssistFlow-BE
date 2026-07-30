@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAttachment;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
@@ -247,7 +248,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-review-message")]
-        public async Task<IActionResult> SendReviewMessage([FromBody] YkbCustomerReviewMessageDto dto )
+        public async Task<IActionResult> SendReviewMessage([FromBody] YkbCustomerReviewMessageDto dto)
         {
             var result = await _workFlowService.SendReviewMessage(dto);
             return Ok(result);
@@ -425,5 +426,36 @@ namespace WebAPI.Controllers
 
             return ToActionResult(result);
         }
+
+
+        [HttpPost("accounting/attachments")]
+        [Consumes("multipart/form-data")]
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachments([FromForm] string requestNo, [FromForm] List<IFormFile> files, CancellationToken cancellationToken)
+        {
+            return await _workFlowService
+                .AddAccountingAttachmentsAsync(
+                    requestNo,
+                    files,
+                    cancellationToken);
+        }
+
+        [HttpGet("accounting/{requestNo}/attachments")]
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> GetAccountingAttachments(string requestNo, CancellationToken cancellationToken)
+        {
+            return await _workFlowService
+                .GetAccountingAttachmentsAsync(
+                    requestNo,
+                    cancellationToken);
+        }
+
+        [HttpPost("accounting/{requestNo}/attachments/{attachmentId:long}/delete")]
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> DeleteAccountingAttachment(string requestNo, long attachmentId, CancellationToken cancellationToken)
+        {
+            return await _workFlowService.DeleteAccountingAttachmentAsync(
+                requestNo,
+                attachmentId,
+                cancellationToken);
+        }
+
     }
 }

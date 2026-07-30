@@ -10221,6 +10221,20 @@ namespace Business.Services.Ykb
 
 
         //Muhasebe ile ilgili işlemler
+
+        private const string AccountingAttachmentStepCode = "ACCT";
+        private sealed class AccountingAttachmentSettings
+        {
+            public string StepCode { get; init; } = string.Empty;
+
+            public int MaxFileCount { get; init; }
+
+            public long MaxTotalFileSizeMb { get; init; }
+
+            public long MaxTotalFileSizeBytes { get; init; }
+
+            public HashSet<string> AllowedExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+        }
         public async Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q)
         {
             try
@@ -10785,5 +10799,638 @@ namespace Business.Services.Ykb
                     StatusCode.Error);
             }
         }
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachmentsAsync(string requestNo, IReadOnlyCollection<IFormFile>? files, CancellationToken cancellationToken = default)
+        {
+            var uploadedStoredFileNames = new List<string>();
+            var createdAttachments = new List<YkbWorkflowAttachment>();
+            var isCommitted = false;
+
+            try
+            {
+                #region Temel validasyonlar
+
+                if (string.IsNullOrWhiteSpace(requestNo))
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "Talep numarası zorunludur.",
+                            StatusCode.BadRequest);
+                }
+
+                requestNo = requestNo.Trim();
+
+                if (requestNo.Length > 64)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "Talep numarası en fazla 64 karakter olabilir.",
+                            StatusCode.BadRequest);
+                }
+
+                var fileList = files?
+                    .Where(x => x is not null && x.Length > 0)
+                    .ToList() ?? new List<IFormFile>();
+
+                if (fileList.Count == 0)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "En az bir dosya gönderilmelidir.",
+                            StatusCode.BadRequest);
+                }
+
+                var attachmentSettings =
+                    await GetAccountingAttachmentSettingsAsync(
+                        cancellationToken);
+
+                if (fileList.Count > attachmentSettings.MaxFileCount)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            $"Tek seferde en fazla " +
+                            $"{attachmentSettings.MaxFileCount} dosya yüklenebilir.",
+                            StatusCode.BadRequest);
+                }
+
+                foreach (var file in fileList)
+                {
+                    ValidateAccountingAttachment(
+                        file,
+                        attachmentSettings);
+                }
+
+                #endregion
+
+                #region Muhasebe işlem uygunluğu
+
+                var workflow = await _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.RequestNo == requestNo &&
+                            !x.IsDeleted,
+                        cancellationToken);
+
+                if (workflow is null)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "İlgili servis talebi bulunamadı.",
+                            StatusCode.NotFound);
+                }
+
+                if (workflow.WorkFlowStatus != WorkFlowStatus.Complated)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "Muhasebe dosyası yalnızca tamamlanmış " +
+                            "servis taleplerine eklenebilir.",
+                            StatusCode.BadRequest);
+                }
+
+                var customerApprovalCompleted = await _uow.Repository
+                    .GetQueryable<YkbFinalApproval>()
+                    .AsNoTracking()
+                    .AnyAsync(
+                        x =>
+                            x.RequestNo == requestNo &&
+                            !x.IsDeleted &&
+                            x.Status == FinalApprovalStatus.Approved &&
+                            x.CustomerApprovedAt.HasValue,
+                        cancellationToken);
+
+                if (!customerApprovalCompleted)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            "Müşteri onayı tamamlanmamış servis talebine " +
+                            "muhasebe dosyası eklenemez.",
+                            StatusCode.BadRequest);
+                }
+
+                #endregion
+
+                #region Mevcut muhasebe dosyaları
+
+                var existingAccountingAttachments =
+                    await _uow.Repository
+                        .GetQueryable<YkbWorkflowAttachment>()
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.RequestNo == requestNo &&
+                            x.UploadedStepCode ==
+                            attachmentSettings.StepCode)
+                        .ToListAsync(cancellationToken);
+
+                var finalFileCount =
+                    existingAccountingAttachments.Count +
+                    fileList.Count;
+
+                if (finalFileCount > attachmentSettings.MaxFileCount)
+                {
+                    return ResponseModel<
+                        List<YkbWorkflowAttachmentGetDto>>.Fail(
+                            $"Muhasebe adımında bir talebe toplam en fazla " +
+                            $"{attachmentSettings.MaxFileCount} dosya eklenebilir. " +
+                            $"Mevcut dosya sayısı: " +
+                            $"{existingAccountingAttachments.Count}.",
+                            StatusCode.BadRequest);
+                }
+
+                #endregion
+
+                #region Toplam dosya boyutu kontrolü
+
+                long existingTotalSizeBytes;
+                long newFilesTotalSizeBytes;
+                long finalTotalSizeBytes;
+
+                try
+                {
+                    existingTotalSizeBytes =
+                        existingAccountingAttachments.Aggregate(
+                            0L,
+                            (total, attachment) =>
+                                checked(total + attachment.SizeBytes));
+
+                    newFilesTotalSizeBytes =
+                        fileList.Aggregate(
+                            0L,
+                            (total, file) =>
+                                checked(total + file.Length));
+
+                    finalTotalSizeBytes = checked(
+                        existingTotalSizeBytes +
+                        newFilesTotalSizeBytes);
+                }
+                catch (OverflowException)
+                {
+                    throw new InvalidDataException(
+                        "Dosyaların toplam boyutu hesaplanamadı.");
+                }
+
+                if (finalTotalSizeBytes >
+                    attachmentSettings.MaxTotalFileSizeBytes)
+                {
+                    var existingTotalSizeMb =
+                        existingTotalSizeBytes / 1024D / 1024D;
+
+                    var newFilesTotalSizeMb =
+                        newFilesTotalSizeBytes / 1024D / 1024D;
+
+                    throw new InvalidDataException(
+                        $"Muhasebe dosyalarının toplam boyutu " +
+                        $"{attachmentSettings.MaxTotalFileSizeMb} MB'ı aşamaz. " +
+                        $"Mevcut dosya boyutu: {existingTotalSizeMb:N2} MB. " +
+                        $"Eklenmek istenen dosya boyutu: " +
+                        $"{newFilesTotalSizeMb:N2} MB.");
+                }
+
+                #endregion
+
+                #region Dosyaları storage ve DB'ye ekleme
+
+                foreach (var file in fileList)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var storedFileName =
+                        await SaveWorkflowAttachmentAsync(
+                            file,
+                            cancellationToken);
+
+                    if (string.IsNullOrWhiteSpace(storedFileName))
+                    {
+                        throw new InvalidOperationException(
+                            $"{Path.GetFileName(file.FileName)} " +
+                            "dosyası kaydedilemedi.");
+                    }
+
+                    uploadedStoredFileNames.Add(storedFileName);
+
+                    if (storedFileName.Length > 260)
+                    {
+                        throw new InvalidDataException(
+                            "Dosya storage anahtarı " +
+                            "260 karakter sınırını aşmaktadır.");
+                    }
+
+                    var originalFileName =
+                        Path.GetFileName(file.FileName);
+
+                    var contentType =
+                        string.IsNullOrWhiteSpace(file.ContentType)
+                            ? "application/octet-stream"
+                            : file.ContentType.Trim();
+
+                    var attachment = new YkbWorkflowAttachment
+                    {
+                        RequestNo = requestNo,
+                        OriginalFileName = originalFileName,
+                        StoredFileName = storedFileName,
+                        Extension = NormalizeFileExtension(Path.GetExtension(originalFileName)),
+                        ContentType = contentType,
+                        SizeBytes = file.Length,
+                        UploadedStepCode = attachmentSettings.StepCode,
+                        LastUpdatedStepCode = attachmentSettings.StepCode
+                    };
+
+                    createdAttachments.Add(attachment);
+
+                    await _uow.Repository.AddAsync(attachment);
+                }
+
+                await _uow.Repository.CompleteAsync();
+                isCommitted = true;
+
+                #endregion
+
+                var result = existingAccountingAttachments
+                    .Concat(createdAttachments)
+                    .OrderByDescending(x => x.Id)
+                    .Select(x => new YkbWorkflowAttachmentGetDto
+                    {
+                        Id = x.Id,
+                        RequestNo = x.RequestNo,
+                        OriginalFileName = x.OriginalFileName,
+                        ContentType = x.ContentType,
+                        Extension = x.Extension,
+                        SizeBytes = x.SizeBytes,
+                        UploadedStepCode = x.UploadedStepCode,
+                        LastUpdatedStepCode = x.LastUpdatedStepCode,
+
+                        Url = _fileStorage.GetPublicUrl(
+                            x.StoredFileName)
+                    })
+                    .ToList();
+
+                return ResponseModel<
+                    List<YkbWorkflowAttachmentGetDto>>.Success(
+                        result);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                if (!isCommitted)
+                {
+                    await DeleteWorkflowAttachmentFilesAsync(
+                        uploadedStoredFileNames,
+                        CancellationToken.None);
+                }
+
+                throw;
+            }
+            catch (InvalidDataException ex)
+            {
+                if (!isCommitted)
+                {
+                    await DeleteWorkflowAttachmentFilesAsync(
+                        uploadedStoredFileNames,
+                        CancellationToken.None);
+                }
+
+                _logger.LogWarning(
+                    ex,
+                    "Muhasebe dosyası doğrulama hatası. " +
+                    "RequestNo: {RequestNo}",
+                    requestNo);
+
+                return ResponseModel<
+                    List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        ex.Message,
+                        StatusCode.BadRequest);
+            }
+            catch (Exception ex)
+            {
+                if (!isCommitted)
+                {
+                    await DeleteWorkflowAttachmentFilesAsync(
+                        uploadedStoredFileNames,
+                        CancellationToken.None);
+                }
+
+                _logger.LogError(
+                    ex,
+                    "Muhasebe dosyaları eklenirken hata oluştu. " +
+                    "RequestNo: {RequestNo}",
+                    requestNo);
+
+                return ResponseModel<
+                    List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        $"Muhasebe dosyaları eklenirken hata oluştu: " +
+                        $"{ex.Message}",
+                        StatusCode.Error);
+            }
+        }
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> GetAccountingAttachmentsAsync(string requestNo, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requestNo))
+                {
+                    return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        "Talep numarası zorunludur.",
+                        StatusCode.BadRequest);
+                }
+
+                requestNo = requestNo.Trim();
+
+                var attachments = await _uow.Repository
+                    .GetQueryable<YkbWorkflowAttachment>()
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.RequestNo == requestNo &&
+                        x.UploadedStepCode == AccountingAttachmentStepCode)
+                    .OrderByDescending(x => x.Id)
+                    .Select(x => new YkbWorkflowAttachmentGetDto
+                    {
+                        Id = x.Id,
+                        RequestNo = x.RequestNo,
+                        OriginalFileName = x.OriginalFileName,
+                        ContentType = x.ContentType,
+                        Extension = x.Extension,
+                        SizeBytes = x.SizeBytes,
+                        UploadedStepCode = x.UploadedStepCode,
+                        LastUpdatedStepCode = x.LastUpdatedStepCode,
+
+                        Url = _fileStorage.GetPublicUrl(
+                            x.StoredFileName)
+                    })
+                    .ToListAsync(cancellationToken);
+
+                return ResponseModel<List<YkbWorkflowAttachmentGetDto>>
+                    .Success(attachments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Muhasebe dosyaları alınırken hata oluştu. RequestNo: {RequestNo}",
+                    requestNo);
+
+                return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                    $"Muhasebe dosyaları alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        private static void ValidateAccountingAttachment(IFormFile file, AccountingAttachmentSettings settings)
+        {
+            if (file is null || file.Length <= 0)
+                throw new InvalidDataException("Boş dosya yüklenemez.");
+
+            var originalFileName = Path.GetFileName(file.FileName);
+
+            if (string.IsNullOrWhiteSpace(originalFileName))
+                throw new InvalidDataException("Dosya adı geçersiz.");
+
+            if (originalFileName.Length > 260)
+            {
+                throw new InvalidDataException(
+                    $"{originalFileName} dosyasının adı en fazla " +
+                    "260 karakter olabilir.");
+            }
+
+            var extension = NormalizeFileExtension(
+                Path.GetExtension(originalFileName));
+
+            if (string.IsNullOrWhiteSpace(extension) ||
+                !settings.AllowedExtensions.Contains(extension))
+            {
+                var allowedExtensionText = string.Join(
+                    ", ",
+                    settings.AllowedExtensions.OrderBy(x => x));
+
+                throw new InvalidDataException(
+                    $"Desteklenmeyen dosya türü: {originalFileName}. " +
+                    $"Desteklenen türler: {allowedExtensionText}");
+            }
+
+            if (extension.Length > 20)
+            {
+                throw new InvalidDataException(
+                    $"{originalFileName} dosyasının uzantısı geçersiz.");
+            }
+
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType.Trim();
+
+            if (contentType.Length > 150)
+            {
+                throw new InvalidDataException(
+                    $"{originalFileName} dosyasının içerik türü geçersiz.");
+            }
+        }
+        private async Task<AccountingAttachmentSettings> GetAccountingAttachmentSettingsAsync(CancellationToken cancellationToken = default)
+        {
+            var settingNames = new[]
+            {
+                "AccountingAttachmentStepCode",
+                "MaxAccountingAttachmentCount",
+                "MaxAccountingAttachmentTotalSize",
+                "AllowedWorkflowAttachmentExtensions"
+            };
+
+            var configurations = await _uow.Repository
+                .GetQueryable<Configuration>()
+                .AsNoTracking()
+                .Where(x => settingNames.Contains(x.Name))
+                .ToListAsync(cancellationToken);
+
+            string? GetConfigurationValue(string name)
+            {
+                return configurations
+                    .FirstOrDefault(x => x.Name == name)
+                    ?.Value
+                    ?.Trim();
+            }
+
+            var stepCode = GetConfigurationValue(
+                "AccountingAttachmentStepCode");
+
+            if (string.IsNullOrWhiteSpace(stepCode))
+            {
+                throw new InvalidOperationException(
+                    "AccountingAttachmentStepCode parametresi tanımlı olmalıdır.");
+            }
+
+            stepCode = stepCode.ToUpperInvariant();
+
+            if (stepCode.Length > 10)
+            {
+                throw new InvalidOperationException(
+                    "AccountingAttachmentStepCode parametresi en fazla 10 karakter olabilir.");
+            }
+
+            var maxFileCountValue = GetConfigurationValue(
+                "MaxAccountingAttachmentCount");
+
+            if (!int.TryParse(
+                    maxFileCountValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var maxFileCount) ||
+                maxFileCount <= 0)
+            {
+                throw new InvalidOperationException(
+                    "MaxAccountingAttachmentCount parametresi " +
+                    "pozitif bir tam sayı olmalıdır.");
+            }
+
+            var maxTotalFileSizeValue = GetConfigurationValue(
+                "MaxAccountingAttachmentTotalSize");
+
+            if (!long.TryParse(
+                    maxTotalFileSizeValue,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var maxTotalFileSizeMb) ||
+                maxTotalFileSizeMb <= 0)
+            {
+                throw new InvalidOperationException(
+                    "MaxAccountingAttachmentTotalSize parametresi " +
+                    "pozitif bir tam sayı olmalıdır.");
+            }
+
+            var allowedExtensionsValue = GetConfigurationValue(
+                "AllowedWorkflowAttachmentExtensions");
+
+            var allowedExtensions =
+                (allowedExtensionsValue ?? string.Empty)
+                .Split(
+                    new[] { ';', ',' },
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                .Select(NormalizeFileExtension)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (allowedExtensions.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "AllowedWorkflowAttachmentExtensions parametresinde " +
+                    "en az bir dosya uzantısı tanımlanmalıdır.");
+            }
+
+            long maxTotalFileSizeBytes;
+
+            try
+            {
+                maxTotalFileSizeBytes = checked(
+                    maxTotalFileSizeMb * 1024L * 1024L);
+            }
+            catch (OverflowException)
+            {
+                throw new InvalidOperationException(
+                    "MaxAccountingAttachmentTotalSize parametresi " +
+                    "desteklenen sınırların üzerindedir.");
+            }
+
+            return new AccountingAttachmentSettings
+            {
+                StepCode = stepCode,
+                MaxFileCount = maxFileCount,
+                MaxTotalFileSizeMb = maxTotalFileSizeMb,
+                MaxTotalFileSizeBytes = maxTotalFileSizeBytes,
+                AllowedExtensions = allowedExtensions
+            };
+        }
+        public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> DeleteAccountingAttachmentAsync(string requestNo, long attachmentId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(requestNo))
+                {
+                    return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        "Talep numarası zorunludur.",
+                        StatusCode.BadRequest);
+                }
+
+                if (attachmentId <= 0)
+                {
+                    return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        "Silinecek dosya bilgisi geçersizdir.",
+                        StatusCode.BadRequest);
+                }
+
+                requestNo = requestNo.Trim();
+
+                var attachmentSettings =
+                    await GetAccountingAttachmentSettingsAsync(cancellationToken);
+
+                var workflowExists = await _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+                    .AnyAsync(
+                        x =>
+                            x.RequestNo == requestNo &&
+                            !x.IsDeleted,
+                        cancellationToken);
+
+                if (!workflowExists)
+                {
+                    return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        "İlgili servis talebi bulunamadı.",
+                        StatusCode.NotFound);
+                }
+
+                /*
+                 * ID tek başına yeterli değildir.
+                 * RequestNo ve UploadedStepCode kontrolleri sayesinde fiyatlama veya
+                 * son onay aşamasında eklenen dosyalar muhasebe ekranından silinemez.
+                 */
+                var attachment = await _uow.Repository
+                    .GetQueryable<YkbWorkflowAttachment>()
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.Id == attachmentId &&
+                            x.RequestNo == requestNo &&
+                            x.UploadedStepCode == attachmentSettings.StepCode,
+                        cancellationToken);
+
+                if (attachment is null)
+                {
+                    return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                        "Muhasebe adımında eklenmiş dosya bulunamadı.",
+                        StatusCode.NotFound);
+                }
+
+                var storedFileName = attachment.StoredFileName;
+
+                // Önce DB kaydı silinir. DB işlemi başarısız olursa fiziksel dosyaya dokunulmaz.
+                _uow.Repository.HardDelete(attachment);
+                await _uow.Repository.CompleteAsync();
+
+                // DB commit başarılı olduktan sonra storage nesnesi temizlenir.
+                // Mevcut yardımcı metod silme hatasını loglar ve başarılı DB işlemini bozmaz.
+                await DeleteWorkflowAttachmentFilesAsync(
+                    new[] { storedFileName },
+                    CancellationToken.None);
+
+                return await GetAccountingAttachmentsAsync(
+                    requestNo,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Muhasebe dosyası silinirken hata oluştu. " +
+                    "RequestNo: {RequestNo}, AttachmentId: {AttachmentId}",
+                    requestNo,
+                    attachmentId);
+
+                return ResponseModel<List<YkbWorkflowAttachmentGetDto>>.Fail(
+                    $"Muhasebe dosyası silinirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
     }
 }
