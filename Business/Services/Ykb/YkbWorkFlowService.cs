@@ -10235,6 +10235,7 @@ namespace Business.Services.Ykb
 
             public HashSet<string> AllowedExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
         }
+       
         public async Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q)
         {
             try
@@ -10335,8 +10336,6 @@ namespace Business.Services.Ykb
                     }
                     else
                     {
-                        // Yapılmayanlar
-                        //
                         // Muhasebe tablosunda hiç satır bulunmaması da
                         // IsProcessed = false olması da "Yapılmadı" kabul edilir.
                         wfQuery = wfQuery.Where(w =>
@@ -10347,14 +10346,53 @@ namespace Business.Services.Ykb
                 }
 
                 // -------------------------------------------------------
+                // İŞ EMRİ TÜRÜ
+                // Seçilen türlerden herhangi birine sahip kayıtlar
+                // -------------------------------------------------------
+
+                if (q.WorkOrderTypeIds is { Count: > 0 })
+                {
+                    var workOrderTypeIds = q.WorkOrderTypeIds
+                        .Where(x => x > 0)
+                        .Distinct()
+                        .ToList();
+
+                    if (workOrderTypeIds.Count > 0)
+                    {
+                        wfQuery = wfQuery.Where(w =>
+                            serviceRequestQuery.Any(sr =>
+                                sr.RequestNo == w.RequestNo &&
+                                sr.YkbServicesRequestWorkOrderTypes.Any(wot =>
+                                    workOrderTypeIds.Contains(wot.WorkOrderTypeId))));
+                    }
+                }
+
+
+                // -------------------------------------------------------
+                // SERVİS TÜRÜ
+                // YkbServicesRequest.ServiceTypeId üzerinden filtrelenir.
+                // -------------------------------------------------------
+
+                if (q.ServiceTypeId.HasValue && q.ServiceTypeId.Value > 0)
+                {
+                    var serviceTypeId = q.ServiceTypeId.Value;
+
+                    wfQuery = wfQuery.Where(w =>
+                        serviceRequestQuery.Any(sr =>
+                            sr.RequestNo == w.RequestNo &&
+                            sr.ServiceTypeId.HasValue &&
+                            sr.ServiceTypeId.Value == serviceTypeId));
+                }
+
+                // -------------------------------------------------------
                 // TOPLAM KAYIT
+                // Tüm filtrelerden sonra hesaplanır.
                 // -------------------------------------------------------
 
                 var total = await wfQuery.CountAsync();
 
                 // -------------------------------------------------------
                 // SAYFALAMA
-                //
                 // Son müşteri onayı verilen kayıt üstte.
                 // -------------------------------------------------------
 
@@ -10362,8 +10400,7 @@ namespace Business.Services.Ykb
                     .OrderByDescending(w =>
                         finalApprovalQuery
                             .Where(fa => fa.RequestNo == w.RequestNo)
-                            .Select(fa => fa.CustomerApprovedAt)
-                            .FirstOrDefault())
+                            .Max(fa => fa.CustomerApprovedAt))
                     .Skip((q.Page - 1) * q.PageSize)
                     .Take(q.PageSize)
                     .Select(w => new
@@ -10392,22 +10429,44 @@ namespace Business.Services.Ykb
                 }
 
                 // -------------------------------------------------------
-                // SERVİS TALEBİ + MÜŞTERİ
+                // SERVİS TALEBİ + MÜŞTERİ + AÇIKLAMA
                 // -------------------------------------------------------
 
                 var serviceRequests = await serviceRequestQuery
-                    .Where(sr => requestNos.Contains(sr.RequestNo))
-                    .Select(sr => new
-                    {
-                        sr.Id,
-                        sr.RequestNo,
-                        sr.CustomerId,
+                       .Where(sr => requestNos.Contains(sr.RequestNo))
+                       .Select(sr => new
+                                 {
+                                     sr.Id,
+                                     sr.RequestNo,
+                                     sr.CustomerId,
+                                     sr.Description,
+                                     sr.ServiceTypeId,
 
-                        CustomerName = sr.Customer != null
-                            ? sr.Customer.SubscriberCompany
-                            : null
-                    })
-                    .ToListAsync();
+                                     CustomerName = sr.Customer != null
+                                         ? sr.Customer.SubscriberCompany
+                                         : null,
+
+                                     ServiceType = sr.ServiceType == null
+                                         ? null
+                                         : new
+                                         {
+                                             sr.ServiceType.Id,
+                                             sr.ServiceType.Name,
+                                             sr.ServiceType.ContractNumber
+                                         },
+
+                                     YkbServicesRequestWorkOrderTypes =
+                                         sr.YkbServicesRequestWorkOrderTypes
+                                             .Select(x => new
+                                             {
+                                                 Id = x.WorkOrderTypeId,
+                                                 x.WorkOrderType.Name,
+                                                 x.WorkOrderType.Code
+                                             })
+                                             .ToList()
+                                 })
+                       .AsSplitQuery()
+                       .ToListAsync();
 
                 // -------------------------------------------------------
                 // PRICING
@@ -10418,7 +10477,6 @@ namespace Business.Services.Ykb
                     .Select(pr => new
                     {
                         pr.RequestNo,
-                        //pr.TotalAmount,
                         pr.Currency
                     })
                     .ToListAsync();
@@ -10432,6 +10490,7 @@ namespace Business.Services.Ykb
                     .Select(fa => new
                     {
                         fa.RequestNo,
+                        fa.CustomerApprovedBy,
                         fa.CustomerApprovedAt
                     })
                     .ToListAsync();
@@ -10452,27 +10511,48 @@ namespace Business.Services.Ykb
                     .ToListAsync();
 
                 // -------------------------------------------------------
-                // MUHASEBE KULLANICILARI
+                // İLİŞKİLİ KULLANICILAR
+                // Muhasebe kullanıcısı ve müşteri onaylayan kullanıcı
+                // tek sorguda toplu olarak getirilir.
                 // -------------------------------------------------------
 
-                var processedUserIds = accountingProcesses
-                    .Where(x => x.ProcessedBy.HasValue)
+                var reportUserIds = accountingProcesses
+                    .Where(x => x.ProcessedBy.HasValue && x.ProcessedBy.Value > 0)
                     .Select(x => x.ProcessedBy!.Value)
+                    .Concat(
+                        finalApprovals
+                            .Where(x =>
+                                x.CustomerApprovedBy.HasValue &&
+                                x.CustomerApprovedBy.Value > 0)
+                            .Select(x => x.CustomerApprovedBy!.Value))
                     .Distinct()
                     .ToList();
 
-                var processedUsers = processedUserIds.Count == 0
+                var reportUsers = reportUserIds.Count == 0
                     ? new Dictionary<long, string?>()
-                    : await _uow.Repository
+                    : (await _uow.Repository
                         .GetQueryable<User>()
                         .AsNoTracking()
-                        .Where(x => processedUserIds.Contains(x.Id))
-                        .ToDictionaryAsync(
+                        .Where(x => reportUserIds.Contains(x.Id))
+                        .Select(x => new
+                        {
+                            x.Id,
+                            x.TechnicianName,
+                            x.TechnicianCode,
+                            x.TechnicianEmail 
+                        })
+                        .ToListAsync())
+                        .ToDictionary(
                             x => x.Id,
-                            x => x.TechnicianName);
+                            x => !string.IsNullOrWhiteSpace(x.TechnicianName)
+                                ? x.TechnicianName
+                                : !string.IsNullOrWhiteSpace(x.TechnicianCode)
+                                    ? x.TechnicianCode
+                                    : x.TechnicianEmail);
 
                 // -------------------------------------------------------
                 // ÜRÜNLER
+                // Mevcut fiyat hesaplama davranışı korunur.
                 // -------------------------------------------------------
 
                 var productEntities = await _uow.Repository
@@ -10523,17 +10603,11 @@ namespace Business.Services.Ykb
                             return new YkbAccountingProductDto
                             {
                                 ProductId = p.ProductId,
-
                                 ProductCode = p.Product?.ProductCode,
-
                                 ProductName = p.Product?.Description,
-
                                 Quantity = p.Quantity,
-
                                 UnitPrice = unitPrice,
-
                                 TotalPrice = totalPrice,
-
                                 Currency = currency
                             };
                         }).ToList()
@@ -10559,7 +10633,9 @@ namespace Business.Services.Ykb
                     .GroupBy(x => x.RequestNo)
                     .ToDictionary(
                         x => x.Key,
-                        x => x.First());
+                        x => x
+                            .OrderByDescending(y => y.CustomerApprovedAt)
+                            .First());
 
                 var accountingDict = accountingProcesses
                     .GroupBy(x => x.RequestNo)
@@ -10574,26 +10650,24 @@ namespace Business.Services.Ykb
                 var items = workflows.Select(w =>
                 {
                     srDict.TryGetValue(w.RequestNo, out var sr);
-
-                    pricingDict.TryGetValue(
-                        w.RequestNo,
-                        out var pricing);
-
-                    finalApprovalDict.TryGetValue(
-                        w.RequestNo,
-                        out var finalApproval);
-
-                    accountingDict.TryGetValue(
-                        w.RequestNo,
-                        out var accounting);
+                    pricingDict.TryGetValue(w.RequestNo, out var pricing);
+                    finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
+                    accountingDict.TryGetValue(w.RequestNo, out var accounting);
 
                     string? processedByName = null;
-
                     if (accounting?.ProcessedBy.HasValue == true)
                     {
-                        processedUsers.TryGetValue(
+                        reportUsers.TryGetValue(
                             accounting.ProcessedBy.Value,
                             out processedByName);
+                    }
+
+                    string? customerApprovedByName = null;
+                    if (finalApproval?.CustomerApprovedBy.HasValue == true)
+                    {
+                        reportUsers.TryGetValue(
+                            finalApproval.CustomerApprovedBy.Value,
+                            out customerApprovedByName);
                     }
 
                     return new YkbAccountingServiceReportDto
@@ -10601,35 +10675,46 @@ namespace Business.Services.Ykb
                         RequestNo = w.RequestNo,
 
                         CustomerId = sr?.CustomerId,
-
                         CustomerName = sr?.CustomerName,
+                        ServiceRequestDescription = sr?.Description,
 
-                        //TotalAmount = pricing?.TotalAmount,
+                        CustomerApprovedBy = finalApproval?.CustomerApprovedBy,
+                        CustomerApprovedByName = customerApprovedByName,
+                        CustomerApprovedAt = finalApproval?.CustomerApprovedAt,
 
                         Currency = pricing?.Currency,
 
-                        CustomerApprovedAt =
-                            finalApproval?.CustomerApprovedAt,
-
                         // Muhasebe satırı yoksa false
-                        IsProcessed =
-                            accounting?.IsProcessed ?? false,
+                        IsProcessed = accounting?.IsProcessed ?? false,
+                        ProcessedAt = accounting?.ProcessedAt,
+                        ProcessedBy = accounting?.ProcessedBy,
+                        ProcessedByName = processedByName,
 
-                        ProcessedAt =
-                            accounting?.ProcessedAt,
+                        ServiceType = sr?.ServiceType == null
+                            ? null
+                            : new YkbAccountingServiceTypeDto
+                            {
+                                Id = sr.ServiceType.Id,
+                                Name = sr.ServiceType.Name,
+                                ContractNumber = sr.ServiceType.ContractNumber
+                            },
 
-                        ProcessedBy =
-                            accounting?.ProcessedBy,
+                        YkbServicesRequestWorkOrderTypes =
+                            sr?.YkbServicesRequestWorkOrderTypes
+                                .Select(x => new YkbAccountingWorkOrderTypeDto
+                                {
+                                    Id = x.Id,
+                                    Name = x.Name,
+                                    Code = x.Code
+                                })
+                                .ToList()
+                            ?? new List<YkbAccountingWorkOrderTypeDto>(),
 
-                        ProcessedByName =
-                            processedByName,
-
-                        Products =
-                            productDict.TryGetValue(
-                                w.RequestNo,
-                                out var products)
-                                    ? products
-                                    : new List<YkbAccountingProductDto>()
+                        Products = productDict.TryGetValue(
+                            w.RequestNo,
+                            out var products)
+                                ? products
+                                : new List<YkbAccountingProductDto>()
                     };
                 }).ToList();
 
