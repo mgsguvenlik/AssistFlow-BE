@@ -1,8 +1,11 @@
 ﻿using Core.Common;
 using Core.Enums;
+using Microsoft.AspNetCore.Http;
+using Model.Concrete.Ykb;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
+using Model.Dtos.WorkFlowDtos.YkbDtos.YkbAttachment;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbFinalApproval;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbPricing;
@@ -96,5 +99,12 @@ namespace Business.Interfaces.Ykb
         //Muhasebe ile ilgili işlemler
         Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q);
         Task<ResponseModel<YkbAccountingStatusDto>> ToggleAccountingProcessAsync(string requestNo);
+
+        Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachmentsAsync(string requestNo, IReadOnlyCollection<IFormFile>? files, CancellationToken cancellationToken = default);
+        Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> GetAccountingAttachmentsAsync(string requestNo, CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> DeleteAccountingAttachmentAsync(string requestNo, long attachmentId, CancellationToken cancellationToken = default);
+
+       
     }
 }
