@@ -1671,6 +1671,13 @@ namespace Business.Services
                 }
                 #endregion
 
+                #region Servis Talebi Güncelle
+                request.WorkFlowStepId = targetStep?.Id ?? request.WorkFlowStepId;
+                request.UpdatedDate = DateTime.Now;
+                request.UpdatedUser = meId;
+                _uow.Repository.Update(request);
+                #endregion
+
                 #region Ürünler Güncellemesi
                 var existingProducts = await _uow.Repository
                     .GetMultipleAsync<ServicesRequestProduct>(

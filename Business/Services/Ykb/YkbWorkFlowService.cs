@@ -1773,6 +1773,14 @@ namespace Business.Services.Ykb
 
                 #endregion
 
+                #region Servis Talebi Güncelle
+                request.WorkFlowStepId = targetStep?.Id ?? request.WorkFlowStepId; 
+                request.YkbWorkFlowStep = null;
+                request.UpdatedDate = DateTime.Now;
+                request.UpdatedUser = meId;
+                _uow.Repository.Update(request);
+                #endregion
+
                 #region Workflow Güncelleme
                 if (wf is not null)
                 {
@@ -1989,6 +1997,14 @@ namespace Business.Services.Ykb
                 if (finalApproval is null)
                     return ResponseModel<YkbFinalApprovalGetDto>.Fail("FinalApproval kaydı bulunamadı.", StatusCode.NotFound);
 
+                var complatedStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Code == "CMP");
+
+                var cancelledStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                   .AsNoTracking()
+                   .FirstOrDefaultAsync(s => s.Code == "CNC");
+
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
 
@@ -1996,6 +2012,16 @@ namespace Business.Services.Ykb
 
                 if (dto.IsAgreed)
                 {
+                  
+                    #region Servis Talebi Güncelle
+                    request.WorkFlowStepId = complatedStep?.Id ?? request.WorkFlowStepId;
+                    request.YkbWorkFlowStep = null;
+                    request.UpdatedDate = DateTime.Now;
+                    request.UpdatedUser = meId;
+                    _uow.Repository.Update(request);
+
+                    #endregion
+
                     // 🔹 Mutabık Kalındı: akış tamamlanır
                     finalApproval.CustomerNote = dto.CustomerNote;
                     finalApproval.CustomerApprovedBy = meId;
@@ -2007,7 +2033,9 @@ namespace Business.Services.Ykb
                     wf.WorkFlowStatus = WorkFlowStatus.Complated;
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
+                    wf.CurrentStepId = complatedStep?.Id?? wf.CurrentStepId;
                     _uow.Repository.Update(wf);
+
 
                     await _activationRecord.LogYkbAsync(
                         WorkFlowActionType.FinalApprovalUpdated,
