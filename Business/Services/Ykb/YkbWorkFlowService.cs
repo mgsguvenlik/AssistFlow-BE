@@ -165,7 +165,8 @@ namespace Business.Services.Ykb
                 request.CreatedUser = meId;
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
                 request.Id = 0;
-                request.YkbServicesRequestWorkOrderTypes = ykbWorkOrderTypeIds
+                request.ServiceTypeId = dto.ServiceTypeId;
+                request.YkbServicesRequestWorkOrderTypes = ykbWorkOrderTypeIds 
                     .Select(wotId => new YkbServicesRequestWorkOrderType { WorkOrderTypeId = wotId })
                     .ToList();
                 await _uow.Repository.AddAsync(request);
