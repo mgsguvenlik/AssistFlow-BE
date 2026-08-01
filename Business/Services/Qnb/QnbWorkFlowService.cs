@@ -1642,6 +1642,13 @@ namespace Business.Services.Qnb
 
                 #endregion
 
+                #region Servis Talebi Güncelle
+                request.WorkFlowStepId = targetStep?.Id ?? request.WorkFlowStepId;
+                request.UpdatedDate = DateTime.Now;
+                request.UpdatedUser = meId;
+                _uow.Repository.Update(request);
+                #endregion
+
                 #region Workflow Güncelleme
 
                 wf.CurrentStepId = targetStep.Id;
@@ -1705,7 +1712,7 @@ namespace Business.Services.Qnb
 
                 await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
 
-                #endregion
+                #endregion  
 
                 #region FinalApproval Güncelleme
 
