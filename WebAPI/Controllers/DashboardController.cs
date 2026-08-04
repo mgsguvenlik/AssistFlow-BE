@@ -190,9 +190,30 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("ykb/kpi")]
-        public async Task<IActionResult> GetYkbKpi(  [FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
+        public async Task<IActionResult> GetYkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
         {
             var result = await _dashboardService.GetYkbKpiAsync(from, to);
+            return Ok(result);
+        }
+
+        [HttpGet("technical-service-status-counts")]
+        public async Task<IActionResult> GetTechnicalServiceStatusCounts()
+        {
+            var result = await _dashboardService.GetMyTechnicalServiceStatusCountsAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("ykb/technical-service-status-counts")]
+        public async Task<IActionResult> YkbGetTechnicalServiceStatusCounts()
+        {
+            var result = await _dashboardService.YkbGetMyTechnicalServiceStatusCountsAsync();
+            return Ok(result);
+        }
+       
+        [HttpGet("qnb/technical-service-status-counts")]
+        public async Task<IActionResult> QnbGetTechnicalServiceStatusCounts() 
+        {
+            var result = await _dashboardService.QnbGetMyTechnicalServiceStatusCountsAsync();
             return Ok(result);
         }
 
