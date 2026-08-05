@@ -5,6 +5,7 @@ using Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
+using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
 using Model.Dtos.Dashboard;
@@ -53,8 +54,8 @@ namespace Business.Services
                         WorkFlowPriority.Region2Normal,
                         WorkFlowPriority.Region3Normal
                     };
-                    
-                                    var criticalPriorities = new HashSet<WorkFlowPriority>
+
+                var criticalPriorities = new HashSet<WorkFlowPriority>
                     {
                         WorkFlowPriority.Urgent,
                         WorkFlowPriority.Region1Urgent,
@@ -1077,8 +1078,82 @@ namespace Business.Services
             }
         }
 
+        public async Task<ResponseModel<List<TechnicalServiceStatusCountDto>>> GetMyTechnicalServiceStatusCountsAsync()
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                if (meId <= 0)
+                {
+                    return ResponseModel<List<TechnicalServiceStatusCountDto>>.Fail(
+                        "Kullanıcı bilgisi alınamadı.",
+                        StatusCode.Unauthorized);
+                }
+
+                var workFlowQuery = _uow.Repository
+                    .GetQueryable<WorkFlow>()
+                    .AsNoTracking()
+                    .Where(wf =>
+                        !wf.IsDeleted &&
+                        wf.ApproverTechnicianId == meId);
+
+                var statusCounts = await _uow.Repository
+                    .GetQueryable<TechnicalService>()
+                    .AsNoTracking()
+                    .Where(ts =>
+                        !ts.IsDeleted &&
+                        workFlowQuery.Any(wf =>
+                            wf.RequestNo == ts.RequestNo))
+                    .GroupBy(ts => ts.ServicesStatus)
+                    .Select(group => new
+                    {
+                        ServicesStatus = group.Key,
+                        RecordCount = group.Count()
+                    })
+                    .ToListAsync();
+
+                var countDictionary = statusCounts.ToDictionary(
+                    x => x.ServicesStatus,
+                    x => x.RecordCount);
+
+                // Kaydı olmayan durumları da 0 olarak döndürür.
+                var result = Enum
+                    .GetValues<TechnicalServiceStatus>()
+                    .Select(status => new TechnicalServiceStatusCountDto
+                    {
+                        ServicesStatus = status,
+                        ServicesStatusName =
+                            GetTechnicalServiceStatusName(status),
+
+                        RecordCount = countDictionary.TryGetValue(
+                            status,
+                            out var count)
+                                ? count
+                                : 0
+                    })
+                    .OrderBy(x => (int)x.ServicesStatus)
+                    .ToList();
+
+                return ResponseModel<List<TechnicalServiceStatusCountDto>>
+                    .Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "GetMyTechnicalServiceStatusCountsAsync sırasında hata oluştu.");
+
+                return ResponseModel<List<TechnicalServiceStatusCountDto>>.Fail(
+                    $"Teknik servis durum adetleri alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
         #endregion
 
+        #region Ykb
         public async Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null)
         {
             try
@@ -1157,6 +1232,178 @@ namespace Business.Services
                     $"YKB dashboard KPI verileri getirilirken hata: {ex.Message}",
                     StatusCode.Error);
             }
+        }
+
+        public async Task<ResponseModel<List<YkbTechnicalServiceStatusCountDto>>> YkbGetMyTechnicalServiceStatusCountsAsync()
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                if (meId <= 0)
+                {
+                    return ResponseModel<List<YkbTechnicalServiceStatusCountDto>>.Fail(
+                        "Kullanıcı bilgisi alınamadı.",
+                        StatusCode.Unauthorized);
+                }
+
+                var workFlowQuery = _uow.Repository
+                    .GetQueryable<YkbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(wf =>
+                        !wf.IsDeleted &&
+                        wf.ApproverTechnicianId == meId);
+
+                var statusCounts = await _uow.Repository
+                    .GetQueryable<YkbTechnicalService>()
+                    .AsNoTracking()
+                    .Where(ts =>
+                        !ts.IsDeleted &&
+                        workFlowQuery.Any(wf =>
+                            wf.RequestNo == ts.RequestNo))
+                    .GroupBy(ts => ts.ServicesStatus)
+                    .Select(group => new
+                    {
+                        ServicesStatus = group.Key,
+                        RecordCount = group.Count()
+                    })
+                    .ToListAsync();
+
+                var countDictionary = statusCounts.ToDictionary(
+                    x => x.ServicesStatus,
+                    x => x.RecordCount);
+
+                // Kaydı olmayan durumları da 0 adet olarak döndürür.
+                var result = Enum
+                    .GetValues<TechnicalServiceStatus>()
+                    .Select(status => new YkbTechnicalServiceStatusCountDto
+                    {
+                        ServicesStatus = status,
+                        ServicesStatusName = GetTechnicalServiceStatusName(status),
+                        RecordCount = countDictionary.TryGetValue(
+                            status,
+                            out var count)
+                                ? count
+                                : 0
+                    })
+                    .OrderBy(x => (int)x.ServicesStatus)
+                    .ToList();
+
+                return ResponseModel<List<YkbTechnicalServiceStatusCountDto>>
+                    .Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "YkbGetMyTechnicalServiceStatusCountsAsync sırasında hata oluştu.");
+
+                return ResponseModel<List<YkbTechnicalServiceStatusCountDto>>.Fail(
+                    $"Teknik servis durum adetleri alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        #endregion
+
+        #region Qnb
+        public async Task<ResponseModel<List<QnbTechnicalServiceStatusCountDto>>> QnbGetMyTechnicalServiceStatusCountsAsync()
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                if (meId <= 0)
+                {
+                    return ResponseModel<List<QnbTechnicalServiceStatusCountDto>>.Fail(
+                        "Kullanıcı bilgisi alınamadı.",
+                        StatusCode.Unauthorized);
+                }
+
+                var workFlowQuery = _uow.Repository
+                    .GetQueryable<QnbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(wf =>
+                        !wf.IsDeleted &&
+                        wf.ApproverTechnicianId == meId);
+
+                var statusCounts = await _uow.Repository
+                    .GetQueryable<QnbTechnicalService>()
+                    .AsNoTracking()
+                    .Where(ts =>
+                        !ts.IsDeleted &&
+                        workFlowQuery.Any(wf =>
+                            wf.RequestNo == ts.RequestNo))
+                    .GroupBy(ts => ts.ServicesStatus)
+                    .Select(group => new
+                    {
+                        ServicesStatus = group.Key,
+                        RecordCount = group.Count()
+                    })
+                    .ToListAsync();
+
+                var countDictionary = statusCounts.ToDictionary(
+                    x => x.ServicesStatus,
+                    x => x.RecordCount);
+
+                // Hiç kaydı olmayan durumlar da 0 olarak döner.
+                var result = Enum
+                    .GetValues<TechnicalServiceStatus>()
+                    .Select(status => new QnbTechnicalServiceStatusCountDto
+                    {
+                        ServicesStatus = status,
+
+                        ServicesStatusName =
+                            GetTechnicalServiceStatusName(status),
+
+                        RecordCount = countDictionary.TryGetValue(
+                            status,
+                            out var count)
+                                ? count
+                                : 0
+                    })
+                    .OrderBy(x => (int)x.ServicesStatus)
+                    .ToList();
+
+                return ResponseModel<List<QnbTechnicalServiceStatusCountDto>>
+                    .Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "QnbGetMyTechnicalServiceStatusCountsAsync sırasında hata oluştu.");
+
+                return ResponseModel<List<QnbTechnicalServiceStatusCountDto>>.Fail(
+                    $"QNB teknik servis durum adetleri alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+        #endregion
+
+        private static string GetTechnicalServiceStatusName(TechnicalServiceStatus status)
+        {
+            return status switch
+            {
+                TechnicalServiceStatus.Pending =>
+                    "Beklemede",
+
+                TechnicalServiceStatus.InProgress =>
+                    "İşlemde",
+
+                TechnicalServiceStatus.Completed =>
+                    "Tamamlandı",
+
+                TechnicalServiceStatus.AwaitingReview =>
+                    "Revizyon Bekliyor",
+
+                TechnicalServiceStatus.Cancelled =>
+                    "İptal Edildi",
+
+                _ => "Bilinmeyen Durum"
+            };
         }
     }
 }
