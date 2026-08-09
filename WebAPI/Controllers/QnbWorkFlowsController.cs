@@ -2,6 +2,7 @@ using Business.Interfaces;
 using Business.Interfaces.Qnb;
 using Business.Services.Qnb;
 using Core.Common;
+using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos;
@@ -142,6 +143,13 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+        [HttpPost("delete-technical-service/image/{id}")]
+        public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
             return Ok(result);
         }
 
