@@ -2,6 +2,7 @@
 using Business.Interfaces.Ykb;
 using Business.Services.Ykb;
 using Core.Common;
+using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos;
@@ -168,6 +169,14 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> FinishTechnicalServiceAsync([FromForm] YkbFinishTechnicalServiceDto dto)
         {
             var result = await _workFlowService.FinishService(dto);
+            return Ok(result);
+        }
+
+
+        [HttpPost("delete-technical-service/image/{id}")]
+        public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
             return Ok(result);
         }
 
