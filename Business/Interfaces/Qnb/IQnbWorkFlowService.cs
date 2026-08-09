@@ -32,6 +32,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<QnbTechnicalServiceGetDto>> StartService(QnbStartTechnicalServiceDto dto);
         Task<ResponseModel<QnbTechnicalServiceGetDto>> FinishService(QnbFinishTechnicalServiceDto dto);
         Task<ResponseModel<QnbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // -------------------- Pricing --------------------
         Task<ResponseModel<QnbPricingGetDto>> ApprovePricing(QnbPricingUpdateDto dto);
@@ -45,7 +46,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<QnbFinalApprovalGetDto>> FinalApprovalAsync(QnbFinalApprovalUpdateDto dto);
         Task<ResponseModel<QnbFinalApprovalGetDto>> GetFinalApprovalByRequestNoAsync(string requestNo);
         Task<ResponseModel<QnbFinalApprovalGetDto>> GetFinalApprovalByIdAsync(long id);
-       
+
         // -------------------- WorkFlow Steps --------------------
         Task<ResponseModel<PagedResult<QnbWorkFlowStepGetDto>>> GetStepsAsync(QueryParams q);
         Task<ResponseModel<QnbWorkFlowStepGetDto>> GetStepByIdAsync(long id);

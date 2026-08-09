@@ -166,7 +166,7 @@ namespace Business.Services.Ykb
                 request.ServicesRequestStatus = ServicesRequestStatus.Draft;
                 request.Id = 0;
                 request.ServiceTypeId = dto.ServiceTypeId;
-                request.YkbServicesRequestWorkOrderTypes = ykbWorkOrderTypeIds 
+                request.YkbServicesRequestWorkOrderTypes = ykbWorkOrderTypeIds
                     .Select(wotId => new YkbServicesRequestWorkOrderType { WorkOrderTypeId = wotId })
                     .ToList();
                 await _uow.Repository.AddAsync(request);
@@ -1255,30 +1255,6 @@ namespace Business.Services.Ykb
                     return okCt.Contains(contentType);
                 }
 
-                //async Task<string?> SaveAsync(IFormFile file, CancellationToken ct)
-                //{
-                //    if (file.Length <= 0) return null;
-                //    if (!IsAllowed(file.FileName, file.ContentType))
-                //        throw new InvalidOperationException($"Desteklenmeyen dosya türü: {file.FileName}");
-
-                //    var ext = Path.GetExtension(file.FileName);
-                //    var name = $"{Guid.NewGuid()}{ext}";
-                //    var path = Path.Combine(uploadRoot, name);
-
-                //    await using var read = file.OpenReadStream();
-                //    await using var write = new FileStream(
-                //        path,
-                //        FileMode.CreateNew,
-                //        FileAccess.Write,
-                //        FileShare.None,
-                //        bufferSize: 1024 * 64,
-                //        options: FileOptions.Asynchronous | FileOptions.SequentialScan
-                //    );
-                //    await read.CopyToAsync(write, 1024 * 64, ct);
-
-                //    // DB’de sadece dosya adını tutalım (URL hesaplamasını dışarıda yaparız)
-                //    return name;
-                //}
 
                 async Task<string?> SaveAsync(IFormFile file, CancellationToken cancellationToken)
                 {
@@ -1775,7 +1751,7 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Servis Talebi Güncelle
-                request.WorkFlowStepId = targetStep?.Id ?? request.WorkFlowStepId; 
+                request.WorkFlowStepId = targetStep?.Id ?? request.WorkFlowStepId;
                 request.YkbWorkFlowStep = null;
                 request.UpdatedDate = DateTime.Now;
                 request.UpdatedUser = meId;
@@ -2013,7 +1989,7 @@ namespace Business.Services.Ykb
 
                 if (dto.IsAgreed)
                 {
-                  
+
                     #region Servis Talebi Güncelle
                     request.WorkFlowStepId = complatedStep?.Id ?? request.WorkFlowStepId;
                     request.YkbWorkFlowStep = null;
@@ -2034,7 +2010,7 @@ namespace Business.Services.Ykb
                     wf.WorkFlowStatus = WorkFlowStatus.Complated;
                     wf.UpdatedDate = DateTime.Now;
                     wf.UpdatedUser = meId;
-                    wf.CurrentStepId = complatedStep?.Id?? wf.CurrentStepId;
+                    wf.CurrentStepId = complatedStep?.Id ?? wf.CurrentStepId;
                     _uow.Repository.Update(wf);
 
 
@@ -3898,6 +3874,86 @@ namespace Business.Services.Ykb
 
             return ResponseModel<YkbTechnicalServiceGetDto>.Success(dto);
         }
+
+        public async Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                string? url = null;
+
+                if (type == TechnicalServiceImageType.Service)
+                {
+                    var image = await _uow.Repository
+                        .GetQueryable<YkbTechnicalServiceImage>()
+                        .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+                    if (image is null)
+                        return ResponseModel.Fail("Resim bulunamadı.", StatusCode.NotFound);
+
+                    url = image.Url;
+
+                    await _uow.Repository
+                        .HardDeleteAsync<YkbTechnicalServiceImage, long>(image);
+                }
+                else
+                {
+                    var image = await _uow.Repository
+                        .GetQueryable<YkbTechnicalServiceFormImage>()
+                        .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+                    if (image is null)
+                        return ResponseModel.Fail("Form resmi bulunamadı.", StatusCode.NotFound);
+
+                    url = image.Url;
+
+                    await _uow.Repository
+                        .HardDeleteAsync<YkbTechnicalServiceFormImage, long>(image);
+                }
+
+                // CDN / R2 üzerinden sil
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    await _fileStorage.DeleteManyAsync(
+                        new[] { url },
+                        cancellationToken);
+
+                    // Local dosya varsa onu da sil
+                    var fileName = GetStoredFileName(url);
+
+                    var localPath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "UploadsStorage",
+                        fileName);
+
+                    if (File.Exists(localPath))
+                        File.Delete(localPath);
+                }
+
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel.Success(status: StatusCode.NoContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Teknik servis resmi silinirken hata oluştu. Id: {Id}, Type: {Type}",
+                    id,
+                    type);
+
+                return ResponseModel.Fail(
+                    $"Resim silinirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        private static string GetStoredFileName(string url)
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return Path.GetFileName(uri.LocalPath);
+
+            return Path.GetFileName(url);
+        }
+
         /// ------------------ Pricing -----------------------------------
         public async Task<ResponseModel<YkbPricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
         {
@@ -10264,7 +10320,7 @@ namespace Business.Services.Ykb
 
             public HashSet<string> AllowedExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
         }
-       
+
         public async Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q)
         {
             try
@@ -10464,18 +10520,18 @@ namespace Business.Services.Ykb
                 var serviceRequests = await serviceRequestQuery
                        .Where(sr => requestNos.Contains(sr.RequestNo))
                        .Select(sr => new
-                                 {
-                                     sr.Id,
-                                     sr.RequestNo,
-                                     sr.CustomerId,
-                                     sr.Description,
-                                     sr.ServiceTypeId,
+                       {
+                           sr.Id,
+                           sr.RequestNo,
+                           sr.CustomerId,
+                           sr.Description,
+                           sr.ServiceTypeId,
 
-                                     CustomerName = sr.Customer != null
+                           CustomerName = sr.Customer != null
                                          ? sr.Customer.SubscriberCompany
                                          : null,
 
-                                     ServiceType = sr.ServiceType == null
+                           ServiceType = sr.ServiceType == null
                                          ? null
                                          : new
                                          {
@@ -10484,7 +10540,7 @@ namespace Business.Services.Ykb
                                              sr.ServiceType.ContractNumber
                                          },
 
-                                     YkbServicesRequestWorkOrderTypes =
+                           YkbServicesRequestWorkOrderTypes =
                                          sr.YkbServicesRequestWorkOrderTypes
                                              .Select(x => new
                                              {
@@ -10493,7 +10549,7 @@ namespace Business.Services.Ykb
                                                  x.WorkOrderType.Code
                                              })
                                              .ToList()
-                                 })
+                       })
                        .AsSplitQuery()
                        .ToListAsync();
 
@@ -10568,7 +10624,7 @@ namespace Business.Services.Ykb
                             x.Id,
                             x.TechnicianName,
                             x.TechnicianCode,
-                            x.TechnicianEmail 
+                            x.TechnicianEmail
                         })
                         .ToListAsync())
                         .ToDictionary(

@@ -3613,6 +3613,85 @@ namespace Business.Services
 
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
+
+        public async Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                string? url = null;
+
+                if (type == TechnicalServiceImageType.Service)
+                {
+                    var image = await _uow.Repository.GetQueryable<TechnicalServiceImage>().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+                    if (image is null)
+                        return ResponseModel.Fail("Resim bulunamadı.", StatusCode.NotFound);
+
+                    url = image.Url;
+
+                    await _uow.Repository.HardDeleteAsync<TechnicalServiceImage, long>(image);
+                }
+                else
+                {
+                    var image = await _uow.Repository
+                        .GetQueryable<TechnicalServiceFormImage>()
+                        .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+                    if (image is null)
+                        return ResponseModel.Fail(
+                            "Form resmi bulunamadı.",
+                            StatusCode.NotFound);
+
+                    url = image.Url;
+
+                    await _uow.Repository.HardDeleteAsync<TechnicalServiceFormImage, long>(image);
+                }
+
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    // CDN / R2
+                    await _fileStorage.DeleteManyAsync(
+                        new[] { url },
+                        cancellationToken);
+
+                    // Local
+                    var fileName = GetStoredFileName(url);
+
+                    var localPath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "UploadsStorage",
+                        fileName);
+
+                    if (File.Exists(localPath))
+                        File.Delete(localPath);
+                }
+
+                await _uow.Repository.CompleteAsync();
+
+                return ResponseModel.Success(
+                    status: StatusCode.NoContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Teknik servis resmi silinirken hata oluştu. Id: {Id}, Type: {Type}",
+                    id,
+                    type);
+
+                return ResponseModel.Fail(
+                    $"Resim silinirken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        private static string GetStoredFileName(string url)
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return Path.GetFileName(uri.LocalPath);
+
+            return Path.GetFileName(url);
+        }
         /// ------------------ Pricing -----------------------------------
         public async Task<ResponseModel<PricingGetDto>> GetPricingByRequestNoAsync(string requestNo)
         {
@@ -9127,6 +9206,6 @@ namespace Business.Services
                 ? extension
                 : $".{extension}";
         }
-       
+
     }
 }

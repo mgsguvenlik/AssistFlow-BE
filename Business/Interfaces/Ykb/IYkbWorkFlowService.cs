@@ -16,6 +16,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
+using System.Threading.Tasks;
 
 namespace Business.Interfaces.Ykb
 {
@@ -66,6 +67,7 @@ namespace Business.Interfaces.Ykb
 
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<YkbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // Müşteri Onayı 
         Task<ResponseModel<YkbFinalApprovalGetDto>> GetCustomerAgreementByRequestNoAsync(string requestNo, FinalApprovalStatus staqtus = FinalApprovalStatus.CustomerApproval);
