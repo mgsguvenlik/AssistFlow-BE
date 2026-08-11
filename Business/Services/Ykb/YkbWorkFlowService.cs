@@ -1628,7 +1628,10 @@ namespace Business.Services.Ykb
 
                 #region Ürün Fiyat Sabitleme (4. Adım)
                 // 🔹 Artık fiyatı dto.Products listesinden alıyoruz
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                //await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                var captureResult = await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                if (!captureResult.IsSuccess)
+                    return ResponseModel<YkbPricingGetDto>.Fail(captureResult.Message, captureResult.StatusCode);
                 #endregion
 
                 #region Notification Kaydı 
@@ -1907,7 +1910,10 @@ namespace Business.Services.Ykb
 
                 #region Ürün Fiyat Sabitleme (5. Adım)  
                 ///MZK Not: Yeni eklenen ürünlerin işlenmesi için CompleteAsync() sonrasına alındı
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                //await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                var captureResult = await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                if (!captureResult.IsSuccess)
+                    return ResponseModel<YkbFinalApprovalGetDto>.Fail(captureResult.Message, captureResult.StatusCode);
                 #endregion
 
 
@@ -2653,29 +2659,74 @@ namespace Business.Services.Ykb
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
 
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductName = p.Product != null
+                        ? p.Product.Description
+                        : null,
+
+                    ProductCode = p.Product != null
+                        ? p.Product.ProductCode
+                        : null,
+
+                    // Ürünün kendi standart fiyatı
+                    ProductPrice =
+                        (p.Product != null
+                            ? (decimal?)p.Product.Price
+                            : null)
+                        ?? 0m,
 
                     Quantity = p.Quantity,
 
-                    // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
+                    /*
+                     * Effective Price önceliği:
+                     *
+                     * 1. CustomerGroupProductPrice
+                     * 2. CustomerProductPrice
+                     * 3. TenantProductPrice
+                     * 4. Product
+                     */
                     EffectivePrice =
                         p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
-                            .FirstOrDefault() // 🆕 Tenant fiyatı
+                            .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+
+                        ?? 0m,
+
+                    /*
+                     * Currency de EffectivePrice hangi kayıttan
+                     * bulunuyorsa AYNI kayıttan alınır.
+                     *
+                     * Kesinlikle default TRY verilmez.
+                     */
+                    PriceCurrency =
+                        p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => gp.CurrencyCode)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => cp.CurrencyCode)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.Tenant.TenantProductPrices
+                            .Where(tp => tp.ProductId == p.ProductId)
+                            .Select(tp => tp.CurrencyCode)
+                            .FirstOrDefault()
+
+                        ?? p.Product.PriceCurrency
                 })
                 .ToListAsync();
 
@@ -2854,29 +2905,81 @@ namespace Business.Services.Ykb
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
 
-                    ProductName = p.Product != null ? p.Product.Description : null,
-                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductName = p.Product != null
+                        ? p.Product.Description
+                        : null,
+
+                    ProductCode = p.Product != null
+                        ? p.Product.ProductCode
+                        : null,
+
+                    // Product'ın kendi standart fiyatı
+                    ProductPrice =
+                        (p.Product != null
+                            ? (decimal?)p.Product.Price
+                            : null)
+                        ?? 0m,
 
                     Quantity = p.Quantity,
 
-                    // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
+                    /*
+                     * Fiyat önceliği:
+                     * 1. CustomerGroupProductPrice
+                     * 2. CustomerProductPrice
+                     * 3. TenantProductPrice
+                     * 4. Product
+                     */
                     EffectivePrice =
                         p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
-                            .FirstOrDefault() // 🆕 Tenant fiyatı
+                            .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+                        ?? 0m,
+
+                    /*
+                     * Currency, fiyat hangi kaynaktan geldiyse
+                     * kesinlikle aynı kaynaktan alınır.
+                     *
+                     * Default TRY YOK.
+                     */
+                    PriceCurrency =
+                        p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency
                 })
                 .ToListAsync();
 
@@ -4073,30 +4176,76 @@ namespace Business.Services.Ykb
                         .Where(p => p.RequestNo == dto.RequestNo)
                         .ToListAsync();
 
-            dto.Products = productEntities
-                .Select(p =>
+
+            dto.Products = new List<YkbServicesRequestProductGetDto>();
+            foreach (var p in productEntities)
+            {
+                /*
+                 * Fiyat ve currency AYNI kaynaktan çözülür.
+                 */
+                var effectivePriceInfo = p.GetEffectivePriceWithCurrency();
+
+                var captured = p.IsPriceCaptured;
+
+                decimal effectivePrice;
+                string? currency;
+
+                if (captured)
                 {
-                    var captured = p.IsPriceCaptured;
+                    /*
+                     * Capture edilmiş kayıt varsa öncelik captured alanlarda.
+                     */
+                    effectivePrice = p.CapturedUnitPrice ?? effectivePriceInfo.Price;
 
-                    var effectivePrice = captured
-                        ? p.CapturedUnitPrice ?? 0m
-                        : p.GetEffectivePrice();
+                    /*
+                     * Eski kayıtlarda CapturedCurrency boş kalmış olabilir.
+                     * Böyle bir durumda effective fiyat hangi kaynaktan
+                     * geliyorsa onun CurrencyCode değeri kullanılır.
+                     */
+                    currency =
+                        !string.IsNullOrWhiteSpace(p.CapturedCurrency)
+                            ? p.CapturedCurrency
+                            : effectivePriceInfo.CurrencyCode;
+                }
+                else
+                {
+                    /*
+                     * Capture edilmemiş kayıtta price ve currency
+                     * aynı kaynaktan gelir.
+                     */
+                    effectivePrice = effectivePriceInfo.Price;
 
-                    var currency = captured
-                        ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
-                        : p.Product?.PriceCurrency ?? "TRY";
+                    currency = effectivePriceInfo.CurrencyCode;
+                }
 
-                    var totalPrice = captured
-                        ? p.CapturedTotal ?? effectivePrice * p.Quantity
-                        : effectivePrice * p.Quantity;
+                /*
+                 * Kesinlikle otomatik TRY atanmaz.
+                 */
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    return ResponseModel<YkbPricingGetDto>.Fail(
+                        $"Ürün para birimi belirlenemedi. " +
+                        $"RequestNo: {requestNo}, " +
+                        $"ProductId: {p.ProductId}. " +
+                        $"Ürünün etkin fiyat kaynağındaki CurrencyCode alanını kontrol ediniz.",
+                        StatusCode.BadRequest);
+                }
 
-                    return new YkbServicesRequestProductGetDto
+                var totalPrice = captured
+                    ? p.CapturedTotal
+                        ?? (effectivePrice * p.Quantity)
+                    : effectivePrice * p.Quantity;
+
+                dto.Products.Add(
+                    new YkbServicesRequestProductGetDto
                     {
                         Id = p.Id,
                         RequestNo = p.RequestNo,
                         ProductId = p.ProductId,
+
                         CustomerId = p.CustomerId ?? 0,
                         CustomerName = p.Customer?.SubscriberCompany,
+
                         Quantity = p.Quantity,
 
                         ProductName = p.Product?.Description,
@@ -4108,17 +4257,72 @@ namespace Business.Services.Ykb
                         EffectivePrice = effectivePrice,
                         TotalPrice = totalPrice,
 
-                        IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+                        IsServiceFeeProduct =
+                            p.Product?.IsServiceFeeProduct,
 
-                        ServiceFeePercentage = p.Product?.ServiceFeePercentage,
+                        ServiceFeePercentage =
+                            p.Product?.ServiceFeePercentage,
 
-                        IsPriceCaptured = p.IsPriceCaptured,
-                        CapturedUnitPrice = p.CapturedUnitPrice,
-                        CapturedCurrency = p.CapturedCurrency,
-                        CapturedTotal = p.CapturedTotal
-                    };
-                })
-                .ToList();
+                        IsPriceCaptured =
+                            p.IsPriceCaptured,
+
+                        CapturedUnitPrice =
+                            p.CapturedUnitPrice,
+
+                        CapturedCurrency =
+                            p.CapturedCurrency,
+
+                        CapturedTotal =
+                            p.CapturedTotal
+                    });
+            }
+
+            //dto.Products = productEntities
+            //    .Select(p =>
+            //    {
+            //        var captured = p.IsPriceCaptured;
+
+            //        var effectivePrice = captured
+            //            ? p.CapturedUnitPrice ?? 0m
+            //            : p.GetEffectivePrice();
+
+            //        var currency = captured
+            //            ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
+            //            : p.Product?.PriceCurrency ?? "TRY";
+
+            //        var totalPrice = captured
+            //            ? p.CapturedTotal ?? effectivePrice * p.Quantity
+            //            : effectivePrice * p.Quantity;
+
+            //        return new YkbServicesRequestProductGetDto
+            //        {
+            //            Id = p.Id,
+            //            RequestNo = p.RequestNo,
+            //            ProductId = p.ProductId,
+            //            CustomerId = p.CustomerId ?? 0,
+            //            CustomerName = p.Customer?.SubscriberCompany,
+            //            Quantity = p.Quantity,
+
+            //            ProductName = p.Product?.Description,
+            //            ProductCode = p.Product?.ProductCode,
+
+            //            PriceCurrency = currency,
+
+            //            ProductPrice = effectivePrice,
+            //            EffectivePrice = effectivePrice,
+            //            TotalPrice = totalPrice,
+
+            //            IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+
+            //            ServiceFeePercentage = p.Product?.ServiceFeePercentage,
+
+            //            IsPriceCaptured = p.IsPriceCaptured,
+            //            CapturedUnitPrice = p.CapturedUnitPrice,
+            //            CapturedCurrency = p.CapturedCurrency,
+            //            CapturedTotal = p.CapturedTotal
+            //        };
+            //    })
+            //    .ToList();
 
 
             // REVIEW LOG’LARI (Pricing adımı)
@@ -6377,8 +6581,12 @@ namespace Business.Services.Ykb
 
                         LineUnitPriceTL = r.LineUnitPriceTL,
                         LineTotalTL = r.LineTotalTL,
+
                         LineUnitPriceUSD = r.LineUnitPriceUSD,
                         LineTotalUSD = r.LineTotalUSD,
+
+                        LineUnitPriceEUR = r.LineUnitPriceEUR,
+                        LineTotalEUR = r.LineTotalEUR,
 
                         GLCode = r.GLCode,
                         MGSDescription = r.MGSDescription,
@@ -6871,6 +7079,7 @@ namespace Business.Services.Ykb
                       {
                           decimal totalUsd = 0m;
                           decimal totalTry = 0m;
+                          decimal totalEur = 0m;
 
                           foreach (var productItem in group)
                           {
@@ -6892,6 +7101,11 @@ namespace Business.Services.Ykb
                                       totalUsd += total;
                                       break;
 
+                                  case "EUR":
+                                  case "€":
+                                      totalEur += total;
+                                      break;
+
                                   case "TRY":
                                   case "TL":
                                   case "₺":
@@ -6903,6 +7117,7 @@ namespace Business.Services.Ykb
                           return new
                           {
                               TotalUsd = totalUsd,
+                              TotalEur = totalEur,
                               TotalTry = totalTry
                           };
                       });
@@ -7228,6 +7443,7 @@ namespace Business.Services.Ykb
                         PricingStatus = pricing?.Status,
 
                         PricingTotalAmountUsd = productTotals?.TotalUsd ?? 0m,
+                        PricingTotalAmountEur = productTotals?.TotalEur ?? 0m,
                         PricingTotalAmountTry = productTotals?.TotalTry ?? 0m,
 
                         FinalApprovalStatus = finalApproval?.Status,
@@ -7449,6 +7665,7 @@ namespace Business.Services.Ykb
 
                          "Fiyatlandırma Durumu",
                          "Fiyatlandırma Toplam Tutar (USD)",
+                         "Fiyatlandırma Toplam Tutar (EUR)",
                          "Fiyatlandırma Toplam Tutar (TL)",
 
                          "Son Onay Durumu",
@@ -7551,6 +7768,7 @@ namespace Business.Services.Ykb
 
             ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
             SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountUsd, "#,##0.00");
+            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountEur, "#,##0.00");
             SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountTry, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
@@ -7568,6 +7786,7 @@ namespace Business.Services.Ykb
             // Uzun not alanları için satır taşması.
             ws.Cell(row, 51).Style.Alignment.WrapText = true;
             ws.Cell(row, 52).Style.Alignment.WrapText = true;
+            ws.Cell(row, 53).Style.Alignment.WrapText = true;
         }
         private static void SetNullableLong(IXLCell cell, long? value)
         {
@@ -7743,10 +7962,15 @@ namespace Business.Services.Ykb
                 ws.Cell(1, c++).Value = "Servis Oracle No";
                 ws.Cell(1, c++).Value = "İş Emri";
                 ws.Cell(1, c++).Value = "Hakediş Adet";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (TL)";
                 ws.Cell(1, c++).Value = "Satır Toplam (TL)";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (USD)";
                 ws.Cell(1, c++).Value = "Satır Toplam (USD)";
+
+                ws.Cell(1, c++).Value = "Satır Birim Fiyat (EUR)";
+                ws.Cell(1, c++).Value = "Satır Toplam (EUR)";
                 ws.Cell(1, c++).Value = "GL Kodu";
                 ws.Cell(1, c++).Value = "MGS Açıklama";
                 ws.Cell(1, c++).Value = "Sözleşme No";
@@ -7796,10 +8020,29 @@ namespace Business.Services.Ykb
                     ws.Cell(r, c++).Value = x.WorkOrder;             // İş Emri
                     ws.Cell(r, c++).Value = x.Quantity;              // Miktar
 
-                    var uTL = ws.Cell(r, c++); uTL.Value = x.LineUnitPriceTL; uTL.Style.NumberFormat.Format = "#,##0.00";
-                    var tTL = ws.Cell(r, c++); tTL.Value = x.LineTotalTL; tTL.Style.NumberFormat.Format = "#,##0.00";
-                    var uUS = ws.Cell(r, c++); uUS.Value = x.LineUnitPriceUSD; uUS.Style.NumberFormat.Format = "#,##0.00";
-                    var tUS = ws.Cell(r, c++); tUS.Value = x.LineTotalUSD; tUS.Style.NumberFormat.Format = "#,##0.00";
+                    var uTL = ws.Cell(r, c++);
+                    uTL.Value = x.LineUnitPriceTL;
+                    uTL.Style.NumberFormat.Format = "#,##0.00";
+
+                    var tTL = ws.Cell(r, c++);
+                    tTL.Value = x.LineTotalTL;
+                    tTL.Style.NumberFormat.Format = "#,##0.00";
+
+                    var uUS = ws.Cell(r, c++);
+                    uUS.Value = x.LineUnitPriceUSD;
+                    uUS.Style.NumberFormat.Format = "#,##0.00";
+
+                    var tUS = ws.Cell(r, c++);
+                    tUS.Value = x.LineTotalUSD;
+                    tUS.Style.NumberFormat.Format = "#,##0.00";
+
+                    var uEUR = ws.Cell(r, c++);
+                    uEUR.Value = x.LineUnitPriceEUR;
+                    uEUR.Style.NumberFormat.Format = "#,##0.00";
+
+                    var tEUR = ws.Cell(r, c++);
+                    tEUR.Value = x.LineTotalEUR;
+                    tEUR.Style.NumberFormat.Format = "#,##0.00";
 
                     ws.Cell(r, c++).Value = x.GLCode;               // GL Kodu
                     ws.Cell(r, c++).Value = x.MGSDescription;       // MGS Açıklama
@@ -8571,7 +8814,7 @@ namespace Business.Services.Ykb
         }
 
         /// Servis Ürünleri Fiyat savbitleme
-        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<YkbServicesRequestProductCreateDto>? productsDto)
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync_(string requestNo, IEnumerable<YkbServicesRequestProductCreateDto>? productsDto)
         {
             var dtoDict = (productsDto ??
                            Enumerable.Empty<YkbServicesRequestProductCreateDto>())
@@ -8609,13 +8852,7 @@ namespace Business.Services.Ykb
                 if (product.Product?.IsServiceFeeProduct == true)
                     continue;
 
-                var currency = string.IsNullOrWhiteSpace(
-                    product.Product?.PriceCurrency
-                )
-                    ? "TRY"
-                    : product.Product.PriceCurrency
-                        .Trim()
-                        .ToUpperInvariant();
+                var currency = string.IsNullOrWhiteSpace(product.Product?.PriceCurrency) ? "TRY" : product.Product.PriceCurrency.Trim().ToUpperInvariant();
 
                 // Normal ürünlerin fiyatı mevcut davranışta olduğu gibi DTO'dan gelir.
                 var unitPrice = dtoItem.Price ?? 0m;
@@ -8696,6 +8933,260 @@ namespace Business.Services.Ykb
                 product.CapturedAt = DateTime.Now;
                 product.IsPriceCaptured = true;
 
+                _uow.Repository.Update(product);
+            }
+
+            await _uow.Repository.CompleteAsync();
+
+            return ResponseModel.Success();
+        }
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<YkbServicesRequestProductCreateDto>? productsDto)
+        {
+            static string? NormalizeCurrency(string? currency)
+            {
+                if (string.IsNullOrWhiteSpace(currency))
+                    return null;
+
+                var value = currency.Trim().ToUpperInvariant();
+                return value switch
+                {
+                    "TL" => "TRY",
+                    "₺" => "TRY",
+                    "€" => "EUR",
+                    "$" => "USD",
+                    _ => value
+                };
+            }
+
+            var dtoDict = (productsDto ??
+                           Enumerable.Empty<YkbServicesRequestProductCreateDto>())
+                .GroupBy(x => x.ProductId).ToDictionary(
+                    x => x.Key,
+                    x => x.First());
+
+            if (dtoDict.Count == 0)
+                return ResponseModel.Success();
+
+
+            // -------------------------------------------------------
+            // Talebin Tenant bilgisini bul
+            // RequestNo -> ServicesRequest -> Customer -> TenantId
+            // -------------------------------------------------------
+
+            var tenantId = await _uow.Repository
+                .GetQueryable<YkbServicesRequest>()
+                .AsNoTracking()
+                .Where(x =>
+                    x.RequestNo == requestNo &&
+                    !x.IsDeleted)
+                .Select(x => x.Customer.TenantId)
+                .FirstOrDefaultAsync();
+
+
+            // -------------------------------------------------------
+            // Talebe ait ürünleri getir
+            // -------------------------------------------------------
+
+            var list = await _uow.Repository
+                .GetQueryable<YkbServicesRequestProduct>()
+                .Include(x => x.Product)
+                .Where(x => x.RequestNo == requestNo)
+                .ToListAsync();
+
+            if (list.Count == 0)
+                return ResponseModel.Success();
+
+
+            // -------------------------------------------------------
+            // Product.PriceCurrency olmayan ürünleri belirle
+            // -------------------------------------------------------
+
+            var productsWithoutCurrency = list
+                .Where(x =>
+                    dtoDict.ContainsKey(x.ProductId) &&
+                    string.IsNullOrWhiteSpace(x.Product?.PriceCurrency))
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+
+            // -------------------------------------------------------
+            // TenantProductPrice currency bilgilerini TEK SORGU ile al
+            // -------------------------------------------------------
+
+            var tenantCurrencyByProductId = new Dictionary<long, string>();
+
+            if (productsWithoutCurrency.Count > 0 && tenantId.HasValue && tenantId.Value > 0)
+            {
+                var tenantPrices = await _uow.Repository
+                    .GetQueryable<TenantProductPrice>()
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.IsDeleted &&
+                        x.TenantId == tenantId.Value &&
+                        productsWithoutCurrency.Contains(x.ProductId))
+                    .Select(x => new
+                    {
+                        x.ProductId,
+                        x.CurrencyCode
+                    })
+                    .ToListAsync();
+
+                tenantCurrencyByProductId = tenantPrices
+                    .Where(x => !string.IsNullOrWhiteSpace(x.CurrencyCode))
+                    .GroupBy(x => x.ProductId)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => NormalizeCurrency(
+                            x.First().CurrencyCode)!
+                    );
+            }
+
+
+            // -------------------------------------------------------
+            // Her ürünün kullanılacak currency bilgisini bir kez çöz
+            // -------------------------------------------------------
+
+            var resolvedCurrencyByProductId =
+                new Dictionary<long, string>();
+
+            foreach (var product in list)
+            {
+                if (!dtoDict.ContainsKey(product.ProductId))
+                    continue;
+
+                // 1. Öncelik Product.PriceCurrency
+                var currency = NormalizeCurrency(product.Product?.PriceCurrency);
+
+                // 2. Product currency yoksa TenantProductPrice.CurrencyCode
+                if (currency is null &&
+                    tenantCurrencyByProductId.TryGetValue(
+                        product.ProductId,
+                        out var tenantCurrency))
+                {
+                    currency = tenantCurrency;
+                }
+
+                // Currency hâlâ bulunamadıysa TRY varsayma.
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    return ResponseModel.Fail(
+                        $"Ürün para birimi belirlenemedi. " +
+                        $"RequestNo: {requestNo}, " +
+                        $"ProductId: {product.ProductId}. " +
+                        $"Product.PriceCurrency ve TenantProductPrice.CurrencyCode alanlarını kontrol ediniz.",
+                        StatusCode.BadRequest);
+                }
+
+                resolvedCurrencyByProductId[product.ProductId] = currency;
+            }
+
+
+            // -------------------------------------------------------
+            // Hizmet bedeli olmayan ürünlerin toplamları
+            // Currency bazında hesaplanır.
+            // -------------------------------------------------------
+
+            var baseTotalsByCurrency =
+                new Dictionary<string, decimal>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var product in list)
+            {
+                if (!dtoDict.TryGetValue(
+                        product.ProductId,
+                        out var dtoItem))
+                {
+                    continue;
+                }
+
+                // Hizmet bedeli ürünü başka hizmet bedelinin
+                // matrahına girmez.
+                if (product.Product?.IsServiceFeeProduct == true)
+                    continue;
+
+                var currency =
+                    resolvedCurrencyByProductId[product.ProductId];
+
+                // Normal ürün fiyatı mevcut davranıştaki gibi DTO'dan.
+                var unitPrice = dtoItem.Price ?? 0m;
+
+                var lineTotal =
+                    unitPrice * product.Quantity;
+
+                baseTotalsByCurrency[currency] =
+                    baseTotalsByCurrency.TryGetValue(
+                        currency,
+                        out var currentTotal)
+                        ? currentTotal + lineTotal
+                        : lineTotal;
+            }
+
+
+            // -------------------------------------------------------
+            // Capture
+            // -------------------------------------------------------
+
+            foreach (var product in list)
+            {
+                if (!dtoDict.TryGetValue(
+                        product.ProductId,
+                        out var dtoItem))
+                {
+                    continue;
+                }
+
+                // Artık Product.PriceCurrency okumuyoruz.
+                // Yukarıda tek bir noktada çözülmüş currency kullanılıyor.
+                var currency =
+                    resolvedCurrencyByProductId[product.ProductId];
+
+                decimal? unitPrice;
+
+                if (product.Product?.IsServiceFeeProduct == true)
+                {
+                    var percentage =
+                        product.Product.ServiceFeePercentage ?? 0m;
+
+                    var currencyBaseTotal =
+                        baseTotalsByCurrency.TryGetValue(
+                            currency,
+                            out var calculatedBaseTotal)
+                            ? calculatedBaseTotal
+                            : 0m;
+
+                    /*
+                     * Hizmet Bedeli Birim Fiyatı =
+                     *
+                     * Aynı para birimindeki normal ürün toplamı
+                     * × Hizmet bedeli yüzdesi
+                     * ÷ 100
+                     */
+                    unitPrice = Math.Round(
+                        currencyBaseTotal * percentage / 100m,
+                        2,
+                        MidpointRounding.AwayFromZero);
+                }
+                else
+                {
+                    // Normal ürün fiyatı DTO'dan gelir.
+                    unitPrice = dtoItem.Price;
+                }
+
+                var totalPrice = unitPrice * product.Quantity;
+
+                /*
+                 * Burada CapturedSource'u Tenant yapmak doğru olmaz.
+                 *
+                 * Çünkü yalnızca currency TenantProductPrice'tan gelmiş olabilir.
+                 * Birim fiyat hâlâ dtoItem.Price üzerinden geliyor.
+                 */
+                product.CapturedSource = CapturedPriceSource.Standard;
+                product.CapturedUnitPrice = unitPrice;
+                product.CapturedCurrency = currency;
+                product.CapturedTotal = totalPrice;
+                product.CapturedAt = DateTime.Now;
+                product.IsPriceCaptured = true;
                 _uow.Repository.Update(product);
             }
 

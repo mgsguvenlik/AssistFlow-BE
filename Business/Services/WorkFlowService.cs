@@ -1716,9 +1716,7 @@ namespace Business.Services
                 }
                 #endregion
 
-                #region Ürün Fiyat Sabitleme (5. Adım)
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
-                #endregion
+
 
                 #region Fiyatlama Güncelleme (FinalApproval)
                 existsFinalApproval.Notes = dto.Notes;
@@ -1806,6 +1804,10 @@ namespace Business.Services
 
                 await _uow.Repository.CompleteAsync();
 
+
+                #region Ürün Fiyat Sabitleme (5. Adım)
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                #endregion
                 #region Dosya Silme
 
                 attachmentsCommitted = true;
@@ -5659,8 +5661,12 @@ namespace Business.Services
 
                         LineUnitPriceTL = r.LineUnitPriceTL,
                         LineTotalTL = r.LineTotalTL,
+
                         LineUnitPriceUSD = r.LineUnitPriceUSD,
                         LineTotalUSD = r.LineTotalUSD,
+
+                        LineUnitPriceEUR = r.LineUnitPriceEUR,
+                        LineTotalEUR = r.LineTotalEUR,
 
                         GLCode = r.GLCode,
                         MGSDescription = r.MGSDescription,
@@ -5767,10 +5773,16 @@ namespace Business.Services
                 ws.Cell(1, c++).Value = "Servis Oracle No";
                 ws.Cell(1, c++).Value = "İş Emri";
                 ws.Cell(1, c++).Value = "Hakediş Adet";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (TL)";
                 ws.Cell(1, c++).Value = "Satır Toplam (TL)";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (USD)";
                 ws.Cell(1, c++).Value = "Satır Toplam (USD)";
+
+                ws.Cell(1, c++).Value = "Satır Birim Fiyat (EUR)";
+                ws.Cell(1, c++).Value = "Satır Toplam (EUR)";
+
                 ws.Cell(1, c++).Value = "GL Kodu";
                 ws.Cell(1, c++).Value = "MGS Açıklama";
                 ws.Cell(1, c++).Value = "Sözleşme No";
@@ -5824,6 +5836,10 @@ namespace Business.Services
                     var tTL = ws.Cell(r, c++); tTL.Value = x.LineTotalTL; tTL.Style.NumberFormat.Format = "#,##0.00";
                     var uUS = ws.Cell(r, c++); uUS.Value = x.LineUnitPriceUSD; uUS.Style.NumberFormat.Format = "#,##0.00";
                     var tUS = ws.Cell(r, c++); tUS.Value = x.LineTotalUSD; tUS.Style.NumberFormat.Format = "#,##0.00";
+
+                    var uEUR = ws.Cell(r, c++); uEUR.Value = x.LineUnitPriceEUR; uEUR.Style.NumberFormat.Format = "#,##0.00";
+                    var tEUR = ws.Cell(r, c++); tEUR.Value = x.LineTotalEUR; tEUR.Style.NumberFormat.Format = "#,##0.00";
+
 
                     ws.Cell(r, c++).Value = x.GLCode;               // GL Kodu
                     ws.Cell(r, c++).Value = x.MGSDescription;       // MGS Açıklama
@@ -6193,6 +6209,77 @@ namespace Business.Services
                 }
 
                 // -------------------------
+                // Ürünler
+                // -------------------------
+
+                var products = await _uow.Repository
+                    .GetQueryable<ServicesRequestProduct>()
+                    .AsNoTracking()
+                    .Include(p => p.Product)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.CustomerGroup)
+                            .ThenInclude(g => g.GroupProductPrices)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.CustomerProductPrices)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.Tenant)
+                            .ThenInclude(t => t.TenantProductPrices)
+                    .Where(p => requestNos.Contains(p.RequestNo))
+                    .AsSplitQuery()
+                    .ToListAsync();
+
+                var productTotalDict = products
+                     .GroupBy(p => p.RequestNo)
+                     .ToDictionary(
+                         group => group.Key,
+                         group =>
+                         {
+                             decimal totalUsd = 0m;
+                             decimal totalTry = 0m;
+                             decimal totalEur = 0m;
+
+                             foreach (var productItem in group)
+                             {
+                                 var useCapturedPrice =
+                                     productItem.IsPriceCaptured &&
+                                     productItem.CapturedTotal.HasValue;
+
+                                 var total = useCapturedPrice
+                                     ? productItem.CapturedTotal!.Value
+                                     : productItem.GetEffectivePrice() * productItem.Quantity;
+
+                                 var currency = useCapturedPrice
+                                     ? productItem.CapturedCurrency
+                                     : productItem.Product?.PriceCurrency;
+
+                                 switch (currency?.Trim().ToUpperInvariant())
+                                 {
+                                     case "USD":
+                                         totalUsd += total;
+                                         break;
+
+                                     case "EUR":
+                                     case "€":
+                                         totalEur += total;
+                                         break;
+
+                                     case "TRY":
+                                     case "TL":
+                                     case "₺":
+                                         totalTry += total;
+                                         break;
+                                 }
+                             }
+
+                             return new
+                             {
+                                 TotalUsd = totalUsd,
+                                 TotalEur = totalEur,
+                                 TotalTry = totalTry
+                             };
+                         });
+
+                // -------------------------
                 // Sayfadaki RequestNo'lara ait detayları çek
                 // -------------------------
 
@@ -6284,12 +6371,12 @@ namespace Business.Services
                 var userIds = workflows
                     .SelectMany(x => new long?[]
                     {
-                x.CreatedUser,
-                x.ApproverTechnicianId
-                    })
-                    .Where(x => x.HasValue && x.Value > 0)
-                    .Select(x => x!.Value)
-                    .Distinct()
+                     x.CreatedUser,
+                     x.ApproverTechnicianId
+                         })
+                         .Where(x => x.HasValue && x.Value > 0)
+                         .Select(x => x!.Value)
+                         .Distinct()
                     .ToList();
 
                 var users = await userQuery
@@ -6338,6 +6425,39 @@ namespace Business.Services
                     .GroupBy(x => x.Id)
                     .ToDictionary(x => x.Key, x => x.First());
 
+                var productDict = products
+                    .GroupBy(p => p.RequestNo)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(p =>
+                        {
+                            var captured = p.IsPriceCaptured;
+
+                            var effectivePrice = captured
+                                ? p.CapturedUnitPrice ?? 0m
+                                : p.GetEffectivePrice();
+
+                            var currency = captured
+                                ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
+                                : p.Product?.PriceCurrency ?? "TRY";
+
+                            return new ServicesRequestProductGetDto
+                            {
+                                Id = p.Id,
+                                RequestNo = p.RequestNo,
+                                ProductId = p.ProductId,
+                                Quantity = p.Quantity,
+
+                                ProductName = p.Product?.Description,
+                                ProductCode = p.Product?.ProductCode,
+
+                                PriceCurrency = currency,
+                                ProductPrice = effectivePrice,
+                                EffectivePrice = effectivePrice
+                            };
+                        }).ToList()
+                    );
+
                 // -------------------------
                 // DTO oluştur
                 // -------------------------
@@ -6349,6 +6469,7 @@ namespace Business.Services
                     tsDict.TryGetValue(w.RequestNo, out var ts);
                     pricingDict.TryGetValue(w.RequestNo, out var pricing);
                     finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
+                    productTotalDict.TryGetValue(w.RequestNo, out var productTotals);
 
                     userDict.TryGetValue(w.CreatedUser, out var createdUser);
 
@@ -6421,8 +6542,9 @@ namespace Business.Services
                         TechnicalServiceDurationMinutes = durationMinutes,
 
                         PricingStatus = pricing?.Status,
-                        PricingTotalAmount = pricing?.TotalAmount,
-                        Currency = pricing?.Currency,
+                        PricingTotalAmountUsd = productTotals?.TotalUsd ?? 0m,
+                        PricingTotalAmountEur = productTotals?.TotalEur ?? 0m,
+                        PricingTotalAmountTry = productTotals?.TotalTry ?? 0m,
 
                         FinalApprovalStatus = finalApproval?.Status,
                         FinalApprovalNotes = finalApproval?.Notes,
@@ -6430,7 +6552,11 @@ namespace Business.Services
 
                         WorkOrderTypes = wotDict.TryGetValue(w.RequestNo, out var wotList)
                             ? wotList
-                            : new List<WorkOrderTypeLiteDto>()
+                            : new List<WorkOrderTypeLiteDto>(),
+
+                        Products = productDict.TryGetValue(w.RequestNo, out var productList)
+                            ? productList
+                            : new List<ServicesRequestProductGetDto>()
                     };
                 }).ToList();
 
@@ -6520,11 +6646,15 @@ namespace Business.Services
                 foreach (var ws in workbook.Worksheets)
                 {
                     var lastRowForWidth = Math.Min(ws.LastRowUsed()?.RowNumber() ?? 1, 100);
-                    ws.Columns(1, 54).AdjustToContents(1, lastRowForWidth);
+                    var lastColumn = ws.LastColumnUsed()?.ColumnNumber() ?? 1;
+
+                    ws.Columns(1, lastColumn).AdjustToContents(1, lastRowForWidth);
+
                     ws.SheetView.FreezeRows(1);
-                    ws.Range(1, 1, 1, 54).SetAutoFilter();
-                    ws.Columns().Style.Alignment.Vertical =
-                        XLAlignmentVerticalValues.Center;
+
+                    ws.Range(1, 1, 1, lastColumn).SetAutoFilter();
+
+                    ws.Columns().Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 }
 
                 using var memoryStream = new MemoryStream();
@@ -6587,6 +6717,8 @@ namespace Business.Services
                  "Servis Türü",
                  "İş Emri Türleri",
 
+                 "Ürünler",
+
                  "Servis Talep Tarihi",
                  "Planlanan Tamamlanma Tarihi",
 
@@ -6606,7 +6738,11 @@ namespace Business.Services
                  "Teknik Servis Süresi (Dakika)",
 
                  "Fiyatlandırma Durumu",
-                 "Fiyatlandırma Toplam Tutar",
+
+                 "Fiyatlandırma Toplam Tutar (USD)",
+                 "Fiyatlandırma Toplam Tutar (EUR)",
+                 "Fiyatlandırma Toplam Tutar (TL)",
+
                  "Para Birimi",
 
                  "Son Onay Durumu",
@@ -6677,6 +6813,14 @@ namespace Business.Services
 
             ws.Cell(row, c++).Value = FormatWorkOrderTypes(x.WorkOrderTypes);
 
+            var productsCell = ws.Cell(row, c++);
+            productsCell.Value = FormatProducts(x.Products);
+            productsCell.Style.Alignment.WrapText = true;
+
+
+            SetDateTime(ws.Cell(row, c++), x.ServicesDate);
+            SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
+
             SetDateTime(ws.Cell(row, c++), x.ServicesDate);
             SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
 
@@ -6696,13 +6840,48 @@ namespace Business.Services
             SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
-            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmount, "#,##0.00");
-            ws.Cell(row, c++).Value = x.Currency ?? string.Empty;
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountUsd,
+                "#,##0.00");
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountEur,
+                "#,##0.00");
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountTry,
+                "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
             SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
 
             SetDateTime(ws.Cell(row, c++), x.LastActivityDate);
+        }
+        private static string FormatProducts(List<ServicesRequestProductGetDto>? products)
+        {
+            if (products is null || products.Count == 0)
+                return string.Empty;
+
+            return string.Join(
+                Environment.NewLine,
+                products.Select(p =>
+                {
+                    var productName =
+                        !string.IsNullOrWhiteSpace(p.ProductCode) &&
+                        !string.IsNullOrWhiteSpace(p.ProductName)
+                            ? $"{p.ProductCode} - {p.ProductName}"
+                            : p.ProductName
+                              ?? p.ProductCode
+                              ?? $"Ürün Id: {p.ProductId}";
+
+                    var currency = p.PriceCurrency ?? string.Empty;
+
+                    return $"{productName} | Miktar: {p.Quantity} | Birim Fiyat: {p.EffectivePrice:N2} {currency}";
+                }));
         }
 
         private static void SetNullableLong(IXLCell cell, long? value)
@@ -7432,10 +7611,7 @@ namespace Business.Services
 
 
         /// Servis Ürünleri Fiyat savbitleme
-        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
-            string requestNo,
-            IEnumerable<ServicesRequestProductCreateDto>? productsDto
-        )
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync_(string requestNo, IEnumerable<ServicesRequestProductCreateDto>? productsDto)
         {
             // DTO boş ise iş yapma
             var dtoDict = (productsDto ?? Enumerable.Empty<ServicesRequestProductCreateDto>())
@@ -7480,6 +7656,87 @@ namespace Business.Services
             }
 
             await _uow.Repository.CompleteAsync();
+            return ResponseModel.Success();
+        }
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<ServicesRequestProductCreateDto>? productsDto)
+        {
+            var dtoDict = (productsDto ??
+                           Enumerable.Empty<ServicesRequestProductCreateDto>())
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.First());
+
+            if (dtoDict.Count == 0)
+                return ResponseModel.Success();
+
+            // İlgili request'in ürünlerini;
+            // Product ve TenantProductPrice bilgileriyle beraber getir.
+            var list = await _uow.Repository
+                .GetQueryable<ServicesRequestProduct>()
+                .Include(x => x.Product)
+                .Include(x => x.Customer)
+                    .ThenInclude(x => x.Tenant)
+                        .ThenInclude(x => x.TenantProductPrices)
+                .Where(x => x.RequestNo == requestNo)
+                .AsSplitQuery()
+                .ToListAsync();
+
+            if (list.Count == 0)
+                return ResponseModel.Success();
+
+            foreach (var p in list)
+            {
+                if (!dtoDict.TryGetValue(p.ProductId, out var dtoItem))
+                    continue;
+
+                // 1) Birim fiyat DTO'dan geliyor.
+                var unit = dtoItem.Price;
+
+                // 2) Öncelikle Product.PriceCurrency kullanılır.
+                var currency = p.Product?.PriceCurrency?.Trim();
+
+                // 3) Product.PriceCurrency boşsa
+                // ilgili TenantProductPrice.CurrencyCode kullanılır.
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    currency = p.Customer?
+                        .Tenant?
+                        .TenantProductPrices
+                        .FirstOrDefault(x =>
+                            x.ProductId == p.ProductId &&
+                            !x.IsDeleted)?
+                        .CurrencyCode?
+                        .Trim();
+                }
+
+                // 4) Hâlâ currency bulunamadıysa otomatik TRY atanmaz.
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    return ResponseModel.Fail(
+                        $"Ürün para birimi belirlenemedi. " +
+                        $"RequestNo: {requestNo}, " +
+                        $"ProductId: {p.ProductId}. " +
+                        $"Product.PriceCurrency ve TenantProductPrice.CurrencyCode alanlarını kontrol ediniz.",
+                        StatusCode.BadRequest);
+                }
+
+                var total = unit * p.Quantity;
+
+                // Fiyat DTO'dan geldiği için Standard olarak korunuyor.
+                // TenantProductPrice burada yalnızca currency fallback'i.
+                p.CapturedSource = CapturedPriceSource.Standard;
+                p.CapturedUnitPrice = unit;
+                p.CapturedCurrency = currency;
+                p.CapturedTotal = total;
+                p.CapturedAt = DateTime.Now;
+                p.IsPriceCaptured = true;
+
+                _uow.Repository.Update(p);
+            }
+
+            await _uow.Repository.CompleteAsync();
+
             return ResponseModel.Success();
         }
 

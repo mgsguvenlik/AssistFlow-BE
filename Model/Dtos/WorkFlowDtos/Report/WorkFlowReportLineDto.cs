@@ -21,6 +21,9 @@
         public decimal? LineUnitPriceUSD { get; set; }
         public decimal? LineTotalUSD { get; set; }
 
+        public decimal? LineUnitPriceEUR { get; set; }
+        public decimal? LineTotalEUR { get; set; }
+
         public string? GLCode { get; set; }
         public string? MGSDescription { get; set; }
 

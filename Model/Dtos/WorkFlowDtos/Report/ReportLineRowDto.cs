@@ -29,6 +29,9 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public decimal? LineUnitPriceUSD { get; set; }
         public decimal? LineTotalUSD { get; set; }
 
+        public decimal? LineUnitPriceEUR { get; set; }
+        public decimal? LineTotalEUR { get; set; }
+
         public string? GLCode { get; set; }                   // boş dönüyor (SP)
         public string? MGSDescription { get; set; }           // boş dönüyor (SP)
 

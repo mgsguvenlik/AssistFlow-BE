@@ -23,6 +23,9 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public decimal? LineUnitPriceUSD { get; set; }
         public decimal? LineTotalUSD { get; set; }
 
+        public decimal? LineUnitPriceEUR { get; set; }
+        public decimal? LineTotalEUR { get; set; }
+
         public string? GLCode { get; set; }                   // boþ dönüyor (SP)
         public string? MGSDescription { get; set; }           // boþ dönüyor (SP)
 

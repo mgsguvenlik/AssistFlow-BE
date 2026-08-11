@@ -22,21 +22,51 @@ namespace Model.Concrete.Qnb
 
         public decimal GetEffectivePrice()
         {
-            if (Customer?.CustomerGroup?.GroupProductPrices
-                .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
-                return groupPrice.Price;
 
-            if (Customer?.CustomerProductPrices
-                .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
-                return customerPrice.Price;
+            return GetEffectivePriceWithCurrency().Price;
+            //if (Customer?.CustomerGroup?.GroupProductPrices
+            //    .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
+            //    return groupPrice.Price;
 
-            if (Customer?.Tenant?.TenantProductPrices
-                .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
-                return tenantPrice.Price;
+            //if (Customer?.CustomerProductPrices
+            //    .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
+            //    return customerPrice.Price;
 
-            return Product?.Price ?? 0m;
+            //if (Customer?.Tenant?.TenantProductPrices
+            //    .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
+            //    return tenantPrice.Price;
+
+            //return Product?.Price ?? 0m;
         }
 
+        public (decimal Price, string? CurrencyCode) GetEffectivePriceWithCurrency()
+        {
+            // 1. Grup fiyatý
+            var groupPrice = Customer?.CustomerGroup?.GroupProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
+            if (groupPrice is not null)
+            {
+                return (groupPrice.Price, groupPrice.CurrencyCode);
+            }
+
+            // 2. Müþteri özel fiyatý
+            var customerPrice = Customer?.CustomerProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
+
+            if (customerPrice is not null)
+            {
+                return (customerPrice.Price, customerPrice.CurrencyCode);
+            }
+
+            // 3. Tenant fiyatý
+            var tenantPrice = Customer?.Tenant?.TenantProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
+
+            if (tenantPrice is not null)
+            {
+                return (tenantPrice.Price, tenantPrice.CurrencyCode);
+            }
+
+            // 4. Ürün genel fiyatý
+            return (Product?.Price ?? 0m, Product?.PriceCurrency);
+        }
         public decimal GetTotalEffectivePrice()
         {
             if (Customer?.CustomerGroup?.GroupProductPrices
