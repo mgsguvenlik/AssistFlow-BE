@@ -4699,55 +4699,55 @@ namespace Business.Services.Ykb
                     .ThenInclude(c => c.CustomerProductPrices)
                 .Where(p => p.RequestNo == dto.RequestNo)
                 .ToListAsync();
-              dto.Products = productEntities
-                 .Select(p =>
-                 {
-                     var captured = p.IsPriceCaptured;
+            dto.Products = productEntities
+               .Select(p =>
+               {
+                   var captured = p.IsPriceCaptured;
 
-                     decimal effectivePrice;
-                     string? currency;
-                     decimal totalPrice;
+                   decimal effectivePrice;
+                   string? currency;
+                   decimal totalPrice;
 
-                     if (captured)
-                     {
-                         // Capture edilmiş fiyat artık snapshot'tır.
-                         effectivePrice = p.CapturedUnitPrice ?? 0m;
-                         currency = p.CapturedCurrency;
+                   if (captured)
+                   {
+                       // Capture edilmiş fiyat artık snapshot'tır.
+                       effectivePrice = p.CapturedUnitPrice ?? 0m;
+                       currency = p.CapturedCurrency;
 
-                         totalPrice = p.CapturedTotal
-                             ?? (effectivePrice * p.Quantity);
-                     }
-                     else
-                     {
-                         // Price ve Currency aynı fiyat kaynağından gelir.
-                         var effectivePriceInfo = p.GetEffectivePriceWithCurrency();
-                         effectivePrice = effectivePriceInfo.Price;
-                         currency = effectivePriceInfo.CurrencyCode;
-                         totalPrice = effectivePrice * p.Quantity;
-                     }
+                       totalPrice = p.CapturedTotal
+                           ?? (effectivePrice * p.Quantity);
+                   }
+                   else
+                   {
+                       // Price ve Currency aynı fiyat kaynağından gelir.
+                       var effectivePriceInfo = p.GetEffectivePriceWithCurrency();
+                       effectivePrice = effectivePriceInfo.Price;
+                       currency = effectivePriceInfo.CurrencyCode;
+                       totalPrice = effectivePrice * p.Quantity;
+                   }
 
 
-                     return new YkbServicesRequestProductGetDto
-                     {
-                         Id = p.Id,
-                         RequestNo = p.RequestNo,
-                         ProductId = p.ProductId,
-                         Quantity = p.Quantity,
-                         IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
-                         ServiceFeePercentage = p.Product?.ServiceFeePercentage,
-                         ProductName = p.Product?.Description,
-                         ProductCode = p.Product?.ProductCode,
-                         PriceCurrency = currency,
-                         ProductPrice = effectivePrice,
-                         EffectivePrice = effectivePrice,
-                         TotalPrice = totalPrice,
-                         IsPriceCaptured = p.IsPriceCaptured,
-                         CapturedUnitPrice = p.CapturedUnitPrice,
-                         CapturedCurrency = p.CapturedCurrency,
-                         CapturedTotal = p.CapturedTotal
-                     };
-                 })
-            .ToList();
+                   return new YkbServicesRequestProductGetDto
+                   {
+                       Id = p.Id,
+                       RequestNo = p.RequestNo,
+                       ProductId = p.ProductId,
+                       Quantity = p.Quantity,
+                       IsServiceFeeProduct = p.Product?.IsServiceFeeProduct,
+                       ServiceFeePercentage = p.Product?.ServiceFeePercentage,
+                       ProductName = p.Product?.Description,
+                       ProductCode = p.Product?.ProductCode,
+                       PriceCurrency = currency,
+                       ProductPrice = effectivePrice,
+                       EffectivePrice = effectivePrice,
+                       TotalPrice = totalPrice,
+                       IsPriceCaptured = p.IsPriceCaptured,
+                       CapturedUnitPrice = p.CapturedUnitPrice,
+                       CapturedCurrency = p.CapturedCurrency,
+                       CapturedTotal = p.CapturedTotal
+                   };
+               })
+          .ToList();
 
             // REVIEW LOG’ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -7832,7 +7832,7 @@ namespace Business.Services.Ykb
             SetDecimal(ws.Cell(row, c++), x.PricingTotalAmountTry, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
-            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+            SetDecimal(ws.Cell(row, c++), x.DiscountPercent.HasValue ? x.DiscountPercent.Value / 100m : null, "0.00%");
 
             ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
             ws.Cell(row, c++).Value = x.CustomerNote ?? string.Empty;

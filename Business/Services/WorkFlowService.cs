@@ -6990,7 +6990,7 @@ namespace Business.Services
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
             SetDecimal(
                 ws.Cell(row, c++),
-                x.DiscountPercent,
+                x.DiscountPercent.HasValue ? x.DiscountPercent.Value / 100m : null,
                 "0.00%");
 
             SetDateTime(

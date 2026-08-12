@@ -5846,7 +5846,6 @@ namespace Business.Services.Qnb
                  "Fiyatlandırma Toplam Tutar (EUR)",
                  "Fiyatlandırma Toplam Tutar (TL)",
 
-                 "Para Birimi",
 
                  "Son Onay Durumu",
                  "İndirim Oranı",
@@ -5960,7 +5959,8 @@ namespace Business.Services.Qnb
                 "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
-            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+            SetDecimal(ws.Cell(row, c++), x.DiscountPercent.HasValue ? x.DiscountPercent.Value / 100m : null, "0.00%");
+
             ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
 
             var notesColumn = c - 1;
