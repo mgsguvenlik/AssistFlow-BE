@@ -6876,8 +6876,6 @@ namespace Business.Services
                  "Fiyatlandırma Toplam Tutar (EUR)",
                  "Fiyatlandırma Toplam Tutar (TL)",
 
-                 "Para Birimi",
-
                  "Son Onay Durumu",
                  "İndirim Oranı",
 
@@ -6954,9 +6952,6 @@ namespace Business.Services
             SetDateTime(ws.Cell(row, c++), x.ServicesDate);
             SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
 
-            SetDateTime(ws.Cell(row, c++), x.ServicesDate);
-            SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
-
             ws.Cell(row, c++).Value = BoolText(x.IsAgreement);
             ws.Cell(row, c++).Value = BoolText(x.IsLocationValid);
             ws.Cell(row, c++).Value = BoolText(x.IsProductRequirement);
@@ -6970,7 +6965,10 @@ namespace Business.Services
             ws.Cell(row, c++).Value = GetEnumText(x.TechnicalServiceStatus);
             SetDateTime(ws.Cell(row, c++), x.TechnicalStartTime);
             SetDateTime(ws.Cell(row, c++), x.TechnicalEndTime);
-            SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
+            SetDouble(
+                ws.Cell(row, c++),
+                x.TechnicalServiceDurationMinutes,
+                "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
 
@@ -6990,9 +6988,14 @@ namespace Business.Services
                 "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
-            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.DiscountPercent,
+                "0.00%");
 
-            SetDateTime(ws.Cell(row, c++), x.LastActivityDate);
+            SetDateTime(
+                ws.Cell(row, c++),
+                x.LastActivityDate);
         }
         private static string FormatProducts(List<ServicesRequestProductGetDto>? products)
         {
