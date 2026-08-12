@@ -2235,42 +2235,84 @@ namespace Business.Services
 
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
             baseDto.ServicesRequestProducts = await _uow.Repository
-                     .GetQueryable<ServicesRequestProduct>()
-                     .AsNoTracking()
-                     .Where(p => p.RequestNo == baseDto.RequestNo)
-                     .Select(p => new ServicesRequestProductGetDto
-                     {
-                         Id = p.Id,
-                         RequestNo = p.RequestNo,
-                         ProductId = p.ProductId,
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == baseDto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
 
-                         // Ürün temel alanları
-                         ProductName = p.Product != null ? p.Product.Description : null,
-                         ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                         ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                         PriceCurrency = p.Product.PriceCurrency,
+                    // Ürün temel alanları
+                    ProductName = p.Product != null ? p.Product.Description : null,
+                    ProductCode = p.Product != null ? p.Product.ProductCode : null,
 
-                         Quantity = p.Quantity,
+                    ProductPrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+                        : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
 
-                         // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
-                         // 1) CustomerGroup fiyatı → 2) Customer özel fiyatı → 3) Tenant fiyatı → 4) Ürün liste fiyatı
-                         EffectivePrice =
-                             p.Customer.CustomerGroup.GroupProductPrices
-                                 .Where(gp => gp.ProductId == p.ProductId)
-                                 .Select(gp => (decimal?)gp.Price)
-                                 .FirstOrDefault()
-                             ?? p.Customer.CustomerProductPrices
-                                 .Where(cp => cp.ProductId == p.ProductId)
-                                 .Select(cp => (decimal?)cp.Price)
-                                 .FirstOrDefault()
-                             ?? p.Customer.Tenant.TenantProductPrices
-                                 .Where(tp => tp.ProductId == p.ProductId)
-                                 .Select(tp => (decimal?)tp.Price)
-                                 .FirstOrDefault() // 🆕 Tenant fiyatı
-                             ?? (decimal?)p.Product.Price
-                             ?? 0m
-                     })
-               .ToListAsync();
+                    // Captured ise CapturedCurrency,
+                    // değilse EffectivePrice hangi kaynaktan geliyorsa aynı kaynağın CurrencyCode'u
+                    PriceCurrency = p.IsPriceCaptured
+                        ? p.CapturedCurrency
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    Quantity = p.Quantity,
+
+                    // 1) Captured
+                    // 2) CustomerGroup
+                    // 3) Customer
+                    // 4) Tenant
+                    // 5) Product
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.Tenant.TenantProductPrices
+                            .Where(tp => tp.ProductId == p.ProductId)
+                            .Select(tp => (decimal?)tp.Price)
+                            .FirstOrDefault()
+
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m
+                })
+                .ToListAsync();
+
 
             // 3) Review logs (tek bağımsız sorgu — SR adımıyla sınırlı)
             baseDto.ReviewLogs = await _uow.Repository
@@ -2442,7 +2484,7 @@ namespace Business.Services
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
-                .Where(p => p.RequestNo == requestNo)
+                .Where(p => p.RequestNo == baseDto.RequestNo)
                 .Select(p => new ServicesRequestProductGetDto
                 {
                     Id = p.Id,
@@ -2452,27 +2494,69 @@ namespace Business.Services
                     // Ürün temel alanları
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+
+                    ProductPrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+                        : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
+
+                    // Captured ise CapturedCurrency,
+                    // değilse EffectivePrice hangi kaynaktan geliyorsa aynı kaynağın CurrencyCode'u
+                    PriceCurrency = p.IsPriceCaptured
+                        ? p.CapturedCurrency
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
 
                     Quantity = p.Quantity,
 
-                    // 🆕 EF-translatable EffectivePrice (Tenant eklendi)
-                    EffectivePrice =
-                             p.Customer.CustomerGroup.GroupProductPrices
-                                 .Where(gp => gp.ProductId == p.ProductId)
-                                 .Select(gp => (decimal?)gp.Price)
-                                 .FirstOrDefault()
-                             ?? p.Customer.CustomerProductPrices
-                                 .Where(cp => cp.ProductId == p.ProductId)
-                                 .Select(cp => (decimal?)cp.Price)
-                                 .FirstOrDefault()
-                             ?? p.Customer.Tenant.TenantProductPrices
-                                 .Where(tp => tp.ProductId == p.ProductId)
-                                 .Select(tp => (decimal?)tp.Price)
-                                 .FirstOrDefault() // 🆕 Tenant fiyatı
-                             ?? (decimal?)p.Product.Price
-                             ?? 0m
+                    // 1) Captured
+                    // 2) CustomerGroup
+                    // 3) Customer
+                    // 4) Tenant
+                    // 5) Product
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.Tenant.TenantProductPrices
+                            .Where(tp => tp.ProductId == p.ProductId)
+                            .Select(tp => (decimal?)tp.Price)
+                            .FirstOrDefault()
+
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m
                 })
                 .ToListAsync();
 
@@ -3377,20 +3461,6 @@ namespace Business.Services
         {
             var query = _uow.Repository.GetQueryable<TechnicalService>();
 
-            // HEADER (mevcut mapster config'ine göre)
-            //var dto = await query
-            //    .AsNoTracking()
-            //    .Where(x => x.RequestNo == requestNo)
-            //    .AsSplitQuery()
-            //    .Include(x => x.ServiceRequestFormImages)
-            //    .Include(x => x.ServicesImages)
-            //    .Include(x => x.ServiceType)
-            //    .ProjectToType<TechnicalServiceGetDto>(_config)
-            //    .FirstOrDefaultAsync();
-
-            //if (dto is null)
-            //    return ResponseModel<TechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
             var entity = await query
                   .AsNoTracking()
                   .Where(x => x.RequestNo == requestNo)
@@ -3802,9 +3872,9 @@ namespace Business.Services
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
                 .Include(p => p.Product)
-                .Include(p => p.Customer)                           // 🆕
-                    .ThenInclude(c => c.Tenant)                     // 🆕
-                        .ThenInclude(t => t.TenantProductPrices)    // 🆕
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.Tenant)
+                        .ThenInclude(t => t.TenantProductPrices)
                 .Include(p => p.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.GroupProductPrices)
@@ -3821,13 +3891,16 @@ namespace Business.Services
 
                     // 1) Birim fiyat
                     decimal effectivePrice = captured
-                        ? (p.CapturedUnitPrice ?? 0m)          // sabitlenmiş ise buradan
-                        : p.GetEffectivePrice();              // sabitlenmemiş ise hesapla (TENANT İÇERİR)
+                        ? (p.CapturedUnitPrice ?? 0m)
+                        : p.GetEffectivePrice();
 
                     // 2) Para birimi
+                    // Captured ise CapturedCurrency,
+                    // değilse EffectivePrice hangi kaynaktan geldiyse
+                    // aynı kaynağın CurrencyCode değeri alınır.
                     string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                        ? p.CapturedCurrency
+                        : p.GetEffectivePriceWithCurrency().CurrencyCode;
 
                     // 3) DTO doldur
                     return new ServicesRequestProductGetDto
@@ -3840,14 +3913,10 @@ namespace Business.Services
                         ProductName = p.Product?.Description,
                         ProductCode = p.Product?.ProductCode,
 
-                        // Para birimi: sabitse Captured, değilse Product
                         PriceCurrency = currency,
 
-                        // Ürün fiyatı: ekranda kullanılacak birim fiyat
                         ProductPrice = effectivePrice,
-
-                        // EffectivePrice: her zaman ekranda görünen "esas" fiyat
-                        EffectivePrice = effectivePrice,
+                        EffectivePrice = effectivePrice
                     };
                 })
                 .ToList();
@@ -3959,15 +4028,14 @@ namespace Business.Services
                 dto.ProblemDescription = technicalServiceInfo.ProblemDescription;
                 dto.ResolutionAndActions = technicalServiceInfo.ResolutionAndActions;
             }
-
             // ÜRÜNLER: Include yok; EffectivePrice server-side hesaplanır
             var productEntities = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
                 .Include(p => p.Product)
-                .Include(p => p.Customer)                           // 🆕
-                    .ThenInclude(c => c.Tenant)                     // 🆕
-                        .ThenInclude(t => t.TenantProductPrices)    // 🆕
+                .Include(p => p.Customer)
+                    .ThenInclude(c => c.Tenant)
+                        .ThenInclude(t => t.TenantProductPrices)
                 .Include(p => p.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.GroupProductPrices)
@@ -3982,15 +4050,15 @@ namespace Business.Services
                     // Fiyat sabitlenmiş mi?
                     bool captured = p.IsPriceCaptured;
 
-                    // 1) Birim fiyat (GetEffectivePrice artık Tenant'ı da içeriyor)
+                    // 1) Birim fiyat
                     decimal effectivePrice = captured
                         ? (p.CapturedUnitPrice ?? 0m)
                         : p.GetEffectivePrice();
 
                     // 2) Para birimi
                     string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                        ? p.CapturedCurrency
+                        : p.GetEffectivePriceWithCurrency().CurrencyCode;
 
                     // 3) DTO doldur
                     return new ServicesRequestProductGetDto
@@ -4201,35 +4269,100 @@ namespace Business.Services
 
             // PRODUCTS: Include yok; EffectivePrice server-side hesaplanır
             dto.Products = await _uow.Repository
-                 .GetQueryable<ServicesRequestProduct>()
-                 .AsNoTracking()
-                 .Where(p => p.RequestNo == dto.RequestNo)
-                 .Select(p => new ServicesRequestProductGetDto
-                 {
-                     Id = p.Id,
-                     RequestNo = p.RequestNo,
-                     ProductId = p.ProductId,
-                     Quantity = p.Quantity,
+                .GetQueryable<ServicesRequestProduct>()
+                .AsNoTracking()
+                .Where(p => p.RequestNo == dto.RequestNo)
+                .Select(p => new ServicesRequestProductGetDto
+                {
+                    Id = p.Id,
+                    RequestNo = p.RequestNo,
+                    ProductId = p.ProductId,
+                    Quantity = p.Quantity,
 
-                     // ürün temel alanları
-                     ProductName = p.Product != null ? p.Product.Description : null,
-                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
+                    // Ürün temel alanları
+                    ProductName = p.Product != null
+                        ? p.Product.Description
+                        : null,
 
-                     // 🔹 Para birimi: sabitlenmiş (Captured) varsa onu kullan
-                     PriceCurrency = p.CapturedCurrency
-                         ?? (p.Product != null ? p.Product.PriceCurrency : null),
+                    ProductCode = p.Product != null
+                        ? p.Product.ProductCode
+                        : null,
 
-                     // 🔹 Ürün fiyatı: sabitlenmiş birim fiyat
-                     ProductPrice = p.CapturedUnitPrice
-                        ?? (p.Product != null ? (decimal?)p.Product.Price : null)
+                    // Para birimi
+                    PriceCurrency = p.IsPriceCaptured
+                        ? p.CapturedCurrency
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    // Ekranda kullanılacak birim fiyat
+                    ProductPrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.Tenant.TenantProductPrices
+                            .Where(tp => tp.ProductId == p.ProductId)
+                            .Select(tp => (decimal?)tp.Price)
+                            .FirstOrDefault()
+
+                        ?? (decimal?)p.Product.Price
                         ?? 0m,
 
-                     // 🔹 EffectivePrice: artık runtime hesap yok,
-                     // sabitlenmiş birim fiyat = ekranda görünen "esas fiyat"
-                     EffectivePrice = p.CapturedUnitPrice
-                          ?? 0m,
-                 })
-                 .ToListAsync();
+                    // Esas fiyat
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Where(gp => gp.ProductId == p.ProductId)
+                            .Select(gp => (decimal?)gp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.CustomerProductPrices
+                            .Where(cp => cp.ProductId == p.ProductId)
+                            .Select(cp => (decimal?)cp.Price)
+                            .FirstOrDefault()
+
+                        ?? p.Customer.Tenant.TenantProductPrices
+                            .Where(tp => tp.ProductId == p.ProductId)
+                            .Select(tp => (decimal?)tp.Price)
+                            .FirstOrDefault()
+
+                        ?? (decimal?)p.Product.Price
+                        ?? 0m,
+                })
+                .ToListAsync();
 
             // REVIEW LOG'ları (APR adımı)
             dto.ReviewLogs = await _uow.Repository
@@ -6901,16 +7034,7 @@ namespace Business.Services
             cell.Value = value.Value.DateTime;
             cell.Style.DateFormat.Format = format;
         }
-        private static void SetDateTime(IXLCell cell, DateTime? value, string format = "dd.MM.yyyy HH:mm")
-        {
-            if (!value.HasValue)
-                return;
-
-            // Değer mutlaka atanmalı; sadece DateFormat vermek hücreyi doldurmaz.
-            cell.Value = value.Value;
-            cell.Style.DateFormat.Format = format;
-        }
-
+     
         private static void SetDecimal(IXLCell cell, decimal? value, string format)
         {
             if (!value.HasValue)
@@ -7609,55 +7733,7 @@ namespace Business.Services
             }
         }
 
-
         /// Servis Ürünleri Fiyat savbitleme
-        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync_(string requestNo, IEnumerable<ServicesRequestProductCreateDto>? productsDto)
-        {
-            // DTO boş ise iş yapma
-            var dtoDict = (productsDto ?? Enumerable.Empty<ServicesRequestProductCreateDto>())
-                .ToDictionary(x => x.ProductId, x => x);
-
-            if (!dtoDict.Any())
-                return ResponseModel.Success();
-
-            // İlgili request’in ürünlerini çek
-            var list = await _uow.Repository.GetQueryable<ServicesRequestProduct>()
-                .Include(x => x.Product) // Para birimi vs için
-                .Where(x => x.RequestNo == requestNo)
-                .ToListAsync();
-
-            if (list.Count == 0)
-                return ResponseModel.Success();
-
-            foreach (var p in list)
-            {
-                // DTO’da karşılığı yoksa o satırı atla (istersen burada 0 fiyat da yazabilirsin)
-                if (!dtoDict.TryGetValue(p.ProductId, out var dtoItem))
-                    continue;
-
-                // 1) Birim fiyat: artık DTO’dan geliyor
-                var unit = dtoItem.Price; // ← DTO’daki Price
-
-                // 2) Para birimi: eskisi gibi ürün tablosundan
-                var currency = p.Product?.PriceCurrency ?? "TRY";
-
-                var total = unit * p.Quantity;
-
-                // İstersen CapturedSource için yeni enum (Manual) ekleyebilirsin,
-                // şimdilik mevcut enum’lardan birini kullanıyorum.
-                p.CapturedSource = CapturedPriceSource.Standard; // veya CapturedPriceSource.CustomerGroupPriceManual vs
-                p.CapturedUnitPrice = unit;
-                p.CapturedCurrency = currency;
-                p.CapturedTotal = total;
-                p.CapturedAt = DateTime.Now;
-                p.IsPriceCaptured = true;
-
-                _uow.Repository.Update(p);
-            }
-
-            await _uow.Repository.CompleteAsync();
-            return ResponseModel.Success();
-        }
         private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<ServicesRequestProductCreateDto>? productsDto)
         {
             var dtoDict = (productsDto ??

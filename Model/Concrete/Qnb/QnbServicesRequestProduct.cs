@@ -24,19 +24,7 @@ namespace Model.Concrete.Qnb
         {
 
             return GetEffectivePriceWithCurrency().Price;
-            //if (Customer?.CustomerGroup?.GroupProductPrices
-            //    .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
-            //    return groupPrice.Price;
-
-            //if (Customer?.CustomerProductPrices
-            //    .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
-            //    return customerPrice.Price;
-
-            //if (Customer?.Tenant?.TenantProductPrices
-            //    .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
-            //    return tenantPrice.Price;
-
-            //return Product?.Price ?? 0m;
+           
         }
 
         public (decimal Price, string? CurrencyCode) GetEffectivePriceWithCurrency()

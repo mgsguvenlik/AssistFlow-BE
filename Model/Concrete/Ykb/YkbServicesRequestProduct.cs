@@ -25,23 +25,7 @@ namespace Model.Concrete.Ykb
         {
             return GetEffectivePriceWithCurrency().Price;
 
-            //// 1️⃣ Grup fiyatı
-            //if (Customer?.CustomerGroup?.GroupProductPrices
-            //    .FirstOrDefault(gp => gp.ProductId == ProductId) is { } groupPrice)
-            //    return groupPrice.Price;
-
-            //// 2️⃣ Müşteri özel fiyatı
-            //if (Customer?.CustomerProductPrices
-            //    .FirstOrDefault(cp => cp.ProductId == ProductId) is { } customerPrice)
-            //    return customerPrice.Price;
-
-            //// 3️⃣ Tenant fiyatı 🆕
-            //if (Customer?.Tenant?.TenantProductPrices
-            //    .FirstOrDefault(tp => tp.ProductId == ProductId) is { } tenantPrice)
-            //    return tenantPrice.Price;
-
-            //// 4️⃣ Ürün genel fiyatı
-            //return Product?.Price ?? 0m;
+       
         }
 
         public decimal GetTotalEffectivePrice()

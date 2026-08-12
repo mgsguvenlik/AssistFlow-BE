@@ -2523,7 +2523,7 @@ namespace Business.Services.Qnb
                 .ToList();
 
 
-
+            //ÜRÜNLER 
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
@@ -2533,26 +2533,87 @@ namespace Business.Services.Qnb
                     Id = p.Id,
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
+
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductPrice = p.IsPriceCaptured ? (p.CapturedUnitPrice ?? 0m) : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
                     Quantity = p.Quantity,
-                    EffectivePrice =
-                        p.Customer.CustomerGroup.GroupProductPrices
+                    PriceCurrency = p.IsPriceCaptured ? p.CapturedCurrency
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
                             .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+                        ?? 0m,
+
+                    TotalPrice = p.IsPriceCaptured
+                        ? (p.CapturedTotal
+                            ?? ((p.CapturedUnitPrice ?? 0m) * p.Quantity))
+
+                        : (
+                            p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => (decimal?)gp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.CustomerProductPrices
+                                .Where(cp => cp.ProductId == p.ProductId)
+                                .Select(cp => (decimal?)cp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.Tenant.TenantProductPrices
+                                .Where(tp => tp.ProductId == p.ProductId)
+                                .Select(tp => (decimal?)tp.Price)
+                                .FirstOrDefault()
+
+                            ?? (decimal?)p.Product.Price
+                            ?? 0m
+                        ) * p.Quantity,
+
+                    IsPriceCaptured = p.IsPriceCaptured,
+                    CapturedUnitPrice = p.CapturedUnitPrice,
+                    CapturedCurrency = p.CapturedCurrency,
+                    CapturedTotal = p.CapturedTotal
                 })
                 .ToListAsync();
 
@@ -2710,35 +2771,97 @@ namespace Business.Services.Qnb
                     .FirstOrDefaultAsync() ?? new CustomerGroupGetDto();
             }
 
+            //ÜRÜNLER 
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
-                .Where(p => p.RequestNo == requestNo)
+                .Where(p => p.RequestNo == baseDto.RequestNo)
                 .Select(p => new QnbServicesRequestProductGetDto
                 {
                     Id = p.Id,
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
+
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductPrice = p.IsPriceCaptured ? (p.CapturedUnitPrice ?? 0m) : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
                     Quantity = p.Quantity,
-                    EffectivePrice =
-                        p.Customer.CustomerGroup.GroupProductPrices
+                    PriceCurrency = p.IsPriceCaptured ? p.CapturedCurrency
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
                             .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+                        ?? 0m,
+
+                    TotalPrice = p.IsPriceCaptured
+                        ? (p.CapturedTotal
+                            ?? ((p.CapturedUnitPrice ?? 0m) * p.Quantity))
+
+                        : (
+                            p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => (decimal?)gp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.CustomerProductPrices
+                                .Where(cp => cp.ProductId == p.ProductId)
+                                .Select(cp => (decimal?)cp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.Tenant.TenantProductPrices
+                                .Where(tp => tp.ProductId == p.ProductId)
+                                .Select(tp => (decimal?)tp.Price)
+                                .FirstOrDefault()
+
+                            ?? (decimal?)p.Product.Price
+                            ?? 0m
+                        ) * p.Quantity,
+
+                    IsPriceCaptured = p.IsPriceCaptured,
+                    CapturedUnitPrice = p.CapturedUnitPrice,
+                    CapturedCurrency = p.CapturedCurrency,
+                    CapturedTotal = p.CapturedTotal
                 })
                 .ToListAsync();
 
@@ -3169,19 +3292,6 @@ namespace Business.Services.Qnb
         {
             var query = _uow.Repository.GetQueryable<QnbTechnicalService>();
 
-            //var dto = await query
-            //    .AsNoTracking()
-            //    .Where(x => x.RequestNo == requestNo)
-            //    .AsSplitQuery()
-            //    .Include(x => x.QnbServiceRequestFormImages)
-            //    .Include(x => x.QnbServicesImages)
-            //    .Include(x => x.ServiceType)
-            //    .ProjectToType<QnbTechnicalServiceGetDto>(_config)
-            //    .FirstOrDefaultAsync();
-
-            //if (dto is null)
-            //    return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
 
             // HEADER (mevcut mapster config'ine göre)
             var entity = await query
@@ -3534,31 +3644,40 @@ namespace Business.Services.Qnb
 
             //Ürünler 
             var productEntities = await _uow.Repository
-                .GetQueryable<QnbServicesRequestProduct>()
-                .AsNoTracking()
-                .Include(p => p.Product)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.Tenant)
-                        .ThenInclude(t => t.TenantProductPrices)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerGroup)
-                        .ThenInclude(g => g.GroupProductPrices)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerProductPrices)
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ToListAsync();
+                  .GetQueryable<QnbServicesRequestProduct>()
+                  .AsNoTracking()
+                  .Include(p => p.Product)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.Tenant)
+                          .ThenInclude(t => t.TenantProductPrices)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.CustomerGroup)
+                          .ThenInclude(g => g.GroupProductPrices)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.CustomerProductPrices)
+                  .Where(p => p.RequestNo == dto.RequestNo)
+                  .ToListAsync();
 
             dto.Products = productEntities
                 .Select(p =>
                 {
                     bool captured = p.IsPriceCaptured;
+
                     decimal effectivePrice = captured
                         ? (p.CapturedUnitPrice ?? 0m)
                         : p.GetEffectivePrice();
 
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                    string? currency;
+
+                    if (captured)
+                    {
+                        currency = p.CapturedCurrency;
+                    }
+                    else
+                    {
+                        var effectivePriceInfo = p.GetEffectivePriceWithCurrency();
+                        currency = effectivePriceInfo.CurrencyCode;
+                    }
 
                     return new QnbServicesRequestProductGetDto
                     {
@@ -3571,7 +3690,11 @@ namespace Business.Services.Qnb
                         PriceCurrency = currency,
                         ProductPrice = effectivePrice,
                         EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
+                        TotalPrice = captured ? p.CapturedTotal ?? (effectivePrice * p.Quantity) : effectivePrice * p.Quantity,
+                        IsPriceCaptured = p.IsPriceCaptured,
+                        CapturedUnitPrice = p.CapturedUnitPrice,
+                        CapturedCurrency = p.CapturedCurrency,
+                        CapturedTotal = p.CapturedTotal
                     };
                 })
                 .ToList();
@@ -3637,9 +3760,7 @@ namespace Business.Services.Qnb
                         ? (p.CapturedUnitPrice ?? 0m)
                         : p.GetEffectivePrice();
 
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                    string? currency = captured ? p.CapturedCurrency : p.GetEffectivePriceWithCurrency().CurrencyCode;
 
                     return new QnbServicesRequestProductGetDto
                     {
