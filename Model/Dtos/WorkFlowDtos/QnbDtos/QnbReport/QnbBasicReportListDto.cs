@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
@@ -99,8 +100,11 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public double? TechnicalServiceDurationMinutes { get; set; }
 
         public PricingStatus? PricingStatus { get; set; }
-        public decimal? PricingTotalAmount { get; set; }
-        public string? Currency { get; set; }
+    
+
+        public decimal PricingTotalAmountUsd { get; set; }
+        public decimal PricingTotalAmountEur { get; set; }
+        public decimal PricingTotalAmountTry { get; set; }
 
         public FinalApprovalStatus? FinalApprovalStatus { get; set; }
         public decimal? DiscountPercent { get; set; }
@@ -109,5 +113,6 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
 
         public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
+        public List<QnbServicesRequestProductGetDto> Products { get; set; } = new();
     }
 }

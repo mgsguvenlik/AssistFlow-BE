@@ -1,4 +1,5 @@
 ﻿using Core.Enums;
+using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,8 +88,11 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public double? TechnicalServiceDurationMinutes { get; set; }
 
         public PricingStatus? PricingStatus { get; set; }
-        public decimal? PricingTotalAmount { get; set; }
-        public string? Currency { get; set; }
+   
+
+        public decimal PricingTotalAmountUsd { get; set; }
+        public decimal PricingTotalAmountEur { get; set; }
+        public decimal PricingTotalAmountTry { get; set; }
 
         public FinalApprovalStatus? FinalApprovalStatus { get; set; }
         public string? FinalApprovalNotes { get; set; }
@@ -97,5 +101,7 @@ namespace Model.Dtos.WorkFlowDtos.Report
         public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
 
         public DateTimeOffset LastActivityDate => UpdatedDate ?? CreatedDate;
+
+        public List<ServicesRequestProductGetDto> Products { get; set; } = new();
     }
 }

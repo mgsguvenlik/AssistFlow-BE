@@ -23,7 +23,8 @@ namespace Model.Dtos.Dashboard
         // Finansal
         public decimal TotalServiceCostTL { get; set; }
         public decimal TotalServiceCostUSD { get; set; }
-        
+        public decimal TotalServiceCostEUR { get; set; }
+
         // Garanti Durumu
         public int InWarrantyCount { get; set; }
         public int OutOfWarrantyCount { get; set; }

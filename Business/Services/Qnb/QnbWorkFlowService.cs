@@ -1108,7 +1108,7 @@ namespace Business.Services.Qnb
                     {
                         RequestNo = dto.RequestNo,
                         Status = PricingStatus.Pending,
-                        Currency = "TRY",
+                        Currency = "TRY",///İşlevsiz
                         Notes = string.Empty,
                         TotalAmount = 0,
                         CreatedDate = DateTime.Now,
@@ -1120,7 +1120,7 @@ namespace Business.Services.Qnb
                 {
                     pricing.Status = PricingStatus.Pending;
                     pricing.RequestNo = dto.RequestNo;
-                    pricing.Currency = "TRY";
+                    pricing.Currency = "TRY"; ///İşlevsiz
                     pricing.UpdatedDate = DateTime.Now;
                     pricing.UpdatedUser = meId;
                     _uow.Repository.Update(pricing);
@@ -1145,29 +1145,7 @@ namespace Business.Services.Qnb
                     return okCt.Contains(contentType);
                 }
 
-                //async Task<string?> SaveAsync(IFormFile file, CancellationToken ct)
-                //{
-                //    if (file.Length <= 0) return null;
-                //    if (!IsAllowed(file.FileName, file.ContentType))
-                //        throw new InvalidOperationException($"Desteklenmeyen dosya türü: {file.FileName}");
 
-                //    var ext = Path.GetExtension(file.FileName);
-                //    var name = $"{Guid.NewGuid()}{ext}";
-                //    var path = Path.Combine(uploadRoot, name);
-
-                //    await using var read = file.OpenReadStream();
-                //    await using var write = new FileStream(
-                //        path,
-                //        FileMode.CreateNew,
-                //        FileAccess.Write,
-                //        FileShare.None,
-                //        bufferSize: 1024 * 64,
-                //        options: FileOptions.Asynchronous | FileOptions.SequentialScan
-                //    );
-                //    await read.CopyToAsync(write, 1024 * 64, ct);
-
-                //    return name;
-                //}
                 async Task<string?> SaveAsync(IFormFile file, CancellationToken cancellationToken)
                 {
                     if (file.Length <= 0)
@@ -1430,9 +1408,6 @@ namespace Business.Services.Qnb
                 }
                 #endregion
 
-                #region Ürün Fiyat Sabitleme (4. Adım)
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
-                #endregion
 
                 #region Son Onaya Gönderim
                 var finalApproval = await _uow.Repository
@@ -1501,6 +1476,11 @@ namespace Business.Services.Qnb
 
                 await _uow.Repository.CompleteAsync();
 
+
+
+                #region Ürün Fiyat Sabitleme (4. Adım)
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+                #endregion
                 #region Dosya Silme
                 attachmentsCommitted = true;
                 if (attachmentChangeSet is not null)
@@ -1708,11 +1688,6 @@ namespace Business.Services.Qnb
 
                 #endregion
 
-                #region Ürün Fiyat Sabitleme
-
-                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
-
-                #endregion  
 
                 #region FinalApproval Güncelleme
 
@@ -1808,6 +1783,9 @@ namespace Business.Services.Qnb
 
                 await _uow.Repository.CompleteAsync();
 
+
+
+
                 #region Dosya Silme
                 attachmentsCommitted = true;
                 if (attachmentChangeSet is not null)
@@ -1815,6 +1793,12 @@ namespace Business.Services.Qnb
                     await DeleteWorkflowAttachmentFilesAsync(attachmentChangeSet.OldStoredFileNames);
                 }
                 #endregion
+
+                #region Ürün Fiyat Sabitleme
+
+                await EnsurePricesCapturedFromDtoAsync(dto.RequestNo, dto.Products);
+
+                #endregion 
                 return await GetFinalApprovalByRequestNoAsync(dto.RequestNo);
             }
             catch (Exception ex)
@@ -2539,7 +2523,7 @@ namespace Business.Services.Qnb
                 .ToList();
 
 
-
+            //ÜRÜNLER 
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
@@ -2549,26 +2533,87 @@ namespace Business.Services.Qnb
                     Id = p.Id,
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
+
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductPrice = p.IsPriceCaptured ? (p.CapturedUnitPrice ?? 0m) : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
                     Quantity = p.Quantity,
-                    EffectivePrice =
-                        p.Customer.CustomerGroup.GroupProductPrices
+                    PriceCurrency = p.IsPriceCaptured ? p.CapturedCurrency
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
                             .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+                        ?? 0m,
+
+                    TotalPrice = p.IsPriceCaptured
+                        ? (p.CapturedTotal
+                            ?? ((p.CapturedUnitPrice ?? 0m) * p.Quantity))
+
+                        : (
+                            p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => (decimal?)gp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.CustomerProductPrices
+                                .Where(cp => cp.ProductId == p.ProductId)
+                                .Select(cp => (decimal?)cp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.Tenant.TenantProductPrices
+                                .Where(tp => tp.ProductId == p.ProductId)
+                                .Select(tp => (decimal?)tp.Price)
+                                .FirstOrDefault()
+
+                            ?? (decimal?)p.Product.Price
+                            ?? 0m
+                        ) * p.Quantity,
+
+                    IsPriceCaptured = p.IsPriceCaptured,
+                    CapturedUnitPrice = p.CapturedUnitPrice,
+                    CapturedCurrency = p.CapturedCurrency,
+                    CapturedTotal = p.CapturedTotal
                 })
                 .ToListAsync();
 
@@ -2726,35 +2771,97 @@ namespace Business.Services.Qnb
                     .FirstOrDefaultAsync() ?? new CustomerGroupGetDto();
             }
 
+            //ÜRÜNLER 
             baseDto.ServicesRequestProducts = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
-                .Where(p => p.RequestNo == requestNo)
+                .Where(p => p.RequestNo == baseDto.RequestNo)
                 .Select(p => new QnbServicesRequestProductGetDto
                 {
                     Id = p.Id,
                     RequestNo = p.RequestNo,
                     ProductId = p.ProductId,
+
                     ProductName = p.Product != null ? p.Product.Description : null,
                     ProductCode = p.Product != null ? p.Product.ProductCode : null,
-                    ProductPrice = (p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m,
-                    PriceCurrency = p.Product.PriceCurrency,
+                    ProductPrice = p.IsPriceCaptured ? (p.CapturedUnitPrice ?? 0m) : ((p.Product != null ? (decimal?)p.Product.Price : null) ?? 0m),
                     Quantity = p.Quantity,
-                    EffectivePrice =
-                        p.Customer.CustomerGroup.GroupProductPrices
+                    PriceCurrency = p.IsPriceCaptured ? p.CapturedCurrency
+                        : p.Customer.CustomerGroup.GroupProductPrices
+                            .Any(gp => gp.ProductId == p.ProductId)
+
+                            ? p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => gp.CurrencyCode)
+                                .FirstOrDefault()
+
+                            : p.Customer.CustomerProductPrices
+                                .Any(cp => cp.ProductId == p.ProductId)
+
+                                ? p.Customer.CustomerProductPrices
+                                    .Where(cp => cp.ProductId == p.ProductId)
+                                    .Select(cp => cp.CurrencyCode)
+                                    .FirstOrDefault()
+
+                                : p.Customer.Tenant.TenantProductPrices
+                                    .Any(tp => tp.ProductId == p.ProductId)
+
+                                    ? p.Customer.Tenant.TenantProductPrices
+                                        .Where(tp => tp.ProductId == p.ProductId)
+                                        .Select(tp => tp.CurrencyCode)
+                                        .FirstOrDefault()
+
+                                    : p.Product.PriceCurrency,
+
+                    EffectivePrice = p.IsPriceCaptured
+                        ? (p.CapturedUnitPrice ?? 0m)
+
+                        : p.Customer.CustomerGroup.GroupProductPrices
                             .Where(gp => gp.ProductId == p.ProductId)
                             .Select(gp => (decimal?)gp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.CustomerProductPrices
                             .Where(cp => cp.ProductId == p.ProductId)
                             .Select(cp => (decimal?)cp.Price)
                             .FirstOrDefault()
+
                         ?? p.Customer.Tenant.TenantProductPrices
                             .Where(tp => tp.ProductId == p.ProductId)
                             .Select(tp => (decimal?)tp.Price)
                             .FirstOrDefault()
+
                         ?? (decimal?)p.Product.Price
-                        ?? 0m
+                        ?? 0m,
+
+                    TotalPrice = p.IsPriceCaptured
+                        ? (p.CapturedTotal
+                            ?? ((p.CapturedUnitPrice ?? 0m) * p.Quantity))
+
+                        : (
+                            p.Customer.CustomerGroup.GroupProductPrices
+                                .Where(gp => gp.ProductId == p.ProductId)
+                                .Select(gp => (decimal?)gp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.CustomerProductPrices
+                                .Where(cp => cp.ProductId == p.ProductId)
+                                .Select(cp => (decimal?)cp.Price)
+                                .FirstOrDefault()
+
+                            ?? p.Customer.Tenant.TenantProductPrices
+                                .Where(tp => tp.ProductId == p.ProductId)
+                                .Select(tp => (decimal?)tp.Price)
+                                .FirstOrDefault()
+
+                            ?? (decimal?)p.Product.Price
+                            ?? 0m
+                        ) * p.Quantity,
+
+                    IsPriceCaptured = p.IsPriceCaptured,
+                    CapturedUnitPrice = p.CapturedUnitPrice,
+                    CapturedCurrency = p.CapturedCurrency,
+                    CapturedTotal = p.CapturedTotal
                 })
                 .ToListAsync();
 
@@ -3185,19 +3292,6 @@ namespace Business.Services.Qnb
         {
             var query = _uow.Repository.GetQueryable<QnbTechnicalService>();
 
-            //var dto = await query
-            //    .AsNoTracking()
-            //    .Where(x => x.RequestNo == requestNo)
-            //    .AsSplitQuery()
-            //    .Include(x => x.QnbServiceRequestFormImages)
-            //    .Include(x => x.QnbServicesImages)
-            //    .Include(x => x.ServiceType)
-            //    .ProjectToType<QnbTechnicalServiceGetDto>(_config)
-            //    .FirstOrDefaultAsync();
-
-            //if (dto is null)
-            //    return ResponseModel<QnbTechnicalServiceGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
-
 
             // HEADER (mevcut mapster config'ine göre)
             var entity = await query
@@ -3550,31 +3644,40 @@ namespace Business.Services.Qnb
 
             //Ürünler 
             var productEntities = await _uow.Repository
-                .GetQueryable<QnbServicesRequestProduct>()
-                .AsNoTracking()
-                .Include(p => p.Product)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.Tenant)
-                        .ThenInclude(t => t.TenantProductPrices)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerGroup)
-                        .ThenInclude(g => g.GroupProductPrices)
-                .Include(p => p.Customer)
-                    .ThenInclude(c => c.CustomerProductPrices)
-                .Where(p => p.RequestNo == dto.RequestNo)
-                .ToListAsync();
+                  .GetQueryable<QnbServicesRequestProduct>()
+                  .AsNoTracking()
+                  .Include(p => p.Product)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.Tenant)
+                          .ThenInclude(t => t.TenantProductPrices)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.CustomerGroup)
+                          .ThenInclude(g => g.GroupProductPrices)
+                  .Include(p => p.Customer)
+                      .ThenInclude(c => c.CustomerProductPrices)
+                  .Where(p => p.RequestNo == dto.RequestNo)
+                  .ToListAsync();
 
             dto.Products = productEntities
                 .Select(p =>
                 {
                     bool captured = p.IsPriceCaptured;
+
                     decimal effectivePrice = captured
                         ? (p.CapturedUnitPrice ?? 0m)
                         : p.GetEffectivePrice();
 
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                    string? currency;
+
+                    if (captured)
+                    {
+                        currency = p.CapturedCurrency;
+                    }
+                    else
+                    {
+                        var effectivePriceInfo = p.GetEffectivePriceWithCurrency();
+                        currency = effectivePriceInfo.CurrencyCode;
+                    }
 
                     return new QnbServicesRequestProductGetDto
                     {
@@ -3587,7 +3690,11 @@ namespace Business.Services.Qnb
                         PriceCurrency = currency,
                         ProductPrice = effectivePrice,
                         EffectivePrice = effectivePrice,
-                        TotalPrice = effectivePrice * p.Quantity
+                        TotalPrice = captured ? p.CapturedTotal ?? (effectivePrice * p.Quantity) : effectivePrice * p.Quantity,
+                        IsPriceCaptured = p.IsPriceCaptured,
+                        CapturedUnitPrice = p.CapturedUnitPrice,
+                        CapturedCurrency = p.CapturedCurrency,
+                        CapturedTotal = p.CapturedTotal
                     };
                 })
                 .ToList();
@@ -3653,9 +3760,7 @@ namespace Business.Services.Qnb
                         ? (p.CapturedUnitPrice ?? 0m)
                         : p.GetEffectivePrice();
 
-                    string? currency = captured
-                        ? (p.CapturedCurrency ?? p.Product?.PriceCurrency)
-                        : p.Product?.PriceCurrency;
+                    string? currency = captured ? p.CapturedCurrency : p.GetEffectivePriceWithCurrency().CurrencyCode;
 
                     return new QnbServicesRequestProductGetDto
                     {
@@ -4525,10 +4630,16 @@ namespace Business.Services.Qnb
                         ServiceOracleNo = r.ServiceOracleNo,
                         WorkOrder = r.WorkOrder,
                         Quantity = r.Quantity,
+
                         LineUnitPriceTL = r.LineUnitPriceTL,
                         LineTotalTL = r.LineTotalTL,
+
                         LineUnitPriceUSD = r.LineUnitPriceUSD,
                         LineTotalUSD = r.LineTotalUSD,
+
+                        LineUnitPriceEUR = r.LineUnitPriceEUR,
+                        LineTotalEUR = r.LineTotalEUR,
+
                         GLCode = r.GLCode,
                         MGSDescription = r.MGSDescription,
                         ContractNo = r.Contract_No,
@@ -4591,10 +4702,16 @@ namespace Business.Services.Qnb
                 ws.Cell(1, c++).Value = "Servis Oracle No";
                 ws.Cell(1, c++).Value = "İş Emri";
                 ws.Cell(1, c++).Value = "Hakediş Adet";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (TL)";
                 ws.Cell(1, c++).Value = "Satır Toplam (TL)";
+
                 ws.Cell(1, c++).Value = "Satır Birim Fiyat (USD)";
                 ws.Cell(1, c++).Value = "Satır Toplam (USD)";
+
+                ws.Cell(1, c++).Value = "Satır Birim Fiyat (EUR)";
+                ws.Cell(1, c++).Value = "Satır Toplam (EUR)";
+
                 ws.Cell(1, c++).Value = "GL Kodu";
                 ws.Cell(1, c++).Value = "MGS Açıklama";
                 ws.Cell(1, c++).Value = "Sözleşme No";
@@ -4641,6 +4758,15 @@ namespace Business.Services.Qnb
                     var tTL = ws.Cell(r, c++); tTL.Value = x.LineTotalTL; tTL.Style.NumberFormat.Format = "#,##0.00";
                     var uUS = ws.Cell(r, c++); uUS.Value = x.LineUnitPriceUSD; uUS.Style.NumberFormat.Format = "#,##0.00";
                     var tUS = ws.Cell(r, c++); tUS.Value = x.LineTotalUSD; tUS.Style.NumberFormat.Format = "#,##0.00";
+
+                    var uEUR = ws.Cell(r, c++);
+                    uEUR.Value = x.LineUnitPriceEUR;
+                    uEUR.Style.NumberFormat.Format = "#,##0.00";
+
+                    var tEUR = ws.Cell(r, c++);
+                    tEUR.Value = x.LineTotalEUR;
+                    tEUR.Style.NumberFormat.Format = "#,##0.00";
+
 
                     ws.Cell(r, c++).Value = x.GLCode;
                     ws.Cell(r, c++).Value = x.MGSDescription;
@@ -5180,6 +5306,79 @@ namespace Business.Services.Qnb
                     );
                 }
 
+                // -------------------------
+                // Ürünler
+                // -------------------------
+
+                var products = await _uow.Repository
+                    .GetQueryable<QnbServicesRequestProduct>()
+                    .AsNoTracking()
+                    .Include(p => p.Product)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.CustomerGroup)
+                            .ThenInclude(g => g.GroupProductPrices)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.CustomerProductPrices)
+                    .Include(p => p.Customer)
+                        .ThenInclude(c => c.Tenant)
+                            .ThenInclude(t => t.TenantProductPrices)
+                    .Where(p => requestNos.Contains(p.RequestNo))
+                    .AsSplitQuery()
+                    .ToListAsync();
+
+                var productTotalDict = products
+                    .GroupBy(p => p.RequestNo)
+                    .ToDictionary(
+                        group => group.Key,
+                        group =>
+                        {
+                            decimal totalUsd = 0m;
+                            decimal totalTry = 0m;
+                            decimal totalEur = 0m;
+
+                            foreach (var productItem in group)
+                            {
+                                var useCapturedPrice =
+                                    productItem.IsPriceCaptured &&
+                                    productItem.CapturedTotal.HasValue;
+
+                                var total = useCapturedPrice
+                                    ? productItem.CapturedTotal!.Value
+                                    : productItem.GetEffectivePrice() * productItem.Quantity;
+
+                                var currency = useCapturedPrice
+                                    ? productItem.CapturedCurrency
+                                    : productItem.Product?.PriceCurrency;
+
+                                switch (currency?.Trim().ToUpperInvariant())
+                                {
+                                    case "USD":
+                                        totalUsd += total;
+                                        break;
+
+                                    case "EUR":
+                                    case "€":
+                                        totalEur += total;
+                                        break;
+
+                                    case "TRY":
+                                    case "TL":
+                                    case "₺":
+                                        totalTry += total;
+                                        break;
+                                }
+                            }
+
+                            return new
+                            {
+                                TotalUsd = totalUsd,
+                                TotalEur = totalEur,
+                                TotalTry = totalTry
+                            };
+                        });
+
+
+
                 var servicesRequests = await srQuery
                     .Where(sr => requestNos.Contains(sr.RequestNo))
                     .Select(sr => new
@@ -5324,6 +5523,44 @@ namespace Business.Services.Qnb
                     .GroupBy(x => x.Id)
                     .ToDictionary(x => x.Key, x => x.First());
 
+                var productDict = products
+                    .GroupBy(p => p.RequestNo)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(p =>
+                        {
+                            var captured = p.IsPriceCaptured;
+
+                            var effectivePrice = captured
+                                ? p.CapturedUnitPrice ?? 0m
+                                : p.GetEffectivePrice();
+
+                            var currency = captured
+                                ? p.CapturedCurrency ?? p.Product?.PriceCurrency ?? "TRY"
+                                : p.Product?.PriceCurrency ?? "TRY";
+
+                            var totalPrice = captured
+                                ? p.CapturedTotal ?? (effectivePrice * p.Quantity)
+                                : effectivePrice * p.Quantity;
+
+                            return new QnbServicesRequestProductGetDto
+                            {
+                                Id = p.Id,
+                                RequestNo = p.RequestNo,
+                                ProductId = p.ProductId,
+                                Quantity = p.Quantity,
+
+                                ProductName = p.Product?.Description,
+                                ProductCode = p.Product?.ProductCode,
+
+                                PriceCurrency = currency,
+                                ProductPrice = effectivePrice,
+                                EffectivePrice = effectivePrice,
+                                TotalPrice = totalPrice
+                            };
+                        }).ToList()
+                    );
+
                 var items = workflows.Select(w =>
                 {
                     srDict.TryGetValue(w.RequestNo, out var sr);
@@ -5331,7 +5568,7 @@ namespace Business.Services.Qnb
                     tsDict.TryGetValue(w.RequestNo, out var ts);
                     pricingDict.TryGetValue(w.RequestNo, out var pricing);
                     finalApprovalDict.TryGetValue(w.RequestNo, out var finalApproval);
-
+                    productTotalDict.TryGetValue(w.RequestNo, out var productTotals);
                     userDict.TryGetValue(w.CreatedUser, out var createdUser);
 
                     var technician = w.ApproverTechnicianId.HasValue &&
@@ -5404,14 +5641,17 @@ namespace Business.Services.Qnb
                         TechnicalServiceDurationMinutes = durationMinutes,
 
                         PricingStatus = pricing?.Status,
-                        PricingTotalAmount = pricing?.TotalAmount,
-                        Currency = pricing?.Currency,
+                        PricingTotalAmountUsd = productTotals?.TotalUsd ?? 0m,
+                        PricingTotalAmountEur = productTotals?.TotalEur ?? 0m,
+                        PricingTotalAmountTry = productTotals?.TotalTry ?? 0m,
 
                         FinalApprovalStatus = finalApproval?.Status,
                         FinalApprovalNotes = finalApproval?.Notes,
                         DiscountPercent = finalApproval?.DiscountPercent,
 
-                        WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList) ? qnbWotList : new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>()
+                        WorkOrderTypes = qnbWotDict.TryGetValue(w.RequestNo, out var qnbWotList) ? qnbWotList : new List<Model.Dtos.WorkFlowDtos.Report.WorkOrderTypeLiteDto>(),
+                        Products = productDict.TryGetValue(w.RequestNo, out var productList) ? productList : new List<QnbServicesRequestProductGetDto>()
+
                     };
                 }).ToList();
 
@@ -5500,10 +5740,20 @@ namespace Business.Services.Qnb
 
                 foreach (var ws in workbook.Worksheets)
                 {
-                    var lastRowForWidth = Math.Min(ws.LastRowUsed()?.RowNumber() ?? 1, 100);
-                    ws.Columns(1, 54).AdjustToContents(1, lastRowForWidth);
+                    var lastRowForWidth = Math.Min(
+                        ws.LastRowUsed()?.RowNumber() ?? 1,
+                        100);
+
+                    var lastColumn = ws.LastColumnUsed()?.ColumnNumber() ?? 1;
+
+                    ws.Columns(1, lastColumn)
+                        .AdjustToContents(1, lastRowForWidth);
+
                     ws.SheetView.FreezeRows(1);
-                    ws.Range(1, 1, 1, 54).SetAutoFilter();
+
+                    ws.Range(1, 1, 1, lastColumn)
+                        .SetAutoFilter();
+
                     ws.Columns().Style.Alignment.Vertical =
                         XLAlignmentVerticalValues.Center;
                 }
@@ -5570,6 +5820,8 @@ namespace Business.Services.Qnb
                  "Servis Türü",
                  "İş Emri Türleri",
 
+                 "Ürünler",
+
                  "Servis Talep Tarihi",
                  "Planlanan Tamamlanma Tarihi",
 
@@ -5589,8 +5841,11 @@ namespace Business.Services.Qnb
                  "Teknik Servis Süresi (Dakika)",
 
                  "Fiyatlandırma Durumu",
-                 "Fiyatlandırma Toplam Tutar",
-                 "Para Birimi",
+
+                 "Fiyatlandırma Toplam Tutar (USD)",
+                 "Fiyatlandırma Toplam Tutar (EUR)",
+                 "Fiyatlandırma Toplam Tutar (TL)",
+
 
                  "Son Onay Durumu",
                  "İndirim Oranı",
@@ -5662,7 +5917,13 @@ namespace Business.Services.Qnb
 
             ws.Cell(row, c++).Value = FormatWorkOrderTypes(x.WorkOrderTypes);
 
+            // Ürünler
+            var productsCell = ws.Cell(row, c++);
+            productsCell.Value = FormatQnbProducts(x.Products);
+            productsCell.Style.Alignment.WrapText = true;
+
             SetDateTime(ws.Cell(row, c++), x.ServicesDate);
+
             SetDateTime(ws.Cell(row, c++), x.PlannedCompletionDate);
 
             ws.Cell(row, c++).Value = BoolText(x.IsAgreement);
@@ -5681,11 +5942,25 @@ namespace Business.Services.Qnb
             SetDouble(ws.Cell(row, c++), x.TechnicalServiceDurationMinutes, "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.PricingStatus);
-            SetDecimal(ws.Cell(row, c++), x.PricingTotalAmount, "#,##0.00");
-            ws.Cell(row, c++).Value = x.Currency ?? string.Empty;
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountUsd,
+                "#,##0.00");
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountEur,
+                "#,##0.00");
+
+            SetDecimal(
+                ws.Cell(row, c++),
+                x.PricingTotalAmountTry,
+                "#,##0.00");
 
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
-            SetDecimal(ws.Cell(row, c++), x.DiscountPercent, "0.00%");
+            SetDecimal(ws.Cell(row, c++), x.DiscountPercent.HasValue ? x.DiscountPercent.Value / 100m : null, "0.00%");
+
             ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
 
             var notesColumn = c - 1;
@@ -5694,6 +5969,33 @@ namespace Business.Services.Qnb
 
             // Uzun not alanı için satır taşması.
             ws.Cell(row, notesColumn).Style.Alignment.WrapText = true;
+        }
+
+        private static string FormatQnbProducts(List<QnbServicesRequestProductGetDto>? products)
+        {
+            if (products is null || products.Count == 0)
+                return string.Empty;
+
+            return string.Join(
+                Environment.NewLine,
+                products.Select(p =>
+                {
+                    var product =
+                        !string.IsNullOrWhiteSpace(p.ProductCode) &&
+                        !string.IsNullOrWhiteSpace(p.ProductName)
+                            ? $"{p.ProductCode} - {p.ProductName}"
+                            : p.ProductName
+                              ?? p.ProductCode
+                              ?? $"Ürün Id: {p.ProductId}";
+
+                    var currency = p.PriceCurrency ?? string.Empty;
+
+                    return
+                        $"{product} | " +
+                        $"Miktar: {p.Quantity} | " +
+                        $"Birim Fiyat: {p.EffectivePrice:N2} {currency} | " +
+                        $"Toplam: {p.TotalPrice:N2} {currency}";
+                }));
         }
 
         private static void SetNullableLong(IXLCell cell, long? value)
@@ -6449,9 +6751,7 @@ namespace Business.Services.Qnb
         }
 
         // ------------------------ Ürün fiyat sabitleme ------------------------
-        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(
-            string requestNo,
-            IEnumerable<QnbServicesRequestProductCreateDto>? productsDto)
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync_(string requestNo, IEnumerable<QnbServicesRequestProductCreateDto>? productsDto)
         {
             var dtoDict = (productsDto ?? Enumerable.Empty<QnbServicesRequestProductCreateDto>())
                 .ToDictionary(x => x.ProductId, x => x);
@@ -6490,6 +6790,92 @@ namespace Business.Services.Qnb
             return ResponseModel.Success();
         }
 
+        private async Task<ResponseModel> EnsurePricesCapturedFromDtoAsync(string requestNo, IEnumerable<QnbServicesRequestProductCreateDto>? productsDto)
+        {
+            var dtoDict = (productsDto ??
+                           Enumerable.Empty<QnbServicesRequestProductCreateDto>())
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.First());
+
+            if (dtoDict.Count == 0)
+                return ResponseModel.Success();
+
+            var list = await _uow.Repository
+                .GetQueryable<QnbServicesRequestProduct>()
+                .Include(x => x.Product)
+                .Include(x => x.Customer)
+                    .ThenInclude(x => x.Tenant)
+                        .ThenInclude(x => x.TenantProductPrices)
+                .Where(x => x.RequestNo == requestNo)
+                .AsSplitQuery()
+                .ToListAsync();
+
+            if (list.Count == 0)
+                return ResponseModel.Success();
+
+            foreach (var p in list)
+            {
+                if (!dtoDict.TryGetValue(p.ProductId, out var dtoItem))
+                    continue;
+
+                var unit = dtoItem.Price;
+
+                /*
+                 * Currency önceliği:
+                 *
+                 * 1. Product.PriceCurrency
+                 * 2. Customer -> Tenant -> TenantProductPrice.CurrencyCode
+                 * 3. İkisi de yoksa hata
+                 */
+                var currency = p.Product?.PriceCurrency?.Trim();
+
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    currency = p.Customer?
+                        .Tenant?
+                        .TenantProductPrices
+                        .FirstOrDefault(x =>
+                            x.ProductId == p.ProductId &&
+                            !x.IsDeleted)?
+                        .CurrencyCode?
+                        .Trim();
+                }
+
+                if (string.IsNullOrWhiteSpace(currency))
+                {
+                    return ResponseModel.Fail(
+                        $"Ürün para birimi belirlenemedi. " +
+                        $"RequestNo: {requestNo}, " +
+                        $"ProductId: {p.ProductId}. " +
+                        $"Product.PriceCurrency ve TenantProductPrice.CurrencyCode alanlarını kontrol ediniz.",
+                        StatusCode.BadRequest);
+                }
+
+                var total = unit * p.Quantity;
+
+                /*
+                 * Fiyat DTO'dan geldiği için CapturedSource Standard
+                 * olarak kalıyor.
+                 *
+                 * TenantProductPrice burada sadece currency fallback'i
+                 * olarak kullanılıyor.
+                 */
+                p.CapturedSource = CapturedPriceSource.Standard;
+                p.CapturedUnitPrice = unit;
+                p.CapturedCurrency = currency;
+                p.CapturedTotal = total;
+                p.CapturedAt = DateTime.Now;
+                p.IsPriceCaptured = true;
+
+                _uow.Repository.Update(p);
+            }
+
+            await _uow.Repository.CompleteAsync();
+
+            return ResponseModel.Success();
+        }
 
         //Manitou Test Zone ile ilgili işlemler 
         public async Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto)
@@ -8016,463 +8402,6 @@ namespace Business.Services.Qnb
                 : $".{extension}";
         }
 
-
-        ////Fiyatlama ve onay ekranında dosya ekleme silme işlemleri 
-        //private sealed class WorkflowAttachmentChangeSet
-        //{
-        //    public List<string> NewStoredFileNames { get; } = new();
-
-        //    public List<string> OldStoredFileNames { get; } = new();
-        //}
-
-        //private sealed class WorkflowAttachmentSettings
-        //{
-        //    public int MaxFileCount { get; init; }
-
-        //    public long MaxFileSizeMb { get; init; }
-
-        //    public long MaxFileSizeBytes { get; init; }
-
-        //    public HashSet<string> AllowedExtensions { get; init; }
-        //        = new(StringComparer.OrdinalIgnoreCase);
-        //}
-        //private static void ValidateWorkflowAttachment(IFormFile file, WorkflowAttachmentSettings settings)
-        //{
-        //    if (file is null || file.Length <= 0)
-        //        throw new InvalidDataException("Boş dosya yüklenemez.");
-
-        //    if (file.Length > settings.MaxFileSizeBytes)
-        //    {
-        //        throw new InvalidDataException(
-        //            $"{Path.GetFileName(file.FileName)} dosyası " +
-        //            $"{settings.MaxFileSizeMb} MB sınırını aşamaz.");
-        //    }
-
-        //    var originalFileName =
-        //        Path.GetFileName(file.FileName);
-
-        //    if (string.IsNullOrWhiteSpace(originalFileName))
-        //        throw new InvalidDataException("Dosya adı geçersiz.");
-
-        //    var extension = NormalizeFileExtension(
-        //        Path.GetExtension(originalFileName));
-
-        //    if (string.IsNullOrWhiteSpace(extension) ||
-        //        !settings.AllowedExtensions.Contains(extension))
-        //    {
-        //        var allowedExtensionText = string.Join(
-        //            ", ",
-        //            settings.AllowedExtensions.OrderBy(x => x));
-
-        //        throw new InvalidDataException(
-        //            $"Desteklenmeyen dosya türü: {originalFileName}. " +
-        //            $"Desteklenen türler: {allowedExtensionText}");
-        //    }
-        //}
-        //private static string GetWorkflowAttachmentUploadRoot()
-        //{
-        //    var uploadRoot = Path.Combine(
-        //        Directory.GetCurrentDirectory(),
-        //        "UploadsStorage");
-
-        //    Directory.CreateDirectory(uploadRoot);
-
-        //    return uploadRoot;
-        //}
-
-        //private static async Task<string> SaveWorkflowAttachmentAsync(IFormFile file, CancellationToken cancellationToken)
-        //{
-        //    var extension = NormalizeFileExtension(
-        //        Path.GetExtension(file.FileName));
-
-        //    var storedFileName =
-        //        $"{Guid.NewGuid():N}{extension}";
-
-        //    var physicalPath = Path.Combine(
-        //        GetWorkflowAttachmentUploadRoot(),
-        //        storedFileName);
-
-        //    await using var inputStream =
-        //        file.OpenReadStream();
-
-        //    await using var outputStream = new FileStream(
-        //        physicalPath,
-        //        FileMode.CreateNew,
-        //        FileAccess.Write,
-        //        FileShare.None,
-        //        bufferSize: 1024 * 64,
-        //        options:
-        //            FileOptions.Asynchronous |
-        //            FileOptions.SequentialScan);
-
-        //    await inputStream.CopyToAsync(
-        //        outputStream,
-        //        1024 * 64,
-        //        cancellationToken);
-
-        //    return storedFileName;
-        //}
-        //private void DeleteWorkflowAttachmentPhysicalFiles(IEnumerable<string> storedFileNames)
-        //{
-        //    var uploadRoot =
-        //        GetWorkflowAttachmentUploadRoot();
-
-        //    foreach (var storedFileName in storedFileNames
-        //                 .Where(x => !string.IsNullOrWhiteSpace(x))
-        //                 .Distinct())
-        //    {
-        //        try
-        //        {
-        //            var safeFileName =
-        //                Path.GetFileName(storedFileName);
-
-        //            var physicalPath = Path.Combine(
-        //                uploadRoot,
-        //                safeFileName);
-
-        //            if (File.Exists(physicalPath))
-        //                File.Delete(physicalPath);
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            _logger.LogWarning(
-        //                ex,
-        //                "QNB akış dosyası fiziksel olarak silinemedi. " +
-        //                "FileName: {FileName}",
-        //                storedFileName);
-        //        }
-        //    }
-        //}
-        //private async Task<WorkflowAttachmentChangeSet> ApplyWorkflowAttachmentChangesAsync(
-        //        string requestNo,
-        //        IEnumerable<IFormFile>? attachments,
-        //        IEnumerable<long>? deletedAttachmentIds,
-        //        IEnumerable<QnbWorkflowAttachmentReplaceDto>?
-        //            replacedAttachments,
-        //        string stepCode,
-        //        CancellationToken cancellationToken = default)
-        //{
-        //    if (stepCode is not ("PRC" or "APR"))
-        //    {
-        //        throw new InvalidDataException(
-        //            "Dosya değişikliği yalnızca PRC veya APR adımında yapılabilir.");
-        //    }
-
-        //    var settings =
-        //        await GetWorkflowAttachmentSettings();
-
-        //    var newFiles = attachments?
-        //        .Where(x => x is not null && x.Length > 0)
-        //        .ToList() ?? new List<IFormFile>();
-
-        //    var deleteIds = deletedAttachmentIds?
-        //        .Where(x => x > 0)
-        //        .Distinct()
-        //        .ToHashSet() ?? new HashSet<long>();
-
-        //    var replacements = replacedAttachments?
-        //        .Where(x =>
-        //            x is not null &&
-        //            x.AttachmentId > 0 &&
-        //            x.File is not null)
-        //        .GroupBy(x => x.AttachmentId)
-        //        .Select(x => x.First())
-        //        .ToList()
-        //        ?? new List<QnbWorkflowAttachmentReplaceDto>();
-
-        //    foreach (var file in newFiles)
-        //        ValidateWorkflowAttachment(file, settings);
-
-        //    foreach (var replacement in replacements)
-        //        ValidateWorkflowAttachment(replacement.File, settings);
-
-        //    var replacementIds = replacements
-        //        .Select(x => x.AttachmentId)
-        //        .ToHashSet();
-
-        //    if (deleteIds.Overlaps(replacementIds))
-        //    {
-        //        throw new InvalidDataException(
-        //            "Aynı dosya hem silme hem değiştirme listesinde bulunamaz.");
-        //    }
-
-        //    var existingAttachments = await _uow.Repository
-        //        .GetQueryable<QnbWorkflowAttachment>()
-        //        .Where(x => x.RequestNo == requestNo)
-        //        .ToListAsync(cancellationToken);
-
-        //    var existingIds = existingAttachments
-        //        .Select(x => x.Id)
-        //        .ToHashSet();
-
-        //    var requestedIds = deleteIds
-        //        .Concat(replacementIds)
-        //        .ToHashSet();
-
-        //    if (requestedIds.Except(existingIds).Any())
-        //    {
-        //        throw new InvalidDataException(
-        //            "Silinmek veya değiştirilmek istenen dosyalardan biri bulunamadı.");
-        //    }
-
-        //    var finalAttachmentCount =
-        //        existingAttachments.Count -
-        //        deleteIds.Count +
-        //        newFiles.Count;
-
-        //    if (finalAttachmentCount > settings.MaxFileCount)
-        //    {
-        //        throw new InvalidDataException(
-        //            $"Bir talebe en fazla " +
-        //            $"{settings.MaxFileCount} adet dosya eklenebilir.");
-        //    }
-
-        //    var changeSet =
-        //        new WorkflowAttachmentChangeSet();
-
-        //    try
-        //    {
-        //        foreach (var replacement in replacements)
-        //        {
-        //            var entity = existingAttachments.First(
-        //                x => x.Id ==
-        //                     replacement.AttachmentId);
-
-        //            var newStoredFileName =
-        //                await SaveWorkflowAttachmentAsync(
-        //                    replacement.File,
-        //                    cancellationToken);
-
-        //            changeSet.NewStoredFileNames.Add(
-        //                newStoredFileName);
-
-        //            changeSet.OldStoredFileNames.Add(
-        //                entity.StoredFileName);
-
-        //            entity.OriginalFileName =
-        //                Path.GetFileName(
-        //                    replacement.File.FileName);
-
-        //            entity.StoredFileName =
-        //                newStoredFileName;
-
-        //            entity.Extension =
-        //                NormalizeFileExtension(
-        //                    Path.GetExtension(
-        //                        replacement.File.FileName));
-
-        //            entity.ContentType =
-        //                string.IsNullOrWhiteSpace(
-        //                    replacement.File.ContentType)
-        //                    ? "application/octet-stream"
-        //                    : replacement.File.ContentType;
-
-        //            entity.SizeBytes =
-        //                replacement.File.Length;
-
-        //            entity.LastUpdatedStepCode =
-        //                stepCode;
-
-
-        //            _uow.Repository.Update(entity);
-        //        }
-
-        //        foreach (var file in newFiles)
-        //        {
-        //            var storedFileName =
-        //                await SaveWorkflowAttachmentAsync(
-        //                    file,
-        //                    cancellationToken);
-
-        //            changeSet.NewStoredFileNames.Add(
-        //                storedFileName);
-
-        //            await _uow.Repository.AddAsync(
-        //                new QnbWorkflowAttachment
-        //                {
-        //                    RequestNo = requestNo,
-        //                    OriginalFileName =
-        //                        Path.GetFileName(file.FileName),
-        //                    StoredFileName = storedFileName,
-        //                    Extension =
-        //                        NormalizeFileExtension(
-        //                            Path.GetExtension(
-        //                                file.FileName)),
-        //                    ContentType =
-        //                        string.IsNullOrWhiteSpace(
-        //                            file.ContentType)
-        //                            ? "application/octet-stream"
-        //                            : file.ContentType,
-        //                    SizeBytes = file.Length,
-        //                    UploadedStepCode = stepCode,
-        //                    LastUpdatedStepCode = stepCode,
-        //                });
-        //        }
-
-        //        foreach (var entity in existingAttachments
-        //                     .Where(x =>
-        //                         deleteIds.Contains(x.Id)))
-        //        {
-        //            changeSet.OldStoredFileNames.Add(
-        //                entity.StoredFileName);
-
-        //            _uow.Repository.HardDelete(entity);
-        //        }
-
-        //        return changeSet;
-        //    }
-        //    catch
-        //    {
-        //        DeleteWorkflowAttachmentPhysicalFiles(
-        //            changeSet.NewStoredFileNames);
-
-        //        throw;
-        //    }
-        //}
-        //private async Task<List<QnbWorkflowAttachmentGetDto>> GetWorkflowAttachmentsAsync(string requestNo, CancellationToken cancellationToken = default)
-        //{
-        //    var entities = await _uow.Repository
-        //        .GetQueryable<QnbWorkflowAttachment>()
-        //        .AsNoTracking()
-        //        .Where(x => x.RequestNo == requestNo)
-        //        .ToListAsync(cancellationToken);
-
-        //    var appSettings =
-        //        ServiceTool.ServiceProvider
-        //            .GetService<IOptionsSnapshot<AppSettings>>();
-
-        //    var baseUrl =
-        //        appSettings?.Value.FileUrl?.TrimEnd('/')
-        //        ?? string.Empty;
-
-        //    return entities.Select(x =>
-        //    {
-        //        var relativeUrl =
-        //            $"/uploads/{x.StoredFileName}";
-
-        //        return new QnbWorkflowAttachmentGetDto
-        //        {
-        //            Id = x.Id,
-        //            RequestNo = x.RequestNo,
-        //            OriginalFileName =
-        //                x.OriginalFileName,
-        //            ContentType = x.ContentType,
-        //            Extension = x.Extension,
-        //            SizeBytes = x.SizeBytes,
-        //            UploadedStepCode =
-        //                x.UploadedStepCode,
-        //            LastUpdatedStepCode =
-        //                x.LastUpdatedStepCode,
-        //            Url = string.IsNullOrWhiteSpace(baseUrl)
-        //                ? relativeUrl
-        //                : $"{baseUrl}{relativeUrl}"
-        //        };
-        //    }).ToList();
-        //}
-        //private async Task<WorkflowAttachmentSettings> GetWorkflowAttachmentSettings()
-        //{
-        //    var maxCountValue = await _uow.Repository
-        //        .GetQueryable<Configuration>()
-        //        .AsNoTracking()
-        //        .FirstOrDefaultAsync(
-        //            x => x.Name ==
-        //                 "MaxWorkflowAttachmentCount");
-
-        //    if (!int.TryParse(
-        //            maxCountValue?.Value?.Trim(),
-        //            NumberStyles.Integer,
-        //            CultureInfo.InvariantCulture,
-        //            out var maxFileCount) ||
-        //        maxFileCount <= 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "MaxWorkflowAttachmentCount parametresi " +
-        //            "pozitif bir tam sayı olmalıdır.");
-        //    }
-
-        //    var maxSizeValue = await _uow.Repository
-        //        .GetQueryable<Configuration>()
-        //        .AsNoTracking()
-        //        .FirstOrDefaultAsync(
-        //            x => x.Name ==
-        //                 "MaxWorkflowAttachmentSize");
-
-        //    if (!long.TryParse(
-        //            maxSizeValue?.Value?.Trim(),
-        //            NumberStyles.Integer,
-        //            CultureInfo.InvariantCulture,
-        //            out var maxFileSizeMb) ||
-        //        maxFileSizeMb <= 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "MaxWorkflowAttachmentSize parametresi " +
-        //            "pozitif bir tam sayı olmalıdır.");
-        //    }
-
-        //    var allowedExtensionsValue =
-        //        await _uow.Repository
-        //            .GetQueryable<Configuration>()
-        //            .AsNoTracking()
-        //            .FirstOrDefaultAsync(
-        //                x => x.Name ==
-        //                     "AllowedWorkflowAttachmentExtensions");
-
-        //    var allowedExtensions =
-        //        (allowedExtensionsValue?.Value ??
-        //         string.Empty)
-        //        .Split(
-        //            new[] { ';', ',' },
-        //            StringSplitOptions.RemoveEmptyEntries |
-        //            StringSplitOptions.TrimEntries)
-        //        .Select(NormalizeFileExtension)
-        //        .Where(x => !string.IsNullOrWhiteSpace(x))
-        //        .ToHashSet(
-        //            StringComparer.OrdinalIgnoreCase);
-
-        //    if (allowedExtensions.Count == 0)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "AllowedWorkflowAttachmentExtensions " +
-        //            "parametresinde en az bir dosya uzantısı tanımlanmalıdır.");
-        //    }
-
-        //    long maxFileSizeBytes;
-
-        //    try
-        //    {
-        //        maxFileSizeBytes = checked(
-        //            maxFileSizeMb * 1024L * 1024L);
-        //    }
-        //    catch (OverflowException)
-        //    {
-        //        throw new InvalidOperationException(
-        //            "Dosya boyutu parametresi desteklenen " +
-        //            "sınırların üzerindedir.");
-        //    }
-
-        //    return new WorkflowAttachmentSettings
-        //    {
-        //        MaxFileCount = maxFileCount,
-        //        MaxFileSizeMb = maxFileSizeMb,
-        //        MaxFileSizeBytes = maxFileSizeBytes,
-        //        AllowedExtensions = allowedExtensions
-        //    };
-        //}
-
-        //private static string NormalizeFileExtension(
-        //   string extension)
-        //{
-        //    extension = extension
-        //        .Trim()
-        //        .ToLowerInvariant();
-
-        //    if (string.IsNullOrWhiteSpace(extension))
-        //        return string.Empty;
-
-        //    return extension.StartsWith('.')
-        //        ? extension
-        //        : $".{extension}";
-        //}
 
     }
 

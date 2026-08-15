@@ -30,5 +30,6 @@ namespace Model.Dtos.Dashboard
         public int TotalQuantity { get; set; }
         public decimal TotalCostTL { get; set; }
         public decimal TotalCostUSD { get; set; }
+        public decimal TotalCostEUR { get; set; }
     }
 }
