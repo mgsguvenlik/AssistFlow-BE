@@ -1,10 +1,19 @@
 ﻿using Core.Enums;
+using Core.Enums.Crm;
 using Mapster;
 using Model.Concrete;
+using Model.Concrete.Crm;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Brand;
 using Model.Dtos.City;
 using Model.Dtos.Configuration;
+using Model.Dtos.Crm.PurchaseAttachment;
+using Model.Dtos.Crm.PurchaseRequest;
+using Model.Dtos.Crm.PurchaseRequestAction;
+using Model.Dtos.Crm.PurchaseRequestHistory;
+using Model.Dtos.Crm.PurchaseRequestItem;
+using Model.Dtos.Crm.PurchaseRequestStep;
+using Model.Dtos.Crm.PurchaseRequestTask;
 using Model.Dtos.CurrencyType;
 using Model.Dtos.Customer;
 using Model.Dtos.CustomerGroup;
@@ -715,6 +724,452 @@ namespace Business.Mapper
                   .Ignore(d => d.Id);
 
             config.NewConfig<WorkOrderType, WorkOrderTypeGetDto>();
+
+
+            #region CRM
+
+            // =======================================================
+            // PurchaseRequest
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestCreateDto, PurchaseRequest>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.RequestNo)
+                  .Ignore(d => d.RequesterUserId)
+                  .Ignore(d => d.Status)
+                  .Ignore(d => d.CurrentStepId)
+                  .Ignore(d => d.ClosedDate)
+
+                  // Navigations
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.RequesterUser)
+                  .Ignore(d => d.ManagerUser)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.SystemType)
+                  .Ignore(d => d.CurrentStep)
+                  .Ignore(d => d.Items)
+                  .Ignore(d => d.Tasks)
+                  .Ignore(d => d.Histories)
+                  .Ignore(d => d.Attachments);
+
+
+            // Partial update.
+            // Workflow tarafından yönetilecek alanların update DTO üzerinden
+            // değiştirilmesine izin vermiyoruz.
+            config.NewConfig<PurchaseRequestUpdateDto, PurchaseRequest>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.RequestNo)
+                  .Ignore(d => d.RequesterUserId)
+                  .Ignore(d => d.Status)
+                  .Ignore(d => d.CurrentStepId)
+                  .Ignore(d => d.ClosedDate)
+
+                  // Navigations
+                  .Ignore(d => d.Tenant)
+                  .Ignore(d => d.RequesterUser)
+                  .Ignore(d => d.ManagerUser)
+                  .Ignore(d => d.Customer)
+                  .Ignore(d => d.SystemType)
+                  .Ignore(d => d.CurrentStep)
+                  .Ignore(d => d.Items)
+                  .Ignore(d => d.Tasks)
+                  .Ignore(d => d.Histories)
+                  .Ignore(d => d.Attachments);
+
+
+            config.NewConfig<PurchaseRequest, PurchaseRequestGetDto>()
+                  .Map(d => d.TenantName,
+                       s => s.Tenant != null
+                           ? s.Tenant.Name
+                           : null)
+
+                  .Map(d => d.RequesterUserName,
+                       s => s.RequesterUser != null
+                           ? s.RequesterUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.ManagerUserName,
+                       s => s.ManagerUser != null
+                           ? s.ManagerUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.CustomerName,
+                       s => s.Customer != null
+                           ? (s.Customer.SubscriberCompany ?? s.Customer.ContactName1)
+                           : null)
+
+                  .Map(d => d.SystemTypeName,
+                       s => s.SystemType != null
+                           ? s.SystemType.Name
+                           : null)
+
+                  .Map(d => d.CurrentStepCode,
+                       s => s.CurrentStep != null
+                           ? s.CurrentStep.Code
+                           : null)
+
+                  .Map(d => d.CurrentStepName,
+                       s => s.CurrentStep != null
+                           ? s.CurrentStep.Name
+                           : null)
+
+                  .Map(d => d.RequestTypeName,
+                       s => s.RequestType == PurchaseRequestType.NormalPurchase
+                           ? "Normal Satın Alma"
+                           : s.RequestType == PurchaseRequestType.ResearchAndOffer
+                               ? "Araştırma ve Teklif"
+                               : "Bilinmiyor")
+
+                  .Map(d => d.StatusName,
+                       s => s.Status == PurchaseRequestStatus.Draft
+                           ? "Taslak"
+                           : s.Status == PurchaseRequestStatus.InProgress
+                               ? "Devam Ediyor"
+                               : s.Status == PurchaseRequestStatus.RevisionRequired
+                                   ? "Revizyon Bekliyor"
+                                   : s.Status == PurchaseRequestStatus.Completed
+                                       ? "Tamamlandı"
+                                       : s.Status == PurchaseRequestStatus.Rejected
+                                           ? "Reddedildi"
+                                           : s.Status == PurchaseRequestStatus.Cancelled
+                                               ? "İptal Edildi"
+                                               : "Bilinmiyor");
+
+
+            // =======================================================
+            // PurchaseRequest Detail
+            // =======================================================
+            //
+            // AvailableActions özellikle burada maplenmiyor.
+            // Çünkü o alan current user / role / aktif task kontrolü yapıldıktan sonra
+            // service katmanında oluşturulacak.
+            //
+            config.NewConfig<PurchaseRequest, PurchaseRequestDetailDto>()
+                  .Map(d => d.TenantName,
+                       s => s.Tenant != null
+                           ? s.Tenant.Name
+                           : null)
+
+                  .Map(d => d.RequesterUserName,
+                       s => s.RequesterUser != null
+                           ? s.RequesterUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.ManagerUserName,
+                       s => s.ManagerUser != null
+                           ? s.ManagerUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.CustomerName,
+                       s => s.Customer != null
+                           ? (s.Customer.SubscriberCompany ?? s.Customer.ContactName1)
+                           : null)
+
+                  .Map(d => d.SystemTypeName,
+                       s => s.SystemType != null
+                           ? s.SystemType.Name
+                           : null)
+
+                  .Map(d => d.CurrentStepCode,
+                       s => s.CurrentStep != null
+                           ? s.CurrentStep.Code
+                           : null)
+
+                  .Map(d => d.CurrentStepName,
+                       s => s.CurrentStep != null
+                           ? s.CurrentStep.Name
+                           : null)
+
+                  .Map(d => d.RequestTypeName,
+                       s => s.RequestType == PurchaseRequestType.NormalPurchase
+                           ? "Normal Satın Alma"
+                           : s.RequestType == PurchaseRequestType.ResearchAndOffer
+                               ? "Araştırma ve Teklif"
+                               : "Bilinmiyor")
+
+                  .Map(d => d.StatusName,
+                       s => s.Status == PurchaseRequestStatus.Draft
+                           ? "Taslak"
+                           : s.Status == PurchaseRequestStatus.InProgress
+                               ? "Devam Ediyor"
+                               : s.Status == PurchaseRequestStatus.RevisionRequired
+                                   ? "Revizyon Bekliyor"
+                                   : s.Status == PurchaseRequestStatus.Completed
+                                       ? "Tamamlandı"
+                                       : s.Status == PurchaseRequestStatus.Rejected
+                                           ? "Reddedildi"
+                                           : s.Status == PurchaseRequestStatus.Cancelled
+                                               ? "İptal Edildi"
+                                               : "Bilinmiyor")
+
+                  .Map(d => d.Items,
+                       s => s.Items
+                             .Where(x => !x.IsDeleted)
+                             .OrderBy(x => x.LineNo))
+
+                  .Map(d => d.Tasks,
+                       s => s.Tasks
+                             .Where(x => !x.IsDeleted)
+                             .OrderByDescending(x => x.CreatedDate))
+
+                  .Map(d => d.Histories,
+                       s => s.Histories
+                             .Where(x => !x.IsDeleted)
+                             .OrderByDescending(x => x.CreatedDate))
+
+                  .Map(d => d.Attachments,
+                       s => s.Attachments
+                             .Where(x => !x.IsDeleted)
+                             .OrderByDescending(x => x.CreatedDate))
+
+                  .Ignore(d => d.AvailableActions);
+
+
+            // =======================================================
+            // PurchaseRequestItem
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestItemCreateDto, PurchaseRequestItem>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequest)
+                  .Ignore(d => d.Product)
+                  .Ignore(d => d.AlternateProduct)
+                  .Ignore(d => d.CurrencyType);
+
+
+            config.NewConfig<PurchaseRequestItemUpdateDto, PurchaseRequestItem>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequest)
+                  .Ignore(d => d.Product)
+                  .Ignore(d => d.AlternateProduct)
+                  .Ignore(d => d.CurrencyType);
+
+
+            config.NewConfig<PurchaseRequestItem, PurchaseRequestItemGetDto>()
+                  .Map(d => d.ProductCode,
+                       s => s.Product != null
+                           ? s.Product.ProductCode
+                           : null)
+
+                  .Map(d => d.ProductName,
+                       s => !string.IsNullOrEmpty(s.ProductName)
+                           ? s.ProductName
+                           : s.Product != null
+                               ? s.Product.Description
+                               : null)
+
+                  .Map(d => d.AlternateProductCode,
+                       s => s.AlternateProduct != null
+                           ? s.AlternateProduct.ProductCode
+                           : null)
+
+                  .Map(d => d.AlternateProductName,
+                       s => !string.IsNullOrEmpty(s.AlternateProductName)
+                           ? s.AlternateProductName
+                           : s.AlternateProduct != null
+                               ? s.AlternateProduct.Description
+                               : null)
+
+                  .Map(d => d.CurrencyCode,
+                       s => s.CurrencyType != null
+                           ? s.CurrencyType.Code
+                           : null)
+
+                  .Map(d => d.CurrencyName,
+                       s => s.CurrencyType != null
+                           ? s.CurrencyType.Name
+                           : null);
+
+
+            // =======================================================
+            // PurchaseRequestStep
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestStepCreateDto, PurchaseRequestStep>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Actions);
+
+
+            config.NewConfig<PurchaseRequestStepUpdateDto, PurchaseRequestStep>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.Actions);
+
+
+            config.NewConfig<PurchaseRequestStep, PurchaseRequestStepGetDto>();
+
+
+            // =======================================================
+            // PurchaseRequestAction
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestActionCreateDto, PurchaseRequestAction>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequestStep)
+                  .Ignore(d => d.TargetStep);
+
+
+            config.NewConfig<PurchaseRequestActionUpdateDto, PurchaseRequestAction>()
+                  .IgnoreNullValues(true)
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequestStep)
+                  .Ignore(d => d.TargetStep);
+
+
+            config.NewConfig<PurchaseRequestAction, PurchaseRequestActionGetDto>()
+                  .Map(d => d.PurchaseRequestStepCode,
+                       s => s.PurchaseRequestStep != null
+                           ? s.PurchaseRequestStep.Code
+                           : null)
+
+                  .Map(d => d.PurchaseRequestStepName,
+                       s => s.PurchaseRequestStep != null
+                           ? s.PurchaseRequestStep.Name
+                           : null)
+
+                  .Map(d => d.TargetStepCode,
+                       s => s.TargetStep != null
+                           ? s.TargetStep.Code
+                           : null)
+
+                  .Map(d => d.TargetStepName,
+                       s => s.TargetStep != null
+                           ? s.TargetStep.Name
+                           : null);
+
+
+            // =======================================================
+            // PurchaseRequestTask
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestTaskCreateDto, PurchaseRequestTask>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequest)
+                  .Ignore(d => d.PurchaseRequestStep)
+                  .Ignore(d => d.AssignedUser)
+                  .Ignore(d => d.AssignedRole)
+                  .Ignore(d => d.CompletedUser)
+                  .Ignore(d => d.CompletedDate)
+                  .Ignore(d => d.CompletedUserId);
+
+
+            config.NewConfig<PurchaseRequestTask, PurchaseRequestTaskGetDto>()
+                  .Map(d => d.StepCode,
+                       s => s.PurchaseRequestStep != null
+                           ? s.PurchaseRequestStep.Code
+                           : null)
+
+                  .Map(d => d.StepName,
+                       s => s.PurchaseRequestStep != null
+                           ? s.PurchaseRequestStep.Name
+                           : null)
+
+                  .Map(d => d.AssignedUserName,
+                       s => s.AssignedUser != null
+                           ? s.AssignedUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.AssignedRoleName,
+                       s => s.AssignedRole != null
+                           ? s.AssignedRole.Name
+                           : null)
+
+                  .Map(d => d.CompletedUserName,
+                       s => s.CompletedUser != null
+                           ? s.CompletedUser.TechnicianName
+                           : null)
+
+                  .Map(d => d.StatusName,
+                       s => s.Status == PurchaseRequestTaskStatus.Pending
+                           ? "Bekliyor"
+                           : s.Status == PurchaseRequestTaskStatus.Completed
+                               ? "Tamamlandı"
+                               : s.Status == PurchaseRequestTaskStatus.Cancelled
+                                   ? "İptal Edildi"
+                                   : "Bilinmiyor");
+
+
+            // =======================================================
+            // PurchaseRequestHistory
+            // =======================================================
+
+            config.NewConfig<PurchaseRequestHistoryCreateDto, PurchaseRequestHistory>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequest)
+                  .Ignore(d => d.FromStep)
+                  .Ignore(d => d.ToStep)
+                  .Ignore(d => d.PurchaseRequestAction);
+
+
+            config.NewConfig<PurchaseRequestHistory, PurchaseRequestHistoryGetDto>()
+                  .Map(d => d.FromStepCode,
+                       s => s.FromStep != null
+                           ? s.FromStep.Code
+                           : null)
+
+                  .Map(d => d.FromStepName,
+                       s => s.FromStep != null
+                           ? s.FromStep.Name
+                           : null)
+
+                  .Map(d => d.ToStepCode,
+                       s => s.ToStep != null
+                           ? s.ToStep.Code
+                           : null)
+
+                  .Map(d => d.ToStepName,
+                       s => s.ToStep != null
+                           ? s.ToStep.Name
+                           : null)
+
+                  .Map(d => d.ActionCode,
+                       s => s.PurchaseRequestAction != null
+                           ? s.PurchaseRequestAction.Code
+                           : null)
+
+                  .Map(d => d.ActionName,
+                       s => s.PurchaseRequestAction != null
+                           ? s.PurchaseRequestAction.Name
+                           : null)
+
+                  // CreatedUser için navigation olmadığı için servis katmanında doldurulacak.
+                  .Map(d => d.CreatedUserName, s => (string?)null);
+
+
+            // =======================================================
+            // PurchaseAttachment
+            // =======================================================
+
+            config.NewConfig<PurchaseAttachmentCreateDto, PurchaseAttachment>()
+                  .Ignore(d => d.Id)
+                  .Ignore(d => d.PurchaseRequest)
+                  .Ignore(d => d.UploadedStep);
+
+
+            config.NewConfig<PurchaseAttachment, PurchaseAttachmentGetDto>()
+                  .Map(d => d.AttachmentTypeName,
+                       s => s.AttachmentType == PurchaseAttachmentType.General
+                           ? "Dosyalar"
+                           : s.AttachmentType == PurchaseAttachmentType.Purchase
+                               ? "Satınalma Dosyaları"
+                               : "Bilinmiyor")
+
+                  .Map(d => d.UploadedStepCode,
+                       s => s.UploadedStep != null
+                           ? s.UploadedStep.Code
+                           : null)
+
+                  .Map(d => d.UploadedStepName,
+                       s => s.UploadedStep != null
+                           ? s.UploadedStep.Name
+                           : null)
+
+                  // CreatedUser navigation olmadığı için servis katmanında doldurulacak.
+                  .Map(d => d.CreatedUserName, s => (string?)null);
+
+            #endregion CRM
         }
 
         // Helper metodlar için (MapsterConfig sınıfı içine ekleyin)

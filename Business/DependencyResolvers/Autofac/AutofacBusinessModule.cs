@@ -2,11 +2,13 @@
 using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
 using Business.Interfaces.Business.Interfaces;
+using Business.Interfaces.Crm;
 using Business.Interfaces.Manitou;
 using Business.Interfaces.Qnb;
 using Business.Interfaces.Storage;
 using Business.Interfaces.Ykb;
 using Business.Services;
+using Business.Services.Crm;
 using Business.Services.Manitou;
 using Business.Services.Qnb;
 using Business.Services.Storage;
@@ -72,6 +74,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IManitouApiService), typeof(ManitouApiService));
             services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
             services.AddScoped(typeof(IFileStorage), typeof(R2FileStorage));
+            services.AddScoped(typeof(IPurchaseRequestService), typeof(PurchaseRequestService));
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
