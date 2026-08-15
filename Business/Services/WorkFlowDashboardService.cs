@@ -313,13 +313,9 @@ namespace Business.Services
                     var customerWfs = workFlows.Where(x => requestNos.Contains(x.RequestNo)).ToList();
                     var customerProducts = products.Where(x => x.CustomerId == customerId).ToList();
 
-                    var totalCostTL = customerProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                    var totalCostUSD = customerProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var totalCostTL = GetTotalByCurrency(customerProducts, "TRY");
+                    var totalCostUSD = GetTotalByCurrency(customerProducts, "USD");
+                    var totalCostEUR = GetTotalByCurrency(customerProducts, "EUR");
 
                     var now = DateTime.Now;
                     var installDate = customer.InstallationDate;
@@ -354,6 +350,7 @@ namespace Business.Services
                         CancelledRequests = customerWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Cancelled),
                         TotalServiceCostTL = totalCostTL,
                         TotalServiceCostUSD = totalCostUSD,
+                        TotalServiceCostEUR = totalCostEUR,
                         InWarrantyCount = inWarrantyCount,
                         OutOfWarrantyCount = outOfWarrantyCount,
                         LastServiceDate = customerRequests.Count > 0 ? customerRequests.Max(x => x.ServicesDate).DateTime : (DateTime?)null
@@ -408,13 +405,9 @@ namespace Business.Services
                     var totalQuantity = productItems.Sum(x => x.Quantity);
                     var usageCount = productItems.Count;
 
-                    var totalCostTL = productItems
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                    var totalCostUSD = productItems
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var totalCostTL = GetTotalByCurrency(productItems, "TRY");
+                    var totalCostUSD = GetTotalByCurrency(productItems, "USD");
+                    var totalCostEUR = GetTotalByCurrency(productItems, "EUR");
 
                     topProducts.Add(new ProductUsageDto
                     {
@@ -424,7 +417,8 @@ namespace Business.Services
                         UsageCount = usageCount,
                         TotalQuantity = totalQuantity,
                         TotalCostTL = totalCostTL,
-                        TotalCostUSD = totalCostUSD
+                        TotalCostUSD = totalCostUSD,
+                        TotalCostEUR = totalCostEUR
                     });
                 }
 
@@ -486,13 +480,9 @@ namespace Business.Services
                     var dayRequestNos = dayWfs.Select(x => x.RequestNo).ToHashSet();
                     var dayProducts = products.Where(x => dayRequestNos.Contains(x.RequestNo)).ToList();
 
-                    var revenueTL = dayProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                    var revenueUSD = dayProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var revenueTL = GetTotalByCurrency(dayProducts, "TRY");
+                    var revenueUSD = GetTotalByCurrency(dayProducts, "USD");
+                    var revenueEUR = GetTotalByCurrency(dayProducts, "EUR");
 
                     dailyTrend.Add(new TrendDataPoint
                     {
@@ -510,7 +500,8 @@ namespace Business.Services
                             x.UpdatedDate.Value >= date &&
                             x.UpdatedDate.Value < dayEnd),
                         TotalRevenueTL = revenueTL,
-                        TotalRevenueUSD = revenueUSD
+                        TotalRevenueUSD = revenueUSD,
+                        TotalRevenueEUR = revenueEUR
                     });
                 }
 
@@ -525,13 +516,9 @@ namespace Business.Services
                     var weekRequestNos = weekWfs.Select(x => x.RequestNo).ToHashSet();
                     var weekProducts = products.Where(x => weekRequestNos.Contains(x.RequestNo)).ToList();
 
-                    var revenueTL = weekProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                    var revenueUSD = weekProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var revenueTL = GetTotalByCurrency(weekProducts, "TRY");
+                    var revenueUSD = GetTotalByCurrency(weekProducts, "USD");
+                    var revenueEUR = GetTotalByCurrency(weekProducts, "EUR");
 
                     weeklyTrend.Add(new TrendDataPoint
                     {
@@ -541,7 +528,8 @@ namespace Business.Services
                         CompletedCount = weekWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Complated),
                         CancelledCount = weekWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Cancelled),
                         TotalRevenueTL = revenueTL,
-                        TotalRevenueUSD = revenueUSD
+                        TotalRevenueUSD = revenueUSD,
+                        TotalRevenueEUR = revenueEUR
                     });
 
                     weekStart = weekEnd;
@@ -571,13 +559,9 @@ namespace Business.Services
                     var monthRequestNos = monthWfs.Select(x => x.RequestNo).ToHashSet();
                     var monthProducts = allProductsForMonths.Where(x => monthRequestNos.Contains(x.RequestNo)).ToList();
 
-                    var revenueTL = monthProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                    var revenueUSD = monthProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var revenueTL = GetTotalByCurrency(monthProducts, "TRY");
+                    var revenueUSD = GetTotalByCurrency(monthProducts, "USD");
+                    var revenueEUR = GetTotalByCurrency(monthProducts, "EUR");
 
                     monthlyTrend.Add(new TrendDataPoint
                     {
@@ -587,7 +571,8 @@ namespace Business.Services
                         CompletedCount = monthWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Complated),
                         CancelledCount = monthWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Cancelled),
                         TotalRevenueTL = revenueTL,
-                        TotalRevenueUSD = revenueUSD
+                        TotalRevenueUSD = revenueUSD,
+                        TotalRevenueEUR = revenueEUR
                     });
 
                     monthStart = monthEnd;
@@ -741,13 +726,9 @@ namespace Business.Services
                     .ToListAsync();
 
                 // Toplam Gelir
-                var totalRevenueTL = products
-                    .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
-
-                var totalRevenueUSD = products
-                    .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var totalRevenueTL = GetTotalByCurrency(products, "TRY");
+                var totalRevenueUSD = GetTotalByCurrency(products, "USD");
+                var totalRevenueEUR = GetTotalByCurrency(products, "EUR");
 
                 // Aylık Gelir
                 var monthlyRequestNos = servicesRequests
@@ -755,13 +736,13 @@ namespace Business.Services
                     .Select(x => x.RequestNo)
                     .ToHashSet();
 
-                var monthlyRevenueTL = products
-                    .Where(x => monthlyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "TRY")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var monthlyProducts = products.Where(x => monthlyRequestNos.Contains(x.RequestNo)).ToList();
 
-                var monthlyRevenueUSD = products
-                    .Where(x => monthlyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "USD")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var monthlyRevenueTL = GetTotalByCurrency(monthlyProducts, "TRY");
+
+                var monthlyRevenueUSD = GetTotalByCurrency(monthlyProducts, "USD");
+
+                var monthlyRevenueEUR = GetTotalByCurrency(monthlyProducts, "EUR");
 
                 // Haftalık Gelir
                 var weeklyRequestNos = servicesRequests
@@ -769,13 +750,13 @@ namespace Business.Services
                     .Select(x => x.RequestNo)
                     .ToHashSet();
 
-                var weeklyRevenueTL = products
-                    .Where(x => weeklyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "TRY")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var weeklyProducts = products.Where(x => weeklyRequestNos.Contains(x.RequestNo)).ToList();
 
-                var weeklyRevenueUSD = products
-                    .Where(x => weeklyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "USD")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var weeklyRevenueTL = GetTotalByCurrency(weeklyProducts, "TRY");
+
+                var weeklyRevenueUSD = GetTotalByCurrency(weeklyProducts, "USD");
+
+                var weeklyRevenueEUR = GetTotalByCurrency(weeklyProducts, "EUR");
 
                 // Günlük Gelir
                 var dailyRequestNos = servicesRequests
@@ -783,13 +764,11 @@ namespace Business.Services
                     .Select(x => x.RequestNo)
                     .ToHashSet();
 
-                var dailyRevenueTL = products
-                    .Where(x => dailyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "TRY")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var dailyProducts = products.Where(x => dailyRequestNos.Contains(x.RequestNo)).ToList();
 
-                var dailyRevenueUSD = products
-                    .Where(x => dailyRequestNos.Contains(x.RequestNo) && x.Product != null && x.Product.PriceCurrency == "USD")
-                    .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                var dailyRevenueTL = GetTotalByCurrency(dailyProducts, "TRY");
+                var dailyRevenueUSD = GetTotalByCurrency(dailyProducts, "USD");
+                var dailyRevenueEUR = GetTotalByCurrency(dailyProducts, "EUR");
 
                 // Maliyet Tipleri
                 var costTypeDict = servicesRequests.GroupBy(x => x.ServicesCostStatus);
@@ -802,6 +781,7 @@ namespace Business.Services
                 var totalJobs = servicesRequests.Count;
                 var avgJobValueTL = totalJobs > 0 ? totalRevenueTL / totalJobs : 0;
                 var avgJobValueUSD = totalJobs > 0 ? totalRevenueUSD / totalJobs : 0;
+                var avgJobValueEUR = totalJobs > 0 ? totalRevenueEUR / totalJobs : 0;
 
                 // İndirim İstatistikleri
                 var discounts = finalApprovals.Where(x => x.DiscountPercent > 0).ToList();
@@ -811,16 +791,28 @@ namespace Business.Services
                 {
                     TotalRevenueTL = totalRevenueTL,
                     TotalRevenueUSD = totalRevenueUSD,
+                    TotalRevenueEUR = totalRevenueEUR,
+
                     MonthlyRevenueTL = monthlyRevenueTL,
                     MonthlyRevenueUSD = monthlyRevenueUSD,
+                    MonthlyRevenueEUR = monthlyRevenueEUR,
+
                     WeeklyRevenueTL = weeklyRevenueTL,
                     WeeklyRevenueUSD = weeklyRevenueUSD,
+                    WeeklyRevenueEUR = weeklyRevenueEUR,
+
                     DailyRevenueTL = dailyRevenueTL,
                     DailyRevenueUSD = dailyRevenueUSD,
+                    DailyRevenueEUR = dailyRevenueEUR,
 
-                    PendingPricing = pricings.Count(x => x.Status == PricingStatus.Pending),
-                    ApprovedPricing = pricings.Count(x => x.Status == PricingStatus.Approved),
-                    RejectedPricing = pricings.Count(x => x.Status == PricingStatus.Rejected),
+                    PendingPricing = pricings.Count(x =>
+                        x.Status == PricingStatus.Pending),
+
+                    ApprovedPricing = pricings.Count(x =>
+                        x.Status == PricingStatus.Approved),
+
+                    RejectedPricing = pricings.Count(x =>
+                        x.Status == PricingStatus.Rejected),
 
                     WarrantyServices = warrantyCount,
                     PaidServices = paidCount,
@@ -829,6 +821,7 @@ namespace Business.Services
 
                     AverageJobValueTL = avgJobValueTL,
                     AverageJobValueUSD = avgJobValueUSD,
+                    AverageJobValueEUR = avgJobValueEUR,
 
                     TotalDiscountAmount = 0,
                     AverageDiscountPercent = avgDiscountPercent
@@ -1022,13 +1015,13 @@ namespace Business.Services
                     var cityWfs = workFlows.Where(x => requestNos.Contains(x.RequestNo)).ToList();
                     var cityProducts = products.Where(x => requestNos.Contains(x.RequestNo)).ToList();
 
-                    var revenueTL = cityProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "TRY")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var revenueTL = GetTotalByCurrency(cityProducts, "TRY");
 
-                    var revenueUSD = cityProducts
-                        .Where(x => x.Product != null && x.Product.PriceCurrency == "USD")
-                        .Sum(x => (x.CapturedUnitPrice ?? x.Product!.Price ?? 0) * x.Quantity);
+                    var revenueUSD =
+                        GetTotalByCurrency(cityProducts, "USD");
+
+                    var revenueEUR =
+                        GetTotalByCurrency(cityProducts, "EUR");
 
                     var firstCustomer = cityRequests.First().Customer;
 
@@ -1048,10 +1041,16 @@ namespace Business.Services
                     {
                         City = city,
                         TotalRequests = cityRequests.Count,
-                        ActiveRequests = cityWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Pending),
-                        CompletedRequests = cityWfs.Count(x => x.WorkFlowStatus == WorkFlowStatus.Complated),
+                        ActiveRequests = cityWfs.Count(x =>
+                            x.WorkFlowStatus == WorkFlowStatus.Pending),
+
+                        CompletedRequests = cityWfs.Count(x =>
+                            x.WorkFlowStatus == WorkFlowStatus.Complated),
+
                         TotalRevenueTL = revenueTL,
                         TotalRevenueUSD = revenueUSD,
+                        TotalRevenueEUR = revenueEUR,
+
                         Latitude = firstCustomer?.Latitude,
                         Longitude = firstCustomer?.Longitude,
                         Districts = districtStats
@@ -1404,6 +1403,54 @@ namespace Business.Services
 
                 _ => "Bilinmeyen Durum"
             };
+        }
+
+
+
+        private static string GetProductCurrency(ServicesRequestProduct item)
+        {
+            var currency = item.IsPriceCaptured &&
+                           !string.IsNullOrWhiteSpace(item.CapturedCurrency)
+                ? item.CapturedCurrency
+                : item.Product?.PriceCurrency;
+
+            var normalized = (currency ?? "TRY")
+                .Trim()
+                .ToUpperInvariant();
+
+            return normalized switch
+            {
+                "TL" => "TRY",
+                "₺" => "TRY",
+                "€" => "EUR",
+                "$" => "USD",
+                _ => normalized
+            };
+        }
+
+        private static decimal GetProductTotal(ServicesRequestProduct item)
+        {
+            if (item.IsPriceCaptured)
+            {
+                if (item.CapturedTotal.HasValue)
+                    return item.CapturedTotal.Value;
+
+                var capturedUnitPrice =
+                    item.CapturedUnitPrice ??
+                    item.Product?.Price ??
+                    0m;
+
+                return capturedUnitPrice * item.Quantity;
+            }
+
+            return (item.Product?.Price ?? 0m) * item.Quantity;
+        }
+
+        private static decimal GetTotalByCurrency(IEnumerable<ServicesRequestProduct> products, string currency)
+        {
+            return products
+                .Where(x => GetProductCurrency(x) == currency)
+                .Sum(x => GetProductTotal(x));
         }
     }
 }

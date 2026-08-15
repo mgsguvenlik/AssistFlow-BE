@@ -21,7 +21,8 @@ namespace Model.Dtos.Dashboard
         public int CompletedRequests { get; set; }
         public decimal TotalRevenueTL { get; set; }
         public decimal TotalRevenueUSD { get; set; }
-        
+        public decimal TotalRevenueEUR { get; set; }
+
         // Koordinatlar (harita için)
         public string? Latitude { get; set; }
         public string? Longitude { get; set; }

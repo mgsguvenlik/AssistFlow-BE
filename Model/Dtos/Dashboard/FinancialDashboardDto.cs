@@ -11,7 +11,16 @@ namespace Model.Dtos.Dashboard
         // Toplam Cirolar
         public decimal TotalRevenueTL { get; set; }
         public decimal TotalRevenueUSD { get; set; }
-        
+        public decimal TotalRevenueEUR { get; set; }
+
+        public decimal MonthlyRevenueEUR { get; set; }
+
+        public decimal WeeklyRevenueEUR { get; set; }
+
+        public decimal DailyRevenueEUR { get; set; }
+
+        public decimal AverageJobValueEUR { get; set; }
+
         // Bu Ay
         public decimal MonthlyRevenueTL { get; set; }
         public decimal MonthlyRevenueUSD { get; set; }
@@ -28,6 +37,7 @@ namespace Model.Dtos.Dashboard
         public int PendingPricing { get; set; }
         public int ApprovedPricing { get; set; }
         public int RejectedPricing { get; set; }
+
         
         // Maliyet Tipleri
         public int WarrantyServices { get; set; }
@@ -38,6 +48,7 @@ namespace Model.Dtos.Dashboard
         // Ortalama İş Değeri
         public decimal AverageJobValueTL { get; set; }
         public decimal AverageJobValueUSD { get; set; }
+
         
         // İndirim İstatistikleri
         public decimal TotalDiscountAmount { get; set; }

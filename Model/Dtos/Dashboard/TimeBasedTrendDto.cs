@@ -23,5 +23,6 @@ namespace Model.Dtos.Dashboard
         public int CancelledCount { get; set; }
         public decimal TotalRevenueTL { get; set; }
         public decimal TotalRevenueUSD { get; set; }
+        public decimal TotalRevenueEUR { get; set; }
     }
 }
