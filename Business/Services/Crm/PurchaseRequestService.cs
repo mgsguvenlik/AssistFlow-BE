@@ -5,11 +5,16 @@ using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
 using Core.Enums.Crm;
+using Core.Settings.Concrete;
 using Core.Utilities.Constants;
+using Core.Utilities.IoC;
 using Mapster;
 using MapsterMapper;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Concrete.Crm;
 using Model.Dtos.Auth;
@@ -57,6 +62,7 @@ namespace Business.Services.Crm
         private static class ActionCodes
         {
             public const string Submit = "SUBMIT";
+            public const string Approve = "APPROVE";
             public const string Cancel = "CANCEL";
         }
 
@@ -213,7 +219,7 @@ namespace Business.Services.Crm
 
                 var entity = await _uow.Repository
                     .GetQueryable<PurchaseRequest>()
-                    .FirstOrDefaultAsync(x => x.Id == mapped.Id, cancellationToken);
+                    .FirstOrDefaultAsync(x => x.Id == dto.Id, cancellationToken);
 
                 if (entity == null)
                 {
@@ -1074,21 +1080,18 @@ namespace Business.Services.Crm
         // ATTACHMENT
         // =====================================================
 
-        public async Task<ResponseModel<PurchaseAttachmentGetDto>> AddAttachmentAsync(
-            long purchaseRequestId,
-            PurchaseAttachmentCreateDto dto,
-            CancellationToken cancellationToken = default)
+        public async Task<ResponseModel<PurchaseAttachmentGetDto>> AddAttachmentAsync(long purchaseRequestId, IFormFile file, CancellationToken cancellationToken = default)
         {
+            string? storedFileName = null;
+            var isCommitted = false;
+
             try
             {
-                var currentUserResult =
-                    await GetCurrentUserAsync(cancellationToken);
+                var currentUserResult = await GetCurrentUserAsync(cancellationToken);
 
                 if (!currentUserResult.IsSuccess)
                 {
-                    return ResponseModel<PurchaseAttachmentGetDto>.Fail(
-                        currentUserResult.Message,
-                        currentUserResult.StatusCode);
+                    return ResponseModel<PurchaseAttachmentGetDto>.Fail(currentUserResult.Message, currentUserResult.StatusCode);
                 }
 
                 var user = currentUserResult.Data!;
@@ -1102,17 +1105,7 @@ namespace Business.Services.Crm
                         StatusCode.NotFound);
                 }
 
-                var canModify =
-                    IsEditableByRequester(
-                        request,
-                        user.Id)
-
-                    ||
-
-                    await UserCanProcessCurrentStepAsync(
-                        request,
-                        user,
-                        cancellationToken);
+                var canModify = IsEditableByRequester(request, user.Id) || await UserCanProcessCurrentStepAsync(request, user, cancellationToken);
 
                 if (!canModify)
                 {
@@ -1121,79 +1114,169 @@ namespace Business.Services.Crm
                         StatusCode.BadRequest);
                 }
 
-                if (string.IsNullOrWhiteSpace(
-                        dto.StoredFileName))
+                // -------------------------------------------------
+                // FILE VALIDATION
+                // -------------------------------------------------
+
+                if (file == null || file.Length <= 0)
                 {
                     return ResponseModel<PurchaseAttachmentGetDto>.Fail(
-                        "Storage dosya adı boş olamaz.",
+                        "Yüklenecek dosya boş olamaz.",
                         StatusCode.BadRequest);
                 }
 
-                /*
-                 * Bu interface metadata alıyor, binary file almıyor.
-                 *
-                 * Dolayısıyla upload önceden IFileStorage.SaveAsync ile
-                 * yapılmış olmalı.
-                 *
-                 * Burada R2'de gerçekten dosya var mı kontrol ediyoruz.
-                 */
-                var fileExists =
-                    await _fileStorage.ExistsAsync(
-                        dto.StoredFileName,
-                        cancellationToken);
+                var originalFileName = Path.GetFileName(file.FileName);
 
-                if (!fileExists)
+                if (string.IsNullOrWhiteSpace(originalFileName))
                 {
                     return ResponseModel<PurchaseAttachmentGetDto>.Fail(
-                        "Dosya storage üzerinde bulunamadı.",
+                        "Dosya adı geçersiz.",
                         StatusCode.BadRequest);
                 }
 
-                var entity =
-                    _mapper.Map<PurchaseAttachment>(dto);
+                var extension =
+                    Path.GetExtension(originalFileName)
+                        ?.Trim()
+                        .ToLowerInvariant()
+                    ?? string.Empty;
 
-                entity.Id = 0;
-                entity.PurchaseRequestId =
-                    request.Id;
+                if (string.IsNullOrWhiteSpace(extension))
+                {
+                    return ResponseModel<PurchaseAttachmentGetDto>.Fail(
+                        "Dosya uzantısı bulunamadı.",
+                        StatusCode.BadRequest);
+                }
 
-                entity.OriginalFileName =
-                    Path.GetFileName(
-                        dto.OriginalFileName);
+                var contentType =
+                    string.IsNullOrWhiteSpace(file.ContentType)
+                        ? "application/octet-stream"
+                        : file.ContentType.Trim();
 
-                /*
-                 * UploadedStepId client'tan alınmamalı.
-                 */
-                entity.UploadedStepId =
-                    request.CurrentStepId;
+                // -------------------------------------------------
+                // STORAGE
+                // -------------------------------------------------
 
-                ApplyCreateAudit(
-                    entity,
-                    user.Id);
+                storedFileName = await _fileStorage.SaveAsync(file, cancellationToken);
 
-                await _uow.Repository.AddAsync(
-                    entity,
-                    cancellationToken);
+                if (string.IsNullOrWhiteSpace(storedFileName))
+                {
+                    return ResponseModel<PurchaseAttachmentGetDto>.Fail(
+                        "Dosya storage üzerine yüklenemedi.",
+                        StatusCode.Error);
+                }
 
-                await _uow.Repository.CompleteAsync(
-                    cancellationToken);
+                if (storedFileName.Length > 260)
+                {
+                    throw new InvalidDataException(
+                        "Dosya storage anahtarı 260 karakter sınırını aşmaktadır.");
+                }
 
-                var result = await _uow.Repository
-                    .GetQueryable<PurchaseAttachment>()
-                    .AsNoTracking()
-                    .Where(x => x.Id == entity.Id)
-                    .ProjectToType<PurchaseAttachmentGetDto>(_config)
-                    .FirstAsync(cancellationToken);
+                // -------------------------------------------------
+                // DB METADATA
+                // -------------------------------------------------
+
+                var entity = new PurchaseAttachment
+                {
+                    PurchaseRequestId = request.Id,
+                    OriginalFileName = Path.GetFileName(file.FileName),
+                    StoredFileName = storedFileName,
+                    Extension = Path.GetExtension(file.FileName).Trim().ToLowerInvariant(),
+                    ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType.Trim(),
+                    SizeBytes = file.Length,
+                    UploadedStepId = request.CurrentStepId
+                };
+
+
+                ApplyCreateAudit(entity, user.Id);
+
+                await _uow.Repository.AddAsync(entity, cancellationToken);
+
+                await _uow.Repository.CompleteAsync(cancellationToken);
+                isCommitted = true;
+
+                // -------------------------------------------------
+                // RESULT
+                // -------------------------------------------------
+
+                var result =
+                    await _uow.Repository
+                        .GetQueryable<PurchaseAttachment>()
+                        .AsNoTracking()
+                        .Where(x => x.Id == entity.Id)
+                        .ProjectToType<PurchaseAttachmentGetDto>(_config)
+                        .FirstAsync(cancellationToken);
 
                 return ResponseModel<PurchaseAttachmentGetDto>.Success(
                     result,
                     Messages.Created,
                     StatusCode.Created);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                /*
+                 * Storage upload tamamlandı ancak DB commit olmadıysa
+                 * orphan dosya bırakmayalım.
+                 */
+                if (!isCommitted && !string.IsNullOrWhiteSpace(storedFileName))
+                {
+                    await TryDeleteUploadedAttachmentAsync(storedFileName);
+                }
+
+                throw;
+            }
+            catch (InvalidDataException ex)
+            {
+                if (!isCommitted && !string.IsNullOrWhiteSpace(storedFileName))
+                {
+                    await TryDeleteUploadedAttachmentAsync(storedFileName);
+                }
+
+                _logger.LogWarning(
+                    ex,
+                    "Purchase attachment doğrulama hatası. PurchaseRequestId: {PurchaseRequestId}",
+                    purchaseRequestId);
+
+                return ResponseModel<PurchaseAttachmentGetDto>.Fail(
+                    ex.Message,
+                    StatusCode.BadRequest);
+            }
             catch (Exception ex)
             {
+                /*
+                 * Dosya CDN'e çıktı fakat DB işlemi başarısız olduysa
+                 * CDN üzerinde orphan dosya bırakmıyoruz.
+                 */
+                if (!isCommitted &&
+                    !string.IsNullOrWhiteSpace(storedFileName))
+                {
+                    await TryDeleteUploadedAttachmentAsync(storedFileName);
+                }
+
+                _logger.LogError(
+                    ex,
+                    "Purchase attachment eklenirken hata oluştu. PurchaseRequestId: {PurchaseRequestId}",
+                    purchaseRequestId);
+
                 return ResponseModel<PurchaseAttachmentGetDto>.Fail(
                     $"{Messages.UnexpectedError}: {ex.GetBaseException().Message}",
                     StatusCode.Error);
+            }
+        }
+
+        private async Task TryDeleteUploadedAttachmentAsync(string storedFileName)
+        {
+            try
+            {
+                await _fileStorage.DeleteAsync(
+                    storedFileName,
+                    CancellationToken.None);
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(
+                    cleanupEx,
+                    "DB işlemi başarısız olduktan sonra Purchase attachment storage dosyası temizlenemedi. FileName: {FileName}",
+                    storedFileName);
             }
         }
 
@@ -1298,14 +1381,11 @@ namespace Business.Services.Crm
         {
             try
             {
-                var context =
-                    await GetCurrentUserAsync(cancellationToken);
+                var context = await GetCurrentUserAsync(cancellationToken);
 
                 if (!context.IsSuccess)
                 {
-                    return ResponseModel<List<PurchaseAttachmentGetDto>>.Fail(
-                        context.Message,
-                        context.StatusCode);
+                    return ResponseModel<List<PurchaseAttachmentGetDto>>.Fail(context.Message, context.StatusCode);
                 }
 
                 var exists = await RequestExistsAsync(purchaseRequestId, cancellationToken);
@@ -1320,15 +1400,46 @@ namespace Business.Services.Crm
                 var items = await _uow.Repository
                     .GetQueryable<PurchaseAttachment>()
                     .AsNoTracking()
-                    .Where(x =>
-                        x.PurchaseRequestId ==
-                        purchaseRequestId)
+                    .Where(x => x.PurchaseRequestId == purchaseRequestId)
                     .OrderByDescending(x => x.CreatedDate)
                     .ProjectToType<PurchaseAttachmentGetDto>(_config)
                     .ToListAsync(cancellationToken);
 
-                return ResponseModel<List<PurchaseAttachmentGetDto>>.Success(
-                    items);
+
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                string? NormalizeImageUrl(string? urlOrFileName)
+                {
+                    if (string.IsNullOrWhiteSpace(urlOrFileName))
+                        return urlOrFileName;
+
+                    // 1) Zaten tam URL ise (http/https) → hiç dokunma
+                    if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return urlOrFileName;
+                    }
+
+                    // 2) /uploads/xxx.png gibi relative path ise
+                    if (urlOrFileName.StartsWith("/"))
+                    {
+                        return string.IsNullOrEmpty(baseUrl)
+                            ? urlOrFileName
+                            : $"{baseUrl}{urlOrFileName}";
+                    }
+
+                    // 3) Sadece dosya adı ise (Guid.ext)
+                    var relative = $"/uploads/{urlOrFileName}";
+                    return string.IsNullOrEmpty(baseUrl)
+                        ? relative
+                        : $"{baseUrl}{relative}";
+                }
+                foreach (var item in items)
+                {
+                    item.Url = NormalizeImageUrl(item.StoredFileName);
+                }
+
+                return ResponseModel<List<PurchaseAttachmentGetDto>>.Success(items);
             }
             catch (Exception ex)
             {
@@ -1347,8 +1458,7 @@ namespace Business.Services.Crm
         {
             try
             {
-                var currentUserResult =
-                    await GetCurrentUserAsync(cancellationToken);
+                var currentUserResult = await GetCurrentUserAsync(cancellationToken);
 
                 if (!currentUserResult.IsSuccess)
                 {
@@ -1376,8 +1486,7 @@ namespace Business.Services.Crm
                         StatusCode.NotFound);
                 }
 
-                if (request.CurrentStepId == null ||
-                    request.CurrentStep == null)
+                if (request.CurrentStepId == null || request.CurrentStep == null)
                 {
                     return ResponseModel<PurchaseRequestDetailDto>.Fail(
                         "Talebin mevcut workflow adımı bulunamadı.",
@@ -1395,19 +1504,9 @@ namespace Business.Services.Crm
                     .GetQueryable<PurchaseRequestAction>()
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
-                        x =>
-                            x.Id ==
-                            dto.PurchaseRequestActionId
-
-                            &&
-
-                            x.PurchaseRequestStepId ==
-                            request.CurrentStepId.Value
-
-                            &&
-
-                            x.IsActive,
-                        cancellationToken);
+                        x => x.Id == dto.PurchaseRequestActionId
+                            && x.PurchaseRequestStepId == request.CurrentStepId.Value
+                            && x.IsActive, cancellationToken);
 
                 if (action == null)
                 {
@@ -1428,10 +1527,7 @@ namespace Business.Services.Crm
                  * Draft ilk gönderimde henüz task oluşturmadık.
                  * Talep sahibi doğrudan SUBMIT çalıştırabilir.
                  */
-                var isInitialDraft =
-                    IsStatus(request.Status, "Draft")
-                    &&
-                    request.CurrentStep.IsInitial;
+                var isInitialDraft = IsStatus(request.Status, "Draft") && request.CurrentStep.IsInitial;
 
                 PurchaseRequestTask? currentTask = null;
 
@@ -1466,8 +1562,7 @@ namespace Business.Services.Crm
                 }
                 else
                 {
-                    currentTask =
-                        await GetAuthorizedPendingTaskAsync(
+                    currentTask = await GetAuthorizedPendingTaskAsync(
                             request,
                             user,
                             cancellationToken);
@@ -1480,11 +1575,7 @@ namespace Business.Services.Crm
                     }
                 }
 
-                var targetStep =
-                    await ResolveTargetStepAsync(
-                        request,
-                        action,
-                        cancellationToken);
+                var targetStep = await ResolveTargetStepAsync(request, action, cancellationToken);
 
                 if (targetStep == null)
                 {
@@ -1493,11 +1584,9 @@ namespace Business.Services.Crm
                         StatusCode.BadRequest);
                 }
 
-                var previousStep =
-                    request.CurrentStep;
+                var previousStep = request.CurrentStep;
 
-                var previousStatus =
-                    request.Status;
+                var previousStatus = request.Status;
 
                 var newStatus =
                     ResolveNewRequestStatus(
@@ -1859,7 +1948,7 @@ namespace Business.Services.Crm
         // WORKFLOW HELPERS
         // =====================================================
 
-        private async Task<PurchaseRequestStep?> ResolveTargetStepAsync(PurchaseRequest request, PurchaseRequestAction action, CancellationToken cancellationToken)
+        private async Task<PurchaseRequestStep?> ResolveTargetStepAsync__(PurchaseRequest request, PurchaseRequestAction action, CancellationToken cancellationToken)
         {
             /*
              * Araştırma/Teklif:
@@ -1869,11 +1958,75 @@ namespace Business.Services.Crm
              * Normal satın alma ise Action.TargetStep üzerinden
              * Manager First Approval'a gider.
              */
-            if (CodeEquals(action.Code, ActionCodes.Submit) &&
-                IsResearchAndOffer(request.RequestType))
+            if (CodeEquals(action.Code, ActionCodes.Submit) && IsResearchAndOffer(request.RequestType))
+            {
+                return await FindStepByCodeAsync(StepCodes.PurchasingResearch, cancellationToken);
+            }
+
+            /*
+             * Standart/configurable geçiş.
+             */
+            if (action.TargetStepId.HasValue)
+            {
+                return await _uow.Repository
+                    .GetQueryable<PurchaseRequestStep>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == action.TargetStepId.Value && x.IsActive, cancellationToken);
+            }
+
+            /*
+             * Conditional route:
+             *
+             * Procurement tamamlandıktan sonra
+             * fiziksel/depo kontrolü gerektiren item varsa
+             * WarehouseControl.
+             *
+             * Yoksa Accounting.
+             */
+            if (CodeEquals(request.CurrentStep?.Code, StepCodes.Procurement))
+            {
+                var requiresWarehouse = request.Items.Any(x => x.RequiresWarehouseControl);
+
+                return await FindStepByCodeAsync(requiresWarehouse ? StepCodes.WarehouseControl : StepCodes.Accounting, cancellationToken);
+            }
+
+            return null;
+        }
+
+        private async Task<PurchaseRequestStep?> ResolveTargetStepAsync(PurchaseRequest request, PurchaseRequestAction action, CancellationToken cancellationToken)
+        {
+            /*
+             * ResearchAndOffer:
+             * Draft SUBMIT ile ilk yönetici onayını atlar
+             * ve doğrudan satın alma araştırmasına gider.
+             */
+            if (CodeEquals(action.Code, ActionCodes.Submit) && IsResearchAndOffer(request.RequestType))
             {
                 return await FindStepByCodeAsync(
                     StepCodes.PurchasingResearch,
+                    cancellationToken);
+            }
+
+            /*
+             * Araştırma sonucu talep sahibi tarafından uygun bulundu.
+             *
+             * NormalPurchase:
+             * ikinci yönetici değerlendirmesine devam eder.
+             *
+             * ResearchAndOffer:
+             * yalnızca araştırma/teklif süreci olduğu için tamamlanır.
+             */
+            if (CodeEquals(
+                    request.CurrentStep?.Code,
+                    StepCodes.RequesterResearchReview) &&
+                CodeEquals(
+                    action.Code,
+                    ActionCodes.Approve))
+            {
+                return await FindStepByCodeAsync(
+                    IsResearchAndOffer(request.RequestType)
+                        ? StepCodes.Completed
+                        : StepCodes.ManagerSecondApproval,
                     cancellationToken);
             }
 
@@ -1887,21 +2040,15 @@ namespace Business.Services.Crm
                     .AsNoTracking()
                     .FirstOrDefaultAsync(
                         x =>
-                            x.Id ==
-                            action.TargetStepId.Value
-                            &&
+                            x.Id == action.TargetStepId.Value &&
                             x.IsActive,
                         cancellationToken);
             }
 
             /*
-             * Conditional route:
-             *
-             * Procurement tamamlandıktan sonra
-             * fiziksel/depo kontrolü gerektiren item varsa
-             * WarehouseControl.
-             *
-             * Yoksa Accounting.
+             * Tedarik tamamlandıktan sonra:
+             * depo kontrolü gerekiyor ise depo,
+             * gerekmiyorsa muhasebe.
              */
             if (CodeEquals(
                     request.CurrentStep?.Code,
@@ -2579,42 +2726,10 @@ namespace Business.Services.Crm
         }
 
 
-        private static bool IsResearchAndOffer(
-            PurchaseRequestType requestType)
+        private static bool IsResearchAndOffer(PurchaseRequestType requestType)
         {
-            var value =
-                requestType.ToString();
-
-            return
-                value.Contains(
-                    "Research",
-                    StringComparison.OrdinalIgnoreCase)
-
-                ||
-
-                value.Contains(
-                    "Offer",
-                    StringComparison.OrdinalIgnoreCase)
-
-                ||
-
-                value.Contains(
-                    "Quote",
-                    StringComparison.OrdinalIgnoreCase)
-
-                ||
-
-                value.Contains(
-                    "Teklif",
-                    StringComparison.OrdinalIgnoreCase)
-
-                ||
-
-                value.Contains(
-                    "Arastirma",
-                    StringComparison.OrdinalIgnoreCase);
+            return requestType == PurchaseRequestType.ResearchAndOffer;
         }
-
 
         private static bool IsStatus(
             PurchaseRequestStatus current,

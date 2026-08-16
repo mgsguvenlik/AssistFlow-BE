@@ -198,20 +198,15 @@ namespace WebAPI.Controllers
         /// PurchaseRequest attachment metadata kaydını oluşturur.
         /// </summary>
         [HttpPost("{purchaseRequestId:long}/attachments/create")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> AddAttachment(
-            [FromRoute] long purchaseRequestId,
-            [FromBody] PurchaseAttachmentCreateDto dto,
-            CancellationToken cancellationToken)
+           [FromRoute] long purchaseRequestId,
+           [FromForm] IFormFile file,
+           CancellationToken cancellationToken)
         {
-            /*
-             * DTO içerisindeki PurchaseRequestId yerine
-             * route üzerindeki id esas alınır.
-             */
-            dto.PurchaseRequestId = purchaseRequestId;
-
             var result = await _purchaseRequestService.AddAttachmentAsync(
                 purchaseRequestId,
-                dto,
+                file,
                 cancellationToken);
 
             return ToActionResult(result);
@@ -356,24 +351,6 @@ namespace WebAPI.Controllers
                 cancellationToken);
 
             return ToActionResult(result);
-        }
-
-
-        // =====================================================
-        // RESPONSE HELPERS
-        // =====================================================
-
-        private IActionResult ToActionResult(ResponseModel response)
-        {
-            if (response.StatusCode == Core.Enums.StatusCode.NoContent)
-            {
-                return StatusCode(
-                    (int)Core.Enums.StatusCode.NoContent);
-            }
-
-            return StatusCode(
-                (int)response.StatusCode,
-                response);
         }
 
 

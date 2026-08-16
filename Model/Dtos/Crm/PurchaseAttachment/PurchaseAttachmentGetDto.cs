@@ -15,6 +15,7 @@ namespace Model.Dtos.Crm.PurchaseAttachment
         public string OriginalFileName { get; set; } = string.Empty;
 
         public string StoredFileName { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty; 
 
         public string Extension { get; set; } = string.Empty;
 
@@ -35,5 +36,7 @@ namespace Model.Dtos.Crm.PurchaseAttachment
         public string? CreatedUserName { get; set; }
 
         public DateTimeOffset CreatedDate { get; set; }
+
+       
     }
 }

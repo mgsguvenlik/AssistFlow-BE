@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Microsoft.AspNetCore.Http;
 using Model.Dtos.Crm.PurchaseAttachment;
 using Model.Dtos.Crm.PurchaseRequest;
 using Model.Dtos.Crm.PurchaseRequestAction;
@@ -64,7 +65,7 @@ namespace Business.Interfaces.Crm
 
         Task<ResponseModel<PurchaseAttachmentGetDto>> AddAttachmentAsync(
             long purchaseRequestId,
-            PurchaseAttachmentCreateDto dto,
+            IFormFile file,
             CancellationToken cancellationToken = default);
 
         Task<ResponseModel<bool>> DeleteAttachmentAsync(
