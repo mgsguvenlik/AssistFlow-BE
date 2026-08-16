@@ -3,7 +3,7 @@
     public enum PurchaseRequestType
     {
         /// <summary>
-        /// Normal satın alma süreci.
+        /// Satın Alma süreci.
         /// </summary>
         NormalPurchase = 1,
 

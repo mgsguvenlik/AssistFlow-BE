@@ -367,5 +367,29 @@ namespace WebAPI.Controllers
                 (int)response.StatusCode,
                 response);
         }
+
+        /// <summary>
+        /// Giriş yapan kullanıcının daha önce oluşturduğu,
+        /// ancak şu anda kendi üzerinde olmayan satın alma taleplerini getirir.
+        /// </summary>
+        [HttpGet("my-requests")]
+        public async Task<IActionResult> GetMyRequests([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
+        {
+            var result = await _purchaseRequestService.GetMyRequestsAsync(queryParams, cancellationToken);
+            return ToActionResult(result);
+        }
+
+
+        /// <summary>
+        /// Giriş yapan kullanıcının daha önce workflow üzerinde
+        /// işlem yaptığı satın alma taleplerini getirir.
+        /// </summary>
+        [HttpGet("my-processed-requests")]
+        public async Task<IActionResult> GetMyProcessedRequests([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
+        {
+            var result = await _purchaseRequestService.GetMyProcessedRequestsAsync(queryParams, cancellationToken);
+            return ToActionResult(result);
+        }
+
     }
 }

@@ -73,7 +73,7 @@ namespace Model.Concrete.Crm
         public string? Description { get; set; }
 
         /// <summary>
-        /// Normal Satın Alma veya Araştırma ve Teklif.
+        /// Satın Alma veya Araştırma ve Teklif.
         /// </summary>
         public PurchaseRequestType RequestType { get; set; }
 

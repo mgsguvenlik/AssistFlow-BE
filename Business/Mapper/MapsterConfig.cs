@@ -816,7 +816,7 @@ namespace Business.Mapper
 
                   .Map(d => d.RequestTypeName,
                        s => s.RequestType == PurchaseRequestType.NormalPurchase
-                           ? "Normal Satın Alma"
+                           ? "Satın Alma"
                            : s.RequestType == PurchaseRequestType.ResearchAndOffer
                                ? "Araştırma ve Teklif"
                                : "Bilinmiyor")
@@ -883,7 +883,7 @@ namespace Business.Mapper
 
                   .Map(d => d.RequestTypeName,
                        s => s.RequestType == PurchaseRequestType.NormalPurchase
-                           ? "Normal Satın Alma"
+                           ? "Satın Alma"
                            : s.RequestType == PurchaseRequestType.ResearchAndOffer
                                ? "Araştırma ve Teklif"
                                : "Bilinmiyor")

@@ -36,6 +36,9 @@ namespace Business.Services.Crm
         private readonly IMapper _mapper;
         private readonly TypeAdapterConfig _config;
         private readonly ILogger<PurchaseRequestService> _logger;
+        private readonly IMailPushService _mailPushService;
+        private readonly IUserService _userService;
+        private readonly IOptionsSnapshot<AppSettings> _appSettings;
 
         /*
          * Bu kodların crm.PurchaseRequestStep seed/config kayıtlarında
@@ -68,12 +71,15 @@ namespace Business.Services.Crm
 
 
         public PurchaseRequestService(
-            IUnitOfWork uow,
-            ICurrentUser currentUser,
-            IFileStorage fileStorage,
-            IMapper mapper,
-            TypeAdapterConfig config,
-            ILogger<PurchaseRequestService> logger)
+           IUnitOfWork uow,
+           ICurrentUser currentUser,
+           IFileStorage fileStorage,
+           IMapper mapper,
+           TypeAdapterConfig config,
+           ILogger<PurchaseRequestService> logger,
+           IMailPushService mailPushService,
+           IUserService userService,
+           IOptionsSnapshot<AppSettings> appSettings)
         {
             _uow = uow;
             _currentUser = currentUser;
@@ -81,6 +87,9 @@ namespace Business.Services.Crm
             _mapper = mapper;
             _config = config;
             _logger = logger;
+            _mailPushService = mailPushService;
+            _userService = userService;
+            _appSettings = appSettings;
         }
 
 
@@ -111,7 +120,7 @@ namespace Business.Services.Crm
                 var currentUser = currentUserResult.Data!;
 
                 var entity = _mapper.Map<PurchaseRequest>(dto);
-                var tenantId = currentUser.TenantId;
+                var tenantId = dto.TenantId;
                 var validationResult = await ValidateRequestRelationsAsync(entity, cancellationToken);
 
                 if (!validationResult.IsSuccess)
@@ -262,10 +271,7 @@ namespace Business.Services.Crm
                 entity.CurrentStepId = currentStepId;
                 entity.ClosedDate = closedDate;
 
-                var validationResult =
-                    await ValidateRequestRelationsAsync(
-                        entity,
-                        cancellationToken);
+                var validationResult = await ValidateRequestRelationsAsync(entity, cancellationToken);
 
                 if (!validationResult.IsSuccess)
                 {
@@ -276,12 +282,10 @@ namespace Business.Services.Crm
 
                 ApplyUpdateAudit(entity, currentUser.Id);
 
-                await _uow.Repository.CompleteAsync(
-                    cancellationToken);
+                await _uow.Repository.CompleteAsync(cancellationToken);
 
-                var updated = await GetRequestDtoAsync(
-                    entity.Id,
-                    cancellationToken);
+              
+                var updated = await GetRequestDtoAsync(entity.Id, cancellationToken);
 
                 return updated == null
                     ? ResponseModel<PurchaseRequestGetDto>.Fail(
@@ -632,179 +636,21 @@ namespace Business.Services.Crm
                         currentUserResult.StatusCode);
                 }
 
+                var page = queryParams.Page <= 0 ? 1 : queryParams.Page;
 
-                var page =
-                    queryParams.Page <= 0
-                        ? 1
-                        : queryParams.Page;
+                var pageSize = queryParams.PageSize <= 0 ? 20 : Math.Min(queryParams.PageSize, 100);
 
-                var pageSize =
-                    queryParams.PageSize <= 0
-                        ? 20
-                        : Math.Min(queryParams.PageSize, 100);
-
-                IQueryable<PurchaseRequest> query =
-                    _uow.Repository
-                        .GetQueryable<PurchaseRequest>()
-                        .AsNoTracking();
+                IQueryable<PurchaseRequest> query = _uow.Repository.GetQueryable<PurchaseRequest>().AsNoTracking();
 
 
                 // -------------------------------------------------
-                // SEARCH
+                // FILTER
                 // -------------------------------------------------
+                query = ApplyPurchaseRequestVisibilityFilter(query, currentUserResult.Data!);
 
-                if (!string.IsNullOrWhiteSpace(queryParams.Search))
-                {
-                    var search =
-                        queryParams.Search.Trim();
-
-                    var like =
-                        $"%{search}%";
-
-                    query = query.Where(x =>
-
-                        EF.Functions.Like(
-                            x.RequestNo,
-                            like)
-
-                        ||
-
-                        EF.Functions.Like(
-                            x.Subject,
-                            like)
-
-                        ||
-
-                        (
-                            x.Description != null &&
-                            EF.Functions.Like(
-                                x.Description,
-                                like)
-                        )
-
-                        ||
-
-                        (
-                            x.RequesterUser != null &&
-                            EF.Functions.Like(
-                                x.RequesterUser.TechnicianName,
-                                like)
-                        )
-
-                        ||
-
-                        (
-                            x.ManagerUser != null &&
-                            EF.Functions.Like(
-                                x.ManagerUser.TechnicianName,
-                                like)
-                        )
-
-                        ||
-
-                        (
-                            x.SystemType != null &&
-                            EF.Functions.Like(
-                                x.SystemType.Name,
-                                like)
-                        )
-
-                        ||
-
-                        x.Items.Any(i =>
-                            i.ProductName != null &&
-                            EF.Functions.Like(
-                                i.ProductName,
-                                like))
-                    );
-                }
+                return await GetPagedResultAsync(query, queryParams, cancellationToken);
 
 
-                // -------------------------------------------------
-                // SORT
-                // -------------------------------------------------
-
-                var sort =
-                    queryParams.Sort?
-                        .Trim()
-                        .ToLowerInvariant();
-
-                query = sort switch
-                {
-                    "requestno" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.RequestNo)
-                            : query.OrderBy(x => x.RequestNo),
-
-                    "subject" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.Subject)
-                            : query.OrderBy(x => x.Subject),
-
-                    "requester" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(
-                                x => x.RequesterUser!.TechnicianName)
-                            : query.OrderBy(
-                                x => x.RequesterUser!.TechnicianName),
-
-                    "manager" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(
-                                x => x.ManagerUser!.TechnicianName)
-                            : query.OrderBy(
-                                x => x.ManagerUser!.TechnicianName),
-
-                    "status" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.Status)
-                            : query.OrderBy(x => x.Status),
-
-                    "currentstep" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(
-                                x => x.CurrentStep!.OrderNo)
-                            : query.OrderBy(
-                                x => x.CurrentStep!.OrderNo),
-
-                    "createddate" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.CreatedDate)
-                            : query.OrderBy(x => x.CreatedDate),
-
-                    "updateddate" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.UpdatedDate)
-                            : query.OrderBy(x => x.UpdatedDate),
-
-                    "id" =>
-                        queryParams.Desc
-                            ? query.OrderByDescending(x => x.Id)
-                            : query.OrderBy(x => x.Id),
-
-                    _ =>
-                        query.OrderByDescending(x => x.Id)
-                };
-
-
-                var totalCount =
-                    await query.CountAsync(
-                        cancellationToken);
-
-                var items = await query
-                    .Skip((page - 1) * pageSize)
-                    .Take(pageSize)
-                    .ProjectToType<PurchaseRequestGetDto>(_config)
-                    .ToListAsync(cancellationToken);
-
-                return ResponseModel<
-                        PaginatedList<PurchaseRequestGetDto>>
-                    .Success(
-                        new PaginatedList<PurchaseRequestGetDto>(
-                            items,
-                            totalCount,
-                            page,
-                            pageSize));
             }
             catch (Exception ex)
             {
@@ -855,7 +701,7 @@ namespace Business.Services.Crm
                         user.Id))
                 {
                     return ResponseModel<PurchaseRequestItemGetDto>.Fail(
-                        "Bu talebe yeni ürün/hizmet kalemi eklenemez.",
+                        "Bu talebe yeni ürün kalemi eklenemez.",
                         StatusCode.BadRequest);
                 }
 
@@ -965,7 +811,7 @@ namespace Business.Services.Crm
                     !canEditByWorkflowUser)
                 {
                     return ResponseModel<PurchaseRequestItemGetDto>.Fail(
-                        "Bu ürün/hizmet kalemini güncelleme yetkiniz bulunmuyor.",
+                        "Bu ürün kalemini güncelleme yetkiniz bulunmuyor.",
                         StatusCode.BadRequest);
                 }
 
@@ -1050,7 +896,7 @@ namespace Business.Services.Crm
                         user.Id))
                 {
                     return ResponseModel<bool>.Fail(
-                        "Bu ürün/hizmet kalemi mevcut durumda silinemez.",
+                        "Bu ürün kalemi mevcut durumda silinemez.",
                         StatusCode.BadRequest,
                         false);
                 }
@@ -1556,7 +1402,7 @@ namespace Business.Services.Crm
                     if (request.Items.Count == 0)
                     {
                         return ResponseModel<PurchaseRequestDetailDto>.Fail(
-                            "Talep workflow'a gönderilmeden önce en az bir ürün/hizmet kalemi eklenmelidir.",
+                            "Talep workflow'a gönderilmeden önce en az bir ürün kalemi eklenmelidir.",
                             StatusCode.BadRequest);
                     }
                 }
@@ -1710,12 +1556,19 @@ namespace Business.Services.Crm
                  *
                  * aynı DbContext SaveChanges transaction'ında yapılır.
                  */
-                await _uow.Repository.CompleteAsync(
-                    cancellationToken);
+                await _uow.Repository.CompleteAsync(cancellationToken);
 
-                return await GetDetailInternalAsync(
-                    request.Id,
-                    cancellationToken);
+                if (!targetStep.IsFinal)
+                {
+                    await SendPurchaseRequestAssignmentMailAsync(
+                        request,
+                        previousStep,
+                        targetStep,
+                        user.Id,
+                        cancellationToken);
+                }
+
+                return await GetDetailInternalAsync(request.Id, cancellationToken);
             }
             catch (DbUpdateException ex)
             {
@@ -1944,10 +1797,312 @@ namespace Business.Services.Crm
             }
         }
 
+        public async Task<ResponseModel<PaginatedList<PurchaseRequestGetDto>>> GetMyRequestsAsync(QueryParams queryParams, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                queryParams ??= new QueryParams();
+
+                var currentUserResult =
+                    await GetCurrentUserAsync(cancellationToken);
+
+                if (!currentUserResult.IsSuccess)
+                {
+                    return ResponseModel<PaginatedList<PurchaseRequestGetDto>>.Fail(
+                        currentUserResult.Message,
+                        currentUserResult.StatusCode);
+                }
+
+                var user = currentUserResult.Data!;
+
+                var roleIds = user.Roles
+                    .Select(x => x.Id)
+                    .ToList();
+
+                var pendingStatus =
+                    GetTaskStatus("Pending");
+
+                var draftStatus =
+                    GetPurchaseStatus("Draft");
+
+                var revisionStatus =
+                    GetPurchaseStatus("RevisionRequired");
+
+                IQueryable<PurchaseRequest> query =
+                    _uow.Repository
+                        .GetQueryable<PurchaseRequest>()
+                        .AsNoTracking()
+                        .Where(request =>
+
+                            request.RequesterUserId == user.Id
+
+                            &&
+
+                            /*
+                             * Şu anda tekrar talep sahibinin üzerinde
+                             * bulunan kayıtları bu listeye alma.
+                             */
+                            !(
+                                request.Status == draftStatus
+                                ||
+                                request.Status == revisionStatus
+
+                                ||
+
+                                _uow.Repository
+                                    .GetQueryable<PurchaseRequestTask>()
+                                    .Any(task =>
+                                        task.PurchaseRequestId == request.Id
+                                        &&
+                                        task.PurchaseRequestStepId == request.CurrentStepId
+                                        &&
+                                        task.Status == pendingStatus
+                                        &&
+                                        (
+                                            task.AssignedUserId == user.Id
+                                            ||
+                                            (
+                                                task.AssignedRoleId.HasValue
+                                                &&
+                                                roleIds.Contains(task.AssignedRoleId.Value)
+                                            )
+                                        )
+                                    )
+                            )
+                        );
+
+                return await GetPagedResultAsync(
+                    query,
+                    queryParams,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return ResponseModel<PaginatedList<PurchaseRequestGetDto>>.Fail(
+                    $"{Messages.UnexpectedError}: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
+
+        public async Task<ResponseModel<PaginatedList<PurchaseRequestGetDto>>> GetMyProcessedRequestsAsync(QueryParams queryParams, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                queryParams ??= new QueryParams();
+
+                var currentUserResult =
+                    await GetCurrentUserAsync(cancellationToken);
+
+                if (!currentUserResult.IsSuccess)
+                {
+                    return ResponseModel<PaginatedList<PurchaseRequestGetDto>>.Fail(
+                        currentUserResult.Message,
+                        currentUserResult.StatusCode);
+                }
+
+                var user = currentUserResult.Data!;
+
+                IQueryable<PurchaseRequest> query =
+                    _uow.Repository
+                        .GetQueryable<PurchaseRequest>()
+                        .AsNoTracking()
+                        .Where(request =>
+                            _uow.Repository
+                                .GetQueryable<PurchaseRequestHistory>()
+                                .Any(history =>
+                                    history.PurchaseRequestId == request.Id
+                                    &&
+                                    history.CreatedUser == user.Id
+                                )
+                        );
+
+                return await GetPagedResultAsync(
+                    query,
+                    queryParams,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return ResponseModel<PaginatedList<PurchaseRequestGetDto>>.Fail(
+                    $"{Messages.UnexpectedError}: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
+
         // =====================================================
         // WORKFLOW HELPERS
         // =====================================================
 
+        private async Task<ResponseModel<PaginatedList<PurchaseRequestGetDto>>> GetPagedResultAsync(IQueryable<PurchaseRequest> query, QueryParams queryParams, CancellationToken cancellationToken)
+        {
+            queryParams ??= new QueryParams();
+
+            var page = queryParams.Page <= 0 ? 1 : queryParams.Page;
+
+            var pageSize = queryParams.PageSize <= 0 ? 20 : Math.Min(queryParams.PageSize, 100);
+
+
+            // -------------------------------------------------
+            // SEARCH
+            // -------------------------------------------------
+
+            if (!string.IsNullOrWhiteSpace(queryParams.Search))
+            {
+                var search = queryParams.Search.Trim();
+
+                var like = $"%{search}%";
+
+                query = query.Where(x =>
+
+                    EF.Functions.Like(x.RequestNo, like) ||
+                    EF.Functions.Like(x.Subject, like) ||
+                    (x.Description != null && EF.Functions.Like(x.Description, like)) ||
+                    (x.RequesterUser != null && EF.Functions.Like(x.RequesterUser.TechnicianName, like)) ||
+                    (x.ManagerUser != null && EF.Functions.Like(x.ManagerUser.TechnicianName, like)) ||
+                    (x.SystemType != null && EF.Functions.Like(x.SystemType.Name, like)) ||
+                    x.Items.Any(i => i.ProductName != null && EF.Functions.Like(i.ProductName, like))
+                );
+            }
+
+            // -------------------------------------------------
+            // SORT
+            // -------------------------------------------------
+            var sort = queryParams.Sort?.Trim().ToLowerInvariant();
+
+            query = sort switch
+            {
+                "requestno" => queryParams.Desc ? query.OrderByDescending(x => x.RequestNo) : query.OrderBy(x => x.RequestNo),
+                "subject" => queryParams.Desc ? query.OrderByDescending(x => x.Subject) : query.OrderBy(x => x.Subject),
+                "requester" => queryParams.Desc ? query.OrderByDescending(x => x.RequesterUser!.TechnicianName) : query.OrderBy(x => x.RequesterUser!.TechnicianName),
+                "manager" => queryParams.Desc ? query.OrderByDescending(x => x.ManagerUser!.TechnicianName) : query.OrderBy(x => x.ManagerUser!.TechnicianName),
+                "status" => queryParams.Desc ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
+                "currentstep" => queryParams.Desc ? query.OrderByDescending(x => x.CurrentStep!.OrderNo) : query.OrderBy(x => x.CurrentStep!.OrderNo),
+                "createddate" => queryParams.Desc ? query.OrderByDescending(x => x.CreatedDate) : query.OrderBy(x => x.CreatedDate),
+                "updateddate" => queryParams.Desc ? query.OrderByDescending(x => x.UpdatedDate) : query.OrderBy(x => x.UpdatedDate),
+                "id" => queryParams.Desc ? query.OrderByDescending(x => x.Id) : query.OrderBy(x => x.Id),
+                _ => query.OrderByDescending(x => x.Id)
+            };
+
+            // -------------------------------------------------
+            // TOTAL COUNT
+            // -------------------------------------------------
+
+            var totalCount =
+                await query.CountAsync(
+                    cancellationToken);
+
+
+            // -------------------------------------------------
+            // PAGINATION + DTO
+            // -------------------------------------------------
+
+            var items =
+                await query
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ProjectToType<PurchaseRequestGetDto>(_config)
+                    .ToListAsync(cancellationToken);
+
+
+            return ResponseModel<
+                    PaginatedList<PurchaseRequestGetDto>>
+                .Success(
+                    new PaginatedList<PurchaseRequestGetDto>(
+                        items,
+                        totalCount,
+                        page,
+                        pageSize));
+        }
+        private IQueryable<PurchaseRequest> ApplyPurchaseRequestVisibilityFilter(IQueryable<PurchaseRequest> query, CurrentUserDto user)
+        {
+            var roleIds = user.Roles
+                .Select(x => x.Id)
+                .ToList();
+
+            var pendingStatus =
+                GetTaskStatus("Pending");
+
+            var draftStatus =
+                GetPurchaseStatus("Draft");
+
+            var revisionRequiredStatus =
+                GetPurchaseStatus("RevisionRequired");
+
+            return query.Where(request =>
+
+                /*
+                 * 1. Kullanıcının kendi talebi:
+                 *
+                 * - Draft
+                 * - RevisionRequired
+                 *
+                 * durumlarında kullanıcı kendi talebini görür.
+                 */
+                (
+                    request.RequesterUserId == user.Id
+                    &&
+                    (
+                        request.Status == draftStatus
+                        ||
+                        request.Status == revisionRequiredStatus
+                    )
+                )
+
+                ||
+
+                /*
+                 * 2. Kullanıcının üzerinde aktif workflow görevi varsa.
+                 *
+                 * Görev:
+                 * - doğrudan kullanıcıya atanmış olabilir
+                 * - kullanıcının rollerinden birine atanmış olabilir
+                 */
+                _uow.Repository
+                    .GetQueryable<PurchaseRequestTask>()
+                    .Any(task =>
+
+                        task.PurchaseRequestId == request.Id
+
+                        &&
+
+                        /*
+                         * Eski bir task değil,
+                         * request'in mevcut workflow adımındaki task olmalı.
+                         */
+                        task.PurchaseRequestStepId ==
+                        request.CurrentStepId
+
+                        &&
+
+                        task.Status ==
+                        pendingStatus
+
+                        &&
+
+                        (
+                            /*
+                             * Doğrudan kullanıcı ataması.
+                             */
+                            task.AssignedUserId ==
+                            user.Id
+
+                            ||
+
+                            /*
+                             * Rol bazlı atama.
+                             */
+                            (
+                                task.AssignedRoleId.HasValue
+                                &&
+                                roleIds.Contains(
+                                    task.AssignedRoleId.Value)
+                            )
+                        )
+                    )
+            );
+        }
         private async Task<PurchaseRequestStep?> ResolveTargetStepAsync__(PurchaseRequest request, PurchaseRequestAction action, CancellationToken cancellationToken)
         {
             /*
@@ -1955,7 +2110,7 @@ namespace Business.Services.Crm
              *
              * Draft SUBMIT doğrudan satın alma araştırmasına gider.
              *
-             * Normal satın alma ise Action.TargetStep üzerinden
+             * Satın Alma ise Action.TargetStep üzerinden
              * Manager First Approval'a gider.
              */
             if (CodeEquals(action.Code, ActionCodes.Submit) && IsResearchAndOffer(request.RequestType))
@@ -2371,6 +2526,244 @@ namespace Business.Services.Crm
             }
         }
 
+        private async Task SendPurchaseRequestAssignmentMailAsync(PurchaseRequest request, PurchaseRequestStep previousStep, PurchaseRequestStep targetStep, long createdUserId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (targetStep.IsFinal)
+                    return;
+
+                var pendingStatus = GetTaskStatus("Pending");
+
+                var task = await _uow.Repository
+                    .GetQueryable<PurchaseRequestTask>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(x =>
+                        x.PurchaseRequestId == request.Id &&
+                        x.PurchaseRequestStepId == targetStep.Id &&
+                        x.Status == pendingStatus,
+                        cancellationToken);
+
+                if (task == null)
+                {
+                    _logger.LogWarning(
+                        "Satın alma mail bildirimi için aktif görev bulunamadı. PurchaseRequestId: {PurchaseRequestId}, StepId: {StepId}",
+                        request.Id,
+                        targetStep.Id);
+
+                    return;
+                }
+
+                var recipients = new List<(string Name, string Email)>();
+
+                // -------------------------------------------------
+                // USER ASSIGNMENT
+                // -------------------------------------------------
+
+                if (task.AssignedUserId.HasValue)
+                {
+                    var assignedUser = await _uow.Repository
+                        .GetQueryable<User>()
+                        .AsNoTracking()
+                        .Where(x => x.Id == task.AssignedUserId.Value)
+                        .Select(x => new
+                        {
+                            x.TechnicianName,
+                            x.TechnicianEmail
+                        })
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    if (assignedUser != null && !string.IsNullOrWhiteSpace(assignedUser.TechnicianEmail))
+                    {
+                        recipients.Add((
+                            assignedUser.TechnicianName ?? "Kullanıcı",
+                            assignedUser.TechnicianEmail.Trim()
+                        ));
+                    }
+                }
+
+                // -------------------------------------------------
+                // ROLE ASSIGNMENT
+                // -------------------------------------------------
+
+                else if (task.AssignedRoleId.HasValue)
+                {
+                    var usersResult = await _userService.GetUserByRoleAsync(task.AssignedRoleId.Value);
+
+                    if (usersResult.IsSuccess && usersResult.Data != null)
+                    {
+                        recipients.AddRange(
+                            usersResult.Data
+                                .Where(x => !string.IsNullOrWhiteSpace(x.TechnicianEmail))
+                                .Select(x => (
+                                    x.TechnicianName ?? "Kullanıcı",
+                                    x.TechnicianEmail!.Trim()
+                                )));
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Satın alma mail bildirimi için role bağlı kullanıcı bulunamadı. RoleId: {RoleId}, PurchaseRequestId: {PurchaseRequestId}",
+                            task.AssignedRoleId.Value,
+                            request.Id);
+                    }
+                }
+
+                recipients = recipients
+                    .GroupBy(x => x.Email, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x.First())
+                    .ToList();
+
+                if (recipients.Count == 0)
+                {
+                    _logger.LogWarning(
+                        "Satın alma mail bildirimi için geçerli mail adresi bulunamadı. PurchaseRequestId: {PurchaseRequestId}",
+                        request.Id);
+
+                    return;
+                }
+
+                var appUrl = (_appSettings.Value.FrontUrl ?? string.Empty).TrimEnd('/');
+                var detailUrl = $"{appUrl}/crm/purchase-requests/{request.Id}";
+                var processMessage = GetPurchaseRequestMailProcessMessage(targetStep);
+
+                foreach (var recipient in recipients)
+                {
+                    var mail = new MailOutbox
+                    {
+                        RequestNo = request.RequestNo,
+                        FromStepCode = previousStep.Code,
+                        ToStepCode = targetStep.Code,
+                        ToRecipients = recipient.Email,
+                        Subject = "MGS Satın Alma Talebi Hk.",
+                        BodyHtml = BuildPurchaseRequestAssignmentMailBody(recipient.Name, request, targetStep, processMessage, detailUrl),
+                        CreatedUser = createdUserId,
+                        CreatedDate = DateTime.Now
+                    };
+
+                    await _mailPushService.EnqueueAsync(mail);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Satın alma talebi atama maili oluşturulurken hata oluştu. PurchaseRequestId: {PurchaseRequestId}",
+                    request.Id);
+            }
+        }
+        private static string GetPurchaseRequestMailProcessMessage(PurchaseRequestStep step)
+        {
+            var code = NormalizeCode(step.Code);
+
+            return code switch
+            {
+                StepCodes.ManagerFirstApproval => "ilk yönetici onayınıza sunulmuştur.",
+                StepCodes.ManagerSecondApproval => "ikinci yönetici değerlendirmenize sunulmuştur.",
+                StepCodes.ManagementApproval => "yönetim onayınıza sunulmuştur.",
+                StepCodes.PurchasingResearch => "satın alma araştırması ve teklif çalışması için tarafınıza atanmıştır.",
+                StepCodes.RequesterResearchReview => "araştırma ve teklif sonuçlarını değerlendirmeniz için tarafınıza iletilmiştir.",
+                StepCodes.Procurement => "satın alma işlemlerinin gerçekleştirilmesi için tarafınıza atanmıştır.",
+                StepCodes.WarehouseControl => "depo kontrolünün gerçekleştirilmesi için tarafınıza atanmıştır.",
+                StepCodes.Accounting => "muhasebe işlemlerinin gerçekleştirilmesi için tarafınıza atanmıştır.",
+                StepCodes.RequesterDeliveryControl => "teslimat kontrolünün gerçekleştirilmesi için tarafınıza iletilmiştir.",
+                StepCodes.InvoiceControl => "fatura kontrolünün gerçekleştirilmesi için tarafınıza atanmıştır.",
+                _ => $"{step.Name} aşamasında işleminizi beklemektedir."
+            };
+        }
+
+
+        private static string BuildPurchaseRequestAssignmentMailBody(
+            string userName,
+            PurchaseRequest request,
+            PurchaseRequestStep step,
+            string processMessage,
+            string detailUrl)
+        {
+            return $@"
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset=""UTF-8"">
+                    </head>
+                    <body style=""margin:0; padding:0; background-color:#f5f7fa; font-family:Arial, Helvetica, sans-serif;"">
+                        <table width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""background-color:#f5f7fa; padding:24px 0;"">
+                            <tr>
+                                <td align=""center"">
+                                    <table width=""600"" cellpadding=""0"" cellspacing=""0"" style=""max-width:600px; width:100%; background:#ffffff; border:1px solid #e5e7eb; border-radius:8px;"">
+                                        <tr>
+                                            <td style=""padding:24px 28px; border-bottom:1px solid #e5e7eb;"">
+                                                <div style=""font-size:20px; font-weight:600; color:#1f2937;"">
+                                                    Satın Alma Talebi
+                                                </div>
+                                                <div style=""font-size:13px; color:#6b7280; margin-top:4px;"">
+                                                    {request.RequestNo}
+                                                </div>
+                                            </td>
+                                        </tr>
+                    
+                                        <tr>
+                                            <td style=""padding:28px;"">
+                                                <p style=""margin:0 0 18px; font-size:15px; color:#374151;"">
+                                                    Sayın <strong>{userName}</strong>,
+                                                </p>
+                    
+                                                <p style=""margin:0 0 18px; font-size:15px; line-height:1.6; color:#374151;"">
+                                                    <strong>{request.RequestNo}</strong> numaralı Satın Alma Talebi
+                                                    {processMessage}
+                                                </p>
+                    
+                                                <table width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""margin:20px 0; background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;"">
+                                                    <tr>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#6b7280; width:140px;"">
+                                                            Talep No
+                                                        </td>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#111827; font-weight:600;"">
+                                                            {request.RequestNo}
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#6b7280; border-top:1px solid #e5e7eb;"">
+                                                            Konu
+                                                        </td>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#111827; border-top:1px solid #e5e7eb;"">
+                                                            {request.Subject}
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#6b7280; border-top:1px solid #e5e7eb;"">
+                                                            İşlem
+                                                        </td>
+                                                        <td style=""padding:14px 16px; font-size:14px; color:#111827; border-top:1px solid #e5e7eb;"">
+                                                            {step.Name}
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                    
+                                                <p style=""margin:0 0 20px; font-size:14px; line-height:1.6; color:#6b7280;"">
+                                                    Talep üzerindeki işleminizi gerçekleştirmek için aşağıdaki butonu kullanabilirsiniz.
+                                                </p>
+                    
+                                                <a href=""{detailUrl}""
+                                                   style=""display:inline-block; padding:11px 20px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:6px; font-size:14px; font-weight:600;"">
+                                                    Talebi Görüntüle
+                                                </a>
+                                            </td>
+                                        </tr>
+                    
+                                        <tr>
+                                            <td style=""padding:18px 28px; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af;"">
+                                                Bu e-posta MGS Satın Alma Talep Yönetimi tarafından otomatik olarak oluşturulmuştur.
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </body>
+                    </html>";
+        }
+
         // =====================================================
         // ROLE ASSIGNMENT
         // =====================================================
@@ -2512,7 +2905,7 @@ namespace Business.Services.Crm
             if (entity.Quantity <= 0)
             {
                 return ResponseModel.Fail(
-                    "Ürün/hizmet miktarı sıfırdan büyük olmalıdır.",
+                    "Ürün miktarı sıfırdan büyük olmalıdır.",
                     StatusCode.BadRequest);
             }
 

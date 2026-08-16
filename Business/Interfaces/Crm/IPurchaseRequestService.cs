@@ -117,7 +117,11 @@ namespace Business.Interfaces.Crm
         // STEP
         // =====================================================
 
-        Task<ResponseModel<List<PurchaseRequestStepGetDto>>> GetStepsAsync(
-            CancellationToken cancellationToken = default);
+        Task<ResponseModel<List<PurchaseRequestStepGetDto>>> GetStepsAsync(CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<PaginatedList<PurchaseRequestGetDto>>> GetMyRequestsAsync(QueryParams queryParams, CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<PaginatedList<PurchaseRequestGetDto>>> GetMyProcessedRequestsAsync(QueryParams queryParams, CancellationToken cancellationToken = default);
+
     }
 }
