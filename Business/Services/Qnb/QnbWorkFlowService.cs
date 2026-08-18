@@ -4051,6 +4051,8 @@ namespace Business.Services.Qnb
 
             var pendingStatus = WorkFlowStatus.Pending;
 
+
+
             IQueryable<QnbWorkFlow> wfBase = _uow.Repository.GetQueryable<QnbWorkFlow>()
                 .AsNoTracking()
                 .Include(x => x.CurrentStep)
@@ -4103,6 +4105,8 @@ namespace Business.Services.Qnb
             var usersQuery = _uow.Repository
                     .GetQueryable<User>()
                     .AsNoTracking();
+
+
             var qJoined =
                from wf in wfBase
 
@@ -4120,6 +4124,17 @@ namespace Business.Services.Qnb
                    sr,
                    createdUser
                };
+
+
+            // İş emri türü filtresi
+            if (q.WorkOrderTypeIds is { Count: > 0 })
+            {
+                var workOrderTypeIds = q.WorkOrderTypeIds;
+
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.QnbServicesRequestWorkOrderTypes.Any(wot => workOrderTypeIds.Contains(wot.WorkOrderTypeId)));
+            }
 
             var total = await qJoined.CountAsync();
 
