@@ -1,8 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
+using Model.Concrete.Crm;
+using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
-using Model.Concrete.Qnb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -103,6 +104,18 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<QnbTechnicalServiceWorkSession> QnbTechnicalServiceWorkSessions { get; set; } = default!;
         public DbSet<QnbServicesRequestWorkOrderType> QnbServicesRequestWorkOrderTypes { get; set; } = default!;
         public DbSet<QnbWorkflowAttachment> QnbWorkflowAttachments { get; set; }
+
+        #endregion
+
+        #region CRM
+
+        public DbSet<PurchaseRequest> PurchaseRequests { get; set; } = default!;
+        public DbSet<PurchaseRequestItem> PurchaseRequestItems { get; set; } = default!;
+        public DbSet<PurchaseRequestStep> PurchaseRequestSteps { get; set; } = default!;
+        public DbSet<PurchaseRequestAction> PurchaseRequestActions { get; set; } = default!;
+        public DbSet<PurchaseRequestTask> PurchaseRequestTasks { get; set; } = default!;
+        public DbSet<PurchaseRequestHistory> PurchaseRequestHistories { get; set; } = default!;
+        public DbSet<PurchaseAttachment> PurchaseAttachments { get; set; } = default!;
 
         #endregion
 
@@ -766,6 +779,475 @@ namespace Data.Concrete.EfCore.Context
 
                 entity.HasIndex(x => x.RequestNo);
             });
+            #endregion
+
+
+            #region CRM
+
+            // =======================================================
+            // PurchaseRequest
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequest>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.RequestNo)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.Subject)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(4000);
+
+                // Talep numarası sistem genelinde benzersiz olacak.
+                entity.HasIndex(x => x.RequestNo)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PurchaseRequest_RequestNo");
+
+                // Listeleme ve filtreleme için.
+                entity.HasIndex(x => x.Status)
+                    .HasDatabaseName("IX_PurchaseRequest_Status");
+
+                entity.HasIndex(x => x.CurrentStepId)
+                    .HasDatabaseName("IX_PurchaseRequest_CurrentStepId");
+
+                entity.HasIndex(x => new
+                {
+                    x.Status,
+                    x.CurrentStepId
+                })
+                .HasDatabaseName("IX_PurchaseRequest_Status_CurrentStepId");
+
+                entity.HasIndex(x => new
+                {
+                    x.TenantId,
+                    x.Status
+                })
+                .HasDatabaseName("IX_PurchaseRequest_TenantId_Status");
+
+                entity.HasIndex(x => x.RequesterUserId)
+                    .HasDatabaseName("IX_PurchaseRequest_RequesterUserId");
+
+                entity.HasIndex(x => x.ManagerUserId)
+                    .HasDatabaseName("IX_PurchaseRequest_ManagerUserId");
+
+                entity.HasIndex(x => x.CreatedDate)
+                    .HasDatabaseName("IX_PurchaseRequest_CreatedDate");
+
+
+                // ---------------- Tenant ----------------
+
+                entity.HasOne(x => x.Tenant)
+                    .WithMany()
+                    .HasForeignKey(x => x.TenantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- Requester User ----------------
+
+                entity.HasOne(x => x.RequesterUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.RequesterUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- Manager User ----------------
+
+                entity.HasOne(x => x.ManagerUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.ManagerUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- Customer ----------------
+
+                entity.HasOne(x => x.Customer)
+                    .WithMany()
+                    .HasForeignKey(x => x.CustomerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- SystemType ----------------
+
+                entity.HasOne(x => x.SystemType)
+                    .WithMany()
+                    .HasForeignKey(x => x.SystemTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- Current CRM Step ----------------
+
+                entity.HasOne(x => x.CurrentStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.CurrentStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // ---------------- Items ----------------
+
+                entity.HasMany(x => x.Items)
+                    .WithOne(x => x.PurchaseRequest)
+                    .HasForeignKey(x => x.PurchaseRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+
+                // ---------------- Tasks ----------------
+
+                entity.HasMany(x => x.Tasks)
+                    .WithOne(x => x.PurchaseRequest)
+                    .HasForeignKey(x => x.PurchaseRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+
+                // ---------------- Histories ----------------
+
+                entity.HasMany(x => x.Histories)
+                    .WithOne(x => x.PurchaseRequest)
+                    .HasForeignKey(x => x.PurchaseRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+
+                // ---------------- Attachments ----------------
+
+                entity.HasMany(x => x.Attachments)
+                    .WithOne(x => x.PurchaseRequest)
+                    .HasForeignKey(x => x.PurchaseRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+
+            // =======================================================
+            // PurchaseRequestItem
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequestItem>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Quantity)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.ProductName)
+                    .HasMaxLength(500);
+
+                entity.Property(x => x.BrandName)
+                    .HasMaxLength(250);
+
+                entity.Property(x => x.ModelName)
+                    .HasMaxLength(250);
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(2000);
+
+                entity.Property(x => x.AlternateProductName)
+                    .HasMaxLength(500);
+
+                entity.Property(x => x.SupplierName)
+                    .HasMaxLength(500);
+
+                entity.Property(x => x.SupplierListPrice)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.SupplierDiscountRate)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.SupplierNetPrice)
+                    .HasPrecision(18, 2);
+
+                entity.Property(x => x.StockStatus)
+                    .HasMaxLength(250);
+
+                entity.Property(x => x.Maturity)
+                    .HasMaxLength(250);
+
+                entity.Property(x => x.CompanyCode)
+                    .HasMaxLength(250);
+
+
+                // Talep içerisinde LineNo benzersiz olmalı.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestId,
+                    x.LineNo
+                })
+                .IsUnique()
+                .HasDatabaseName("IX_PurchaseRequestItem_RequestId_LineNo");
+
+
+                entity.HasIndex(x => x.ProductId)
+                    .HasDatabaseName("IX_PurchaseRequestItem_ProductId");
+
+
+                // Ana ürün.
+                entity.HasOne(x => x.Product)
+                    .WithMany()
+                    .HasForeignKey(x => x.ProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Muadil ürün de aynı Product tablosuna bağlı.
+                entity.HasOne(x => x.AlternateProduct)
+                    .WithMany()
+                    .HasForeignKey(x => x.AlternateProductId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Para birimi.
+                entity.HasOne(x => x.CurrencyType)
+                    .WithMany()
+                    .HasForeignKey(x => x.CurrencyTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // =======================================================
+            // PurchaseRequestStep
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequestStep>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Code)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.Name)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(1000);
+
+                entity.HasIndex(x => x.Code)
+                    .IsUnique()
+                    .HasDatabaseName("IX_PurchaseRequestStep_Code");
+
+                entity.HasIndex(x => new
+                {
+                    x.IsActive,
+                    x.OrderNo
+                })
+                .HasDatabaseName("IX_PurchaseRequestStep_IsActive_OrderNo");
+            });
+
+
+            // =======================================================
+            // PurchaseRequestAction
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequestAction>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Code)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(x => x.Name)
+                    .IsRequired()
+                    .HasMaxLength(200);
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(1000);
+
+
+                // Aynı step içerisinde aynı action code iki kez bulunmasın.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestStepId,
+                    x.Code
+                })
+                .IsUnique()
+                .HasDatabaseName("IX_PurchaseRequestAction_StepId_Code");
+
+
+                // Frontend'e aksiyonları sıralı getirmek için.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestStepId,
+                    x.IsActive,
+                    x.OrderNo
+                })
+                .HasDatabaseName("IX_PurchaseRequestAction_StepId_IsActive_OrderNo");
+
+
+                // Aksiyonun bulunduğu step.
+                entity.HasOne(x => x.PurchaseRequestStep)
+                    .WithMany(x => x.Actions)
+                    .HasForeignKey(x => x.PurchaseRequestStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Aksiyonun hedef step'i.
+                entity.HasOne(x => x.TargetStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.TargetStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // =======================================================
+            // PurchaseRequestTask
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequestTask>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                // Aktif görev sorguları.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestId,
+                    x.Status
+                })
+                .HasDatabaseName("IX_PurchaseRequestTask_RequestId_Status");
+
+
+                // "Görevlerim" - kullanıcı görevleri.
+                entity.HasIndex(x => new
+                {
+                    x.AssignedUserId,
+                    x.Status
+                })
+                .HasDatabaseName("IX_PurchaseRequestTask_AssignedUserId_Status");
+
+
+                // "Görevlerim" - rol görevleri.
+                entity.HasIndex(x => new
+                {
+                    x.AssignedRoleId,
+                    x.Status
+                })
+                .HasDatabaseName("IX_PurchaseRequestTask_AssignedRoleId_Status");
+
+
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestId,
+                    x.PurchaseRequestStepId
+                })
+                .HasDatabaseName("IX_PurchaseRequestTask_RequestId_StepId");
+
+
+                // CRM workflow step.
+                entity.HasOne(x => x.PurchaseRequestStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.PurchaseRequestStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Doğrudan kullanıcıya atanmış görev.
+                entity.HasOne(x => x.AssignedUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.AssignedUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Role atanmış görev.
+                entity.HasOne(x => x.AssignedRole)
+                    .WithMany()
+                    .HasForeignKey(x => x.AssignedRoleId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Görevi gerçekten tamamlayan kullanıcı.
+                entity.HasOne(x => x.CompletedUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.CompletedUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // =======================================================
+            // PurchaseRequestHistory
+            // =======================================================
+            modelBuilder.Entity<PurchaseRequestHistory>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.Description)
+                    .HasMaxLength(4000);
+
+
+                // Talep geçmişi en çok bu index ile okunacak.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestId,
+                    x.CreatedDate
+                })
+                .HasDatabaseName("IX_PurchaseRequestHistory_RequestId_CreatedDate");
+
+
+                entity.HasIndex(x => x.PurchaseRequestActionId)
+                    .HasDatabaseName("IX_PurchaseRequestHistory_ActionId");
+
+
+                // İşlem öncesi step.
+                entity.HasOne(x => x.FromStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.FromStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // İşlem sonrası step.
+                entity.HasOne(x => x.ToStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.ToStepId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+
+                // Yapılan action.
+                entity.HasOne(x => x.PurchaseRequestAction)
+                    .WithMany()
+                    .HasForeignKey(x => x.PurchaseRequestActionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+
+            // =======================================================
+            // PurchaseAttachment
+            // =======================================================
+            modelBuilder.Entity<PurchaseAttachment>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.OriginalFileName)
+                    .IsRequired()
+                    .HasMaxLength(260);
+
+                entity.Property(x => x.StoredFileName)
+                    .IsRequired()
+                    .HasMaxLength(260);
+
+                entity.Property(x => x.Extension)
+                    .IsRequired()
+                    .HasMaxLength(20);
+
+                entity.Property(x => x.ContentType)
+                    .IsRequired()
+                    .HasMaxLength(150);
+
+
+                // Talepteki genel/satınalma dosyalarını hızlı getirmek için.
+                entity.HasIndex(x => new
+                {
+                    x.PurchaseRequestId,
+                    x.AttachmentType
+                })
+                .HasDatabaseName("IX_PurchaseAttachment_RequestId_Type");
+
+
+                entity.HasIndex(x => x.StoredFileName)
+                    .HasDatabaseName("IX_PurchaseAttachment_StoredFileName");
+
+
+                // Dosyanın yüklendiği CRM step.
+                entity.HasOne(x => x.UploadedStep)
+                    .WithMany()
+                    .HasForeignKey(x => x.UploadedStepId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
             #endregion
         }
     }
