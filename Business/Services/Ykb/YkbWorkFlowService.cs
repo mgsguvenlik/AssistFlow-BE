@@ -5375,6 +5375,17 @@ namespace Business.Services.Ykb
                 .GetQueryable<YkbServicesRequest>()
                 .AsNoTracking();
 
+            if (q.WorkOrderTypeIds is { Count: > 0 })
+            {
+                var workOrderTypeIds = q.WorkOrderTypeIds;
+                wfBase = wfBase.Where(w =>
+                    serviceRequestsQuery.Any(sr =>
+                        !sr.IsDeleted &&
+                        sr.RequestNo == w.RequestNo &&
+                        sr.YkbServicesRequestWorkOrderTypes.Any(wot => workOrderTypeIds.Contains(wot.WorkOrderTypeId))));
+            }
+
+
             var customerFormsQuery = _uow.Repository
                 .GetQueryable<YkbCustomerForm>()
                 .AsNoTracking();
