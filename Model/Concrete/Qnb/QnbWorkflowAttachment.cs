@@ -27,8 +27,7 @@ namespace Model.Concrete.Qnb
 
         [Required]
         [MaxLength(150)]
-        public string ContentType { get; set; } =
-            "application/octet-stream";
+        public string ContentType { get; set; } = "application/octet-stream";
 
         public long SizeBytes { get; set; }
 
