@@ -20,11 +20,18 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbWorkFlow
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }
 
+        public List<long>? WorkOrderTypeIds { get; set; }
+
         public void Normalize(int maxPageSize = 200)
         {
             if (Page < 1) Page = 1;
             if (PageSize < 1) PageSize = 1;
             if (PageSize > maxPageSize) PageSize = maxPageSize;
+
+            WorkOrderTypeIds = WorkOrderTypeIds?
+               .Where(x => x > 0)
+               .Distinct()
+               .ToList();
         }
     }
 }

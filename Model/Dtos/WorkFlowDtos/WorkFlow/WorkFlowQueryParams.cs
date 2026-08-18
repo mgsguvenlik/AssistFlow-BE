@@ -42,6 +42,8 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
             // Opsiyonel ama faydalý
             public long? CustomerGroupId { get; set; }
 
+            public List<long>? WorkOrderTypeIds { get; set; }
+
             public void Normalize(int maxPageSize = 200)
             {
                 if (Page < 1) Page = 1;
@@ -70,6 +72,11 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlow
                 Cities = Cities?
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Select(x => x.Trim())
+                    .Distinct()
+                    .ToList();
+
+                WorkOrderTypeIds = WorkOrderTypeIds?
+                    .Where(x => x > 0)
                     .Distinct()
                     .ToList();
             }
