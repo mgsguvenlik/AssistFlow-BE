@@ -370,8 +370,8 @@ namespace Business.Services
                     ProductPrice = p.Price ?? 0m,
                     EffectivePrice = p.Price ?? 0m,
                     EffectiveCurrency = p.PriceCurrency,
-                    IsServiceFeeProduct=p.IsServiceFeeProduct,
-                    ServiceFeePercentage=p.ServiceFeePercentage
+                    IsServiceFeeProduct = p.IsServiceFeeProduct,
+                    ServiceFeePercentage = p.ServiceFeePercentage
 
                 }).ToList();
 
@@ -528,6 +528,104 @@ namespace Business.Services
 
             return ResponseModel<PagedResult<ProductEffectivePriceDto>>.Success(
              new PagedResult<ProductEffectivePriceDto>(effectiveList, totalCount, q.Page, q.PageSize));
+        }
+
+        public async Task<ResponseModel<PagedResult<ProductGetDto>>> GetPurchaseProductsAsync(QueryParams q, CancellationToken cancellationToken = default)
+        {
+            var query = _unitOfWork.Repository.GetQueryable<Product>();
+
+            var inc = IncludeExpression();
+
+            if (inc is not null)
+            {
+                query = inc(query);
+            }
+
+            // Mevcut tenant kuralını koru.
+            query = ApplyTenantFilterIfNeeded(query);
+
+            // Satın Alma ekranında sadece Ürün tipi.
+            query = query.Where(x => !x.IsDeleted && x.ProductTypeId == 1);
+
+            // Server-side search.
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var search = q.Search.Trim();
+
+                query = query.Where(x =>
+                    (x.ProductCode != null &&
+                     x.ProductCode.Contains(search)) ||
+
+                    (x.Description != null &&
+                     x.Description.Contains(search)) ||
+
+                    (x.OracleProductCode != null &&
+                     x.OracleProductCode.Contains(search)) ||
+
+                    (x.Brand != null &&
+                     x.Brand.Name != null &&
+                     x.Brand.Name.Contains(search)) ||
+
+                    (x.Model != null &&
+                     x.Model.Name != null &&
+                     x.Model.Name.Contains(search)));
+            }
+
+            // Sıralama
+            if (!string.IsNullOrWhiteSpace(q.Sort))
+            {
+                var prop = typeof(Product).GetProperty(
+                    q.Sort,
+                    System.Reflection.BindingFlags.IgnoreCase |
+                    System.Reflection.BindingFlags.Public |
+                    System.Reflection.BindingFlags.Instance);
+
+                if (prop != null)
+                {
+                    var parameter =
+                        Expression.Parameter(typeof(Product), "x");
+
+                    var property =
+                        Expression.Property(parameter, prop);
+
+                    var lambda =
+                        Expression.Lambda(property, parameter);
+
+                    var methodName =
+                        q.Desc ? "OrderByDescending" : "OrderBy";
+
+                    var resultExp = Expression.Call(
+                        typeof(Queryable),
+                        methodName,
+                        new[] { typeof(Product), prop.PropertyType },
+                        query.Expression,
+                        Expression.Quote(lambda));
+
+                    query =
+                        query.Provider.CreateQuery<Product>(resultExp);
+                }
+            }
+            else
+            {
+                query = query.OrderByDescending(x => x.Id);
+            }
+
+            var totalCount =
+                await query.CountAsync(cancellationToken);
+
+            var items = await query
+                .AsNoTracking()
+                .Skip((q.Page - 1) * q.PageSize)
+                .Take(q.PageSize)
+                .ProjectToType<ProductGetDto>(_config)
+                .ToListAsync(cancellationToken);
+
+            return ResponseModel<PagedResult<ProductGetDto>>.Success(
+                new PagedResult<ProductGetDto>(
+                    items,
+                    totalCount,
+                    q.Page,
+                    q.PageSize));
         }
     }
 }

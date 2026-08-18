@@ -56,5 +56,15 @@ namespace WebAPI.Controllers
             return ToActionResult(result);
         }
 
+
+        [HttpGet("purchase-products")]
+        public async Task<IActionResult> GetPurchaseProducts([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
+        {
+            var result =
+                await _productService.GetPurchaseProductsAsync(queryParams, cancellationToken);
+
+            return ToActionResult(result);
+        }
+
     }
 }

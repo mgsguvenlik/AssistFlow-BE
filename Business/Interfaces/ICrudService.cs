@@ -10,6 +10,5 @@ namespace Business.Interfaces
         Task<ResponseModel<TGetDto>> GetByIdAsync(TKey id);
         Task<ResponseModel<PagedResult<TGetDto>>> GetPagedAsync(QueryParams query);
     }
-    //public record QueryParams(int Page = 1, int PageSize = 20, string? Search = null, string? Sort = null, bool Desc = false);
-    //public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
+    
 }

@@ -10,5 +10,6 @@ namespace Business.Interfaces
         Task<ResponseModel<ProductEffectivePriceDto>> GetEffectivePriceAsync(long customerId, long productId);
         Task<ResponseModel<List<ProductEffectivePriceDto>>> GetEffectivePricesAsync(CustomerProductRequestDto dto);
         Task<ResponseModel<PagedResult<ProductEffectivePriceDto>>> GetEffectivePriceByCustomerAsync(QueryParams q, long? customerId);
+        Task<ResponseModel<PagedResult<ProductGetDto>>> GetPurchaseProductsAsync(QueryParams queryParams, CancellationToken cancellationToken = default);
     }
 }
