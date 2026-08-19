@@ -30,9 +30,7 @@ namespace Business.Services
             _mailPushService = mailPushService;
         }
 
-        public async Task<ResponseModel<UserFeedbackDto>> CreateFeedbackAsync(
-      CreateUserFeedbackDto dto,
-      string? userAgent = null)
+        public async Task<ResponseModel<UserFeedbackDto>> CreateFeedbackAsync(CreateUserFeedbackDto dto, string? userAgent = null)
         {
             try
             {
