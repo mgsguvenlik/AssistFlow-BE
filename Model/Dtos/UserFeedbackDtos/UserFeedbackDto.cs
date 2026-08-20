@@ -23,6 +23,7 @@ namespace Model.Dtos.UserFeedbackDtos
         public string? RelatedUrl { get; set; }
         public string? UserAgent { get; set; }
         public List<string>? AttachmentUrls { get; set; }
+        public List<UserFeedbackAttachmentDto> Attachments { get; set; } = new();
 
         // Audit bilgileri
         public long CreatedUser { get; set; }

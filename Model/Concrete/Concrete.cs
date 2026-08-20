@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Core.Enums;
 using Model.Abstractions;
 
@@ -77,5 +77,11 @@ namespace Model.Concrete
         /// </summary>
         [MaxLength(2000)]
         public string? AttachmentUrls { get; set; }
+
+        /// <summary>
+        /// IFileStorage üzerinde tutulan geri bildirim dosyalarının metadata kayıtları.
+        /// </summary>
+        public ICollection<UserFeedbackAttachment> Attachments { get; set; } =
+            new List<UserFeedbackAttachment>();
     }
 }

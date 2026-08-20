@@ -128,5 +128,74 @@ namespace WebAPI.Controllers
             var result = await _feedbackService.GetMyFeedbacksAsync();
             return StatusCode((int)result.StatusCode, result);
         }
+
+        /// <summary>
+        /// Geri bildirime bir veya birden fazla dosya ekler.
+        /// </summary>
+        [HttpPost("{feedbackId:long}/attachments/create")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(525_000_000)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 525_000_000, ValueCountLimit = 32)]
+        [ProducesResponseType(typeof(ResponseModel<List<UserFeedbackAttachmentDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> AddAttachments(
+            [FromRoute] long feedbackId,
+            [FromForm] List<IFormFile> files,
+            CancellationToken cancellationToken)
+        {
+            var result = await _feedbackService.AddAttachmentsAsync(
+                feedbackId,
+                files,
+                cancellationToken);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirime ait aktif dosyaları getirir.
+        /// </summary>
+        [HttpGet("{feedbackId:long}/attachments")]
+        [ProducesResponseType(typeof(ResponseModel<List<UserFeedbackAttachmentDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAttachments(
+            [FromRoute] long feedbackId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _feedbackService.GetAttachmentsAsync(
+                feedbackId,
+                cancellationToken);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Yetki kontrolünden sonra dosyanın normalize edilmiş indirme bilgisini döndürür.
+        /// </summary>
+        [HttpGet("attachments/{attachmentId:long}/download")]
+        [ProducesResponseType(typeof(ResponseModel<UserFeedbackAttachmentDto>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAttachmentDownload(
+            [FromRoute] long attachmentId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _feedbackService.GetAttachmentDownloadAsync(
+                attachmentId,
+                cancellationToken);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        /// <summary>
+        /// Geri bildirim dosyasını soft-delete eder ve storage nesnesini kaldırır.
+        /// </summary>
+        [HttpPost("attachments/delete/{attachmentId:long}")]
+        [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> DeleteAttachment(
+            [FromRoute] long attachmentId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _feedbackService.DeleteAttachmentAsync(
+                attachmentId,
+                cancellationToken);
+
+            return StatusCode((int)result.StatusCode, result);
+        }
     }
 }
