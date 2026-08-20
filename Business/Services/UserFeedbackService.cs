@@ -1,9 +1,13 @@
 ﻿using Business.Interfaces;
+using Business.Interfaces.Storage;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
+using Core.Settings.Concrete;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Model.Concrete;
 using Model.Dtos.UserFeedbackDtos;
 using System.Net;
@@ -17,17 +21,34 @@ namespace Business.Services
         private readonly ILogger<UserFeedbackService> _logger;
         private readonly ICurrentUser _currentUser;
         private readonly IMailPushService _mailPushService;
+        private readonly IFileStorage _fileStorage;
+        private readonly IOptionsSnapshot<AppSettings> _appSettings;
+
+        private const int MaxAttachmentCount = 10;
+        private const long MaxAttachmentSizeBytes = 50L * 1024L * 1024L;
+
+        private static readonly HashSet<string> AllowedAttachmentExtensions =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff",
+                ".pdf", ".doc", ".docx", ".rtf", ".xls", ".xlsx", ".csv",
+                ".ppt", ".pptx", ".txt"
+            };
 
         public UserFeedbackService(
             IUnitOfWork uow,
             ILogger<UserFeedbackService> logger,
             ICurrentUser currentUser,
-            IMailPushService mailPushService)
+            IMailPushService mailPushService,
+            IFileStorage fileStorage,
+            IOptionsSnapshot<AppSettings> appSettings)
         {
             _uow = uow;
             _logger = logger;
             _currentUser = currentUser;
             _mailPushService = mailPushService;
+            _fileStorage = fileStorage;
+            _appSettings = appSettings;
         }
 
         public async Task<ResponseModel<UserFeedbackDto>> CreateFeedbackAsync(CreateUserFeedbackDto dto, string? userAgent = null)
@@ -202,7 +223,8 @@ namespace Business.Services
                         StatusCode.Unauthorized);
                 }
 
-                return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
+                return ResponseModel<UserFeedbackDto>.Success(
+                    await MapToDto(feedback, includeAttachments: true));
             }
             catch (Exception ex)
             {
@@ -398,6 +420,372 @@ namespace Business.Services
             }
         }
 
+        public async Task<ResponseModel<List<UserFeedbackAttachmentDto>>> AddAttachmentsAsync(
+            long feedbackId,
+            IReadOnlyCollection<IFormFile> files,
+            CancellationToken cancellationToken = default)
+        {
+            var uploadedStoredFileNames = new List<string>();
+            var isCommitted = false;
+
+            try
+            {
+                var me = await _currentUser.GetAsync(cancellationToken);
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var feedback = await _uow.Repository
+                    .GetQueryable<UserFeedback>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Id == feedbackId && !x.IsDeleted,
+                        cancellationToken);
+
+                if (feedback == null)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Geri bildirim bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                if (!CanManageFeedback(feedback, me))
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Bu geri bildirime dosya ekleme yetkiniz bulunmamaktadır.",
+                        StatusCode.Unauthorized);
+                }
+
+                var fileList = files?.ToList() ?? new List<IFormFile>();
+
+                if (fileList.Count == 0)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Yüklenecek en az bir dosya seçilmelidir.",
+                        StatusCode.BadRequest);
+                }
+
+                var existingAttachmentCount = await _uow.Repository
+                    .GetQueryable<UserFeedbackAttachment>()
+                    .AsNoTracking()
+                    .CountAsync(
+                        x => x.UserFeedbackId == feedbackId && !x.IsDeleted,
+                        cancellationToken);
+
+                if (existingAttachmentCount + fileList.Count > MaxAttachmentCount)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Bir geri bildirime en fazla 10 dosya eklenebilir.",
+                        StatusCode.BadRequest);
+                }
+
+                foreach (var file in fileList)
+                    ValidateAttachment(file);
+
+                var createdDate = DateTimeOffset.Now;
+                var entities = new List<UserFeedbackAttachment>(fileList.Count);
+
+                foreach (var file in fileList)
+                {
+                    var originalFileName = Path.GetFileName(file.FileName);
+                    var storedFileName = await _fileStorage.SaveAsync(
+                        file,
+                        cancellationToken);
+
+                    if (string.IsNullOrWhiteSpace(storedFileName))
+                        throw new InvalidDataException("Dosya storage üzerine yüklenemedi.");
+
+                    if (storedFileName.Length > 260)
+                        throw new InvalidDataException("Dosya storage anahtarı 260 karakter sınırını aşmaktadır.");
+
+                    uploadedStoredFileNames.Add(storedFileName);
+
+                    entities.Add(new UserFeedbackAttachment
+                    {
+                        UserFeedbackId = feedbackId,
+                        OriginalFileName = originalFileName,
+                        StoredFileName = storedFileName,
+                        Extension = Path.GetExtension(originalFileName).ToLowerInvariant(),
+                        ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                            ? "application/octet-stream"
+                            : file.ContentType.Trim(),
+                        SizeBytes = file.Length,
+                        CreatedDate = createdDate,
+                        CreatedUser = userId,
+                        IsDeleted = false
+                    });
+                }
+
+                await _uow.Repository.AddRangeAsync(entities, cancellationToken);
+                await _uow.Repository.CompleteAsync(cancellationToken);
+                isCommitted = true;
+
+                _logger.LogInformation(
+                    "Geri bildirime {FileCount} dosya eklendi. FeedbackId: {FeedbackId}, UserId: {UserId}",
+                    entities.Count,
+                    feedbackId,
+                    userId);
+
+                var result = await GetAttachmentDtosAsync(
+                    feedbackId,
+                    cancellationToken: cancellationToken);
+
+                return ResponseModel<List<UserFeedbackAttachmentDto>>.Success(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (!isCommitted && uploadedStoredFileNames.Count > 0)
+                    await _fileStorage.DeleteManyAsync(uploadedStoredFileNames, CancellationToken.None);
+
+                throw;
+            }
+            catch (InvalidDataException ex)
+            {
+                if (!isCommitted && uploadedStoredFileNames.Count > 0)
+                    await _fileStorage.DeleteManyAsync(uploadedStoredFileNames, CancellationToken.None);
+
+                _logger.LogWarning(
+                    ex,
+                    "Feedback attachment doğrulama hatası. FeedbackId: {FeedbackId}",
+                    feedbackId);
+
+                return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                    ex.Message,
+                    StatusCode.BadRequest);
+            }
+            catch (Exception ex)
+            {
+                if (!isCommitted && uploadedStoredFileNames.Count > 0)
+                    await _fileStorage.DeleteManyAsync(uploadedStoredFileNames, CancellationToken.None);
+
+                _logger.LogError(
+                    ex,
+                    "Feedback attachment yükleme hatası. FeedbackId: {FeedbackId}",
+                    feedbackId);
+
+                return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                    $"Dosyalar yüklenirken hata: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        public async Task<ResponseModel<List<UserFeedbackAttachmentDto>>> GetAttachmentsAsync(
+            long feedbackId,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync(cancellationToken);
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var feedback = await _uow.Repository
+                    .GetQueryable<UserFeedback>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Id == feedbackId && !x.IsDeleted,
+                        cancellationToken);
+
+                if (feedback == null)
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Geri bildirim bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                if (!CanManageFeedback(feedback, me))
+                {
+                    return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                        "Bu geri bildirimin dosyalarına erişim yetkiniz bulunmamaktadır.",
+                        StatusCode.Unauthorized);
+                }
+
+                var attachments = await GetAttachmentDtosAsync(
+                    feedbackId,
+                    cancellationToken: cancellationToken);
+
+                return ResponseModel<List<UserFeedbackAttachmentDto>>.Success(attachments);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Feedback attachment listesi alınamadı. FeedbackId: {FeedbackId}",
+                    feedbackId);
+
+                return ResponseModel<List<UserFeedbackAttachmentDto>>.Fail(
+                    $"Dosyalar getirilirken hata: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        public async Task<ResponseModel<UserFeedbackAttachmentDto>> GetAttachmentDownloadAsync(
+            long attachmentId,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync(cancellationToken);
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var attachment = await _uow.Repository
+                    .GetQueryable<UserFeedbackAttachment>()
+                    .AsNoTracking()
+                    .Include(x => x.UserFeedback)
+                    .FirstOrDefaultAsync(
+                        x => x.Id == attachmentId &&
+                             !x.IsDeleted &&
+                             !x.UserFeedback.IsDeleted,
+                        cancellationToken);
+
+                if (attachment == null)
+                {
+                    return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                        "Dosya bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                if (!CanManageFeedback(attachment.UserFeedback, me))
+                {
+                    return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                        "Bu dosyayı indirme yetkiniz bulunmamaktadır.",
+                        StatusCode.Unauthorized);
+                }
+
+                if (!await _fileStorage.ExistsAsync(
+                        attachment.StoredFileName,
+                        cancellationToken))
+                {
+                    return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                        "Dosya storage üzerinde bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                var result = await GetAttachmentDtosAsync(
+                    attachment.UserFeedbackId,
+                    attachment.Id,
+                    cancellationToken);
+
+                var dto = result.SingleOrDefault();
+                if (dto == null)
+                {
+                    return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                        "Dosya bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                return ResponseModel<UserFeedbackAttachmentDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Feedback attachment indirme bilgisi alınamadı. AttachmentId: {AttachmentId}",
+                    attachmentId);
+
+                return ResponseModel<UserFeedbackAttachmentDto>.Fail(
+                    $"Dosya indirme bilgisi alınırken hata: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        public async Task<ResponseModel<bool>> DeleteAttachmentAsync(
+            long attachmentId,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync(cancellationToken);
+                var userId = me?.Id ?? 0;
+
+                if (userId <= 0)
+                {
+                    return ResponseModel<bool>.Fail(
+                        "Kullanıcı bilgisi bulunamadı",
+                        StatusCode.Unauthorized);
+                }
+
+                var attachment = await _uow.Repository
+                    .GetQueryable<UserFeedbackAttachment>()
+                    .Include(x => x.UserFeedback)
+                    .FirstOrDefaultAsync(
+                        x => x.Id == attachmentId &&
+                             !x.IsDeleted &&
+                             !x.UserFeedback.IsDeleted,
+                        cancellationToken);
+
+                if (attachment == null)
+                {
+                    return ResponseModel<bool>.Fail(
+                        "Dosya bulunamadı",
+                        StatusCode.NotFound);
+                }
+
+                if (!CanManageFeedback(attachment.UserFeedback, me))
+                {
+                    return ResponseModel<bool>.Fail(
+                        "Bu dosyayı silme yetkiniz bulunmamaktadır.",
+                        StatusCode.Unauthorized);
+                }
+
+                var storedFileName = attachment.StoredFileName;
+                attachment.IsDeleted = true;
+                attachment.UpdatedDate = DateTimeOffset.Now;
+                attachment.UpdatedUser = userId;
+
+                _uow.Repository.Update(attachment);
+                await _uow.Repository.CompleteAsync(cancellationToken);
+
+                try
+                {
+                    await _fileStorage.DeleteAsync(storedFileName, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Feedback attachment storage dosyası silinemedi. FileName: {FileName}",
+                        storedFileName);
+                }
+
+                _logger.LogInformation(
+                    "Feedback attachment silindi. AttachmentId: {AttachmentId}, UserId: {UserId}",
+                    attachmentId,
+                    userId);
+
+                return ResponseModel<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Feedback attachment silinemedi. AttachmentId: {AttachmentId}",
+                    attachmentId);
+
+                return ResponseModel<bool>.Fail(
+                    $"Dosya silinirken hata: {ex.GetBaseException().Message}",
+                    StatusCode.Error);
+            }
+        }
+
         #region Private Methods
 
         /// <summary>
@@ -413,7 +801,9 @@ namespace Business.Services
                 r.Name?.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) == true);
         }
 
-        private async Task<UserFeedbackDto> MapToDto(UserFeedback feedback)
+        private async Task<UserFeedbackDto> MapToDto(
+            UserFeedback feedback,
+            bool includeAttachments = false)
         {
             // Kullanıcı bilgilerini getir
             var createdUser = await _uow.Repository
@@ -450,6 +840,9 @@ namespace Business.Services
                 AttachmentUrls = !string.IsNullOrWhiteSpace(feedback.AttachmentUrls)
                     ? JsonSerializer.Deserialize<List<string>>(feedback.AttachmentUrls)
                     : null,
+                Attachments = includeAttachments
+                    ? await GetAttachmentDtosAsync(feedback.Id)
+                    : new List<UserFeedbackAttachmentDto>(),
                 CreatedUser = feedback.CreatedUser,
                 CreatedUserName = createdUser?.TechnicianName,
                 CreatedDate = feedback.CreatedDate,
@@ -575,7 +968,8 @@ namespace Business.Services
                     await EnqueueFeedbackAdminResponseMailAsync(feedback);
                 }
 
-                return ResponseModel<UserFeedbackDto>.Success(await MapToDto(feedback));
+                return ResponseModel<UserFeedbackDto>.Success(
+                    await MapToDto(feedback, includeAttachments: true));
             }
             catch (Exception ex)
             {
@@ -997,6 +1391,129 @@ namespace Business.Services
                 FeedbackStatus.Created => "oluşturuldu",
                 _ => "güncellendi"
             };
+        }
+
+        private static bool CanManageFeedback(
+            UserFeedback feedback,
+            Model.Dtos.Auth.CurrentUserDto? user)
+        {
+            return user != null &&
+                   (feedback.CreatedUser == user.Id || IsUserAdmin(user));
+        }
+
+        private static void ValidateAttachment(IFormFile file)
+        {
+            if (file == null || file.Length <= 0)
+                throw new InvalidDataException("Boş dosya yüklenemez.");
+
+            if (file.Length > MaxAttachmentSizeBytes)
+            {
+                throw new InvalidDataException(
+                    $"{Path.GetFileName(file.FileName)} dosyası 50 MB sınırını aşamaz.");
+            }
+
+            var originalFileName = Path.GetFileName(file.FileName);
+
+            if (string.IsNullOrWhiteSpace(originalFileName))
+                throw new InvalidDataException("Dosya adı geçersiz.");
+
+            if (originalFileName.Length > 260)
+                throw new InvalidDataException("Dosya adı 260 karakter sınırını aşamaz.");
+
+            var extension = Path.GetExtension(originalFileName)
+                .Trim()
+                .ToLowerInvariant();
+
+            if (string.IsNullOrWhiteSpace(extension) ||
+                !AllowedAttachmentExtensions.Contains(extension))
+            {
+                throw new InvalidDataException(
+                    $"Desteklenmeyen dosya türü: {originalFileName}. " +
+                    $"Desteklenen türler: {string.Join(", ", AllowedAttachmentExtensions.OrderBy(x => x))}");
+            }
+
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType)
+                ? "application/octet-stream"
+                : file.ContentType.Trim();
+
+            if (contentType.Length > 150)
+                throw new InvalidDataException("Dosya içerik tipi 150 karakter sınırını aşamaz.");
+        }
+
+        private async Task<List<UserFeedbackAttachmentDto>> GetAttachmentDtosAsync(
+            long feedbackId,
+            long? attachmentId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var query = _uow.Repository
+                .GetQueryable<UserFeedbackAttachment>()
+                .AsNoTracking()
+                .Where(x => x.UserFeedbackId == feedbackId && !x.IsDeleted);
+
+            if (attachmentId.HasValue)
+                query = query.Where(x => x.Id == attachmentId.Value);
+
+            var attachments = await query
+                .OrderByDescending(x => x.CreatedDate)
+                .ToListAsync(cancellationToken);
+
+            var userIds = attachments
+                .Select(x => x.CreatedUser)
+                .Distinct()
+                .ToList();
+
+            var userNames = userIds.Count == 0
+                ? new Dictionary<long, string?>()
+                : await _uow.Repository
+                    .GetQueryable<User>()
+                    .AsNoTracking()
+                    .Where(x => userIds.Contains(x.Id))
+                    .ToDictionaryAsync(
+                        x => x.Id,
+                        x => x.TechnicianName,
+                        cancellationToken);
+
+            return attachments
+                .Select(x => new UserFeedbackAttachmentDto
+                {
+                    Id = x.Id,
+                    UserFeedbackId = x.UserFeedbackId,
+                    OriginalFileName = x.OriginalFileName,
+                    Extension = x.Extension,
+                    ContentType = x.ContentType,
+                    SizeBytes = x.SizeBytes,
+                    Url = NormalizeImageUrl(x.StoredFileName) ?? string.Empty,
+                    CreatedUser = x.CreatedUser,
+                    CreatedUserName = userNames.GetValueOrDefault(x.CreatedUser),
+                    CreatedDate = x.CreatedDate
+                })
+                .ToList();
+        }
+
+        private string? NormalizeImageUrl(string? urlOrFileName)
+        {
+            if (string.IsNullOrWhiteSpace(urlOrFileName))
+                return urlOrFileName;
+
+            if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return urlOrFileName;
+            }
+
+            var baseUrl = _appSettings.Value.FileUrl?.TrimEnd('/') ?? string.Empty;
+
+            if (urlOrFileName.StartsWith("/"))
+            {
+                return string.IsNullOrEmpty(baseUrl)
+                    ? urlOrFileName
+                    : $"{baseUrl}{urlOrFileName}";
+            }
+
+            var relative = $"/uploads/{urlOrFileName}";
+            return string.IsNullOrEmpty(baseUrl)
+                ? relative
+                : $"{baseUrl}{relative}";
         }
 
         #endregion
