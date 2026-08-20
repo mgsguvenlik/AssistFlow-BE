@@ -1,4 +1,5 @@
 ﻿using Core.Common;
+using Microsoft.AspNetCore.Http;
 using Model.Dtos.UserFeedbackDtos;
 
 namespace Business.Interfaces
@@ -47,5 +48,22 @@ namespace Business.Interfaces
         /// Kullanıcının kendi geri bildirimlerini getirir
         /// </summary>
         Task<ResponseModel<List<UserFeedbackDto>>> GetMyFeedbacksAsync();
+
+        Task<ResponseModel<List<UserFeedbackAttachmentDto>>> AddAttachmentsAsync(
+            long feedbackId,
+            IReadOnlyCollection<IFormFile> files,
+            CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<List<UserFeedbackAttachmentDto>>> GetAttachmentsAsync(
+            long feedbackId,
+            CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<UserFeedbackAttachmentDto>> GetAttachmentDownloadAsync(
+            long attachmentId,
+            CancellationToken cancellationToken = default);
+
+        Task<ResponseModel<bool>> DeleteAttachmentAsync(
+            long attachmentId,
+            CancellationToken cancellationToken = default);
     }
 }

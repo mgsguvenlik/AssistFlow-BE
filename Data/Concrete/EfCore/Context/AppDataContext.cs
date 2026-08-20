@@ -56,6 +56,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkFlowArchive> WorkFlowArchives { get; set; }
         public DbSet<Tenant> Tenants { get; set; } = null!;
         public DbSet<UserFeedback> UserFeedbacks { get; set; } = null!;
+        public DbSet<UserFeedbackAttachment> UserFeedbackAttachments { get; set; } = null!;
         public DbSet<WorkFlowSlaSetting> WorkFlowSlaSettings { get; set; } = null!;
         public DbSet<WorkingHourPolicy> WorkingHourPolicies { get; set; }
         public DbSet<TechnicalServiceWorkSession> TechnicalServiceWorkSessions { get; set; }
@@ -700,6 +701,40 @@ namespace Data.Concrete.EfCore.Context
                 entity.HasIndex(x => x.CreatedUser);
                 entity.HasIndex(x => x.CreatedDate);
                 entity.HasIndex(x => new { x.Status, x.FeedbackType });
+
+                entity.HasMany(x => x.Attachments)
+                      .WithOne(x => x.UserFeedback)
+                      .HasForeignKey(x => x.UserFeedbackId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<UserFeedbackAttachment>(entity =>
+            {
+                entity.ToTable("UserFeedbackAttachments");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.OriginalFileName)
+                      .IsRequired()
+                      .HasMaxLength(260);
+
+                entity.Property(x => x.StoredFileName)
+                      .IsRequired()
+                      .HasMaxLength(260);
+
+                entity.Property(x => x.Extension)
+                      .IsRequired()
+                      .HasMaxLength(20);
+
+                entity.Property(x => x.ContentType)
+                      .IsRequired()
+                      .HasMaxLength(150);
+
+                entity.HasIndex(x => new { x.UserFeedbackId, x.IsDeleted })
+                      .HasDatabaseName("IX_UserFeedbackAttachment_FeedbackId_IsDeleted");
+
+                entity.HasIndex(x => x.StoredFileName)
+                      .HasDatabaseName("IX_UserFeedbackAttachment_StoredFileName");
             });
 
             modelBuilder.Entity<ServicesRequestWorkOrderType>(entity =>
