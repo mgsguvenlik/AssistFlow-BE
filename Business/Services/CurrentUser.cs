@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Model.Dtos.Auth;
 
 namespace Business.Services
@@ -21,7 +21,7 @@ namespace Business.Services
 
         public long Id => _me?.Id ?? 0;
         public string? Email => _me?.Email;
-        public string? TechnicianName => _me?.TechnicianName;
+        public string? Name => _me?.Name;
     }
 
 }

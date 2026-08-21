@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Core.Enums.Crm;
 using Mapster;
 using Model.Concrete;
@@ -269,14 +269,14 @@ namespace Business.Mapper
                     .Map(d => d.TenantName,s => s.Tenant != null ? s.Tenant.Name : string.Empty)
                     .Map(d => d.IsTechnicalServiceTestEnabled, s => s.Tenant != null ? s.Tenant.IsTechnicalServiceTestEnabled : false)
                     // 🔹 Diğer basit alanlar (istersen bunları Mapster’a da bırakabilirsin)
-                    .Map(d => d.TechnicianCode, s => s.TechnicianCode)
-                    .Map(d => d.TechnicianCompany, s => s.TechnicianCompany)
-                    .Map(d => d.TechnicianAddress, s => s.TechnicianAddress)
+                    .Map(d => d.Code, s => s.Code)
+                    .Map(d => d.Company, s => s.Company)
+                    .Map(d => d.Address, s => s.Address)
                     .Map(d => d.City, s => s.City)
                     .Map(d => d.District, s => s.District)
-                    .Map(d => d.TechnicianName, s => s.TechnicianName)
-                    .Map(d => d.TechnicianPhone, s => s.TechnicianPhone)
-                    .Map(d => d.TechnicianEmail, s => s.TechnicianEmail)
+                    .Map(d => d.Name, s => s.Name)
+                    .Map(d => d.Phone, s => s.Phone)
+                    .Map(d => d.Email, s => s.Email)
                     .Map(d => d.IsActive, s => s.IsActive)
 
                     // 🔹 Roller
@@ -786,12 +786,12 @@ namespace Business.Mapper
 
                   .Map(d => d.RequesterUserName,
                        s => s.RequesterUser != null
-                           ? s.RequesterUser.TechnicianName
+                           ? s.RequesterUser.Name
                            : null)
 
                   .Map(d => d.ManagerUserName,
                        s => s.ManagerUser != null
-                           ? s.ManagerUser.TechnicianName
+                           ? s.ManagerUser.Name
                            : null)
 
                   .Map(d => d.CustomerName,
@@ -853,12 +853,12 @@ namespace Business.Mapper
 
                   .Map(d => d.RequesterUserName,
                        s => s.RequesterUser != null
-                           ? s.RequesterUser.TechnicianName
+                           ? s.RequesterUser.Name
                            : null)
 
                   .Map(d => d.ManagerUserName,
                        s => s.ManagerUser != null
-                           ? s.ManagerUser.TechnicianName
+                           ? s.ManagerUser.Name
                            : null)
 
                   .Map(d => d.CustomerName,
@@ -1068,7 +1068,7 @@ namespace Business.Mapper
 
                   .Map(d => d.AssignedUserName,
                        s => s.AssignedUser != null
-                           ? s.AssignedUser.TechnicianName
+                           ? s.AssignedUser.Name
                            : null)
 
                   .Map(d => d.AssignedRoleName,
@@ -1078,7 +1078,7 @@ namespace Business.Mapper
 
                   .Map(d => d.CompletedUserName,
                        s => s.CompletedUser != null
-                           ? s.CompletedUser.TechnicianName
+                           ? s.CompletedUser.Name
                            : null)
 
                   .Map(d => d.StatusName,

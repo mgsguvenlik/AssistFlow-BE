@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Core.Common;
 using Core.Settings.Concrete;
 using Core.Utilities.Constants;
@@ -59,12 +59,12 @@ public class AuthService : IAuthService
            {
                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-               new Claim(ClaimTypes.Name, user.TechnicianName ?? string.Empty),
+               new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
            };
 
-        if (!string.IsNullOrWhiteSpace(user.TechnicianEmail))
-            claims.Add(new Claim(ClaimTypes.Email, user.TechnicianEmail));
+        if (!string.IsNullOrWhiteSpace(user.Email))
+            claims.Add(new Claim(ClaimTypes.Email, user.Email));
 
         // 🔹 TENANT CLAIM'LERİ
         if (user.TenantId > 0)
@@ -150,20 +150,18 @@ public class AuthService : IAuthService
         {
             IsAuthenticated = true,
             Id = u.Id,
-            Name = string.IsNullOrWhiteSpace(u.TechnicianName)
+            Name = string.IsNullOrWhiteSpace(u.Name)
                                     ? (p?.FindFirst(ClaimTypes.Name)?.Value ?? string.Empty)
-                                    : u.TechnicianName,
-            Email = string.IsNullOrWhiteSpace(u.TechnicianEmail)
+                                    : u.Name,
+            Email = string.IsNullOrWhiteSpace(u.Email)
                                     ? p?.FindFirst(ClaimTypes.Email)?.Value
-                                    : u.TechnicianEmail,
-            TechnicianCode = u.TechnicianCode ?? string.Empty,
-            TechnicianCompany = u.TechnicianCompany,
-            TechnicianAddress = u.TechnicianAddress,
+                                    : u.Email,
+            Code = u.Code ?? string.Empty,
+            Company = u.Company,
+            Address = u.Address,
             City = u.City,
             District = u.District,
-            TechnicianName = u.TechnicianName ?? string.Empty,
-            TechnicianPhone = u.TechnicianPhone,
-            TechnicianEmail = u.TechnicianEmail,
+            Phone = u.Phone,
             Roles = u.Roles ?? new List<RoleGetDto>(),
 
             // 🔹 Tenant bilgisi: önce DB, yoksa token claim’inden

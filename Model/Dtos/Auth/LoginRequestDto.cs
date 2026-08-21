@@ -1,4 +1,4 @@
-﻿using Core.Utilities.Constants;
+using Core.Utilities.Constants;
 using Model.Dtos.Menu;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
@@ -8,7 +8,7 @@ namespace Model.Dtos.Auth
     public class LoginRequestDto
     {
         [Required(ErrorMessage = Messages.UsernameRequired)]
-        public string Identifier { get; set; } = string.Empty; // email veya TechnicianCode
+        public string Identifier { get; set; } = string.Empty; // e-posta veya kullanıcı kodu
 
         [Required(ErrorMessage = Messages.PasswordRequired)]
         public string Password { get; set; } = string.Empty;
@@ -19,10 +19,10 @@ namespace Model.Dtos.Auth
     }
 
     /// <summary>
-    /// Identifier eğer '@' içeriyorsa e-posta formatını, aksi halde teknisyen kodu formatını doğrular.
+    /// Identifier eğer '@' içeriyorsa e-posta formatını, aksi halde kullanıcı kodu formatını doğrular.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false)]
-    public sealed class EmailOrTechnicianCodeAttribute : ValidationAttribute
+    public sealed class EmailOrUserCodeAttribute : ValidationAttribute
     {
         public int MinCodeLength { get; set; } = 3;
         public int MaxCodeLength { get; set; } = 32;
@@ -46,10 +46,11 @@ namespace Model.Dtos.Auth
             }
 
             if (s.Length < MinCodeLength || s.Length > MaxCodeLength)
-                return new ValidationResult(ErrorMessage ?? $"{Messages.TechnicianCodeLength}");
+                return new ValidationResult(
+                    ErrorMessage ?? string.Format(Messages.UserCodeLength, MinCodeLength, MaxCodeLength));
 
             if (!CodeRegex.IsMatch(s))
-                return new ValidationResult(ErrorMessage ?? Messages.TechnicianCodeInvalidChars);
+                return new ValidationResult(ErrorMessage ?? Messages.UserCodeInvalidChars);
 
             return ValidationResult.Success;
         }

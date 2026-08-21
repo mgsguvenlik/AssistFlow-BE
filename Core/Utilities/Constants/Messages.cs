@@ -1,4 +1,4 @@
-﻿namespace Core.Utilities.Constants
+namespace Core.Utilities.Constants
 {
     public static class Messages
     {
@@ -85,10 +85,10 @@
         public const string TurkeyCitiesJsonBulunamadi = "turkey-cities.json bulunamadı. seed/ veya DataFiles/ altına koyup 'Copy to Output' verin.";
         public const string TurkeyCitiesJsonEmpty = "turkey-cities.json boş görünüyor, seed atlandı.";
         public const string CityRegionSeedCompleted = "Şehir/İlçe seed tamamlandı: {CityCount} il, {RegionCount} ilçe.";
-        public const string UsernameRequired = "Kullanıcı adı (e-posta veya teknisyen kodu) zorunludur.";
+        public const string UsernameRequired = "Kullanıcı adı (e-posta veya kullanıcı kodu) zorunludur.";
         public const string EnterValidEmail = "Geçerli bir e-posta adresi girin.";
-        public const string TechnicianCodeLength = "Teknisyen kodu {MinCodeLength}-{MaxCodeLength} karakter olmalıdır.";
-        public const string TechnicianCodeInvalidChars = "Teknisyen kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.";
+        public const string UserCodeLength = "Kullanıcı kodu {0}-{1} karakter olmalıdır.";
+        public const string UserCodeInvalidChars = "Kullanıcı kodu yalnızca harf, rakam, '.', '_' ve '-' içerebilir.";
         public const string BrandNameRequired = "Marka adı zorunludur.";
         public const string BrandNameLength = "Marka adı 2-120 karakter olmalıdır.";
         public const string BrandNameCannotBeWhitespace = "Marka adı yalnızca boşluklardan oluşamaz.";
@@ -195,7 +195,7 @@
         public const string Success = "Başarılı";
         public const string NewPasswordAndConfirmationDoNotMatch = "Yeni şifre ile şifre tekrarı eşleşmiyor.";
         public const string RecoveryOldNewRequired = "Eski şifre, yeni şifre ve şifre tekrarı alanları zorunludur.";
-        public const string TechnicianCodeRequired = "Kullanıcı adı  boş olamaz.";
-        public const string TechnicianCodeNoSpaces = "Kullanıcı adı  boşluk içeremez.";
+        public const string UserCodeRequired = "Kullanıcı kodu boş olamaz.";
+        public const string UserCodeNoSpaces = "Kullanıcı kodu boşluk içeremez.";
     }
 }

@@ -9,16 +9,16 @@ namespace Model.Concrete
         [Key]
         public long Id { get; set; }
 
-        /// <summary>Teknisyenin benzersiz kodu (iç sistem/CRM kodu).</summary>
+        /// <summary>Kullanıcının benzersiz kodu (iç sistem/CRM kodu).</summary>
         [Required, MaxLength(50)]
-        public string TechnicianCode { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
 
         /// <summary>Bağlı olduğu firma/unvan.</summary>
         [MaxLength(200)]
-        public string? TechnicianCompany { get; set; }
+        public string? Company { get; set; }
 
         /// <summary>Açık adres.</summary>
-        public string? TechnicianAddress { get; set; }
+        public string? Address { get; set; }
 
         /// <summary>İl.</summary>
         [MaxLength(100)]
@@ -30,15 +30,15 @@ namespace Model.Concrete
 
         /// <summary>Ad Soyad.</summary>
         [Required, MaxLength(150)]
-        public string TechnicianName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>Telefon numarası.</summary>
         [MaxLength(30), Phone]
-        public string? TechnicianPhone { get; set; }
+        public string? Phone { get; set; }
 
         /// <summary>E-posta adresi.</summary>
         [MaxLength(254), EmailAddress]
-        public string? TechnicianEmail { get; set; }
+        public string? Email { get; set; }
 
         /// <summary>
         /// Şifre hash'i. **Düz metin şifre saklamayın.**

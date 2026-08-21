@@ -1,4 +1,4 @@
-﻿using Core.Utilities.Constants;
+using Core.Utilities.Constants;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.User
@@ -7,17 +7,17 @@ namespace Model.Dtos.User
     {
       
 
-        [Required(ErrorMessage = Messages.TechnicianCodeRequired)]
+        [Required(ErrorMessage = Messages.UserCodeRequired)]
         [MaxLength(50)]
-        [RegularExpression(@"^\S+$", ErrorMessage = Messages.TechnicianCodeNoSpaces)] // hiç boşluk yok (baş/son/arası)
-        public string TechnicianCode { get; set; } = string.Empty;
+        [RegularExpression(@"^\S+$", ErrorMessage = Messages.UserCodeNoSpaces)] // hiç boşluk yok (baş/son/arası)
+        public string Code { get; set; } = string.Empty;
 
 
         [MaxLength(200)]
-        public string? TechnicianCompany { get; set; }
+        public string? Company { get; set; }
 
         [MaxLength(500)]
-        public string? TechnicianAddress { get; set; }
+        public string? Address { get; set; }
 
         [MaxLength(100)]
         public string? City { get; set; }
@@ -26,13 +26,13 @@ namespace Model.Dtos.User
         public string? District { get; set; }
 
         [Required, MaxLength(150)]
-        public string TechnicianName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         [MaxLength(30), Phone]
-        public string? TechnicianPhone { get; set; }
+        public string? Phone { get; set; }
 
         [MaxLength(254), EmailAddress]
-        public string? TechnicianEmail { get; set; }
+        public string? Email { get; set; }
         public long? TenantId { get; set; }
 
         // Şifre: min 8, en az 1 büyük, 1 küçük harf ve 1 rakam
