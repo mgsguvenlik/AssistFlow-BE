@@ -21,7 +21,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
         public string? ServiceTypeName { get; set; }
 
         public long? TechnicianId { get; set; }
-        public string? TechnicianName { get; set; }
+        public string? Name { get; set; }
 
         public string Currency { get; set; } = "TRY";
         public decimal? Subtotal { get; set; }

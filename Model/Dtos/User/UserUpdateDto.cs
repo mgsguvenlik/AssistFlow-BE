@@ -1,4 +1,4 @@
-﻿
+
 using Core.Utilities.Constants;
 using System.ComponentModel.DataAnnotations;
 
@@ -8,18 +8,18 @@ namespace Model.Dtos.User
     {
         public long Id { get; set; }
 
-        [Required(ErrorMessage = Messages.TechnicianCodeRequired)]
+        [Required(ErrorMessage = Messages.UserCodeRequired)]
         [MaxLength(50)]
-        [RegularExpression(@"^\S+$", ErrorMessage = Messages.TechnicianCodeNoSpaces)] 
-        public string TechnicianCode { get; set; } = string.Empty;
+        [RegularExpression(@"^\S+$", ErrorMessage = Messages.UserCodeNoSpaces)]
+        public string Code { get; set; } = string.Empty;
 
-        public string? TechnicianCompany { get; set; }
-        public string? TechnicianAddress { get; set; }
+        public string? Company { get; set; }
+        public string? Address { get; set; }
         public string? City { get; set; }
         public string? District { get; set; }
-        public string TechnicianName { get; set; } = string.Empty;
-        public string? TechnicianPhone { get; set; }
-        public string? TechnicianEmail { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
         public bool IsActive { get; set; }
         // Şifre değiştirme opsiyonel
         public string? NewPassword { get; set; }

@@ -174,7 +174,7 @@ namespace Business.Mapper
 
             config.NewConfig<QnbWorkFlow, QnbWorkFlowGetDto>()
                   .Map(dest => dest.CurrentStepCode, src => src.CurrentStep != null ? src.CurrentStep.Code : null)
-                  .Map(dest => dest.ApproverTechnicianName, src => src.ApproverTechnician != null ? src.ApproverTechnician.TechnicianName : null);
+                  .Map(dest => dest.ApproverTechnicianName, src => src.ApproverTechnician != null ? src.ApproverTechnician.Name : null);
 
             // WorkFlowStep
             config.NewConfig<QnbWorkFlowStepCreateDto, QnbWorkFlowStep>()

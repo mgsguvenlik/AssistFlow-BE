@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,7 +44,7 @@ namespace Model.Dtos.Dashboard
     public class LocationIssueDto
     {
         public string RequestNo { get; set; } = string.Empty;
-        public string TechnicianName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public string CustomerName { get; set; } = string.Empty;
         public DateTime IssueDate { get; set; }
         public string IssueType { get; set; } = string.Empty; // "Override Request", "Failed Check"

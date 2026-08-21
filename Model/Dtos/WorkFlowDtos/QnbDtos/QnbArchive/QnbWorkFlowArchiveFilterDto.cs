@@ -3,8 +3,8 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive
     public class QnbWorkFlowArchiveFilterDto
     {
         public string? RequestNo { get; set; }
-        public string? CustomerName { get; set; }       // JSON içinden filtrelenecek
-        public string? TechnicianName { get; set; }     // JSON içinden filtrelenecek
+        public string? CustomerName { get; set; }       // JSON iï¿½inden filtrelenecek
+        public string? Name { get; set; }     // JSON iï¿½inden filtrelenecek
         public string? ArchiveReason { get; set; }      // Completed / Cancelled vb.
         public DateTime? ArchivedFrom { get; set; }
         public DateTime? ArchivedTo { get; set; }

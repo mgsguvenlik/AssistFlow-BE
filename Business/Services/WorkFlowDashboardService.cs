@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
 using Core.Enums;
@@ -244,8 +244,8 @@ namespace Business.Services
                     result.Add(new TechnicianPerformanceDto
                     {
                         TechnicianId = techId,
-                        TechnicianName = technician.TechnicianName ?? "Bilinmiyor",
-                        TechnicianEmail = technician.TechnicianEmail,
+                        Name = technician.Name ?? "Bilinmiyor",
+                        Email = technician.Email,
                         City = technician.City,
                         ActiveTasksCount = activeCount,
                         CompletedTasksCount = completedCount,
@@ -926,7 +926,7 @@ namespace Business.Services
                     .Select(x => new LocationIssueDto
                     {
                         RequestNo = x.RequestNo ?? "Bilinmiyor",
-                        TechnicianName = "Bilinmiyor",
+                        Name = "Bilinmiyor",
                         CustomerName = "Bilinmiyor",
                         IssueDate = x.OccurredAtUtc,
                         IssueType = "Failed Check",
