@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
 using Core.Common;
@@ -51,10 +51,10 @@ public class UserService
 
 
 
-            var uniqueErr = await EnsureUniqueTechnicianAsync(
+            var uniqueErr = await EnsureUniqueUserIdentityAsync(
                 currentUserId: 0,
-                technicianCode: entity.TechnicianCode,
-                technicianEmail: entity.TechnicianEmail,
+                code: entity.Code,
+                email: entity.Email,
                 ct: CancellationToken.None // CreateAsync imzanda ct yoksa None; varsa ct ver
             );
 
@@ -157,10 +157,10 @@ public class UserService
 
 
             // ✅ UNIQUE kontrol (entity.Id hariç)
-            var uniqueErr = await EnsureUniqueTechnicianAsync(
+            var uniqueErr = await EnsureUniqueUserIdentityAsync(
                 currentUserId: entity.Id,
-                technicianCode: entity.TechnicianCode,
-                technicianEmail: entity.TechnicianEmail,
+                code: entity.Code,
+                email: entity.Email,
                 ct: CancellationToken.None // imzaya ct eklersen ct ver
             );
             if (uniqueErr != null)
@@ -311,7 +311,7 @@ public class UserService
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
-            whereExpression: u => u.TechnicianEmail == identifier || u.TechnicianCode == identifier,
+            whereExpression: u => u.Email == identifier || u.Code == identifier,
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
             .Include(u => u.Tenant)
         ).FirstOrDefault();
@@ -354,7 +354,7 @@ public class UserService
         var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
-            whereExpression: u => u.TechnicianEmail == email
+            whereExpression: u => u.Email == email
         ).FirstOrDefault();
 
         if (user == null)
@@ -368,7 +368,7 @@ public class UserService
             };
         }
 
-        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.TechnicianEmail ?? string.Empty) };
+        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.Email ?? string.Empty) };
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Value.Key));
         var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -384,7 +384,7 @@ public class UserService
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
         var mailBody = $@"
-                Merhaba {user.TechnicianName},
+                Merhaba {user.Name},
                 <br/><br/>
                 Şifrenizi sıfırlamak için lütfen aşağıdaki bağlantıya tıklayın:<br/>
                 <a href='{appSettings.Value.AppUrl}/reset-password?code={tokenString}'>Şifre Sıfırlama Bağlantısı</a><br/><br/>
@@ -392,7 +392,7 @@ public class UserService
                 Saygılarımızla,<br/>
             ";
 
-        var mailResult = await _mailService.SendResetPassMailAsync(mailBody, user.TechnicianEmail);
+        var mailResult = await _mailService.SendResetPassMailAsync(mailBody, user.Email);
 
         if (!mailResult.IsSuccess)
         {
@@ -435,7 +435,7 @@ public class UserService
         long userId = long.Parse(userIdString);
         var user = _unitOfWork.Repository.GetMultiple<User>(
         asNoTracking: true,
-        whereExpression: u => u.Id == userId && u.TechnicianEmail == userEmail
+        whereExpression: u => u.Id == userId && u.Email == userEmail
         ).FirstOrDefault();
 
 
@@ -727,11 +727,11 @@ public class UserService
             var search = q.Search.Trim();
 
             query = query.Where(u =>
-                (u.TechnicianName != null && u.TechnicianName.Contains(search)) ||
-                (u.TechnicianEmail != null && u.TechnicianEmail.Contains(search)) ||
-                (u.TechnicianCode != null && u.TechnicianCode.Contains(search)) ||
-                (u.TechnicianCompany != null && u.TechnicianCompany.Contains(search)) ||
-                (u.TechnicianPhone != null && u.TechnicianPhone.Contains(search))
+                (u.Name != null && u.Name.Contains(search)) ||
+                (u.Email != null && u.Email.Contains(search)) ||
+                (u.Code != null && u.Code.Contains(search)) ||
+                (u.Company != null && u.Company.Contains(search)) ||
+                (u.Phone != null && u.Phone.Contains(search))
             );
         }
 
@@ -763,23 +763,23 @@ public class UserService
 
         if (!string.IsNullOrWhiteSpace(q.Sort))
         {
-            if (q.Sort.Equals("technicianName", StringComparison.OrdinalIgnoreCase))
+            if (q.Sort.Equals("name", StringComparison.OrdinalIgnoreCase))
             {
                 query = q.Desc
-                    ? query.OrderByDescending(u => u.TechnicianName)
-                    : query.OrderBy(u => u.TechnicianName);
+                    ? query.OrderByDescending(u => u.Name)
+                    : query.OrderBy(u => u.Name);
             }
-            else if (q.Sort.Equals("technicianEmail", StringComparison.OrdinalIgnoreCase))
+            else if (q.Sort.Equals("email", StringComparison.OrdinalIgnoreCase))
             {
                 query = q.Desc
-                    ? query.OrderByDescending(u => u.TechnicianEmail)
-                    : query.OrderBy(u => u.TechnicianEmail);
+                    ? query.OrderByDescending(u => u.Email)
+                    : query.OrderBy(u => u.Email);
             }
-            else if (q.Sort.Equals("technicianCode", StringComparison.OrdinalIgnoreCase))
+            else if (q.Sort.Equals("code", StringComparison.OrdinalIgnoreCase))
             {
                 query = q.Desc
-                    ? query.OrderByDescending(u => u.TechnicianCode)
-                    : query.OrderBy(u => u.TechnicianCode);
+                    ? query.OrderByDescending(u => u.Code)
+                    : query.OrderBy(u => u.Code);
             }
             else
             {
@@ -804,17 +804,17 @@ public class UserService
             new PagedResult<UserGetDto>(items, total, page, pageSize));
     }
     //Ortak kontrol helper’ı
-    private async Task<ResponseModel<UserGetDto>?> EnsureUniqueTechnicianAsync(
+    private async Task<ResponseModel<UserGetDto>?> EnsureUniqueUserIdentityAsync(
     long currentUserId,
-    string? technicianCode,
-    string? technicianEmail,
+    string? code,
+    string? email,
     CancellationToken ct)
     {
-        var code = technicianCode?.Trim();
-        var email = technicianEmail?.Trim();
+        var normalizedCode = code?.Trim();
+        var normalizedEmail = email?.Trim();
 
         // ikisi de boşsa kontrol etme (istersen zorunlu yaparsın)
-        if (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(email))
+        if (string.IsNullOrWhiteSpace(normalizedCode) && string.IsNullOrWhiteSpace(normalizedEmail))
             return null;
 
         // aynı anda tek sorguda kontrol (IgnoreQueryFilters istersen soft delete için)
@@ -822,20 +822,20 @@ public class UserService
             .AsNoTracking()
             .Where(u => u.Id != currentUserId && !u.IsDeleted)
             .Where(u =>
-                (!string.IsNullOrWhiteSpace(code) && u.TechnicianCode == code) ||
-                (!string.IsNullOrWhiteSpace(email) && u.TechnicianEmail == email)
+                (!string.IsNullOrWhiteSpace(normalizedCode) && u.Code == normalizedCode) ||
+                (!string.IsNullOrWhiteSpace(normalizedEmail) && u.Email == normalizedEmail)
             )
-            .Select(u => new { u.TechnicianCode, u.TechnicianEmail })
+            .Select(u => new { u.Code, u.Email })
             .FirstOrDefaultAsync(ct);
 
         if (exists is null)
             return null;
 
         // hangi alan çakıştı?
-        if (!string.IsNullOrWhiteSpace(code) && string.Equals(exists.TechnicianCode, code, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(normalizedCode) && string.Equals(exists.Code, normalizedCode, StringComparison.OrdinalIgnoreCase))
             return ResponseModel<UserGetDto>.Fail("Aynı kullanıcı adı mevcut.", StatusCode.BadRequest);
 
-        if (!string.IsNullOrWhiteSpace(email) && string.Equals(exists.TechnicianEmail, email, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(normalizedEmail) && string.Equals(exists.Email, normalizedEmail, StringComparison.OrdinalIgnoreCase))
             return ResponseModel<UserGetDto>.Fail("Aynı email  mevcut.", StatusCode.BadRequest);
 
         return ResponseModel<UserGetDto>.Fail("Aynı kullanıcı adı veya email mevcut.", StatusCode.BadRequest);

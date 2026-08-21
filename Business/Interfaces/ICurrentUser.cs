@@ -1,4 +1,4 @@
-﻿using Model.Dtos.Auth;
+using Model.Dtos.Auth;
 
 namespace Business.Interfaces
 {
@@ -7,7 +7,7 @@ namespace Business.Interfaces
         ValueTask<CurrentUserDto?> GetAsync(CancellationToken ct = default);
         long Id { get; }
         string? Email { get; }
-        string? TechnicianName { get; }
+        string? Name { get; }
     }
 
 }

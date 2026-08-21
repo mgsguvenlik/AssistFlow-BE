@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,7 +11,7 @@ namespace Model.Dtos.WorkFlowDtos.WorkFlowArchive
         public long Id { get; set; }
         public string RequestNo { get; set; } = default!;
         public string? CustomerName { get; set; }
-        public string? TechnicianName { get; set; }
+        public string? Name { get; set; }
         public string? WorkFlowStatus { get; set; }
         public string ArchiveReason { get; set; } = default!;
         public DateTime ArchivedAt { get; set; }

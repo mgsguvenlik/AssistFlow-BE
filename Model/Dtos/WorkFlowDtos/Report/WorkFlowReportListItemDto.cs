@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 
 namespace Model.Dtos.WorkFlowDtos.Report
 {
@@ -25,7 +25,7 @@ namespace Model.Dtos.WorkFlowDtos.Report
 
         // Teknisyen
         public long? TechnicianId { get; set; }
-        public string? TechnicianName { get; set; }
+        public string? Name { get; set; }
 
         // Fiyat/Toplam (Captured-first)
         public string Currency { get; set; } = "TRY";

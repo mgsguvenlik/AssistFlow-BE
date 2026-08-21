@@ -1,13 +1,13 @@
 namespace Model.Dtos.OvertimeReport
 {
     /// <summary>
-    /// YKB - Teknisyen bazlý fazla mesai raporu
+    /// YKB - Teknisyen bazlï¿½ fazla mesai raporu
     /// </summary>
     public class YkbTechnicianOvertimeReportDto
     {
         public long TechnicianId { get; set; }
-        public string TechnicianName { get; set; } = string.Empty;
-        public string TechnicianCode { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public double TotalOvertimeHours { get; set; }

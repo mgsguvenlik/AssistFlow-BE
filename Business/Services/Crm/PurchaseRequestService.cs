@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.Interfaces.Crm;
 using Business.Interfaces.Storage;
 using Business.UnitOfWork;
@@ -1959,8 +1959,8 @@ namespace Business.Services.Crm
                     EF.Functions.Like(x.RequestNo, like) ||
                     EF.Functions.Like(x.Subject, like) ||
                     (x.Description != null && EF.Functions.Like(x.Description, like)) ||
-                    (x.RequesterUser != null && EF.Functions.Like(x.RequesterUser.TechnicianName, like)) ||
-                    (x.ManagerUser != null && EF.Functions.Like(x.ManagerUser.TechnicianName, like)) ||
+                    (x.RequesterUser != null && EF.Functions.Like(x.RequesterUser.Name, like)) ||
+                    (x.ManagerUser != null && EF.Functions.Like(x.ManagerUser.Name, like)) ||
                     (x.SystemType != null && EF.Functions.Like(x.SystemType.Name, like)) ||
                     x.Items.Any(i => i.ProductName != null && EF.Functions.Like(i.ProductName, like))
                 );
@@ -1975,8 +1975,8 @@ namespace Business.Services.Crm
             {
                 "requestno" => queryParams.Desc ? query.OrderByDescending(x => x.RequestNo) : query.OrderBy(x => x.RequestNo),
                 "subject" => queryParams.Desc ? query.OrderByDescending(x => x.Subject) : query.OrderBy(x => x.Subject),
-                "requester" => queryParams.Desc ? query.OrderByDescending(x => x.RequesterUser!.TechnicianName) : query.OrderBy(x => x.RequesterUser!.TechnicianName),
-                "manager" => queryParams.Desc ? query.OrderByDescending(x => x.ManagerUser!.TechnicianName) : query.OrderBy(x => x.ManagerUser!.TechnicianName),
+                "requester" => queryParams.Desc ? query.OrderByDescending(x => x.RequesterUser!.Name) : query.OrderBy(x => x.RequesterUser!.Name),
+                "manager" => queryParams.Desc ? query.OrderByDescending(x => x.ManagerUser!.Name) : query.OrderBy(x => x.ManagerUser!.Name),
                 "status" => queryParams.Desc ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
                 "currentstep" => queryParams.Desc ? query.OrderByDescending(x => x.CurrentStep!.OrderNo) : query.OrderBy(x => x.CurrentStep!.OrderNo),
                 "createddate" => queryParams.Desc ? query.OrderByDescending(x => x.CreatedDate) : query.OrderBy(x => x.CreatedDate),
@@ -2568,16 +2568,16 @@ namespace Business.Services.Crm
                         .Where(x => x.Id == task.AssignedUserId.Value)
                         .Select(x => new
                         {
-                            x.TechnicianName,
-                            x.TechnicianEmail
+                            x.Name,
+                            x.Email
                         })
                         .FirstOrDefaultAsync(cancellationToken);
 
-                    if (assignedUser != null && !string.IsNullOrWhiteSpace(assignedUser.TechnicianEmail))
+                    if (assignedUser != null && !string.IsNullOrWhiteSpace(assignedUser.Email))
                     {
                         recipients.Add((
-                            assignedUser.TechnicianName ?? "Kullanıcı",
-                            assignedUser.TechnicianEmail.Trim()
+                            assignedUser.Name ?? "Kullanıcı",
+                            assignedUser.Email.Trim()
                         ));
                     }
                 }
@@ -2594,10 +2594,10 @@ namespace Business.Services.Crm
                     {
                         recipients.AddRange(
                             usersResult.Data
-                                .Where(x => !string.IsNullOrWhiteSpace(x.TechnicianEmail))
+                                .Where(x => !string.IsNullOrWhiteSpace(x.Email))
                                 .Select(x => (
-                                    x.TechnicianName ?? "Kullanıcı",
-                                    x.TechnicianEmail!.Trim()
+                                    x.Name ?? "Kullanıcı",
+                                    x.Email!.Trim()
                                 )));
                     }
                     else

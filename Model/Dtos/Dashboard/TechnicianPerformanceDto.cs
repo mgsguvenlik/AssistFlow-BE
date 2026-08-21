@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,8 +9,8 @@ namespace Model.Dtos.Dashboard
     public class TechnicianPerformanceDto
     {
         public long TechnicianId { get; set; }
-        public string TechnicianName { get; set; } = string.Empty;
-        public string? TechnicianEmail { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Email { get; set; }
         public string? City { get; set; }
         
         // İş Yükü
