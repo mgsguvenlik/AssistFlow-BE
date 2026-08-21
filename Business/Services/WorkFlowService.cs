@@ -1,8 +1,9 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.Interfaces.Manitou;
 using Business.Interfaces.Storage;
 using Business.Services.Manitou;
 using Business.UnitOfWork;
+using Business.Utilities;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
@@ -580,7 +581,7 @@ namespace Business.Services
                         new
                         {
                             warehouse.Id,
-                            tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                            tecnicianName = wf?.ApproverTechnician?.Name ?? "",
                             technicalServiceId = technicalService.Id,
                             DeliveredProducts = dto.DeliveredProducts?.Select(p => new { p.ProductId, p.Quantity })
                         }
@@ -749,7 +750,7 @@ namespace Business.Services
                         "Teknik servise gönderildi (ürün yok)",
                         new
                         {
-                            tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                            tecnicianName = wf?.ApproverTechnician?.Name ?? "",
                             technicalServiceId = technicalService.Id,
                         }
                 );
@@ -1904,7 +1905,7 @@ namespace Business.Services
 
             var me = await _currentUser.GetAsync();
             var techUserId = me?.Id ?? 0;
-            var techUserName = me?.TechnicianName ?? me?.Email ?? "Bilinmiyor";
+            var techUserName = me?.Name ?? me?.Email ?? "Bilinmiyor";
 
             // 2) Konum alanlarını hazırla
             string custLat = customer.Latitude ?? "-";
@@ -3156,14 +3157,14 @@ namespace Business.Services
                           : new UserGetDto
                           {
                               Id = cu.Id,
-                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
-                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
-                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              Code = cu.Code,          // örn. "TEK-001"
+                              Company = cu.Company,       // varsa şirket/kurum adı
+                              Address = cu.Address,       // adres
                               City = cu.City,
                               District = cu.District,
-                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
-                              TechnicianPhone = cu.TechnicianPhone,         // tel
-                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              Name = cu.Name,          // ya da u.FullName kullanıyorsan buraya koy
+                              Phone = cu.Phone,         // tel
+                              Email = cu.Email,         // e-posta
                               IsActive = cu.IsActive,
                           },
                     // 🔹 User (WorkFlow.ApproverTechnician)
@@ -3172,14 +3173,14 @@ namespace Business.Services
                           : new UserGetDto
                           {
                               Id = u.Id,
-                              TechnicianCode = u.TechnicianCode,          // örn. "TEK-001"
-                              TechnicianCompany = u.TechnicianCompany,       // varsa şirket/kurum adı
-                              TechnicianAddress = u.TechnicianAddress,       // adres
+                              Code = u.Code,          // örn. "TEK-001"
+                              Company = u.Company,       // varsa şirket/kurum adı
+                              Address = u.Address,       // adres
                               City = u.City,
                               District = u.District,
-                              TechnicianName = u.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
-                              TechnicianPhone = u.TechnicianPhone,         // tel
-                              TechnicianEmail = u.TechnicianEmail,         // e-posta
+                              Name = u.Name,          // ya da u.FullName kullanıyorsan buraya koy
+                              Phone = u.Phone,         // tel
+                              Email = u.Email,         // e-posta
                               IsActive = u.IsActive,
 
                               // Roller (Include gerektirmez; alt-sorgu olarak çevrilir)
@@ -3370,14 +3371,14 @@ namespace Business.Services
                           : new UserGetDto
                           {
                               Id = cu.Id,
-                              TechnicianCode = cu.TechnicianCode,          // örn. "TEK-001"
-                              TechnicianCompany = cu.TechnicianCompany,       // varsa şirket/kurum adı
-                              TechnicianAddress = cu.TechnicianAddress,       // adres
+                              Code = cu.Code,          // örn. "TEK-001"
+                              Company = cu.Company,       // varsa şirket/kurum adı
+                              Address = cu.Address,       // adres
                               City = cu.City,
                               District = cu.District,
-                              TechnicianName = cu.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
-                              TechnicianPhone = cu.TechnicianPhone,         // tel
-                              TechnicianEmail = cu.TechnicianEmail,         // e-posta
+                              Name = cu.Name,          // ya da u.FullName kullanıyorsan buraya koy
+                              Phone = cu.Phone,         // tel
+                              Email = cu.Email,         // e-posta
                               IsActive = cu.IsActive,
                           },
                     // 🔹 User (WorkFlow.ApproverTechnician)
@@ -3386,14 +3387,14 @@ namespace Business.Services
                           : new UserGetDto
                           {
                               Id = u.Id,
-                              TechnicianCode = u.TechnicianCode,          // örn. "TEK-001"
-                              TechnicianCompany = u.TechnicianCompany,       // varsa şirket/kurum adı
-                              TechnicianAddress = u.TechnicianAddress,       // adres
+                              Code = u.Code,          // örn. "TEK-001"
+                              Company = u.Company,       // varsa şirket/kurum adı
+                              Address = u.Address,       // adres
                               City = u.City,
                               District = u.District,
-                              TechnicianName = u.TechnicianName,          // ya da u.FullName kullanıyorsan buraya koy
-                              TechnicianPhone = u.TechnicianPhone,         // tel
-                              TechnicianEmail = u.TechnicianEmail,         // e-posta
+                              Name = u.Name,          // ya da u.FullName kullanıyorsan buraya koy
+                              Phone = u.Phone,         // tel
+                              Email = u.Email,         // e-posta
                               IsActive = u.IsActive,
 
                               // Roller (Include gerektirmez; alt-sorgu olarak çevrilir)
@@ -4474,7 +4475,6 @@ namespace Business.Services
             var total = await query.CountAsync();
             var items = await query
                 .OrderBy(x => x.Name)
-                .Skip((q.Page - 1) * q.PageSize)
                 .Take(q.PageSize)
                 .ProjectToType<WorkFlowStepGetDto>(_config)
                 .ToListAsync();
@@ -5034,9 +5034,9 @@ namespace Business.Services
                     (
                         x.createdUser != null &&
                         (
-                            (x.createdUser.TechnicianName != null && x.createdUser.TechnicianName.Contains(term)) ||
-                            (x.createdUser.TechnicianEmail != null && x.createdUser.TechnicianEmail.Contains(term)) ||
-                            (x.createdUser.TechnicianPhone != null && x.createdUser.TechnicianPhone.Contains(term)) ||
+                            (x.createdUser.Name != null && x.createdUser.Name.Contains(term)) ||
+                            (x.createdUser.Email != null && x.createdUser.Email.Contains(term)) ||
+                            (x.createdUser.Phone != null && x.createdUser.Phone.Contains(term)) ||
                             (x.createdUser.City != null && x.createdUser.City.Contains(term)) ||
                             (x.createdUser.District != null && x.createdUser.District.Contains(term))
                         )
@@ -5046,9 +5046,9 @@ namespace Business.Services
                     (
                         x.approverTechnician != null &&
                         (
-                            (x.approverTechnician.TechnicianName != null && x.approverTechnician.TechnicianName.Contains(term)) ||
-                            (x.approverTechnician.TechnicianEmail != null && x.approverTechnician.TechnicianEmail.Contains(term)) ||
-                            (x.approverTechnician.TechnicianPhone != null && x.approverTechnician.TechnicianPhone.Contains(term)) ||
+                            (x.approverTechnician.Name != null && x.approverTechnician.Name.Contains(term)) ||
+                            (x.approverTechnician.Email != null && x.approverTechnician.Email.Contains(term)) ||
+                            (x.approverTechnician.Phone != null && x.approverTechnician.Phone.Contains(term)) ||
                             (x.approverTechnician.City != null && x.approverTechnician.City.Contains(term)) ||
                             (x.approverTechnician.District != null && x.approverTechnician.District.Contains(term))
                         )
@@ -5221,7 +5221,7 @@ namespace Business.Services
                     CreatedUser = x.wf.CreatedUser,
                     CreatedUserFullName = x.createdUser == null
                         ? null
-                        : x.createdUser.TechnicianName,
+                        : x.createdUser.Name,
 
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
@@ -5233,12 +5233,12 @@ namespace Business.Services
                         : new UserGetDto
                         {
                             Id = x.approverTechnician.Id,
-                            TechnicianName = x.approverTechnician.TechnicianName,
-                            TechnicianPhone = x.approverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.approverTechnician.TechnicianAddress,
+                            Name = x.approverTechnician.Name,
+                            Phone = x.approverTechnician.Phone,
+                            Address = x.approverTechnician.Address,
                             City = x.approverTechnician.City,
                             District = x.approverTechnician.District,
-                            TechnicianEmail = x.approverTechnician.TechnicianEmail,
+                            Email = x.approverTechnician.Email,
                         },
 
                     CustomerCode = x.customer == null
@@ -5377,9 +5377,9 @@ namespace Business.Services
                     IsLocationValid = wf.IsLocationValid,
                     CustomerApproverName = wf.CustomerApproverName,
                     ApproverTechnicianId = wf.ApproverTechnicianId,
-                    ApproverTechnicianName = wf.ApproverTechnician?.TechnicianName,
-                    ApproverTechnicianEmail = wf.ApproverTechnician?.TechnicianEmail,
-                    ApproverTechnicianCode = wf.ApproverTechnician?.TechnicianCode,
+                    ApproverTechnicianName = wf.ApproverTechnician?.Name,
+                    ApproverTechnicianEmail = wf.ApproverTechnician?.Email,
+                    ApproverTechnicianCode = wf.ApproverTechnician?.Code,
                     Priority = (int)wf.Priority
                 }
             };
@@ -5692,7 +5692,7 @@ namespace Business.Services
                         ServiceTypeId = r.ServiceTypeId,
                         ServiceTypeName = r.ServiceTypeName,
                         TechnicianId = r.TechnicianId,
-                        TechnicianName = r.TechnicianName,
+                        Name = r.Name,
                         Currency = r.Currency ?? "TRY",
                         Subtotal = r.Subtotal,
                         HasImages = q.HasImages ?? false // SP’de döndürürsen r.HasImages
@@ -6078,8 +6078,8 @@ namespace Business.Services
                         ) ||
                         userQuery.Any(u =>
                             w.ApproverTechnicianId == u.Id &&
-                            u.TechnicianName != null &&
-                            u.TechnicianName.Contains(term)
+                            u.Name != null &&
+                            u.Name.Contains(term)
                         )
                     );
                 }
@@ -6519,8 +6519,8 @@ namespace Business.Services
                     .Select(u => new
                     {
                         u.Id,
-                        u.TechnicianName,
-                        u.TechnicianEmail,
+                        u.Name,
+                        u.Email,
                         u.City,
                         u.District
                     })
@@ -6641,11 +6641,11 @@ namespace Business.Services
                         UpdatedDate = w.UpdatedDate,
 
                         CreatedUserId = w.CreatedUser,
-                        CreatedUserName = createdUser?.TechnicianName,
+                        CreatedUserName = createdUser?.Name,
 
                         ApproverTechnicianId = w.ApproverTechnicianId,
-                        ApproverTechnicianName = technician?.TechnicianName,
-                        ApproverTechnicianEmail = technician?.TechnicianEmail,
+                        ApproverTechnicianName = technician?.Name,
+                        ApproverTechnicianEmail = technician?.Email,
                         TechnicianCity = technician?.City,
                         TechnicianDistrict = technician?.District,
 
@@ -7176,7 +7176,7 @@ namespace Business.Services
                 foreach (var a in pageRows)
                 {
                     string? customerName = null;
-                    string? technicianName = null;
+                    string? name = null;
                     string? wfStatus = null;
 
                     // Müşteri adı
@@ -7193,8 +7193,8 @@ namespace Business.Services
                     // Teknisyen adı
                     try
                     {
-                        var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
-                        technicianName = tech?.TechnicianName;
+                        var tech = ArchiveUserJsonCompatibility.Deserialize(a.ApproverTechnicianJson);
+                        name = tech?.Name;
                     }
                     catch
                     {
@@ -7217,7 +7217,7 @@ namespace Business.Services
                         ArchiveReason = a.ArchiveReason,
                         ArchivedAt = a.ArchivedAt,
                         CustomerName = customerName,
-                        TechnicianName = technicianName,
+                        Name = name,
                         WorkFlowStatus = wfStatus
                     });
                 }
@@ -7232,12 +7232,12 @@ namespace Business.Services
                         .ToList();
                 }
 
-                if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
+                if (!string.IsNullOrWhiteSpace(filter.Name))
                 {
-                    var tn = filter.TechnicianName.Trim().ToLowerInvariant();
+                    var tn = filter.Name.Trim().ToLowerInvariant();
                     list = list
-                        .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
-                                    x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .Where(x => !string.IsNullOrEmpty(x.Name) &&
+                                    x.Name!.ToLowerInvariant().Contains(tn))
                         .ToList();
                 }
 
@@ -7418,7 +7418,7 @@ namespace Business.Services
                            ur.Role != null
                            && ur.Role.Code != null
                            && WH_CODES_UP.Contains(ur.Role.Code.ToUpper())))
-                .Select(u => string.IsNullOrWhiteSpace(u.TechnicianEmail) ? "" : u.TechnicianEmail)
+                .Select(u => string.IsNullOrWhiteSpace(u.Email) ? "" : u.Email)
                 .Where(mail => !string.IsNullOrWhiteSpace(mail))
                 .Distinct()
                 .ToListAsync(ct);
@@ -7427,7 +7427,7 @@ namespace Business.Services
         }
         private static string? GetTechnicianEmail(WorkFlow wf)
         {
-            return wf?.ApproverTechnician?.TechnicianEmail;
+            return wf?.ApproverTechnician?.Email;
         }
         private async Task PushTransitionMailsAsync(WorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
         {
@@ -7550,7 +7550,7 @@ namespace Business.Services
             try { servicesRequest = JsonConvert.DeserializeObject<ServicesRequest>(archive.ServicesRequestJson); } catch { }
             try { products = JsonConvert.DeserializeObject<List<ServicesRequestProduct>>(archive.ServicesRequestProductsJson) ?? new(); } catch { }
             try { customer = JsonConvert.DeserializeObject<Customer>(archive.CustomerJson); } catch { }
-            try { approverTechnician = JsonConvert.DeserializeObject<User>(archive.ApproverTechnicianJson); } catch { }
+            approverTechnician = ArchiveUserJsonCompatibility.Deserialize(archive.ApproverTechnicianJson);
             try { customerApprover = JsonConvert.DeserializeObject<ProgressApprover>(archive.CustomerApproverJson); } catch { }
             try { wf = JsonConvert.DeserializeObject<WorkFlow>(archive.WorkFlowJson); } catch { }
             try { reviewLogs = JsonConvert.DeserializeObject<List<WorkFlowReviewLog>>(archive.WorkFlowReviewLogsJson) ?? new(); } catch { }
@@ -8016,7 +8016,7 @@ namespace Business.Services
             public long ServiceTypeId { get; set; }
             public string? ServiceTypeName { get; set; }
             public long? TechnicianId { get; set; }
-            public string? TechnicianName { get; set; }
+            public string? Name { get; set; }
             public decimal Subtotal { get; set; }
             public string Currency { get; set; } = "TRY";
         }
@@ -8090,15 +8090,15 @@ namespace Business.Services
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                        me?.TechnicianName ??
+                var name =
+                        me?.Name ??
                         me?.Name ??
                         me?.Email ??
                         "Bilinmeyen Teknisyen";
 
                 var startDescription = BuildManitouTestDescription(
                     dto.RequestNo,
-                    technicianName,
+                    name,
                     "başlatıldı");
 
                 await _manitouApiService.BeginSystemTestAsync(accessToken, serialNo);
@@ -8255,15 +8255,15 @@ namespace Business.Services
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                      me?.TechnicianName ??
+                var name =
+                      me?.Name ??
                       me?.Name ??
                       me?.Email ??
                       "Bilinmeyen Teknisyen";
 
                 var finishDescription = BuildManitouTestDescription(
                        dto.RequestNo,
-                       technicianName,
+                       name,
                        "bitirildi");
                 await _manitouApiService.SetCustomerOffTestAsync(
                     accessToken,
@@ -8280,7 +8280,7 @@ namespace Business.Services
                 if (missingZones.Count > 0)
                 {
                     await SendMissingZoneWarningMailAsync(
-                        technicianName,
+                        name,
                         customer.SubscriberCompany ?? customer.ContactName1 ?? "-",
                         dto.RequestNo,
                         receivedZones,
@@ -8559,8 +8559,8 @@ namespace Business.Services
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                      me?.TechnicianName ??
+                var name =
+                      me?.Name ??
                       me?.Name ??
                       me?.Email ??
                       "Bilinmeyen Teknisyen";
@@ -8569,7 +8569,7 @@ namespace Business.Services
 
                 var extendDescription = BuildManitouTestDescription(
                 dto.RequestNo,
-                technicianName,
+                name,
                 "uzatıldı");
 
                 await _manitouApiService.SetCustomerOnTestAsync(
@@ -8632,7 +8632,7 @@ namespace Business.Services
                     StatusCode.Error);
             }
         }
-        private async Task SendMissingZoneWarningMailAsync(string technicianName, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
+        private async Task SendMissingZoneWarningMailAsync(string name, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
         {
             var me = await _currentUser.GetAsync();
 
@@ -8670,7 +8670,7 @@ namespace Business.Services
             var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
 
             // Ana gövde ile dinamik oluşturduğumuz detayı birleştiriyoruz.
-            var body = $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
+            var body = $"{name}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
 
             var managerMails = new List<string>();
             var managerMailConfig = await _uow.Repository
@@ -8707,11 +8707,11 @@ namespace Business.Services
                 CreatedUser = me?.Id
             });
         }
-        private static string BuildManitouTestDescription(string requestNo, string technicianName, string action)
+        private static string BuildManitouTestDescription(string requestNo, string name, string action)
         {
             return
                 $"FlowAssist Teknik Servis Testi [FA:{requestNo}] - " +
-                $"{technicianName} tarafından {action}.";
+                $"{name} tarafından {action}.";
         }
         private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records, int serialNo, string requestNo)
         {
@@ -8807,15 +8807,15 @@ namespace Business.Services
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
 
-            var technicianName =
-                me?.TechnicianName ??
+            var name =
+                me?.Name ??
                 me?.Name ??
                 me?.Email ??
                 "Bilinmeyen Teknisyen";
 
             var autoFinishDescription = BuildManitouTestDescription(
                 activeCustomerSession.RequestNo,
-                technicianName,
+                name,
                 $"planlanan süresi dolduğu için '{newRequestNo}' talebi başlatılmadan önce otomatik bitirildi");
 
             // Önce Manitou tarafında test modundan çıkar.
@@ -8896,8 +8896,8 @@ namespace Business.Services
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
 
-                var technicianName =
-                    me?.TechnicianName ??
+                var name =
+                    me?.Name ??
                     me?.Name ??
                     me?.Email ??
                     "Bilinmeyen Teknisyen";
@@ -8974,7 +8974,7 @@ namespace Business.Services
 
                 var finishDescription = BuildManitouTestDescription(
                     session.RequestNo,
-                    technicianName,
+                    name,
                     reason);
 
                 await _manitouApiService.SetCustomerOffTestAsync(

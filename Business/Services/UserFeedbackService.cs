@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.Interfaces.Storage;
 using Business.UnitOfWork;
 using Core.Common;
@@ -833,7 +833,7 @@ namespace Business.Services
                 AdminResponse = feedback.AdminResponse,
                 ResponseDate = feedback.ResponseDate,
                 RespondedBy = feedback.RespondedBy,
-                RespondedByName = respondedUser?.TechnicianName,
+                RespondedByName = respondedUser?.Name,
                 CompletedDate = feedback.CompletedDate,
                 RelatedUrl = feedback.RelatedUrl,
                 UserAgent = feedback.UserAgent,
@@ -844,7 +844,7 @@ namespace Business.Services
                     ? await GetAttachmentDtosAsync(feedback.Id)
                     : new List<UserFeedbackAttachmentDto>(),
                 CreatedUser = feedback.CreatedUser,
-                CreatedUserName = createdUser?.TechnicianName,
+                CreatedUserName = createdUser?.Name,
                 CreatedDate = feedback.CreatedDate,
                 UpdatedDate = feedback.UpdatedDate
             };
@@ -985,8 +985,8 @@ namespace Business.Services
         {
             var title = WebUtility.HtmlEncode(feedback.Title);
             var description = WebUtility.HtmlEncode(feedback.Description);
-            var createdUserName = WebUtility.HtmlEncode(createdUser?.TechnicianName ?? "Bilinmiyor");
-            var createdUserEmail = WebUtility.HtmlEncode(createdUser?.TechnicianEmail ?? "-");
+            var createdUserName = WebUtility.HtmlEncode(createdUser?.Name ?? "Bilinmiyor");
+            var createdUserEmail = WebUtility.HtmlEncode(createdUser?.Email ?? "-");
             var feedbackType = WebUtility.HtmlEncode(GetFeedbackTypeText(feedback.FeedbackType));
             var createdDate = feedback.CreatedDate.ToString("dd.MM.yyyy HH:mm");
 
@@ -1068,7 +1068,7 @@ namespace Business.Services
             FeedbackStatus newStatus,
             string statusMessage)
         {
-            var ownerName = WebUtility.HtmlEncode(owner.TechnicianName);
+            var ownerName = WebUtility.HtmlEncode(owner.Name);
             var title = WebUtility.HtmlEncode(feedback.Title);
             var oldStatusText = WebUtility.HtmlEncode(GetStatusText(oldStatus));
             var newStatusText = WebUtility.HtmlEncode(GetStatusText(newStatus));
@@ -1141,7 +1141,7 @@ namespace Business.Services
 
         private static string BuildFeedbackAdminResponseMailBody(UserFeedback feedback, User owner)
         {
-            var ownerName = WebUtility.HtmlEncode(owner.TechnicianName);
+            var ownerName = WebUtility.HtmlEncode(owner.Name);
             var title = WebUtility.HtmlEncode(feedback.Title);
             var adminResponse = WebUtility.HtmlEncode(feedback.AdminResponse ?? "");
 
@@ -1260,7 +1260,7 @@ namespace Business.Services
             {
                 var owner = await GetFeedbackOwnerAsync(feedback.CreatedUser);
 
-                if (owner == null || string.IsNullOrWhiteSpace(owner.TechnicianEmail))
+                if (owner == null || string.IsNullOrWhiteSpace(owner.Email))
                 {
                     _logger.LogWarning(
                         "Feedback status maili gönderilemedi. Kullanıcı veya e-posta adresi bulunamadı. FeedbackId: {FeedbackId}, UserId: {UserId}",
@@ -1287,7 +1287,7 @@ namespace Business.Services
                     RequestNo = feedback.Id.ToString(),
                     FromStepCode = oldStatus.ToString(),
                     ToStepCode = newStatus.ToString(),
-                    ToRecipients = owner.TechnicianEmail,
+                    ToRecipients = owner.Email,
                     Subject = subject,
                     BodyHtml = body,
                     Status = MailOutboxStatus.Pending,
@@ -1310,7 +1310,7 @@ namespace Business.Services
             {
                 var owner = await GetFeedbackOwnerAsync(feedback.CreatedUser);
 
-                if (owner == null || string.IsNullOrWhiteSpace(owner.TechnicianEmail))
+                if (owner == null || string.IsNullOrWhiteSpace(owner.Email))
                 {
                     _logger.LogWarning(
                         "Feedback admin response maili gönderilemedi. Kullanıcı veya e-posta adresi bulunamadı. FeedbackId: {FeedbackId}, UserId: {UserId}",
@@ -1329,7 +1329,7 @@ namespace Business.Services
                     RequestNo = feedback.Id.ToString(),
                     FromStepCode = "ADMIN_RESPONSE_UPDATED",
                     ToStepCode = "USER_NOTIFICATION",
-                    ToRecipients = owner.TechnicianEmail,
+                    ToRecipients = owner.Email,
                     Subject = subject,
                     BodyHtml = body,
                     Status = MailOutboxStatus.Pending,
@@ -1470,7 +1470,7 @@ namespace Business.Services
                     .Where(x => userIds.Contains(x.Id))
                     .ToDictionaryAsync(
                         x => x.Id,
-                        x => x.TechnicianName,
+                        x => x.Name,
                         cancellationToken);
 
             return attachments

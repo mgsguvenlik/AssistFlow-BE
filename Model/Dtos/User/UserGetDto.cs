@@ -1,4 +1,4 @@
-﻿using Model.Dtos.Role;
+using Model.Dtos.Role;
 
 namespace Model.Dtos.User
 {
@@ -9,14 +9,14 @@ namespace Model.Dtos.User
         public string? TenantCode { get; set; }
         public string? TenantName { get; set; }
         public bool IsTechnicalServiceTestEnabled { get; set; } 
-        public string TechnicianCode { get; set; } = string.Empty;
-        public string? TechnicianCompany { get; set; }
-        public string? TechnicianAddress { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string? Company { get; set; }
+        public string? Address { get; set; }
         public string? City { get; set; }
         public string? District { get; set; }
-        public string TechnicianName { get; set; } = string.Empty;
-        public string? TechnicianPhone { get; set; }
-        public string? TechnicianEmail { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
 
         public bool IsActive { get; set; }
         public List<RoleGetDto> Roles { get; set; } = new();

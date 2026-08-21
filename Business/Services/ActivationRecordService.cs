@@ -1,4 +1,4 @@
-﻿using Azure.Core;
+using Azure.Core;
 using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
@@ -223,7 +223,7 @@ namespace Business.Services
             // Kim?
             var me = (await _auth.MeAsync())?.Data;
             entry.PerformedByUserId = me?.Id;
-            entry.PerformedByUserName = me?.TechnicianName ?? me?.Email;
+            entry.PerformedByUserName = me?.Name ?? me?.Email;
 
             // İstemci
             var http = _httpCtx.HttpContext;

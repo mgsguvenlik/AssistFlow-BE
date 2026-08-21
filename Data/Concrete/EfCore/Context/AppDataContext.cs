@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Model.Concrete;
 using Model.Concrete.Crm;
 using Model.Concrete.Qnb;
@@ -246,11 +246,11 @@ namespace Data.Concrete.EfCore.Context
 
             /// User Entity Configuration
             modelBuilder.Entity<User>()
-                .HasIndex(x => x.TechnicianEmail)
+                .HasIndex(x => x.Email)
                 .IsUnique();
 
             modelBuilder.Entity<User>()
-                .HasIndex(x => x.TechnicianCode)
+                .HasIndex(x => x.Code)
                 .IsUnique();
             modelBuilder.Entity<UserRole>(e =>
             {

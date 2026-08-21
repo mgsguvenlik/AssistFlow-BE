@@ -1,4 +1,4 @@
-﻿using Mapster;
+using Mapster;
 using Model.Concrete.Ykb;
 using Model.Dtos.WorkFlowDtos.YkbDtos.ActivityRecord;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
@@ -175,7 +175,7 @@ namespace Business.Mapper
 
             config.NewConfig<YkbWorkFlow, YkbWorkFlowGetDto>()
                   .Map(dest => dest.CurrentStepCode, src => src.CurrentStep != null ? src.CurrentStep.Code : null)
-                  .Map(dest => dest.ApproverTechnicianName, src => src.ApproverTechnician != null ? src.ApproverTechnician.TechnicianName : null);
+                  .Map(dest => dest.ApproverTechnicianName, src => src.ApproverTechnician != null ? src.ApproverTechnician.Name : null);
 
             // WorkFlowStep
             config.NewConfig<YkbWorkFlowStepCreateDto, YkbWorkFlowStep>()

@@ -1,9 +1,10 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.Interfaces.Manitou;
 using Business.Interfaces.Qnb;
 using Business.Interfaces.Storage;
 using Business.Services.Manitou;
 using Business.UnitOfWork;
+using Business.Utilities;
 using ClosedXML.Excel;
 using Core.Common;
 using Core.Enums;
@@ -606,7 +607,7 @@ namespace Business.Services.Qnb
                     new
                     {
                         warehouse.Id,
-                        tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                        tecnicianName = wf?.ApproverTechnician?.Name ?? "",
                         technicalServiceId = technicalService.Id,
                         DeliveredProducts = dto.DeliveredProducts?.Select(p => new { p.ProductId, p.Quantity })
                     }
@@ -765,7 +766,7 @@ namespace Business.Services.Qnb
                     "Teknik servise gönderildi (ürün yok)",
                     new
                     {
-                        tecnicianName = wf?.ApproverTechnician?.TechnicianName ?? "",
+                        tecnicianName = wf?.ApproverTechnician?.Name ?? "",
                         technicalServiceId = technicalService.Id,
                     }
                 );
@@ -1858,7 +1859,7 @@ namespace Business.Services.Qnb
 
             var me = await _currentUser.GetAsync();
             var techUserId = me?.Id ?? 0;
-            var techUserName = me?.TechnicianName ?? me?.Email ?? "Bilinmiyor";
+            var techUserName = me?.Name ?? me?.Email ?? "Bilinmiyor";
 
             // 2) Konum alanlarını hazırla
             string custLat = customer.Latitude ?? "-";
@@ -3039,28 +3040,28 @@ namespace Business.Services.Qnb
                     CreatedUser = cu == null ? null : new UserGetDto
                     {
                         Id = cu.Id,
-                        TechnicianCode = cu.TechnicianCode,
-                        TechnicianCompany = cu.TechnicianCompany,
-                        TechnicianAddress = cu.TechnicianAddress,
+                        Code = cu.Code,
+                        Company = cu.Company,
+                        Address = cu.Address,
                         City = cu.City,
                         District = cu.District,
-                        TechnicianName = cu.TechnicianName,
-                        TechnicianPhone = cu.TechnicianPhone,
-                        TechnicianEmail = cu.TechnicianEmail,
+                        Name = cu.Name,
+                        Phone = cu.Phone,
+                        Email = cu.Email,
                         IsActive = cu.IsActive,
                     },
 
                     User = u == null ? null : new UserGetDto
                     {
                         Id = u.Id,
-                        TechnicianCode = u.TechnicianCode,
-                        TechnicianCompany = u.TechnicianCompany,
-                        TechnicianAddress = u.TechnicianAddress,
+                        Code = u.Code,
+                        Company = u.Company,
+                        Address = u.Address,
                         City = u.City,
                         District = u.District,
-                        TechnicianName = u.TechnicianName,
-                        TechnicianPhone = u.TechnicianPhone,
-                        TechnicianEmail = u.TechnicianEmail,
+                        Name = u.Name,
+                        Phone = u.Phone,
+                        Email = u.Email,
                         IsActive = u.IsActive,
                         Roles = u.UserRoles
                             .Select(ur => new RoleGetDto
@@ -3224,14 +3225,14 @@ namespace Business.Services.Qnb
                     User = u == null ? null : new UserGetDto
                     {
                         Id = u.Id,
-                        TechnicianCode = u.TechnicianCode,
-                        TechnicianCompany = u.TechnicianCompany,
-                        TechnicianAddress = u.TechnicianAddress,
+                        Code = u.Code,
+                        Company = u.Company,
+                        Address = u.Address,
                         City = u.City,
                         District = u.District,
-                        TechnicianName = u.TechnicianName,
-                        TechnicianPhone = u.TechnicianPhone,
-                        TechnicianEmail = u.TechnicianEmail,
+                        Name = u.Name,
+                        Phone = u.Phone,
+                        Email = u.Email,
                         IsActive = u.IsActive,
                         Roles = u.UserRoles
                             .Select(ur => new RoleGetDto
@@ -4177,7 +4178,7 @@ namespace Business.Services.Qnb
                     CreatedDate = x.wf.CreatedDate,
                     UpdatedDate = x.wf.UpdatedDate,
                     CreatedUser = x.wf.CreatedUser,
-                    CreatedUserFullName = x.createdUser == null ? null : x.createdUser.TechnicianName,
+                    CreatedUserFullName = x.createdUser == null ? null : x.createdUser.Name,
                     UpdatedUser = x.wf.UpdatedUser,
                     IsDeleted = x.wf.IsDeleted,
                     ApproverTechnicianId = x.wf.ApproverTechnicianId,
@@ -4187,12 +4188,12 @@ namespace Business.Services.Qnb
                         : new UserGetDto
                         {
                             Id = x.wf.ApproverTechnician.Id,
-                            TechnicianName = x.wf.ApproverTechnician.TechnicianName,
-                            TechnicianPhone = x.wf.ApproverTechnician.TechnicianPhone,
-                            TechnicianAddress = x.wf.ApproverTechnician.TechnicianAddress,
+                            Name = x.wf.ApproverTechnician.Name,
+                            Phone = x.wf.ApproverTechnician.Phone,
+                            Address = x.wf.ApproverTechnician.Address,
                             City = x.wf.ApproverTechnician.City,
                             District = x.wf.ApproverTechnician.District,
-                            TechnicianEmail = x.wf.ApproverTechnician.TechnicianEmail,
+                            Email = x.wf.ApproverTechnician.Email,
                         },
 
                     CustomerCode = x.sr == null ? null : (x.sr.Customer == null ? null : x.sr.Customer.SubscriberCode),
@@ -4303,9 +4304,9 @@ namespace Business.Services.Qnb
                     IsLocationValid = wf.IsLocationValid,
                     CustomerApproverName = wf.CustomerApproverName,
                     ApproverTechnicianId = wf.ApproverTechnicianId,
-                    ApproverTechnicianName = wf.ApproverTechnician?.TechnicianName,
-                    ApproverTechnicianEmail = wf.ApproverTechnician?.TechnicianEmail,
-                    ApproverTechnicianCode = wf.ApproverTechnician?.TechnicianCode,
+                    ApproverTechnicianName = wf.ApproverTechnician?.Name,
+                    ApproverTechnicianEmail = wf.ApproverTechnician?.Email,
+                    ApproverTechnicianCode = wf.ApproverTechnician?.Code,
                     Priority = (int)wf.Priority
                 }
             };
@@ -4583,7 +4584,7 @@ namespace Business.Services.Qnb
                         ServiceTypeId = r.ServiceTypeId,
                         ServiceTypeName = r.ServiceTypeName,
                         TechnicianId = r.TechnicianId,
-                        TechnicianName = r.TechnicianName,
+                        Name = r.Name,
                         Currency = r.Currency ?? "TRY",
                         Subtotal = r.Subtotal,
                         HasImages = q.HasImages ?? false
@@ -4948,7 +4949,7 @@ namespace Business.Services.Qnb
             public long ServiceTypeId { get; set; }
             public string? ServiceTypeName { get; set; }
             public long? TechnicianId { get; set; }
-            public string? TechnicianName { get; set; }
+            public string? Name { get; set; }
             public decimal Subtotal { get; set; }
             public string Currency { get; set; } = "TRY";
         }
@@ -5020,8 +5021,8 @@ namespace Business.Services.Qnb
 
                         userQuery.Any(u =>
                             w.ApproverTechnicianId == u.Id &&
-                            u.TechnicianName != null &&
-                            u.TechnicianName.Contains(term)
+                            u.Name != null &&
+                            u.Name.Contains(term)
                         )
                     );
                 }
@@ -5498,8 +5499,8 @@ namespace Business.Services.Qnb
                     .Select(u => new
                     {
                         u.Id,
-                        u.TechnicianName,
-                        u.TechnicianEmail,
+                        u.Name,
+                        u.Email,
                         u.City,
                         u.District
                     })
@@ -5620,11 +5621,11 @@ namespace Business.Services.Qnb
                         UpdatedDate = w.UpdatedDate,
 
                         CreatedUserId = w.CreatedUser,
-                        CreatedUserName = createdUser?.TechnicianName,
+                        CreatedUserName = createdUser?.Name,
 
                         ApproverTechnicianId = w.ApproverTechnicianId,
-                        ApproverTechnicianName = technician?.TechnicianName,
-                        ApproverTechnicianEmail = technician?.TechnicianEmail,
+                        ApproverTechnicianName = technician?.Name,
+                        ApproverTechnicianEmail = technician?.Email,
                         TechnicianCity = technician?.City,
                         TechnicianDistrict = technician?.District,
 
@@ -6154,7 +6155,7 @@ namespace Business.Services.Qnb
                 foreach (var a in pageRows)
                 {
                     string? customerName = null;
-                    string? technicianName = null;
+                    string? name = null;
                     string? wfStatus = null;
 
                     try
@@ -6166,8 +6167,8 @@ namespace Business.Services.Qnb
 
                     try
                     {
-                        var tech = JsonConvert.DeserializeObject<User>(a.ApproverTechnicianJson);
-                        technicianName = tech?.TechnicianName;
+                        var tech = ArchiveUserJsonCompatibility.Deserialize(a.ApproverTechnicianJson);
+                        name = tech?.Name;
                     }
                     catch { }
 
@@ -6185,7 +6186,7 @@ namespace Business.Services.Qnb
                         ArchiveReason = a.ArchiveReason,
                         ArchivedAt = a.ArchivedAt,
                         CustomerName = customerName,
-                        TechnicianName = technicianName,
+                        Name = name,
                         WorkFlowStatus = wfStatus
                     });
                 }
@@ -6199,12 +6200,12 @@ namespace Business.Services.Qnb
                         .ToList();
                 }
 
-                if (!string.IsNullOrWhiteSpace(filter.TechnicianName))
+                if (!string.IsNullOrWhiteSpace(filter.Name))
                 {
-                    var tn = filter.TechnicianName.Trim().ToLowerInvariant();
+                    var tn = filter.Name.Trim().ToLowerInvariant();
                     list = list
-                        .Where(x => !string.IsNullOrEmpty(x.TechnicianName) &&
-                                    x.TechnicianName!.ToLowerInvariant().Contains(tn))
+                        .Where(x => !string.IsNullOrEmpty(x.Name) &&
+                                    x.Name!.ToLowerInvariant().Contains(tn))
                         .ToList();
                 }
 
@@ -6454,7 +6455,7 @@ namespace Business.Services.Qnb
             try { servicesRequest = JsonConvert.DeserializeObject<QnbServicesRequest>(archive.QnbServicesRequestJson); } catch { }
             try { products = JsonConvert.DeserializeObject<List<QnbServicesRequestProduct>>(archive.QnbServicesRequestProductsJson) ?? new(); } catch { }
             try { customer = JsonConvert.DeserializeObject<Customer>(archive.CustomerJson); } catch { }
-            try { approverTechnician = JsonConvert.DeserializeObject<User>(archive.ApproverTechnicianJson); } catch { }
+            approverTechnician = ArchiveUserJsonCompatibility.Deserialize(archive.ApproverTechnicianJson);
             try { customerApprover = JsonConvert.DeserializeObject<ProgressApprover>(archive.CustomerApproverJson); } catch { }
             try { wf = JsonConvert.DeserializeObject<QnbWorkFlow>(archive.QnbWorkFlowJson); } catch { }
             try { reviewLogs = JsonConvert.DeserializeObject<List<QnbWorkFlowReviewLog>>(archive.QnbWorkFlowReviewLogsJson) ?? new(); } catch { }
@@ -6647,7 +6648,7 @@ namespace Business.Services.Qnb
                         ur.Role != null
                         && ur.Role.Code != null
                         && WH_CODES_UP.Contains(ur.Role.Code.ToUpper())))
-                .Select(u => string.IsNullOrWhiteSpace(u.TechnicianEmail) ? "" : u.TechnicianEmail)
+                .Select(u => string.IsNullOrWhiteSpace(u.Email) ? "" : u.Email)
                 .Where(mail => !string.IsNullOrWhiteSpace(mail))
                 .Distinct()
                 .ToListAsync(ct);
@@ -6657,7 +6658,7 @@ namespace Business.Services.Qnb
 
         private static string? GetTechnicianEmail(QnbWorkFlow wf)
         {
-            return wf?.ApproverTechnician?.TechnicianEmail;
+            return wf?.ApproverTechnician?.Email;
         }
 
         private async Task PushTransitionMailsAsync(QnbWorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
@@ -6961,15 +6962,15 @@ namespace Business.Services.Qnb
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                        me?.TechnicianName ??
+                var name =
+                        me?.Name ??
                         me?.Name ??
                         me?.Email ??
                         "Bilinmeyen Teknisyen";
 
                 var startDescription = BuildManitouTestDescription(
                     dto.RequestNo,
-                    technicianName,
+                    name,
                     "başlatıldı");
 
                 await _manitouApiService.BeginSystemTestAsync(accessToken, serialNo);
@@ -7126,15 +7127,15 @@ namespace Business.Services.Qnb
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                      me?.TechnicianName ??
+                var name =
+                      me?.Name ??
                       me?.Name ??
                       me?.Email ??
                       "Bilinmeyen Teknisyen";
 
                 var finishDescription = BuildManitouTestDescription(
                        dto.RequestNo,
-                       technicianName,
+                       name,
                        "bitirildi");
                 await _manitouApiService.SetCustomerOffTestAsync(
                     accessToken,
@@ -7151,7 +7152,7 @@ namespace Business.Services.Qnb
                 if (missingZones.Count > 0)
                 {
                     await SendMissingZoneWarningMailAsync(
-                        technicianName,
+                        name,
                         customer.SubscriberCompany ?? customer.ContactName1 ?? "-",
                         dto.RequestNo,
                         receivedZones,
@@ -7430,8 +7431,8 @@ namespace Business.Services.Qnb
 
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
-                var technicianName =
-                      me?.TechnicianName ??
+                var name =
+                      me?.Name ??
                       me?.Name ??
                       me?.Email ??
                       "Bilinmeyen Teknisyen";
@@ -7440,7 +7441,7 @@ namespace Business.Services.Qnb
 
                 var extendDescription = BuildManitouTestDescription(
                 dto.RequestNo,
-                technicianName,
+                name,
                 "uzatıldı");
 
                 await _manitouApiService.SetCustomerOnTestAsync(
@@ -7503,7 +7504,7 @@ namespace Business.Services.Qnb
                     StatusCode.Error);
             }
         }
-        private async Task SendMissingZoneWarningMailAsync(string technicianName, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
+        private async Task SendMissingZoneWarningMailAsync(string name, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
         {
             var me = await _currentUser.GetAsync();
 
@@ -7541,7 +7542,7 @@ namespace Business.Services.Qnb
             var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
 
             // Ana gövde ile dinamik oluşturduğumuz detayı birleştiriyoruz.
-            var body = $"{technicianName}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
+            var body = $"{name}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
 
             var managerMails = new List<string>();
             var managerMailConfig = await _uow.Repository
@@ -7578,11 +7579,11 @@ namespace Business.Services.Qnb
                 CreatedUser = me?.Id
             });
         }
-        private static string BuildManitouTestDescription(string requestNo, string technicianName, string action)
+        private static string BuildManitouTestDescription(string requestNo, string name, string action)
         {
             return
                 $"FlowAssist QNB Teknik Servis Testi [FA:{requestNo}] - " +
-                $"{technicianName} tarafından {action}.";
+                $"{name} tarafından {action}.";
         }
         private static ManitouOutOfServiceResult? GetRelatedOutOfServiceRecord(IEnumerable<ManitouOutOfServiceResult> records, int serialNo, string requestNo)
         {
@@ -7678,15 +7679,15 @@ namespace Business.Services.Qnb
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
 
-            var technicianName =
-                me?.TechnicianName ??
+            var name =
+                me?.Name ??
                 me?.Name ??
                 me?.Email ??
                 "Bilinmeyen Teknisyen";
 
             var autoFinishDescription = BuildManitouTestDescription(
                 activeCustomerSession.RequestNo,
-                technicianName,
+                name,
                 $"planlanan süresi dolduğu için '{newRequestNo}' talebi başlatılmadan önce otomatik bitirildi");
 
             // Önce Manitou tarafında test modundan çıkar.
@@ -7767,8 +7768,8 @@ namespace Business.Services.Qnb
                 var me = await _currentUser.GetAsync();
                 var meId = me?.Id ?? 0;
 
-                var technicianName =
-                    me?.TechnicianName ??
+                var name =
+                    me?.Name ??
                     me?.Name ??
                     me?.Email ??
                     "Bilinmeyen Teknisyen";
@@ -7845,7 +7846,7 @@ namespace Business.Services.Qnb
 
                 var finishDescription = BuildManitouTestDescription(
                     session.RequestNo,
-                    technicianName,
+                    name,
                     reason);
 
                 await _manitouApiService.SetCustomerOffTestAsync(

@@ -1,4 +1,4 @@
-﻿using Model.Dtos.Role;
+using Model.Dtos.Role;
 
 namespace Model.Dtos.Auth
 {
@@ -6,16 +6,14 @@ namespace Model.Dtos.Auth
     {
         public bool IsAuthenticated { get; set; }
         public long Id { get; set; }
-        public string Name { get; set; } = "";
-        public string? Email { get; set; }
-        public string TechnicianCode { get; set; } = string.Empty;
-        public string? TechnicianCompany { get; set; }
-        public string? TechnicianAddress { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string? Company { get; set; }
+        public string? Address { get; set; }
         public string? City { get; set; }
         public string? District { get; set; }
-        public string TechnicianName { get; set; } = string.Empty;
-        public string? TechnicianPhone { get; set; }
-        public string? TechnicianEmail { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
 
         // 🔹 Tenant alanları
         public long? TenantId { get; set; }

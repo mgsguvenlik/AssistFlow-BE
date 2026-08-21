@@ -1,10 +1,10 @@
-﻿namespace Model.Dtos.WorkFlowDtos.WorkFlowArchive
+namespace Model.Dtos.WorkFlowDtos.WorkFlowArchive
 {
     public class WorkFlowArchiveFilterDto
     {
         public string? RequestNo { get; set; }
         public string? CustomerName { get; set; }       // JSON içinden filtrelenecek
-        public string? TechnicianName { get; set; }     // JSON içinden filtrelenecek
+        public string? Name { get; set; }     // JSON içinden filtrelenecek
         public string? ArchiveReason { get; set; }      // Completed / Cancelled vb.
         public DateTime? ArchivedFrom { get; set; }
         public DateTime? ArchivedTo { get; set; }

@@ -1,4 +1,4 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Business.UnitOfWork;
 using ClosedXML.Excel;
 using Core.Common;
@@ -143,8 +143,8 @@ namespace Business.Services
                 var report = new TechnicianOvertimeReportDto
                 {
                     TechnicianId = technician.Id,
-                    TechnicianName = technician.TechnicianName,
-                    TechnicianCode = technician.TechnicianCode,
+                    Name = technician.Name,
+                    Code = technician.Code,
                     StartDate = startDate,
                     EndDate = endDate,
                     TotalOvertimeHours = Math.Round(totalOvertimeHours, 2),
@@ -234,8 +234,8 @@ namespace Business.Services
                         technicians.Add(new TechnicianOvertimeSummaryDto
                         {
                             TechnicianId = techId,
-                            TechnicianName = technician.TechnicianName,
-                            TechnicianCode = technician.TechnicianCode,
+                            Name = technician.Name,
+                            Code = technician.Code,
                             TotalOvertimeHours = Math.Round(techOvertimeHours, 2),
                             TotalJobs = overtimeRequestNos.Count,
                             RequestNos = overtimeRequestNos.Distinct().ToList()
@@ -305,9 +305,9 @@ namespace Business.Services
 
                     // Header
                     worksheet.Cell(1, 1).Value = "Teknisyen Adı";
-                    worksheet.Cell(1, 2).Value = singleReport.Data.TechnicianName;
+                    worksheet.Cell(1, 2).Value = singleReport.Data.Name;
                     worksheet.Cell(2, 1).Value = "Teknisyen Kodu";
-                    worksheet.Cell(2, 2).Value = singleReport.Data.TechnicianCode;
+                    worksheet.Cell(2, 2).Value = singleReport.Data.Code;
                     worksheet.Cell(3, 1).Value = "Başlangıç Tarihi";
                     worksheet.Cell(3, 2).Value = singleReport.Data.StartDate.ToString("dd.MM.yyyy");
                     worksheet.Cell(4, 1).Value = "Bitiş Tarihi";
@@ -383,8 +383,8 @@ namespace Business.Services
                     row++;
                     foreach (var tech in summaryReport.Data.Technicians)
                     {
-                        worksheet.Cell(row, 1).Value = tech.TechnicianCode;
-                        worksheet.Cell(row, 2).Value = tech.TechnicianName;
+                        worksheet.Cell(row, 1).Value = tech.Code;
+                        worksheet.Cell(row, 2).Value = tech.Name;
                         worksheet.Cell(row, 3).Value = tech.TotalOvertimeHours;
                         worksheet.Cell(row, 4).Value = tech.TotalJobs;
                         row++;
