@@ -69,6 +69,8 @@ namespace Business.Services.Crm
             public const string Cancel = "CANCEL";
         }
 
+        private const string AdminRoleCode = "ADMIN";
+
 
         public PurchaseRequestService(
            IUnitOfWork uow,
@@ -243,7 +245,8 @@ namespace Business.Services.Crm
                  * - RevisionRequired
                  * durumlarında talep sahibi tarafından değiştirilebilir.
                  */
-                if (!IsEditableByRequester(entity, currentUser.Id))
+                if (!IsAdmin(currentUser) &&
+                    !IsEditableByRequester(entity, currentUser.Id))
                 {
                     return ResponseModel<PurchaseRequestGetDto>.Fail(
                         "Bu satın alma talebi mevcut durumda düzenlenemez.",
@@ -340,7 +343,8 @@ namespace Business.Services.Crm
                         false);
                 }
 
-                if (request.RequesterUserId != currentUser.Id)
+                if (!IsAdmin(currentUser) &&
+                    request.RequesterUserId != currentUser.Id)
                 {
                     return ResponseModel<bool>.Fail(
                         "Yalnızca talep sahibi satın alma talebini iptal edebilir.",
@@ -348,7 +352,8 @@ namespace Business.Services.Crm
                         false);
                 }
 
-                if (!IsStatus(
+                if (!IsAdmin(currentUser) &&
+                    !IsStatus(
                         request.Status,
                         "Draft",
                         "RevisionRequired"))
@@ -416,7 +421,9 @@ namespace Business.Services.Crm
                     FromStepId = fromStepId,
                     ToStepId = cancelStep.Id,
                     PurchaseRequestActionId = cancelAction.Id,
-                    Description = "Talep sahibi tarafından iptal edildi.",
+                    Description = IsAdmin(currentUser)
+                        ? "Admin tarafından iptal edildi."
+                        : "Talep sahibi tarafından iptal edildi.",
                     PreviousStatus = previousStatus,
                     NewStatus = GetPurchaseStatus("Cancelled")
                 };
@@ -482,7 +489,8 @@ namespace Business.Services.Crm
                         false);
                 }
 
-                if (request.RequesterUserId != currentUser.Id)
+                if (!IsAdmin(currentUser) &&
+                    request.RequesterUserId != currentUser.Id)
                 {
                     return ResponseModel<bool>.Fail(
                         "Yalnızca talep sahibi satın alma talebini iptal edebilir.",
@@ -490,7 +498,8 @@ namespace Business.Services.Crm
                         false);
                 }
 
-                if (!IsStatus(
+                if (!IsAdmin(currentUser) &&
+                    !IsStatus(
                         request.Status,
                         "Draft",
                         "RevisionRequired"))
@@ -560,7 +569,9 @@ namespace Business.Services.Crm
                     FromStepId = fromStepId,
                     ToStepId = cancelStep.Id,
                     PurchaseRequestActionId = cancelAction.Id,
-                    Description = "Talep sahibi tarafından iptal edildi.",
+                    Description = IsAdmin(currentUser)
+                        ? "Admin tarafından iptal edildi."
+                        : "Talep sahibi tarafından iptal edildi.",
                     PreviousStatus = previousStatus,
                     NewStatus = GetPurchaseStatus("Cancelled")
                 };
@@ -609,6 +620,10 @@ namespace Business.Services.Crm
                         Messages.RecordNotFound,
                         StatusCode.NotFound);
                 }
+
+                await PopulateHistoryCreatedUserNamesAsync(
+                    dto.Histories,
+                    cancellationToken);
 
                 return ResponseModel<PurchaseRequestDetailDto>.Success(dto);
             }
@@ -696,7 +711,8 @@ namespace Business.Services.Crm
                  * Yeni talep kalemi yalnızca talep sahibi
                  * Draft / Revision sırasında ekleyebilir.
                  */
-                if (!IsEditableByRequester(
+                if (!IsAdmin(user) &&
+                    !IsEditableByRequester(
                         request,
                         user.Id))
                 {
@@ -807,7 +823,8 @@ namespace Business.Services.Crm
                         user,
                         cancellationToken);
 
-                if (!canEditByRequester &&
+                if (!IsAdmin(user) &&
+                    !canEditByRequester &&
                     !canEditByWorkflowUser)
                 {
                     return ResponseModel<PurchaseRequestItemGetDto>.Fail(
@@ -891,7 +908,8 @@ namespace Business.Services.Crm
                         false);
                 }
 
-                if (!IsEditableByRequester(
+                if (!IsAdmin(user) &&
+                    !IsEditableByRequester(
                         entity.PurchaseRequest,
                         user.Id))
                 {
@@ -951,7 +969,10 @@ namespace Business.Services.Crm
                         StatusCode.NotFound);
                 }
 
-                var canModify = IsEditableByRequester(request, user.Id) || await UserCanProcessCurrentStepAsync(request, user, cancellationToken);
+                var canModify =
+                    IsAdmin(user) ||
+                    IsEditableByRequester(request, user.Id) ||
+                    await UserCanProcessCurrentStepAsync(request, user, cancellationToken);
 
                 if (!canModify)
                 {
@@ -1160,6 +1181,10 @@ namespace Business.Services.Crm
                 }
 
                 var canModify =
+                    IsAdmin(user)
+
+                    ||
+
                     IsEditableByRequester(
                         attachment.PurchaseRequest,
                         user.Id)
@@ -1379,7 +1404,8 @@ namespace Business.Services.Crm
 
                 if (isInitialDraft)
                 {
-                    if (request.RequesterUserId != user.Id)
+                    if (!IsAdmin(user) &&
+                        request.RequesterUserId != user.Id)
                     {
                         return ResponseModel<PurchaseRequestDetailDto>.Fail(
                             "Bu talebi yalnızca talep sahibi işleme gönderebilir.",
@@ -1631,14 +1657,15 @@ namespace Business.Services.Crm
                 }
 
                 var allowed =
-                    request.CurrentStep != null &&
+                    IsAdmin(user) ||
+                    (request.CurrentStep != null &&
                     request.CurrentStep.IsInitial &&
                     IsStatus(request.Status, "Draft")
                         ? request.RequesterUserId == user.Id
                         : await UserCanProcessCurrentStepAsync(
                             request,
                             user,
-                            cancellationToken);
+                            cancellationToken));
 
                 if (!allowed)
                 {
@@ -1708,6 +1735,10 @@ namespace Business.Services.Crm
                     .OrderByDescending(x => x.CreatedDate)
                     .ProjectToType<PurchaseRequestHistoryGetDto>(_config)
                     .ToListAsync(cancellationToken);
+
+                await PopulateHistoryCreatedUserNamesAsync(
+                    result,
+                    cancellationToken);
 
                 return ResponseModel<List<PurchaseRequestHistoryGetDto>>.Success(
                     result);
@@ -2017,6 +2048,9 @@ namespace Business.Services.Crm
         }
         private IQueryable<PurchaseRequest> ApplyPurchaseRequestVisibilityFilter(IQueryable<PurchaseRequest> query, CurrentUserDto user)
         {
+            if (IsAdmin(user))
+                return query;
+
             var roleIds = user.Roles
                 .Select(x => x.Id)
                 .ToList();
@@ -2439,6 +2473,8 @@ namespace Business.Services.Crm
                     .Select(x => x.Id)
                     .ToList();
 
+            var isAdmin = IsAdmin(user);
+
             var pendingStatus =
                 GetTaskStatus("Pending");
 
@@ -2462,6 +2498,10 @@ namespace Business.Services.Crm
                         &&
 
                         (
+                            isAdmin
+
+                            ||
+
                             x.AssignedUserId ==
                             user.Id
 
@@ -3045,11 +3085,60 @@ namespace Business.Services.Crm
                 .ProjectToType<PurchaseRequestDetailDto>(_config)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            return dto == null
-                ? ResponseModel<PurchaseRequestDetailDto>.Fail(
+            if (dto == null)
+            {
+                return ResponseModel<PurchaseRequestDetailDto>.Fail(
                     Messages.RecordNotFound,
-                    StatusCode.NotFound)
-                : ResponseModel<PurchaseRequestDetailDto>.Success(dto);
+                    StatusCode.NotFound);
+            }
+
+            await PopulateHistoryCreatedUserNamesAsync(
+                dto.Histories,
+                cancellationToken);
+
+            return ResponseModel<PurchaseRequestDetailDto>.Success(dto);
+        }
+
+
+        private async Task PopulateHistoryCreatedUserNamesAsync(
+            List<PurchaseRequestHistoryGetDto> histories,
+            CancellationToken cancellationToken)
+        {
+            if (histories.Count == 0)
+                return;
+
+            var userIds = histories
+                .Where(history => history.CreatedUser > 0)
+                .Select(history => history.CreatedUser)
+                .Distinct()
+                .ToList();
+
+            if (userIds.Count == 0)
+                return;
+
+            var userNames = await _uow.Repository
+                .GetQueryable<User>()
+                .AsNoTracking()
+                .Where(user => userIds.Contains(user.Id))
+                .Select(user => new
+                {
+                    user.Id,
+                    user.Name
+                })
+                .ToDictionaryAsync(
+                    user => user.Id,
+                    user => user.Name,
+                    cancellationToken);
+
+            foreach (var history in histories)
+            {
+                if (userNames.TryGetValue(
+                        history.CreatedUser,
+                        out var userName))
+                {
+                    history.CreatedUserName = userName;
+                }
+            }
         }
 
 
@@ -3093,6 +3182,15 @@ namespace Business.Services.Crm
         // =====================================================
         // BUSINESS HELPERS
         // =====================================================
+
+        private static bool IsAdmin(CurrentUserDto user)
+        {
+            return user.Roles.Any(role =>
+                string.Equals(
+                    role.Code,
+                    AdminRoleCode,
+                    StringComparison.OrdinalIgnoreCase));
+        }
 
         private static bool IsEditableByRequester(
             PurchaseRequest request,
