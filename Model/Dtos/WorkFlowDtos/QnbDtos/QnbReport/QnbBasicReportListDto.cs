@@ -10,6 +10,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbReport
 
         public string RequestNo { get; set; } = string.Empty;
         public string RequestTitle { get; set; } = string.Empty;
+        public string? ServiceRequestDescription { get; set; }
         public string? QnbServiceTrackNo { get; set; }
 
         public long? CurrentStepId { get; set; }
