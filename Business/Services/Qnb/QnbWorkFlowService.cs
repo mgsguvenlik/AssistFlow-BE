@@ -5411,6 +5411,7 @@ namespace Business.Services.Qnb
                         ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                         sr.ServicesDate,
                         sr.PlannedCompletionDate,
+                        sr.Description,
                         sr.IsProductRequirement,
                         sr.ServicesCostStatus,
                         sr.ServicesRequestStatus
@@ -5640,6 +5641,7 @@ namespace Business.Services.Qnb
 
                         ServicesDate = sr?.ServicesDate,
                         PlannedCompletionDate = sr?.PlannedCompletionDate,
+                        ServiceRequestDescription = sr?.Description,
 
                         IsAgreement = w.IsAgreement,
                         IsLocationValid = w.IsLocationValid,
@@ -5697,6 +5699,7 @@ namespace Business.Services.Qnb
 
             const int internalPageSize = 200;
             const int excelMaxRow = 1_048_576;
+            const int serviceRequestDescriptionColumn = 5;
 
             try
             {
@@ -5764,6 +5767,8 @@ namespace Business.Services.Qnb
 
                     ws.Columns(1, lastColumn)
                         .AdjustToContents(1, lastRowForWidth);
+                    ws.Column(serviceRequestDescriptionColumn).Width = 60;
+                    ws.Column(serviceRequestDescriptionColumn).Style.Alignment.WrapText = true;
 
                     ws.SheetView.FreezeRows(1);
 
@@ -5804,6 +5809,7 @@ namespace Business.Services.Qnb
                  "Workflow Id",
                  "Talep No",
                  "Talep Başlığı",
+                 "Servis Talebi Açıklaması",
                  "QNB Servis Takip No",
 
                  "Mevcut Adım Id",
@@ -5900,6 +5906,18 @@ namespace Business.Services.Qnb
 
             ws.Cell(row, c++).Value = x.RequestNo ?? string.Empty;
             ws.Cell(row, c++).Value = x.RequestTitle ?? string.Empty;
+
+            var descriptionCell = ws.Cell(row, c++);
+            descriptionCell.Value = LimitExcelCellText(x.ServiceRequestDescription);
+            descriptionCell.Style.Alignment.WrapText = true;
+            descriptionCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+
+            if (!string.IsNullOrWhiteSpace(x.ServiceRequestDescription) &&
+                x.ServiceRequestDescription.Length > 120)
+            {
+                ws.Row(row).Height = 60;
+            }
+
             ws.Cell(row, c++).Value = x.QnbServiceTrackNo ?? string.Empty;
 
             SetNullableLong(ws.Cell(row, c++), x.CurrentStepId);
@@ -5985,6 +6003,16 @@ namespace Business.Services.Qnb
 
             // Uzun not alanı için satır taşması.
             ws.Cell(row, notesColumn).Style.Alignment.WrapText = true;
+        }
+
+        private static string LimitExcelCellText(string? value)
+        {
+            const int excelCellCharacterLimit = 32_767;
+
+            if (string.IsNullOrEmpty(value) || value.Length <= excelCellCharacterLimit)
+                return value ?? string.Empty;
+
+            return value[..(excelCellCharacterLimit - 3)] + "...";
         }
 
         private static string FormatQnbProducts(List<QnbServicesRequestProductGetDto>? products)
