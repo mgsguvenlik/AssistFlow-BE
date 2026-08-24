@@ -7232,6 +7232,7 @@ namespace Business.Services.Ykb
                         ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                         sr.ServicesDate,
                         sr.PlannedCompletionDate,
+                        sr.Description,
                         sr.IsProductRequirement,
                         sr.ServicesCostStatus,
                         sr.ServicesRequestStatus
@@ -7496,6 +7497,7 @@ namespace Business.Services.Ykb
 
                         ServicesDate = sr?.ServicesDate,
                         PlannedCompletionDate = sr?.PlannedCompletionDate,
+                        ServiceRequestDescription = sr?.Description,
 
                         IsAgreement = w.IsAgreement,
                         IsLocationValid = w.IsLocationValid,
@@ -7573,6 +7575,7 @@ namespace Business.Services.Ykb
 
             // Excel'de 1 başlık satırı dahil maksimum 1.048.576 satır bulunabilir.
             const int excelMaxRow = 1_048_576;
+            const int serviceRequestDescriptionColumn = 5;
 
             try
             {
@@ -7641,10 +7644,14 @@ namespace Business.Services.Ykb
                 foreach (var ws in workbook.Worksheets)
                 {
                     var lastRowForWidth = Math.Min(ws.LastRowUsed()?.RowNumber() ?? 1, 100);
-                    ws.Columns(1, 54).AdjustToContents(1, lastRowForWidth);
+                    var lastColumn = ws.LastColumnUsed()?.ColumnNumber() ?? 1;
+
+                    ws.Columns(1, lastColumn).AdjustToContents(1, lastRowForWidth);
+                    ws.Column(serviceRequestDescriptionColumn).Width = 60;
+                    ws.Column(serviceRequestDescriptionColumn).Style.Alignment.WrapText = true;
 
                     ws.SheetView.FreezeRows(1);
-                    ws.Range(1, 1, 1, 54).SetAutoFilter();
+                    ws.Range(1, 1, 1, lastColumn).SetAutoFilter();
 
                     ws.Columns().Style.Alignment.Vertical =
                         XLAlignmentVerticalValues.Center;
@@ -7681,6 +7688,7 @@ namespace Business.Services.Ykb
                          "Workflow Id",
                          "Talep No",
                          "Talep Başlığı",
+                         "Servis Talebi Açıklaması",
                          "YKB Servis Takip No",
 
                          "Mevcut Adım Id",
@@ -7783,6 +7791,12 @@ namespace Business.Services.Ykb
 
             ws.Cell(row, c++).Value = x.RequestNo ?? string.Empty;
             ws.Cell(row, c++).Value = x.RequestTitle ?? string.Empty;
+
+            var descriptionCell = ws.Cell(row, c++);
+            descriptionCell.Value = LimitExcelCellText(x.ServiceRequestDescription);
+            descriptionCell.Style.Alignment.WrapText = true;
+            descriptionCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+
             ws.Cell(row, c++).Value = x.YkbServiceTrackNo ?? string.Empty;
 
             SetNullableLong(ws.Cell(row, c++), x.CurrentStepId);
@@ -7846,8 +7860,13 @@ namespace Business.Services.Ykb
             ws.Cell(row, c++).Value = GetEnumText(x.FinalApprovalStatus);
             SetDecimal(ws.Cell(row, c++), x.DiscountPercent.HasValue ? x.DiscountPercent.Value / 100m : null, "0.00%");
 
-            ws.Cell(row, c++).Value = x.FinalApprovalNotes ?? string.Empty;
-            ws.Cell(row, c++).Value = x.CustomerNote ?? string.Empty;
+            var finalApprovalNotesCell = ws.Cell(row, c++);
+            finalApprovalNotesCell.Value = LimitExcelCellText(x.FinalApprovalNotes);
+            finalApprovalNotesCell.Style.Alignment.WrapText = true;
+
+            var customerNoteCell = ws.Cell(row, c++);
+            customerNoteCell.Value = LimitExcelCellText(x.CustomerNote);
+            customerNoteCell.Style.Alignment.WrapText = true;
 
             SetNullableLong(ws.Cell(row, c++), x.CustomerApprovedBy);
             ws.Cell(row, c++).Value = x.CustomerApprovedByName ?? string.Empty;
@@ -7855,10 +7874,22 @@ namespace Business.Services.Ykb
 
             SetDateTime(ws.Cell(row, c++), x.LastActivityDate);
 
-            // Uzun not alanları için satır taşması.
-            ws.Cell(row, 51).Style.Alignment.WrapText = true;
-            ws.Cell(row, 52).Style.Alignment.WrapText = true;
-            ws.Cell(row, 53).Style.Alignment.WrapText = true;
+            if ((x.ServiceRequestDescription?.Length ?? 0) > 120 ||
+                (x.FinalApprovalNotes?.Length ?? 0) > 120 ||
+                (x.CustomerNote?.Length ?? 0) > 120)
+            {
+                ws.Row(row).Height = 60;
+            }
+        }
+
+        private static string LimitExcelCellText(string? value)
+        {
+            const int excelCellCharacterLimit = 32_767;
+
+            if (string.IsNullOrEmpty(value) || value.Length <= excelCellCharacterLimit)
+                return value ?? string.Empty;
+
+            return value[..(excelCellCharacterLimit - 3)] + "...";
         }
         private static void SetNullableLong(IXLCell cell, long? value)
         {

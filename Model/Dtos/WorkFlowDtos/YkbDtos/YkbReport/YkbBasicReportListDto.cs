@@ -11,6 +11,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 
         public string RequestNo { get; set; } = string.Empty;
         public string RequestTitle { get; set; } = string.Empty;
+        public string? ServiceRequestDescription { get; set; }
         public string? YkbServiceTrackNo { get; set; }
 
         public long? CurrentStepId { get; set; }

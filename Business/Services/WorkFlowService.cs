@@ -6432,6 +6432,7 @@ namespace Business.Services
                         ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
                         sr.ServicesDate,
                         sr.PlannedCompletionDate,
+                        sr.Description,
                         sr.IsProductRequirement,
                         sr.ServicesCostStatus,
                         sr.ServicesRequestStatus
@@ -6660,6 +6661,7 @@ namespace Business.Services
 
                         ServicesDate = sr?.ServicesDate,
                         PlannedCompletionDate = sr?.PlannedCompletionDate,
+                        ServiceRequestDescription = sr?.Description,
 
                         IsAgreement = w.IsAgreement,
                         IsLocationValid = w.IsLocationValid,
@@ -6721,6 +6723,7 @@ namespace Business.Services
 
             const int internalPageSize = 200;
             const int excelMaxRow = 1_048_576;
+            const int serviceRequestDescriptionColumn = 5;
 
             try
             {
@@ -6784,6 +6787,8 @@ namespace Business.Services
                     var lastColumn = ws.LastColumnUsed()?.ColumnNumber() ?? 1;
 
                     ws.Columns(1, lastColumn).AdjustToContents(1, lastRowForWidth);
+                    ws.Column(serviceRequestDescriptionColumn).Width = 60;
+                    ws.Column(serviceRequestDescriptionColumn).Style.Alignment.WrapText = true;
 
                     ws.SheetView.FreezeRows(1);
 
@@ -6822,6 +6827,7 @@ namespace Business.Services
                  "Workflow Id",
                  "Talep No",
                  "Talep Başlığı",
+                 "Servis Talebi Açıklaması",
 
                  "Mevcut Adım Id",
                  "Mevcut Adım Kodu",
@@ -6916,6 +6922,17 @@ namespace Business.Services
             ws.Cell(row, c++).Value = x.RequestNo ?? string.Empty;
             ws.Cell(row, c++).Value = x.RequestTitle ?? string.Empty;
 
+            var descriptionCell = ws.Cell(row, c++);
+            descriptionCell.Value = LimitExcelCellText(x.ServiceRequestDescription);
+            descriptionCell.Style.Alignment.WrapText = true;
+            descriptionCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+
+            if (!string.IsNullOrWhiteSpace(x.ServiceRequestDescription) &&
+                x.ServiceRequestDescription.Length > 120)
+            {
+                ws.Row(row).Height = 60;
+            }
+
             SetNullableLong(ws.Cell(row, c++), x.CurrentStepId);
             ws.Cell(row, c++).Value = x.CurrentStepCode ?? string.Empty;
             ws.Cell(row, c++).Value = x.CurrentStepName ?? string.Empty;
@@ -6998,6 +7015,16 @@ namespace Business.Services
             SetDateTime(
                 ws.Cell(row, c++),
                 x.LastActivityDate);
+        }
+
+        private static string LimitExcelCellText(string? value)
+        {
+            const int excelCellCharacterLimit = 32_767;
+
+            if (string.IsNullOrEmpty(value) || value.Length <= excelCellCharacterLimit)
+                return value ?? string.Empty;
+
+            return value[..(excelCellCharacterLimit - 3)] + "...";
         }
         private static string FormatProducts(List<ServicesRequestProductGetDto>? products)
         {
