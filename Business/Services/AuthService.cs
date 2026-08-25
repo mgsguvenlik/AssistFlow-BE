@@ -86,6 +86,13 @@ public class AuthService : IAuthService
                 var roleName = role?.Name ?? role?.ToString() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(roleName))
                     claims.Add(new Claim(ClaimTypes.Role, roleName));
+
+                var roleCode = role?.Code;
+                if (!string.IsNullOrWhiteSpace(roleCode) &&
+                    !roleCode.Equals(roleName, StringComparison.OrdinalIgnoreCase))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, roleCode));
+                }
             }
         }
 

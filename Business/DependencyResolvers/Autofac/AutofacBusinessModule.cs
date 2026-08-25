@@ -4,12 +4,14 @@ using Business.Interfaces;
 using Business.Interfaces.Business.Interfaces;
 using Business.Interfaces.Crm;
 using Business.Interfaces.Manitou;
+using Business.Interfaces.PeriodicReports;
 using Business.Interfaces.Qnb;
 using Business.Interfaces.Storage;
 using Business.Interfaces.Ykb;
 using Business.Services;
 using Business.Services.Crm;
 using Business.Services.Manitou;
+using Business.Services.PeriodicReports;
 using Business.Services.Qnb;
 using Business.Services.Storage;
 using Business.Services.Ykb;
@@ -75,11 +77,21 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
             services.AddScoped(typeof(IFileStorage), typeof(R2FileStorage));
             services.AddScoped(typeof(IPurchaseRequestService), typeof(PurchaseRequestService));
+            services.AddScoped<IPeriodicReportService, PeriodicReportService>();
+            services.AddScoped<IReportExecutionService, ReportExecutionService>();
+            services.AddScoped<IReportQueryExecutor, ReportQueryExecutor>();
+            services.AddSingleton<IReportSqlValidator, ReportSqlValidator>();
+            services.AddSingleton<IPeriodicReportScheduleCalculator, PeriodicReportScheduleCalculator>();
+            services.AddScoped<IReportExporter, ExcelReportExporter>();
+            services.AddScoped<IReportExporter, CsvReportExporter>();
+            services.AddScoped<IReportExporter, HtmlReportExporter>();
+            services.AddScoped<IReportExporter, PdfReportExporter>();
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddHostedService<MailOutboxDispatcher>();
             services.AddHostedService<SlaNotificationDispatcher>();
             services.AddHostedService<ManitouStagingSyncBackgroundService>();
+            services.AddHostedService<PeriodicReportScheduler>();
 
 
             // ASP.NET Core Identity hasher kaydı
