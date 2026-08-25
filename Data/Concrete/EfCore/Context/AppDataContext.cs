@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Data.Concrete.EfCore.Configurations;
 using Model.Concrete;
 using Model.Concrete.Crm;
+using Model.Concrete.PeriodicReports;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
@@ -64,6 +66,9 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<WorkOrderType> WorkOrderTypes { get; set; } = null!;
         public DbSet<ServicesRequestWorkOrderType> ServicesRequestWorkOrderTypes { get; set; } = null!;
         public DbSet<WorkflowAttachment> WorkflowAttachments { get; set; }
+        public DbSet<PeriodicReport> PeriodicReports { get; set; } = default!;
+        public DbSet<PeriodicReportRecipient> PeriodicReportRecipients { get; set; } = default!;
+        public DbSet<PeriodicReportExecution> PeriodicReportExecutions { get; set; } = default!;
 
         #region YKB
         public DbSet<YkbCustomerForm> YkbCustomerForms { get; set; } = default!;
@@ -1282,6 +1287,10 @@ namespace Data.Concrete.EfCore.Context
                     .HasForeignKey(x => x.UploadedStepId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
+
+            modelBuilder.ApplyConfiguration(new PeriodicReportConfiguration());
+            modelBuilder.ApplyConfiguration(new PeriodicReportRecipientConfiguration());
+            modelBuilder.ApplyConfiguration(new PeriodicReportExecutionConfiguration());
 
             #endregion
         }

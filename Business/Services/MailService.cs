@@ -7,6 +7,7 @@ using Model.Concrete;
 using System.Net;
 using System.Net.Mail;
 using System.Globalization;
+using Business.Models;
 
 namespace Business.Services
 {
@@ -138,6 +139,42 @@ namespace Business.Services
             {
                 return Task.FromResult(new ResponseModel<bool>(false, false, $"{Messages.MailSendFailed} {ex.Message}", StatusCode.Ok));
             }
+        }
+
+        public async Task SendWithAttachmentAsync(
+            IReadOnlyCollection<string> recipients,
+            string subject,
+            string htmlBody,
+            MailAttachmentData attachment,
+            CancellationToken cancellationToken = default)
+        {
+            if (recipients.Count == 0)
+                throw new InvalidOperationException("Mail alıcısı bulunamadı.");
+
+            using var message = new MailMessage
+            {
+                From = new MailAddress(_cfg.From, _cfg.FromName),
+                Subject = subject,
+                IsBodyHtml = true,
+                Body = htmlBody
+            };
+
+            foreach (var recipient in recipients)
+                message.To.Add(new MailAddress(recipient));
+
+            var attachmentStream = new MemoryStream(attachment.Content.ToArray(), writable: false);
+            message.Attachments.Add(new Attachment(
+                attachmentStream,
+                attachment.FileName,
+                attachment.ContentType));
+
+            using var smtp = new SmtpClient(_cfg.Server, _cfg.Port)
+            {
+                EnableSsl = _cfg.UseSsl,
+                Credentials = new NetworkCredential(_cfg.User, _cfg.Pass)
+            };
+
+            await smtp.SendMailAsync(message, cancellationToken);
         }
 
         public static void SendMail(
