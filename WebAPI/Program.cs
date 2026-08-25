@@ -40,6 +40,8 @@ builder.Configuration
 var appSettingsSection = builder.Configuration.GetSection("AppSettings");
 
 builder.Services.Configure<AppSettings>(appSettingsSection);
+builder.Services.Configure<PeriodicReportOptions>(
+    builder.Configuration.GetSection(PeriodicReportOptions.SectionName));
 
 var appSettings = appSettingsSection.Get<AppSettings>();
 
@@ -84,7 +86,7 @@ builder.Services.AddCors(options =>
             "https://flowassist.mgs.com.tr") // React frontend URL'si
             .AllowAnyMethod()
             .AllowAnyHeader()
-            .AllowCredentials() // Bunu kullanýyorsan WithOrigins zorunlu!
+            .AllowCredentials() // Bunu kullanÄ±yorsan WithOrigins zorunlu!
     );
 });
 
@@ -105,13 +107,13 @@ builder.Services
             x.Endpoint,
             UriKind.Absolute,
             out _),
-        "R2 Endpoint geçerli bir URL olmalýdýr.")
+        "R2 Endpoint geÃ§erli bir URL olmalÄ±dÄ±r.")
     .Validate(
         x => Uri.TryCreate(
             x.PublicBaseUrl,
             UriKind.Absolute,
             out _),
-        "R2 PublicBaseUrl geçerli bir URL olmalýdýr.")
+        "R2 PublicBaseUrl geÃ§erli bir URL olmalÄ±dÄ±r.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton<IAmazonS3>(serviceProvider =>
@@ -128,8 +130,8 @@ builder.Services.AddSingleton<IAmazonS3>(serviceProvider =>
     {
         ServiceURL = options.Endpoint,
 
-        // Bucket adý URL host'una eklenmek yerine
-        // endpoint/bucket/key biçimi kullanýlýr.
+        // Bucket adÄ± URL host'una eklenmek yerine
+        // endpoint/bucket/key biÃ§imi kullanÄ±lÄ±r.
         ForcePathStyle = true
     };
 
@@ -146,31 +148,34 @@ mapsterConfig.Scan(AppDomain.CurrentDomain.GetAssemblies()); // AppMappings bulu
 mapsterConfig.Compile();
 
 builder.Services.AddSingleton(mapsterConfig);
-builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu düzenle. Mapster için
+builder.Services.AddScoped<IMapper, Mapper>();///MZK Bunu dÃ¼zenle. Mapster iÃ§in
 
 #endregion
 
 
 #region Seed servislerini kaydet
 builder.Services.AddDataSeeding(
-    typeof(TurkeyCitiesSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+    typeof(TurkeyCitiesSeed)   // buraya diÄŸer seed tiplerini de ekleyebilirsin
 );
 builder.Services.AddDataSeeding(
-    typeof(ConfigSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+    typeof(ConfigSeed)   // buraya diÄŸer seed tiplerini de ekleyebilirsin
 );
 builder.Services.AddDataSeeding(
-    typeof(WorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+    typeof(WorkFlowStepSeed)   // buraya diÄŸer seed tiplerini de ekleyebilirsin
 );
 
 builder.Services.AddDataSeeding(
-    typeof(YkbWorkFlowStepSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+    typeof(YkbWorkFlowStepSeed)   // buraya diÄŸer seed tiplerini de ekleyebilirsin
 );
 builder.Services.AddDataSeeding(
-    typeof(WorkFlowTransitionSeed)   // buraya diðer seed tiplerini de ekleyebilirsin
+    typeof(WorkFlowTransitionSeed)   // buraya diÄŸer seed tiplerini de ekleyebilirsin
 );
 
 builder.Services.AddDataSeeding(
     typeof(MenuSeed)
+);
+builder.Services.AddDataSeeding(
+    typeof(PeriodicReportMenuSeed)
 );
 #endregion
 
@@ -189,7 +194,7 @@ builder.Services.Add(new ServiceDescriptor(
                 serviceProvider =>
                 {
                     var repository = serviceProvider.GetService<IRepository>();
-                    return new UnitOfWork(repository ?? throw new ArgumentException("Bir Hata oluþtu. UnitOfWork null"));
+                    return new UnitOfWork(repository ?? throw new ArgumentException("Bir Hata oluÅŸtu. UnitOfWork null"));
                 }, ServiceLifetime.Scoped));
 
 builder.Services.Add(new ServiceDescriptor(
@@ -243,7 +248,7 @@ builder.Services
             ValidIssuer = appSettings.Issuer,
             ValidAudience = appSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Key)),
-            ClockSkew = TimeSpan.Zero, // Ýsteðe baðlý: expire anýnda düþsün
+            ClockSkew = TimeSpan.Zero, // Ä°steÄŸe baÄŸlÄ±: expire anÄ±nda dÃ¼ÅŸsÃ¼n
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = ClaimTypes.Role,
         };
@@ -257,9 +262,9 @@ builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
-await app.UseDataSeedingAsync<AppDataContext>(); // Migration’dan önce/sonra çaðýrabilirsin
+await app.UseDataSeedingAsync<AppDataContext>(); // Migrationâ€™dan Ã¶nce/sonra Ã§aÄŸÄ±rabilirsin
 
-/// Otomatik Migration iþlemi
+/// Otomatik Migration iÅŸlemi
 MigrationApplier.ApplyMigrations(app);
 
 
@@ -285,7 +290,7 @@ app.UseRequestLocalization(options =>
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-// Sýra önemli:
+// SÄ±ra Ã¶nemli:
 //app.UseSession();
 app.UseRouting();
 
