@@ -5,7 +5,7 @@ namespace Business.Interfaces.Helpdesk;
 
 public interface IHelpdeskTicketService
 {
-    Task<ResponseModel<List<HelpdeskTicketListItemDto>>> GetListAsync(CancellationToken cancellationToken = default);
+    Task<ResponseModel<List<HelpdeskTicketListItemDto>>> GetListAsync(bool archived = false, CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> GetAsync(long id, CancellationToken cancellationToken = default);
     Task<ResponseModel<bool>> MarkReadAsync(long id, CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> CreateAsync(HelpdeskTicketCreateDto dto, CancellationToken cancellationToken = default);
