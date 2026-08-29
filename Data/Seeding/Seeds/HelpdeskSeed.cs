@@ -19,7 +19,8 @@ public sealed class HelpdeskSeed(ILogger<HelpdeskSeed> logger) : IDataSeed
         ("HelpdeskTicketList", "Helpdesk Talep Listesi"),
         ("HelpdeskTicketCreate", "Helpdesk Talebi Oluştur"),
         ("HelpdeskMailbox", "Helpdesk Mailbox Yönetimi"),
-        ("HelpdeskMailRules", "Helpdesk Mail Kuralı Yönetimi")
+        ("HelpdeskMailRules", "Helpdesk Mail Kuralı Yönetimi"),
+        ("HelpdeskTicketArchive", "Helpdesk Arşivlenmiş Talep Listesi")
     ];
 
     public string Key => "SeedHelpdeskRolesAndMenus";
@@ -76,6 +77,9 @@ public sealed class HelpdeskSeed(ILogger<HelpdeskSeed> logger) : IDataSeed
         await EnsurePermission(db, roles, menus, "HELPDESK_TEAM_LEAD", "HelpdeskMailbox", true, true, ct);
         await EnsurePermission(db, roles, menus, "HELPDESK_TEAM_LEAD", "HelpdeskMailRules", true, true, ct);
         await EnsurePermission(db, roles, menus, "HELPDESK_AGENT", "HelpdeskTicketList", true, true, ct);
+        await EnsurePermission(db, roles, menus, "HELPDESK_MANAGER", "HelpdeskTicketArchive", true, true, ct);
+        await EnsurePermission(db, roles, menus, "HELPDESK_TEAM_LEAD", "HelpdeskTicketArchive", true, true, ct);
+        await EnsurePermission(db, roles, menus, "HELPDESK_AGENT", "HelpdeskTicketArchive", true, false, ct);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Helpdesk rol, menü ve izin seed'i doğrulandı.");
     }

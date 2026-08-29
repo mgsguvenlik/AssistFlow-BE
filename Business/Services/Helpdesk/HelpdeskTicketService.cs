@@ -18,6 +18,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
 {
     private const string Admin = "ADMIN";
     private const string Manager = "HELPDESK_MANAGER";
+    private const string ManagerLegacy = "HELPDESK_MANAGE";
     private const string Lead = "HELPDESK_TEAM_LEAD";
     private const string Agent = "HELPDESK_AGENT";
     private readonly AppDataContext _db;
@@ -28,11 +29,14 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     public HelpdeskTicketService(AppDataContext db, ICurrentUser currentUser, IHelpdeskTicketNumberGenerator numberGenerator, IOptionsSnapshot<AppSettings> appSettings)
         => (_db, _currentUser, _numberGenerator, _appSettings) = (db, currentUser, numberGenerator, appSettings);
 
-    public async Task<ResponseModel<List<HelpdeskTicketListItemDto>>> GetListAsync(CancellationToken ct = default)
+    public async Task<ResponseModel<List<HelpdeskTicketListItemDto>>> GetListAsync(bool archived = false, CancellationToken ct = default)
     {
         var user = await RequiredUser(ct);
         if (user is null) return ResponseModel<List<HelpdeskTicketListItemDto>>.Fail("Oturum bulunamadı.", StatusCode.Unauthorized);
-        var query = VisibleTickets(user).Where(x => !x.IsDeleted);
+        if (archived && !CanViewArchive(user)) return ResponseModel<List<HelpdeskTicketListItemDto>>.Fail("Arşivlenmiş talepleri görüntüleme yetkiniz yok.", StatusCode.Unauthorized);
+        var query = VisibleTickets(user).Where(x => !x.IsDeleted && (archived
+            ? x.Status == HelpdeskTicketStatus.Completed || x.Status == HelpdeskTicketStatus.Rejected
+            : x.Status != HelpdeskTicketStatus.Completed && x.Status != HelpdeskTicketStatus.Rejected));
         var items = await query.OrderBy(x => x.IsSuspended).ThenBy(x => x.Priority ?? int.MaxValue).ThenByDescending(x => x.CreatedDate)
             .Select(x => new { Ticket = x, LastReadAt = _db.HelpdeskTicketUserReads.Where(r => r.TicketId == x.Id && r.UserId == user.Id).Select(r => (DateTimeOffset?)r.LastReadAt).FirstOrDefault() })
             .Select(x => new HelpdeskTicketListItemDto { Id = x.Ticket.Id, TicketNo = x.Ticket.TicketNo, Subject = x.Ticket.Subject, RequesterName = x.Ticket.RequesterName, SourceType = x.Ticket.SourceType, Status = x.Ticket.Status, Priority = x.Ticket.Priority, IsSuspended = x.Ticket.IsSuspended, CreatedDate = x.Ticket.CreatedDate, AssignedUsers = x.Ticket.Assignments.Where(a => a.IsActive).Select(a => a.User.Name).ToList(), AssignedUserIds = x.Ticket.Assignments.Where(a => a.IsActive).Select(a => a.UserId).ToList(), UnreadCount = x.LastReadAt.HasValue ? _db.HelpdeskTicketHistories.Count(h => h.TicketId == x.Ticket.Id && !h.IsDeleted && h.Action != "TicketViewed" && h.CreatedDate > x.LastReadAt.Value) : (_db.HelpdeskTicketHistories.Any(h => h.TicketId == x.Ticket.Id && !h.IsDeleted && h.Action != "TicketViewed") ? 1 : 0) }).ToListAsync(ct);
@@ -118,6 +122,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     {
         var ticketResult = await ManageableTicket(id, ct); if (ticketResult.ticket is null) return ticketResult.failure!;
         var (ticket, user) = ticketResult.ticket.Value;
+        if (IsArchivedAgentReadOnly(ticket, user)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Arşivlenmiş talepler Helpdesk personeli için salt okunurdur.", StatusCode.Unauthorized);
         if (!Enum.IsDefined(dto.Status)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Geçersiz ticket durumu.");
         if (dto.Status == HelpdeskTicketStatus.Reopened && !CanReopen(user)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Tamamlanmış ticketı yalnız Helpdesk Yöneticisi, Helpdesk Ekip Lideri veya Admin yeniden açabilir.", StatusCode.Unauthorized);
         if (dto.Status == HelpdeskTicketStatus.Reopened && ticket.Status != HelpdeskTicketStatus.Completed) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Yalnız tamamlanmış ticket yeniden açılabilir.");
@@ -152,7 +157,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     public async Task<ResponseModel<HelpdeskCommentDto>> AddCommentAsync(long id, HelpdeskCommentCreateDto dto, CancellationToken ct = default)
     {
         var ticketResult = await ManageableTicket(id, ct); if (ticketResult.ticket is null) return ResponseModel<HelpdeskCommentDto>.Fail(ticketResult.failure!.Message!, ticketResult.failure.StatusCode);
-        var (ticket, user) = ticketResult.ticket.Value; if (!CanManage(user) && !ticket.Assignments.Any(a => a.IsActive && a.UserId == user.Id)) return ResponseModel<HelpdeskCommentDto>.Fail("Bu ticket için yetkiniz yok.", StatusCode.Unauthorized);
+        var (ticket, user) = ticketResult.ticket.Value; if (IsArchivedAgentReadOnly(ticket, user)) return ResponseModel<HelpdeskCommentDto>.Fail("Arşivlenmiş talepler Helpdesk personeli için salt okunurdur.", StatusCode.Unauthorized); if (!CanManage(user) && !ticket.Assignments.Any(a => a.IsActive && a.UserId == user.Id)) return ResponseModel<HelpdeskCommentDto>.Fail("Bu ticket için yetkiniz yok.", StatusCode.Unauthorized);
         if (string.IsNullOrWhiteSpace(dto.Body)) return ResponseModel<HelpdeskCommentDto>.Fail("Yorum boş olamaz.");
         var comment = new HelpdeskTicketComment { TicketId = id, Body = dto.Body.Trim(), CreatedDate = DateTimeOffset.Now, CreatedUser = user.Id }; _db.HelpdeskTicketComments.Add(comment); AddHistory(id, "CommentAdded", null, null, null, user.Id); await _db.SaveChangesAsync(ct);
         return ResponseModel<HelpdeskCommentDto>.Success(new HelpdeskCommentDto { Id = comment.Id, Body = comment.Body, CreatedDate = comment.CreatedDate, CreatedUser = user.Id });
@@ -188,6 +193,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         var result = await ManageableTicket(id, ct);
         if (result.ticket is null) return ResponseModel<HelpdeskTicketMailDto>.Fail(result.failure!.Message, result.failure.StatusCode);
         var (ticket, user) = result.ticket.Value;
+        if (IsArchivedAgentReadOnly(ticket, user)) return ResponseModel<HelpdeskTicketMailDto>.Fail("Arşivlenmiş talepler Helpdesk personeli için salt okunurdur.", StatusCode.Unauthorized);
         if (string.IsNullOrWhiteSpace(dto.Body)) return ResponseModel<HelpdeskTicketMailDto>.Fail("Mail içeriği boş olamaz.");
         if (string.IsNullOrWhiteSpace(ticket.RequesterEmail)) return ResponseModel<HelpdeskTicketMailDto>.Fail("Talep eden e-posta adresi bulunamadı.");
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -210,7 +216,9 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     }
 
     private IQueryable<HelpdeskTicket> VisibleTickets(CurrentUserDto user) => CanManage(user) ? _db.HelpdeskTickets : _db.HelpdeskTickets.Where(x => x.Assignments.Any(a => a.IsActive && a.UserId == user.Id));
-    private static bool CanManage(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase));
+    private static bool CanManage(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, ManagerLegacy, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase));
+    private static bool CanViewArchive(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, ManagerLegacy, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Agent, StringComparison.OrdinalIgnoreCase));
+    private static bool IsArchivedAgentReadOnly(HelpdeskTicket ticket, CurrentUserDto user) => IsAgent(user) && ticket.Status is HelpdeskTicketStatus.Completed or HelpdeskTicketStatus.Rejected;
     private static bool CanReopen(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase));
     private static bool IsAgent(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Agent, StringComparison.OrdinalIgnoreCase));
     private async Task<CurrentUserDto?> RequiredUser(CancellationToken ct) => await _currentUser.GetAsync(ct);

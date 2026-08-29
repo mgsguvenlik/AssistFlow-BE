@@ -10,7 +10,7 @@ namespace WebAPI.Controllers;
 [Route("api/helpdesk/tickets")]
 public sealed class HelpdeskTicketsController(IHelpdeskTicketService service) : ControllerBase
 {
-    [HttpGet] public async Task<IActionResult> List(CancellationToken ct) { var result = await service.GetListAsync(ct); return StatusCode((int)result.StatusCode, result); }
+    [HttpGet] public async Task<IActionResult> List([FromQuery] bool archived, CancellationToken ct) { var result = await service.GetListAsync(archived, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpGet("{id:long}")] public async Task<IActionResult> Get(long id, CancellationToken ct) { var result = await service.GetAsync(id, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpPost("{id:long}/read")] public async Task<IActionResult> MarkRead(long id, CancellationToken ct) { var result = await service.MarkReadAsync(id, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpPost] public async Task<IActionResult> Create([FromBody] HelpdeskTicketCreateDto dto, CancellationToken ct) { var result = await service.CreateAsync(dto, ct); return StatusCode((int)result.StatusCode, result); }
