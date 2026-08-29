@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Model.Concrete.Helpdesk;
+using System.Security.Cryptography;
 
 namespace Business.Services.Helpdesk;
 
@@ -50,6 +51,12 @@ public sealed class HelpdeskBackgroundWorker(IServiceProvider serviceProvider, I
             {
                 var password = protector.Unprotect(mailbox.ProtectedPassword);
                 await client.ProcessUnreadAsync(mailbox, password, (mail, token) => processor.ProcessAsync(mailbox, mail, token), ct);
+            }
+            catch (CryptographicException ex)
+            {
+                logger.LogError(ex,
+                    "Helpdesk mailbox parolası mevcut Data Protection anahtarıyla çözülemedi. Posta kutusu parolasını yönetim ekranından yeniden kaydedin. MailboxId={MailboxId}",
+                    mailbox.Id);
             }
             catch (Exception ex)
             {
