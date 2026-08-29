@@ -12,6 +12,7 @@ public sealed class HelpdeskTicketsController(IHelpdeskTicketService service) : 
 {
     [HttpGet] public async Task<IActionResult> List(CancellationToken ct) { var result = await service.GetListAsync(ct); return StatusCode((int)result.StatusCode, result); }
     [HttpGet("{id:long}")] public async Task<IActionResult> Get(long id, CancellationToken ct) { var result = await service.GetAsync(id, ct); return StatusCode((int)result.StatusCode, result); }
+    [HttpPost("{id:long}/read")] public async Task<IActionResult> MarkRead(long id, CancellationToken ct) { var result = await service.MarkReadAsync(id, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpPost] public async Task<IActionResult> Create([FromBody] HelpdeskTicketCreateDto dto, CancellationToken ct) { var result = await service.CreateAsync(dto, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpPost("{id:long}/assignments")] public async Task<IActionResult> Assign(long id, [FromBody] HelpdeskAssignmentDto dto, CancellationToken ct) { var result = await service.AssignAsync(id, dto, ct); return StatusCode((int)result.StatusCode, result); }
     [HttpPost("{id:long}/status")] public async Task<IActionResult> Status(long id, [FromBody] HelpdeskStatusChangeDto dto, CancellationToken ct) { var result = await service.ChangeStatusAsync(id, dto, ct); return StatusCode((int)result.StatusCode, result); }

@@ -132,6 +132,7 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<HelpdeskTicketMail> HelpdeskTicketMails { get; set; } = default!;
         public DbSet<HelpdeskTicketComment> HelpdeskTicketComments { get; set; } = default!;
         public DbSet<HelpdeskTicketHistory> HelpdeskTicketHistories { get; set; } = default!;
+        public DbSet<HelpdeskTicketUserRead> HelpdeskTicketUserReads { get; set; } = default!;
         public DbSet<HelpdeskMailbox> HelpdeskMailboxes { get; set; } = default!;
         public DbSet<HelpdeskMailRule> HelpdeskMailRules { get; set; } = default!;
         public DbSet<HelpdeskTicketNumberSequence> HelpdeskTicketNumberSequences { get; set; } = default!;
@@ -1337,6 +1338,13 @@ namespace Data.Concrete.EfCore.Context
             {
                 entity.HasIndex(x => new { x.TicketId, x.CreatedDate }).HasDatabaseName("IX_HelpdeskHistory_Ticket_Date");
                 entity.HasOne(x => x.Ticket).WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<HelpdeskTicketUserRead>(entity =>
+            {
+                entity.HasIndex(x => new { x.TicketId, x.UserId }).IsUnique().HasDatabaseName("UX_HelpdeskTicketUserRead_Ticket_User");
+                entity.HasIndex(x => new { x.UserId, x.LastReadAt }).HasDatabaseName("IX_HelpdeskTicketUserRead_User_Date");
+                entity.HasOne(x => x.Ticket).WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             });
             modelBuilder.Entity<HelpdeskMailbox>(entity =>
             {

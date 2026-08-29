@@ -80,6 +80,17 @@ public sealed class HelpdeskTicketHistory : AuditableWithUserEntity
     [MaxLength(100)] public string? NewValue { get; set; }
 }
 
+[Table("TicketUserRead", Schema = "helpdesk")]
+public sealed class HelpdeskTicketUserRead
+{
+    [Key] public long Id { get; set; }
+    public long TicketId { get; set; }
+    public HelpdeskTicket Ticket { get; set; } = default!;
+    public long UserId { get; set; }
+    public User User { get; set; } = default!;
+    public DateTimeOffset LastReadAt { get; set; }
+}
+
 [Table("Mailbox", Schema = "helpdesk")]
 public sealed class HelpdeskMailbox : AuditableWithUserEntity
 {

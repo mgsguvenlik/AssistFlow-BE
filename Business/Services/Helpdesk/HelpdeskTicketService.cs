@@ -34,7 +34,8 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         if (user is null) return ResponseModel<List<HelpdeskTicketListItemDto>>.Fail("Oturum bulunamadı.", StatusCode.Unauthorized);
         var query = VisibleTickets(user).Where(x => !x.IsDeleted);
         var items = await query.OrderBy(x => x.IsSuspended).ThenBy(x => x.Priority ?? int.MaxValue).ThenByDescending(x => x.CreatedDate)
-            .Select(x => new HelpdeskTicketListItemDto { Id = x.Id, TicketNo = x.TicketNo, Subject = x.Subject, RequesterName = x.RequesterName, Status = x.Status, Priority = x.Priority, IsSuspended = x.IsSuspended, CreatedDate = x.CreatedDate, AssignedUsers = x.Assignments.Where(a => a.IsActive).Select(a => a.User.Name).ToList(), AssignedUserIds = x.Assignments.Where(a => a.IsActive).Select(a => a.UserId).ToList() }).ToListAsync(ct);
+            .Select(x => new { Ticket = x, LastReadAt = _db.HelpdeskTicketUserReads.Where(r => r.TicketId == x.Id && r.UserId == user.Id).Select(r => (DateTimeOffset?)r.LastReadAt).FirstOrDefault() })
+            .Select(x => new HelpdeskTicketListItemDto { Id = x.Ticket.Id, TicketNo = x.Ticket.TicketNo, Subject = x.Ticket.Subject, RequesterName = x.Ticket.RequesterName, SourceType = x.Ticket.SourceType, Status = x.Ticket.Status, Priority = x.Ticket.Priority, IsSuspended = x.Ticket.IsSuspended, CreatedDate = x.Ticket.CreatedDate, AssignedUsers = x.Ticket.Assignments.Where(a => a.IsActive).Select(a => a.User.Name).ToList(), AssignedUserIds = x.Ticket.Assignments.Where(a => a.IsActive).Select(a => a.UserId).ToList(), UnreadCount = x.LastReadAt.HasValue ? _db.HelpdeskTicketHistories.Count(h => h.TicketId == x.Ticket.Id && !h.IsDeleted && h.Action != "TicketViewed" && h.CreatedDate > x.LastReadAt.Value) : (_db.HelpdeskTicketHistories.Any(h => h.TicketId == x.Ticket.Id && !h.IsDeleted && h.Action != "TicketViewed") ? 1 : 0) }).ToListAsync(ct);
         return ResponseModel<List<HelpdeskTicketListItemDto>>.Success(items);
     }
 
@@ -44,6 +45,25 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         if (user is null) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Oturum bulunamadı.", StatusCode.Unauthorized);
         var ticket = await VisibleTickets(user).AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         return ticket is null ? ResponseModel<HelpdeskTicketDetailDto>.Fail("Ticket bulunamadı veya erişim yetkiniz yok.", StatusCode.NotFound) : ResponseModel<HelpdeskTicketDetailDto>.Success(await Detail(ticket, ct));
+    }
+
+    public async Task<ResponseModel<bool>> MarkReadAsync(long id, CancellationToken ct = default)
+    {
+        var user = await RequiredUser(ct);
+        if (user is null) return ResponseModel<bool>.Fail("Oturum bulunamadı.", StatusCode.Unauthorized);
+        if (!await VisibleTickets(user).AsNoTracking().AnyAsync(x => x.Id == id && !x.IsDeleted, ct))
+            return ResponseModel<bool>.Fail("Ticket bulunamadı veya erişim yetkiniz yok.", StatusCode.NotFound);
+
+        var now = DateTimeOffset.Now;
+        var read = await _db.HelpdeskTicketUserReads.FirstOrDefaultAsync(x => x.TicketId == id && x.UserId == user.Id, ct);
+        var shouldLogView = read is null || read.LastReadAt < now.AddSeconds(-5);
+        if (read is null)
+            _db.HelpdeskTicketUserReads.Add(new HelpdeskTicketUserRead { TicketId = id, UserId = user.Id, LastReadAt = now });
+        else
+            read.LastReadAt = now;
+        if (shouldLogView) AddHistory(id, "TicketViewed", null, null, null, user.Id);
+        await _db.SaveChangesAsync(ct);
+        return ResponseModel<bool>.Success(true);
     }
 
     public async Task<ResponseModel<HelpdeskTicketDetailDto>> CreateAsync(HelpdeskTicketCreateDto dto, CancellationToken ct = default)
@@ -99,7 +119,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         var ticketResult = await ManageableTicket(id, ct); if (ticketResult.ticket is null) return ticketResult.failure!;
         var (ticket, user) = ticketResult.ticket.Value;
         if (!Enum.IsDefined(dto.Status)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Geçersiz ticket durumu.");
-        if (dto.Status == HelpdeskTicketStatus.Reopened && !CanReopen(user)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Tamamlanmış ticketı yalnız Helpdesk Yöneticisi veya Admin yeniden açabilir.", StatusCode.Unauthorized);
+        if (dto.Status == HelpdeskTicketStatus.Reopened && !CanReopen(user)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Tamamlanmış ticketı yalnız Helpdesk Yöneticisi, Helpdesk Ekip Lideri veya Admin yeniden açabilir.", StatusCode.Unauthorized);
         if (dto.Status == HelpdeskTicketStatus.Reopened && ticket.Status != HelpdeskTicketStatus.Completed) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Yalnız tamamlanmış ticket yeniden açılabilir.");
         if (!CanManage(user) && !(IsAgent(user) && ticket.Assignments.Any(a => a.IsActive && a.UserId == user.Id) && dto.Status == HelpdeskTicketStatus.Completed)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Bu durum değişikliği için yetkiniz yok.", StatusCode.Unauthorized);
         var previous = ticket.Status; ticket.Status = dto.Status; ticket.CompletedDate = dto.Status == HelpdeskTicketStatus.Completed ? DateTimeOffset.Now : null; ticket.UpdatedDate = DateTimeOffset.Now; ticket.UpdatedUser = user.Id;
@@ -179,19 +199,19 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         var references = string.Join(' ', new[] { latest?.References, latest?.MessageId }.Where(x => !string.IsNullOrWhiteSpace(x)));
         var subject = $"[{ticket.TicketNo}] {TicketPrefixRegex().Replace(ticket.Subject, string.Empty).Trim()}";
         var senderName = WebUtility.HtmlEncode(user.Name);
-        var body = $"<p>{WebUtility.HtmlEncode(dto.Body.Trim()).Replace("\r\n", "<br>").Replace("\n", "<br>")}</p><p style=\"margin-top:24px\">Saygılarımızla,<br><strong>{senderName}</strong><br>FlowAssist Helpdesk</p>";
-        var entity = new HelpdeskTicketMail { TicketId = id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, Body = body, MailDate = DateTimeOffset.Now, CreatedDate = DateTimeOffset.Now, CreatedUser = user.Id };
+        var body = $"<p>{WebUtility.HtmlEncode(dto.Body.Trim()).Replace("\r\n", "<br>").Replace("\n", "<br>")}</p><p style=\"margin-top:24px\">Saygılarımızla,<br><strong>{senderName}</strong></p>";
+        var entity = new HelpdeskTicketMail { TicketId = id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, FromAddress = mailboxAddress, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, Body = body, MailDate = DateTimeOffset.Now, CreatedDate = DateTimeOffset.Now, CreatedUser = user.Id };
         _db.HelpdeskTicketMails.Add(entity);
         _db.MailOutboxes.Add(new MailOutbox { RequestNo = ticket.TicketNo, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, BodyHtml = body, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Status = MailOutboxStatus.Pending, CreatedDate = DateTime.Now, CreatedUser = user.Id });
         AddHistory(id, "ReplyQueued", subject, null, null, user.Id);
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return ResponseModel<HelpdeskTicketMailDto>.Success(new HelpdeskTicketMailDto { Id = entity.Id, Direction = entity.Direction, SenderName = user.Name, ToRecipients = entity.ToRecipients, CcRecipients = entity.CcRecipients, Subject = entity.Subject, Body = entity.Body, MailDate = entity.MailDate });
+        return ResponseModel<HelpdeskTicketMailDto>.Success(new HelpdeskTicketMailDto { Id = entity.Id, Direction = entity.Direction, FromAddress = entity.FromAddress, SenderName = user.Name, ToRecipients = entity.ToRecipients, CcRecipients = entity.CcRecipients, Subject = entity.Subject, Body = entity.Body, MailDate = entity.MailDate });
     }
 
     private IQueryable<HelpdeskTicket> VisibleTickets(CurrentUserDto user) => CanManage(user) ? _db.HelpdeskTickets : _db.HelpdeskTickets.Where(x => x.Assignments.Any(a => a.IsActive && a.UserId == user.Id));
     private static bool CanManage(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase));
-    private static bool CanReopen(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase));
+    private static bool CanReopen(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Admin, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Manager, StringComparison.OrdinalIgnoreCase) || string.Equals(r.Code, Lead, StringComparison.OrdinalIgnoreCase));
     private static bool IsAgent(CurrentUserDto user) => user.Roles.Any(r => string.Equals(r.Code, Agent, StringComparison.OrdinalIgnoreCase));
     private async Task<CurrentUserDto?> RequiredUser(CancellationToken ct) => await _currentUser.GetAsync(ct);
     private void AddHistory(long ticketId, string action, string? description, string? previous, string? next, long userId) => _db.HelpdeskTicketHistories.Add(new HelpdeskTicketHistory { TicketId = ticketId, Action = action, Description = description, PreviousValue = previous, NewValue = next, CreatedDate = DateTimeOffset.Now, CreatedUser = userId });
@@ -237,7 +257,7 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         var subject = $"[{ticket.TicketNo}] Talebiniz alınmıştır";
         var body = BuildAcceptanceMailBody(ticket);
         _db.MailOutboxes.Add(new MailOutbox { RequestNo = ticket.TicketNo, ToRecipients = ticket.RequesterEmail, CcRecipients = ccRecipients, Subject = subject, BodyHtml = body, MessageId = messageId, InReplyTo = latestIncoming?.MessageId, References = references, Status = MailOutboxStatus.Pending, CreatedDate = DateTime.Now, CreatedUser = actorId });
-        _db.HelpdeskTicketMails.Add(new HelpdeskTicketMail { TicketId = ticket.Id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latestIncoming?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, ToRecipients = ticket.RequesterEmail, CcRecipients = ccRecipients, Subject = subject, Body = body, MailDate = acceptedAt, CreatedDate = acceptedAt, CreatedUser = actorId });
+        _db.HelpdeskTicketMails.Add(new HelpdeskTicketMail { TicketId = ticket.Id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latestIncoming?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, FromAddress = mailboxAddress, ToRecipients = ticket.RequesterEmail, CcRecipients = ccRecipients, Subject = subject, Body = body, MailDate = acceptedAt, CreatedDate = acceptedAt, CreatedUser = actorId });
         AddHistory(ticket.Id, "AcceptanceMailQueued", null, null, acceptedAt.ToString("O"), actorId);
     }
     private static string BuildAcceptanceMailBody(HelpdeskTicket ticket)
@@ -337,6 +357,6 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     private static bool RecipientsAreValid(params string?[] values) { try { foreach (var recipient in SplitRecipients(values)) _ = new System.Net.Mail.MailAddress(recipient); return true; } catch (FormatException) { return false; } }
     [System.Text.RegularExpressions.GeneratedRegex(@"^\s*\[?HD-\d{4}-\d{6}\]?\s*", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
     private static partial System.Text.RegularExpressions.Regex TicketPrefixRegex();
-    private async Task<HelpdeskTicketDetailDto> Detail(HelpdeskTicket ticket, CancellationToken ct) { var assignments = await _db.HelpdeskTicketAssignments.Where(x => x.TicketId == ticket.Id && x.IsActive).Select(x => new { x.UserId, x.User.Name }).ToListAsync(ct); var dto = new HelpdeskTicketDetailDto { Id = ticket.Id, TicketNo = ticket.TicketNo, Subject = ticket.Subject, Description = ticket.Description, RequesterName = ticket.RequesterName, RequesterEmail = ticket.RequesterEmail, ToRecipients = ticket.ToRecipients, CcRecipients = ticket.CcRecipients, Status = ticket.Status, Priority = ticket.Priority, IsSuspended = ticket.IsSuspended, SuspendedUntil = ticket.SuspendedUntil, CompletedDate = ticket.CompletedDate, CreatedDate = ticket.CreatedDate, AssignedUsers = assignments.Select(x => x.Name).ToList(), AssignedUserIds = assignments.Select(x => x.UserId).ToList(), Comments = await _db.HelpdeskTicketComments.Where(x => x.TicketId == ticket.Id && !x.IsDeleted).OrderBy(x => x.CreatedDate).Select(x => new HelpdeskCommentDto { Id = x.Id, Body = x.Body, CreatedDate = x.CreatedDate, CreatedUser = x.CreatedUser }).ToListAsync(ct), History = await _db.HelpdeskTicketHistories.Where(x => x.TicketId == ticket.Id && !x.IsDeleted).OrderByDescending(x => x.CreatedDate).Select(x => new HelpdeskHistoryDto { Id = x.Id, Action = x.Action, Description = x.Description, PreviousValue = x.PreviousValue, NewValue = x.NewValue, CreatedDate = x.CreatedDate, CreatedUser = x.CreatedUser }).ToListAsync(ct) }; return dto; }
+    private async Task<HelpdeskTicketDetailDto> Detail(HelpdeskTicket ticket, CancellationToken ct) { var assignments = await _db.HelpdeskTicketAssignments.Where(x => x.TicketId == ticket.Id && x.IsActive).Select(x => new { x.UserId, x.User.Name }).ToListAsync(ct); var dto = new HelpdeskTicketDetailDto { Id = ticket.Id, TicketNo = ticket.TicketNo, Subject = ticket.Subject, Description = ticket.Description, RequesterName = ticket.RequesterName, RequesterEmail = ticket.RequesterEmail, ToRecipients = ticket.ToRecipients, CcRecipients = ticket.CcRecipients, SourceType = ticket.SourceType, Status = ticket.Status, Priority = ticket.Priority, IsSuspended = ticket.IsSuspended, SuspendedUntil = ticket.SuspendedUntil, CompletedDate = ticket.CompletedDate, CreatedDate = ticket.CreatedDate, AssignedUsers = assignments.Select(x => x.Name).ToList(), AssignedUserIds = assignments.Select(x => x.UserId).ToList(), Comments = await _db.HelpdeskTicketComments.Where(x => x.TicketId == ticket.Id && !x.IsDeleted).OrderBy(x => x.CreatedDate).Select(x => new HelpdeskCommentDto { Id = x.Id, Body = x.Body, CreatedDate = x.CreatedDate, CreatedUser = x.CreatedUser }).ToListAsync(ct), History = await _db.HelpdeskTicketHistories.Where(x => x.TicketId == ticket.Id && !x.IsDeleted).OrderByDescending(x => x.CreatedDate).Select(x => new HelpdeskHistoryDto { Id = x.Id, Action = x.Action, Description = x.Description, PreviousValue = x.PreviousValue, NewValue = x.NewValue, CreatedDate = x.CreatedDate, CreatedUser = x.CreatedUser }).ToListAsync(ct) }; return dto; }
     private async Task<((HelpdeskTicket ticket, CurrentUserDto user)? ticket, ResponseModel<HelpdeskTicketDetailDto>? failure)> ManageableTicket(long id, CancellationToken ct) { var user = await RequiredUser(ct); if (user is null) return (null, ResponseModel<HelpdeskTicketDetailDto>.Fail("Oturum bulunamadı.", StatusCode.Unauthorized)); var ticket = await VisibleTickets(user).Include(x => x.Assignments).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct); return ticket is null ? (null, ResponseModel<HelpdeskTicketDetailDto>.Fail("Ticket bulunamadı veya erişim yetkiniz yok.", StatusCode.NotFound)) : ((ticket, user), null); }
 }
