@@ -7,6 +7,7 @@ public interface IHelpdeskTicketService
 {
     Task<ResponseModel<List<HelpdeskTicketListItemDto>>> GetListAsync(CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> GetAsync(long id, CancellationToken cancellationToken = default);
+    Task<ResponseModel<bool>> MarkReadAsync(long id, CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> CreateAsync(HelpdeskTicketCreateDto dto, CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> AssignAsync(long id, HelpdeskAssignmentDto dto, CancellationToken cancellationToken = default);
     Task<ResponseModel<HelpdeskTicketDetailDto>> ChangeStatusAsync(long id, HelpdeskStatusChangeDto dto, CancellationToken cancellationToken = default);

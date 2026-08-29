@@ -20,12 +20,14 @@ public class HelpdeskTicketListItemDto
     public string TicketNo { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string RequesterName { get; set; } = string.Empty;
+    public HelpdeskTicketSourceType SourceType { get; set; }
     public HelpdeskTicketStatus Status { get; set; }
     public int? Priority { get; set; }
     public bool IsSuspended { get; set; }
     public DateTimeOffset CreatedDate { get; set; }
     public List<string> AssignedUsers { get; set; } = [];
     public List<long> AssignedUserIds { get; set; } = [];
+    public int UnreadCount { get; set; }
 }
 
 public sealed class HelpdeskTicketDetailDto : HelpdeskTicketListItemDto

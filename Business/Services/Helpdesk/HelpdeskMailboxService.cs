@@ -13,7 +13,7 @@ namespace Business.Services.Helpdesk;
 
 public sealed class HelpdeskMailboxService : IHelpdeskMailboxService
 {
-    private static readonly string[] ManagementRoles = ["ADMIN", "HELPDESK_MANAGER"];
+    private static readonly string[] ManagementRoles = ["ADMIN", "HELPDESK_MANAGER", "HELPDESK_TEAM_LEAD"];
     private readonly AppDataContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IHelpdeskSecretProtector _protector;

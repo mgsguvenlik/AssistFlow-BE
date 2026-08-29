@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
+using Model.Concrete.Helpdesk;
 using Model.Concrete.WorkFlows;
 using System.Globalization;
 
@@ -109,9 +110,21 @@ namespace Business.Services
 
                             await uow.Repository.CompleteAsync();
 
+                            var fromAddress = _cfg.From;
+                            if (m.MessageId is not null && m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var helpdeskMailboxAddress = await uow.Repository
+                                    .GetQueryable<HelpdeskTicket>(x => x.TicketNo == m.RequestNo && !x.IsDeleted)
+                                    .Where(x => x.MailboxId != null)
+                                    .Select(x => x.Mailbox!.Address)
+                                    .FirstOrDefaultAsync(stoppingToken);
+                                if (!string.IsNullOrWhiteSpace(helpdeskMailboxAddress))
+                                    fromAddress = helpdeskMailboxAddress;
+                            }
+
                             // GÖNDER
                             MailService.SendMail(
-                                from: _cfg.From, // MailService iç config From/FromName kullansın isterseniz oradan çekebilirsiniz
+                                from: fromAddress,
                                 tos: m.ToRecipients,
                                 ccs: m.CcRecipients ?? "",
                                 subject: m.Subject,
