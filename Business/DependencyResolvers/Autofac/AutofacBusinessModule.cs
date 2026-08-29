@@ -3,6 +3,7 @@ using Autofac.Extras.DynamicProxy;
 using Business.Interfaces;
 using Business.Interfaces.Business.Interfaces;
 using Business.Interfaces.Crm;
+using Business.Interfaces.Helpdesk;
 using Business.Interfaces.Manitou;
 using Business.Interfaces.PeriodicReports;
 using Business.Interfaces.Qnb;
@@ -10,6 +11,7 @@ using Business.Interfaces.Storage;
 using Business.Interfaces.Ykb;
 using Business.Services;
 using Business.Services.Crm;
+using Business.Services.Helpdesk;
 using Business.Services.Manitou;
 using Business.Services.PeriodicReports;
 using Business.Services.Qnb;
@@ -77,6 +79,11 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped(typeof(IWorkOrderTypeService), typeof(WorkOrderTypeService));
             services.AddScoped(typeof(IFileStorage), typeof(R2FileStorage));
             services.AddScoped(typeof(IPurchaseRequestService), typeof(PurchaseRequestService));
+            services.AddScoped<IHelpdeskTicketService, HelpdeskTicketService>();
+            services.AddScoped<IHelpdeskMailboxService, HelpdeskMailboxService>();
+            services.AddScoped<IHelpdeskTicketNumberGenerator, HelpdeskTicketNumberGenerator>();
+            services.AddScoped<IHelpdeskMailboxClient, EwsHelpdeskMailboxClient>();
+            services.AddScoped<IHelpdeskIncomingMailProcessor, HelpdeskIncomingMailProcessor>();
             services.AddScoped<IPeriodicReportService, PeriodicReportService>();
             services.AddScoped<IReportExecutionService, ReportExecutionService>();
             services.AddScoped<IReportQueryExecutor, ReportQueryExecutor>();
@@ -92,6 +99,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddHostedService<SlaNotificationDispatcher>();
             services.AddHostedService<ManitouStagingSyncBackgroundService>();
             services.AddHostedService<PeriodicReportScheduler>();
+            services.AddHostedService<HelpdeskBackgroundWorker>();
 
 
             // ASP.NET Core Identity hasher kaydı

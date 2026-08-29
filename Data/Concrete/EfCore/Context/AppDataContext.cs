@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Data.Concrete.EfCore.Configurations;
 using Model.Concrete;
 using Model.Concrete.Crm;
+using Model.Concrete.Helpdesk;
 using Model.Concrete.PeriodicReports;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
@@ -123,6 +124,17 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<PurchaseRequestHistory> PurchaseRequestHistories { get; set; } = default!;
         public DbSet<PurchaseAttachment> PurchaseAttachments { get; set; } = default!;
 
+        #endregion
+
+        #region Helpdesk
+        public DbSet<HelpdeskTicket> HelpdeskTickets { get; set; } = default!;
+        public DbSet<HelpdeskTicketAssignment> HelpdeskTicketAssignments { get; set; } = default!;
+        public DbSet<HelpdeskTicketMail> HelpdeskTicketMails { get; set; } = default!;
+        public DbSet<HelpdeskTicketComment> HelpdeskTicketComments { get; set; } = default!;
+        public DbSet<HelpdeskTicketHistory> HelpdeskTicketHistories { get; set; } = default!;
+        public DbSet<HelpdeskMailbox> HelpdeskMailboxes { get; set; } = default!;
+        public DbSet<HelpdeskMailRule> HelpdeskMailRules { get; set; } = default!;
+        public DbSet<HelpdeskTicketNumberSequence> HelpdeskTicketNumberSequences { get; set; } = default!;
         #endregion
 
         /// <summary>
@@ -1293,6 +1305,58 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.ApplyConfiguration(new PeriodicReportExecutionConfiguration());
 
             #endregion
+
+            modelBuilder.Entity<HelpdeskTicket>(entity =>
+            {
+                entity.HasIndex(x => x.TicketNo).IsUnique().HasDatabaseName("UX_HelpdeskTicket_TicketNo");
+                entity.HasIndex(x => new { x.Status, x.IsSuspended, x.Priority, x.CreatedDate }).HasDatabaseName("IX_HelpdeskTicket_List");
+                entity.HasIndex(x => x.SuspendedUntil).HasDatabaseName("IX_HelpdeskTicket_SuspendedUntil");
+                entity.HasOne(x => x.Mailbox).WithMany().HasForeignKey(x => x.MailboxId).OnDelete(DeleteBehavior.Restrict);
+                entity.Property(x => x.Subject).IsRequired();
+                entity.Property(x => x.Description).IsRequired();
+            });
+            modelBuilder.Entity<HelpdeskTicketAssignment>(entity =>
+            {
+                entity.HasIndex(x => new { x.TicketId, x.UserId }).IsUnique().HasFilter("[IsActive] = 1").HasDatabaseName("UX_HelpdeskAssignment_ActiveTicketUser");
+                entity.HasIndex(x => new { x.UserId, x.IsActive }).HasDatabaseName("IX_HelpdeskAssignment_User");
+                entity.HasOne(x => x.Ticket).WithMany(x => x.Assignments).HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<HelpdeskTicketMail>(entity =>
+            {
+                entity.HasIndex(x => new { x.MailboxId, x.MessageId }).IsUnique().HasFilter("[MailboxId] IS NOT NULL").HasDatabaseName("UX_HelpdeskMail_Mailbox_MessageId");
+                entity.HasIndex(x => new { x.TicketId, x.MailDate }).HasDatabaseName("IX_HelpdeskMail_Ticket_Date");
+                entity.HasOne(x => x.Ticket).WithMany(x => x.Mails).HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<HelpdeskTicketComment>(entity =>
+            {
+                entity.HasIndex(x => new { x.TicketId, x.CreatedDate }).HasDatabaseName("IX_HelpdeskComment_Ticket_Date");
+                entity.HasOne(x => x.Ticket).WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<HelpdeskTicketHistory>(entity =>
+            {
+                entity.HasIndex(x => new { x.TicketId, x.CreatedDate }).HasDatabaseName("IX_HelpdeskHistory_Ticket_Date");
+                entity.HasOne(x => x.Ticket).WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<HelpdeskMailbox>(entity =>
+            {
+                entity.HasIndex(x => x.Address).IsUnique().HasFilter("[IsDeleted] = 0").HasDatabaseName("UX_HelpdeskMailbox_Address");
+                entity.HasIndex(x => x.IsActive).HasDatabaseName("IX_HelpdeskMailbox_IsActive");
+            });
+            modelBuilder.Entity<HelpdeskMailRule>(entity =>
+            {
+                entity.HasIndex(x => new { x.MailboxId, x.IsActive, x.SortOrder }).HasDatabaseName("IX_HelpdeskRule_Mailbox_Order");
+                entity.HasOne(x => x.Mailbox).WithMany().HasForeignKey(x => x.MailboxId).OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<HelpdeskTicketNumberSequence>(entity =>
+            {
+                entity.Property(x => x.Year).ValueGeneratedNever();
+            });
+            modelBuilder.Entity<MailOutbox>(entity =>
+            {
+                entity.Property(x => x.MessageId).HasMaxLength(998);
+                entity.Property(x => x.InReplyTo).HasMaxLength(998);
+            });
         }
     }
 }

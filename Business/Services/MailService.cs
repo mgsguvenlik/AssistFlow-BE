@@ -180,7 +180,8 @@ namespace Business.Services
         public static void SendMail(
             string from, string tos, string ccs, string subject,
             string body, bool isHtml, string mailServer, int mailServerPort, bool useSsl,
-            bool useCredential, string user, string pass, string domain, string fromName, string attachment = "")
+            bool useCredential, string user, string pass, string domain, string fromName, string attachment = "",
+            string? messageId = null, string? inReplyTo = null, string? references = null)
         {
             try
             {
@@ -197,6 +198,10 @@ namespace Business.Services
 
                 foreach (var a in tosArray) { try { mail.To.Add(new MailAddress(a.Trim())); } catch { } }
                 foreach (var a in ccsArray) { try { mail.CC.Add(new MailAddress(a.Trim())); } catch { } }
+
+                if (!string.IsNullOrWhiteSpace(messageId)) mail.Headers["Message-ID"] = messageId;
+                if (!string.IsNullOrWhiteSpace(inReplyTo)) mail.Headers["In-Reply-To"] = inReplyTo;
+                if (!string.IsNullOrWhiteSpace(references)) mail.Headers["References"] = references;
 
                 if (!string.IsNullOrWhiteSpace(attachment))
                     mail.Attachments.Add(new Attachment(attachment));
