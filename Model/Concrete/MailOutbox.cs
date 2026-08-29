@@ -16,6 +16,9 @@ namespace Model.Concrete
         public string? CcRecipients { get; set; }
         public string Subject { get; set; } = "";
         public string BodyHtml { get; set; } = "";
+        public string? MessageId { get; set; }
+        public string? InReplyTo { get; set; }
+        public string? References { get; set; }
 
         // Durum/deneme
         public MailOutboxStatus Status { get; set; } = MailOutboxStatus.Pending;

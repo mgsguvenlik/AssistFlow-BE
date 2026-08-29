@@ -15,6 +15,7 @@ using Data.Seeding.Seeds;
 using Mapster;
 using MapsterMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -55,6 +56,12 @@ builder.Services.AddHttpClient("CustomClient")
     });
 
 builder.Services.AddControllers();
+var dataProtection = builder.Services.AddDataProtection()
+    .SetApplicationName("AssistFlow");
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+builder.Services.AddSingleton<Business.Interfaces.Helpdesk.IHelpdeskSecretProtector, WebAPI.HelpdeskSecretProtector>();
 
 
 #region Serilog
@@ -176,6 +183,9 @@ builder.Services.AddDataSeeding(
 );
 builder.Services.AddDataSeeding(
     typeof(PeriodicReportMenuSeed)
+);
+builder.Services.AddDataSeeding(
+    typeof(HelpdeskSeed)
 );
 #endregion
 
