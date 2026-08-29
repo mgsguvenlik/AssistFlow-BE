@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Model.Concrete;
+using Model.Concrete.Helpdesk;
 using Model.Concrete.WorkFlows;
 using System.Globalization;
 
@@ -109,22 +110,37 @@ namespace Business.Services
 
                             await uow.Repository.CompleteAsync();
 
+                            var fromAddress = _cfg.From;
+                            if (m.MessageId is not null && m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var helpdeskMailboxAddress = await uow.Repository
+                                    .GetQueryable<HelpdeskTicket>(x => x.TicketNo == m.RequestNo && !x.IsDeleted)
+                                    .Where(x => x.MailboxId != null)
+                                    .Select(x => x.Mailbox!.Address)
+                                    .FirstOrDefaultAsync(stoppingToken);
+                                if (!string.IsNullOrWhiteSpace(helpdeskMailboxAddress))
+                                    fromAddress = helpdeskMailboxAddress;
+                            }
+
                             // GÖNDER
                             MailService.SendMail(
-                                from: _cfg.From, // MailService iç config From/FromName kullansın isterseniz oradan çekebilirsiniz
+                                from: fromAddress,
                                 tos: m.ToRecipients,
                                 ccs: m.CcRecipients ?? "",
                                 subject: m.Subject,
                                 body: m.BodyHtml,
                                 isHtml: true,
                                 mailServer: _cfg.Server,              // MailService iç LoadConfig ile dolduruyor; isterseniz wrapper kullanın
-                                mailServerPort: 0,
+                                mailServerPort: _cfg.Port,
                                 useSsl: _cfg.UseSsl,
                                 useCredential: false,
                                 user: _cfg.User,
                                 pass: _cfg.Pass,
                                 domain: _cfg.Domain,
-                                fromName: _cfg.FromName
+                                fromName: _cfg.FromName,
+                                messageId: m.MessageId,
+                                inReplyTo: m.InReplyTo,
+                                references: m.References
                             );
 
                             m.Status = MailOutboxStatus.Sent;
@@ -132,21 +148,24 @@ namespace Business.Services
                             uow.Repository.Update(m);
 
 
-                            var request = await uow.Repository
-                                .GetQueryable<ServicesRequest>()
-                                .Include(x => x.Customer)
-                                .FirstOrDefaultAsync(x => x.RequestNo == m.RequestNo);
-
-                            await uow.Repository.AddAsync(new WorkFlowActivityRecord
+                            if (!m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
                             {
-                                RequestNo = m.RequestNo,
-                                FromStepCode = m.FromStepCode,
-                                ToStepCode = m.ToStepCode,
-                                ActionType = WorkFlowActionType.MailSent,
-                                Summary = $"Mail gönderildi: {m.Subject}",
-                                OccurredAtUtc = DateTime.Now,
-                                CustomerId = request?.CustomerId ?? null
-                            });
+                                var request = await uow.Repository
+                                    .GetQueryable<ServicesRequest>()
+                                    .Include(x => x.Customer)
+                                    .FirstOrDefaultAsync(x => x.RequestNo == m.RequestNo);
+
+                                await uow.Repository.AddAsync(new WorkFlowActivityRecord
+                                {
+                                    RequestNo = m.RequestNo,
+                                    FromStepCode = m.FromStepCode,
+                                    ToStepCode = m.ToStepCode,
+                                    ActionType = WorkFlowActionType.MailSent,
+                                    Summary = $"Mail gönderildi: {m.Subject}",
+                                    OccurredAtUtc = DateTime.Now,
+                                    CustomerId = request?.CustomerId
+                                });
+                            }
 
                             await uow.Repository.CompleteAsync();
                         }
@@ -162,15 +181,18 @@ namespace Business.Services
 
                             uow.Repository.Update(m);
 
-                            await uow.Repository.AddAsync(new WorkFlowActivityRecord
+                            if (!m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
                             {
-                                RequestNo = m.RequestNo,
-                                FromStepCode = m.FromStepCode,
-                                ToStepCode = m.ToStepCode,
-                                ActionType = WorkFlowActionType.MailSendFailed,
-                                Summary = $"Mail gönderimi başarısız: {exSend.Message}",
-                                OccurredAtUtc = DateTime.Now
-                            });
+                                await uow.Repository.AddAsync(new WorkFlowActivityRecord
+                                {
+                                    RequestNo = m.RequestNo,
+                                    FromStepCode = m.FromStepCode,
+                                    ToStepCode = m.ToStepCode,
+                                    ActionType = WorkFlowActionType.MailSendFailed,
+                                    Summary = $"Mail gönderimi başarısız: {exSend.Message}",
+                                    OccurredAtUtc = DateTime.Now
+                                });
+                            }
 
                             await uow.Repository.CompleteAsync();
                         }

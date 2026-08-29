@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260827170638_AddHelpdeskModule")]
+    partial class AddHelpdeskModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1089,10 +1092,13 @@ namespace Data.Migrations
                     b.Property<long>("CreatedUser")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("EwsUrl")
+                    b.Property<int>("ImapPort")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImapServer")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
@@ -1114,6 +1120,9 @@ namespace Data.Migrations
 
                     b.Property<long?>("UpdatedUser")
                         .HasColumnType("bigint");
+
+                    b.Property<bool>("UseSsl")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -1450,35 +1459,6 @@ namespace Data.Migrations
                     b.HasKey("Year");
 
                     b.ToTable("TicketNumberSequence", "helpdesk");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Helpdesk.HelpdeskTicketUserRead", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("LastReadAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("TicketId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TicketId", "UserId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_HelpdeskTicketUserRead_Ticket_User");
-
-                    b.HasIndex("UserId", "LastReadAt")
-                        .HasDatabaseName("IX_HelpdeskTicketUserRead_User_Date");
-
-                    b.ToTable("TicketUserRead", "helpdesk");
                 });
 
             modelBuilder.Entity("Model.Concrete.MailOutbox", b =>
@@ -5698,25 +5678,6 @@ namespace Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Ticket");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Helpdesk.HelpdeskTicketUserRead", b =>
-                {
-                    b.HasOne("Model.Concrete.Helpdesk.HelpdeskTicket", "Ticket")
-                        .WithMany()
-                        .HasForeignKey("TicketId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Model.Concrete.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Ticket");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Model.Concrete.MenuRole", b =>
