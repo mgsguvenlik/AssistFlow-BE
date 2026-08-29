@@ -89,16 +89,15 @@ public sealed partial class HelpdeskIncomingMailProcessor(
 
     private async Task<HelpdeskTicket?> FindExistingTicketAsync(HelpdeskInboundMail mail, CancellationToken ct)
     {
-        var inReplyTo = NormalizeMessageId(mail.InReplyTo);
-        if (inReplyTo is not null)
+        var replyMessageIds = ExtractMessageIds(mail.InReplyTo).ToList();
+        if (replyMessageIds.Count > 0)
         {
-            var ticket = await _db.HelpdeskTicketMails.Where(x => x.MessageId == inReplyTo)
+            var ticket = await _db.HelpdeskTicketMails.Where(x => replyMessageIds.Contains(x.MessageId))
                 .Select(x => x.Ticket).FirstOrDefaultAsync(x => !x.IsDeleted, ct);
             if (ticket is not null) return ticket;
         }
 
-        var references = MessageIdRegex().Matches(mail.References ?? string.Empty)
-            .Select(x => NormalizeMessageId(x.Value)).Where(x => x is not null).Cast<string>().Distinct().ToList();
+        var references = ExtractMessageIds(mail.References).ToList();
         if (references.Count > 0)
         {
             var ticket = await _db.HelpdeskTicketMails.Where(x => references.Contains(x.MessageId))
@@ -111,6 +110,19 @@ public sealed partial class HelpdeskIncomingMailProcessor(
         {
             var ticketNo = match.Groups[1].Value;
             return await _db.HelpdeskTickets.FirstOrDefaultAsync(x => x.TicketNo == ticketNo && !x.IsDeleted, ct);
+        }
+
+        if (ReplySubjectRegex().IsMatch(mail.Subject ?? string.Empty) && !string.IsNullOrWhiteSpace(mail.FromAddress))
+        {
+            var normalizedSubject = NormalizeReplySubject(mail.Subject);
+            var candidates = await _db.HelpdeskTickets.AsNoTracking()
+                .Where(x => !x.IsDeleted && x.RequesterEmail == mail.FromAddress)
+                .OrderByDescending(x => x.CreatedDate)
+                .Take(50)
+                .ToListAsync(ct);
+            var ticket = candidates.FirstOrDefault(x => string.Equals(
+                NormalizeReplySubject(x.Subject), normalizedSubject, StringComparison.OrdinalIgnoreCase));
+            if (ticket is not null) return ticket;
         }
         return null;
     }
@@ -225,9 +237,31 @@ public sealed partial class HelpdeskIncomingMailProcessor(
     private static Notification NewNotification(long userId, string ticketNo, string title, string message) => new() { Type = NotificationType.GenericInfo, Scope = NotificationScope.User, TargetUserId = userId, RequestNo = ticketNo, Title = title, Message = message, IsRead = false, CreatedDate = DateTime.Now, CreatedUser = 0 };
     private static MailOutbox NewOutbox(string ticketNo, string recipients, string subject, string body) => new() { RequestNo = ticketNo, ToRecipients = recipients, Subject = subject, BodyHtml = body, Status = MailOutboxStatus.Pending, CreatedDate = DateTime.Now, CreatedUser = 0 };
     private static string? NormalizeMessageId(string? value) { if (string.IsNullOrWhiteSpace(value)) return null; var trimmed = value.Trim(); return trimmed.StartsWith('<') ? trimmed : $"<{trimmed.Trim('<', '>')}>"; }
+    private static IEnumerable<string> ExtractMessageIds(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) yield break;
+        var matches = MessageIdRegex().Matches(value);
+        if (matches.Count > 0)
+        {
+            foreach (Match match in matches)
+            {
+                var normalized = NormalizeMessageId(match.Value);
+                if (normalized is not null) yield return normalized;
+            }
+            yield break;
+        }
+        foreach (var token in value.Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var normalized = NormalizeMessageId(token);
+            if (normalized is not null) yield return normalized;
+        }
+    }
+    private static string NormalizeReplySubject(string? subject) => ReplySubjectRegex().Replace(subject?.Trim() ?? string.Empty, string.Empty).Trim();
 
     [GeneratedRegex(@"<[^<>\s]+>", RegexOptions.Compiled)]
     private static partial Regex MessageIdRegex();
     [GeneratedRegex(@"\[?(HD-\d{4}-\d{6})\]?", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex TicketNoRegex();
+    [GeneratedRegex(@"^(?:(?:RE|FW|FWD|YANIT|YNT|İLT)\s*:\s*)+", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+    private static partial Regex ReplySubjectRegex();
 }
