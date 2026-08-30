@@ -145,7 +145,8 @@ public sealed class HelpdeskMailboxService : IHelpdeskMailboxService
         if (!await _db.HelpdeskMailboxes.AnyAsync(x => x.Id == dto.MailboxId && !x.IsDeleted, ct)) return "Mailbox bulunamadı.";
         if (string.IsNullOrWhiteSpace(dto.Value)) return "Kural değeri zorunludur.";
         if (dto.SortOrder < 0) return "Kural sırası negatif olamaz.";
-        if (dto.Field != HelpdeskRuleField.Sender && dto.Operator != HelpdeskRuleOperator.Contains) return "Subject ve Body alanlarında yalnız Contains operatörü desteklenir.";
+        if (!Enum.IsDefined(dto.Field)) return "Geçersiz kural alanı.";
+        if (!Enum.IsDefined(dto.Operator)) return "Geçersiz karşılaştırma operatörü.";
         return null;
     }
 
