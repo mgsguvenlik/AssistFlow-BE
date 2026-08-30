@@ -140,6 +140,9 @@ public sealed partial class HelpdeskIncomingMailProcessor(
 
     private static bool Match(HelpdeskMailRule rule, HelpdeskInboundMail mail)
     {
+        if (rule.Field == HelpdeskRuleField.Recipient)
+            return SplitRecipients(mail.ToRecipients).Any(recipient => Compare(recipient, rule.Value, rule.Operator));
+
         var source = rule.Field switch
         {
             HelpdeskRuleField.Subject => mail.Subject,
@@ -147,10 +150,28 @@ public sealed partial class HelpdeskIncomingMailProcessor(
             HelpdeskRuleField.Sender => mail.FromAddress,
             _ => string.Empty
         };
-        return rule.Operator == HelpdeskRuleOperator.Equals
-            ? string.Equals(source?.Trim(), rule.Value.Trim(), StringComparison.OrdinalIgnoreCase)
-            : source?.Contains(rule.Value, StringComparison.OrdinalIgnoreCase) == true;
+        return Compare(source, rule.Value, rule.Operator);
     }
+
+    private static bool Compare(string? source, string value, HelpdeskRuleOperator ruleOperator)
+    {
+        var candidate = source?.Trim() ?? string.Empty;
+        var expected = value.Trim();
+        return ruleOperator switch
+        {
+            HelpdeskRuleOperator.Contains => candidate.Contains(expected, StringComparison.OrdinalIgnoreCase),
+            HelpdeskRuleOperator.NotContains => !candidate.Contains(expected, StringComparison.OrdinalIgnoreCase),
+            HelpdeskRuleOperator.Equals => string.Equals(candidate, expected, StringComparison.OrdinalIgnoreCase),
+            HelpdeskRuleOperator.NotEquals => !string.Equals(candidate, expected, StringComparison.OrdinalIgnoreCase),
+            HelpdeskRuleOperator.StartsWith => candidate.StartsWith(expected, StringComparison.OrdinalIgnoreCase),
+            HelpdeskRuleOperator.EndsWith => candidate.EndsWith(expected, StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
+    private static IEnumerable<string> SplitRecipients(string? recipients) =>
+        (recipients ?? string.Empty).Replace(',', ';')
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private async Task NotifyManagersAsync(HelpdeskTicket ticket, CancellationToken ct)
     {
