@@ -15,6 +15,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlow.Model.Dtos.WorkFlowDtos.WorkFlow;
 using Model.Dtos.WorkFlowDtos.WorkFlowStep;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport;
 using System.Net;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -33,6 +34,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("generate-request-no")]
+        [MenuAuthorize("ServiceRequestCreate", MenuPermission.View)]
         public async Task<IActionResult> GetFlowRequestNo(string prfeix = "SR")
         {
             var result = await _workFlowService.GetRequestNoAsync(prfeix);
@@ -40,6 +42,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("create-services-request")]
+        [MenuAuthorize("ServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> CreateRequest([FromBody] ServicesRequestCreateDto dto)
         {
             var result = await _workFlowService.CreateRequestAsync(dto);
@@ -47,6 +50,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-warehouse")]
+        [MenuAuthorize("ServiceRequestWarehouse", MenuPermission.Edit)]
         public async Task<IActionResult> SendWarehouse([FromBody] SendWarehouseDto dto)
         {
             var result = await _workFlowService.SendWarehouseAsync(dto);
@@ -54,12 +58,14 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("get-warehouse-byid")]
+        [MenuAuthorize("ServiceRequestWarehouse", MenuPermission.View)]
         public async Task<IActionResult> GetWarehouseById([FromBody] long id)
         {
             var result = await _workFlowService.GetWarehouseByIdAsync(id);
             return Ok(result);
         }
         [HttpGet("get-warehouse-byrequestno")]
+        [MenuAuthorize("ServiceRequestWarehouse", MenuPermission.View)]
         public async Task<IActionResult> GetWarehouseByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetWarehouseByRequestNoAsync(requestNo);
@@ -67,6 +73,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("complete-delivery")]
+        [MenuAuthorize("ServiceRequestWarehouse", MenuPermission.Edit)]
         public async Task<IActionResult> CompleteDelivery([FromBody] CompleteDeliveryDto dto)
         {
             if (dto == null)
@@ -80,6 +87,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-list")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetWorkFlowList([FromQuery] WorkFlowQueryParams p)
         {
             var result = await _workFlowService.GetWorkFlowsAsync(p);
@@ -87,6 +95,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-workflow/{id:long}")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.Edit)]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);
@@ -94,6 +103,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("cancel-workflow/{id:long}")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.Edit)]
         public async Task<IActionResult> CancelWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.CancelWorkFlowAsync(id);
@@ -101,6 +111,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-servicesrequest-byid/{id:long}")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {
             var result = await _workFlowService.GetServiceRequestByIdAsync(id);
@@ -108,6 +119,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-servicesrequest-list")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestList([FromQuery] QueryParams p)
         {
             var result = await _workFlowService.GetRequestsAsync(p);
@@ -116,6 +128,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-servicesrequest-byrequestno")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
@@ -123,6 +136,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("update-services-request/{id:long}")]
+        [MenuAuthorize("ServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] ServicesRequestUpdateDto dto)
         {
             if (dto.Id != id)
@@ -133,6 +147,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-technicalservice-by-requestno")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.View)]
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
@@ -140,6 +155,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-technical-service/image/{id}")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
         {
             var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
@@ -147,6 +163,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-technical-service")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] SendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
@@ -155,6 +172,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("start-technical-service")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> StartTechnicalServiceAsync([FromBody] StartTechnicalServiceDto dto)
         {
             var result = await _workFlowService.StartService(dto);
@@ -162,6 +180,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("finish-technical-service")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(200_000_000)] // 200 MB örnek
         [RequestFormLimits(MultipartBodyLengthLimit = 200_000_000, ValueCountLimit = 2048)]
@@ -172,6 +191,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("approve-pricing")]
+        [MenuAuthorize("ServiceRequestPricing", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(275_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000, ValueCountLimit = 2048)]
@@ -182,6 +202,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-pricing-by-requestno")]
+        [MenuAuthorize("ServiceRequestPricing", MenuPermission.View)]
         public async Task<IActionResult> GetPricingByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetPricingByRequestNoAsync(requestNo);
@@ -190,6 +211,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("final-approve")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(275_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000, ValueCountLimit = 2048)]
@@ -200,6 +222,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-finalapproval-by-requestno")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.View)]
         public async Task<IActionResult> GetFinalApprovalByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetFinalApprovalByRequestNoAsync(requestNo);
@@ -207,6 +230,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-finalapproval-by-id")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.View)]
         public async Task<IActionResult> GetFinalApprovalByIdAsync([FromQuery] long id)
         {
             var result = await _workFlowService.GetFinalApprovalByIdAsync(id);
@@ -214,6 +238,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("location-override")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] OverrideLocationCheckDto dto)
         {
             var result = await _workFlowService.RequestLocationOverrideAsync(dto);
@@ -222,6 +247,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("send-back-for-review")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
         {
             var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
@@ -230,6 +256,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("activity-records/{requestNo}")]
+        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)
         {
             var result = await _activationRecordService.GetLatestActivityRecordByRequestNoAsync(requestNo);
@@ -240,6 +267,7 @@ namespace WebAPI.Controllers
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
+        [MenuAuthorize("FlowStatusList", MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -247,6 +275,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
+        [MenuAuthorize("FlowStatusList", MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);
@@ -254,6 +283,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("create-steps")]
+        [MenuAuthorize("FlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> CreateSteps([FromBody] WorkFlowStepCreateDto dto)
         {
             var resp = await _workFlowService.CreateStepAsync(dto);
@@ -265,6 +295,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("update-steps/{id:long}")]
+        [MenuAuthorize("FlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> UpdateSteps([FromRoute] long id, [FromBody] WorkFlowStepUpdateDto dto)
         {
             if (dto.Id != id)
@@ -275,6 +306,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-steps/{id:long}")]
+        [MenuAuthorize("FlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteSteps([FromRoute] long id)
         {
             var resp = await _workFlowService.DeleteStepAsync(id);
@@ -295,6 +327,7 @@ namespace WebAPI.Controllers
         /// &WorkFlowStatuses=Pending&WorkFlowStatuses=Complated&TechnicianId=12&ProductCode=ABC
         /// </remarks>
         [HttpGet("workflow-report")]
+        [MenuAuthorize("ServiceReportsList", MenuPermission.View)]
         [ProducesResponseType(typeof(PagedResult<WorkFlowReportListItemDto>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> Get([FromQuery] ReportQueryParams q, CancellationToken ct)
         {
@@ -305,6 +338,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("report-lines/export")]
+        [MenuAuthorize("ServiceReportsList", MenuPermission.View)]
         public async Task<IActionResult> ExportReportLines([FromQuery] ReportQueryParams q)
         {
             var (content, fileName, contentType) = await _workFlowService.ExportReportLinesAsync(q);
@@ -312,6 +346,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("basic-report")]
+        [MenuAuthorize("BasicWorkflowReportsList", MenuPermission.View)]
         public async Task<IActionResult> GetBasicReport([FromQuery] WorkFlowBasicReportQueryParams q)
         {
             var result = await _workFlowService.GetBasicWorkFlowReportAsync(q);
@@ -319,6 +354,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("basic-report/export")]
+        [MenuAuthorize("BasicWorkflowReportsList", MenuPermission.View)]
         public async Task<IActionResult> ExportBasicReport([FromQuery] WorkFlowBasicReportQueryParams q)
         {
             var (content, fileName, contentType) = await _workFlowService.ExportBasicWorkFlowReportAsync(q);
@@ -347,6 +383,7 @@ namespace WebAPI.Controllers
         ///Manitou System Test Zone ilgili işlemler
 
         [HttpPost("start-working")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> StartWorking([FromBody] StartWorkingDto dto)
         {
             var result = await _workFlowService.StartWorking(dto);
@@ -354,6 +391,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("working-status")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.View)]
         public async Task<IActionResult> GetWorkingStatus([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetWorkingStatus(requestNo);
@@ -361,6 +399,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("extend-working")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> ExtendWorking([FromBody] ExtendWorkingDto dto)
         {
             var result = await _workFlowService.ExtendWorking(dto);
@@ -368,6 +407,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("finish-working")]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> FinishWorking([FromBody] FinishWorkingDto dto)
         {
             var result = await _workFlowService.FinishWorking(dto);

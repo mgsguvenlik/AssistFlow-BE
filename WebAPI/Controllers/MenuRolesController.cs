@@ -2,10 +2,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.MenuRole;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("RoleListPermission")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -20,6 +22,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-by-role/{roleId:long}")]
+        [MenuAuthorize("RoleListPermission", MenuPermission.View)]
         [Authorize]
         public async Task<IActionResult> GetMyMenusByRole(long roleId)
         {
@@ -29,6 +32,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-by-userId/{userId:long}")]
+        [MenuAuthorize("RoleListPermission", MenuPermission.View)]
         [Authorize]
         public async Task<IActionResult> GetMyMenusByUserId(long userId)
         {

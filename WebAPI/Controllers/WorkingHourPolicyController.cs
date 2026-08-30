@@ -3,10 +3,12 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkingHourPolicy;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("WorkingHourPolicyList", MenuPermission.View)]
     [ApiController]
     [Route("api/[controller]")]
     public class WorkingHourPolicyController : ControllerBase
@@ -37,6 +39,7 @@ namespace WebAPI.Controllers
         /// Belirli bir tarihe uygulanan politikaları getirir
         /// </summary>
         [HttpPost("date/{date}")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<WorkingHourPolicyGetDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPoliciesForDate([FromRoute] DateOnly date)
         {
@@ -48,6 +51,7 @@ namespace WebAPI.Controllers
         /// Politika oluşturur
         /// </summary>
         [HttpPost("create")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<WorkingHourPolicyGetDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> CreatePolicy([FromBody] WorkingHourPolicyCreateDto dto)
         {
@@ -59,6 +63,7 @@ namespace WebAPI.Controllers
         /// Politika günceller
         /// </summary>
         [HttpPost("update")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<WorkingHourPolicyGetDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> UpdatePolicy([FromBody] WorkingHourPolicyUpdateDto dto)
         {
@@ -70,6 +75,7 @@ namespace WebAPI.Controllers
         /// Politika siler
         /// </summary>
         [HttpPost("delete/{id}")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> DeletePolicy([FromRoute] long id)
         {
@@ -81,6 +87,7 @@ namespace WebAPI.Controllers
         /// Politika aktif/pasif yapar
         /// </summary>
         [HttpPost("{id}/toggle")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> TogglePolicy([FromRoute] long id, [FromQuery] bool isActive)
         {
@@ -92,6 +99,7 @@ namespace WebAPI.Controllers
         /// Nager.Date API'den resmi tatilleri senkronize eder
         /// </summary>
         [HttpPost("sync/{year}")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<SyncPublicHolidaysDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> SyncPublicHolidays([FromRoute] int year)
         {
@@ -103,6 +111,7 @@ namespace WebAPI.Controllers
         /// Default politikaları oluşturur (Hafta içi, Cumartesi, Pazar)
         /// </summary>
         [HttpPost("create-defaults")]
+        [MenuAuthorize("WorkingHourPolicyList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> CreateDefaultPolicies()
         {

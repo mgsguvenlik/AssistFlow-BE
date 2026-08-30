@@ -5,6 +5,7 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Dashboard;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -29,6 +30,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Dashboard KPI verileri</returns>
         [HttpGet("kpi")]
+        [MenuAuthorize("Dashboard", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetKpi()
@@ -44,6 +46,7 @@ namespace WebAPI.Controllers
         /// <param name="to">Bitiş tarihi (opsiyonel)</param>
         /// <returns>Teknisyen performans listesi</returns>
         [HttpGet("technician-performance")]
+        [MenuAuthorize("TechnicianPerformance", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<TechnicianPerformanceDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<List<TechnicianPerformanceDto>>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetTechnicianPerformance(
@@ -60,6 +63,7 @@ namespace WebAPI.Controllers
         /// <param name="count">Getirilecek müşteri sayısı (varsayılan: 10)</param>
         /// <returns>Müşteri istatistikleri listesi</returns>
         [HttpGet("top-customers")]
+        [MenuAuthorize("TopClients", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<CustomerStatisticsDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<List<CustomerStatisticsDto>>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetTopCustomers([FromQuery] int count = 10)
@@ -73,6 +77,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Ürün istatistikleri</returns>
         [HttpGet("product-statistics")]
+        [MenuAuthorize("ProductStatistics", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<ProductStatisticsDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<ProductStatisticsDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetProductStatistics()
@@ -87,6 +92,7 @@ namespace WebAPI.Controllers
         /// <param name="days">Kaç günlük trend (varsayılan: 30)</param>
         /// <returns>Trend analiz verileri</returns>
         [HttpGet("trend-analysis")]
+        [MenuAuthorize("TrendAnalysis", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<TimeBasedTrendDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<TimeBasedTrendDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetTrendAnalysis([FromQuery] int days = 30)
@@ -100,6 +106,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Adım süre analiz verileri</returns>
         [HttpGet("step-duration-analysis")]
+        [MenuAuthorize("StepDurationAnalysis", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<StepDurationAnalysisDto>>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<List<StepDurationAnalysisDto>>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetStepDurationAnalysis()
@@ -113,6 +120,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Finansal dashboard verileri</returns>
         [HttpGet("financial")]
+        [MenuAuthorize("FinancialReport", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FinancialDashboardDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<FinancialDashboardDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetFinancialDashboard()
@@ -126,6 +134,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Kritik uyarı verileri</returns>
         [HttpGet("critical-alerts")]
+        [MenuAuthorize("CriticalAlerts", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<CriticalAlertsDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<CriticalAlertsDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetCriticalAlerts()
@@ -139,6 +148,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Coğrafi dağılım verileri</returns>
         [HttpGet("geographic-distribution")]
+        [MenuAuthorize("GeographicalDistribution", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<GeographicDistributionDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<GeographicDistributionDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetGeographicDistribution()
@@ -152,6 +162,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Tam dashboard verileri</returns>
         [HttpGet("full")]
+        [MenuAuthorize("Dashboard", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetFullDashboard()
@@ -190,6 +201,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("ykb/kpi")]
+        [MenuAuthorize("Dashboard", MenuPermission.View)]
         public async Task<IActionResult> GetYkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
         {
             var result = await _dashboardService.GetYkbKpiAsync(from, to);
@@ -197,6 +209,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("technical-service-status-counts")]
+        [MenuAuthorize("TechnicianDashboard", MenuPermission.View)]
         public async Task<IActionResult> GetTechnicalServiceStatusCounts()
         {
             var result = await _dashboardService.GetMyTechnicalServiceStatusCountsAsync();
@@ -204,6 +217,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("ykb/technical-service-status-counts")]
+        [MenuAuthorize("YkbTechnicianDashboard", MenuPermission.View)]
         public async Task<IActionResult> YkbGetTechnicalServiceStatusCounts()
         {
             var result = await _dashboardService.YkbGetMyTechnicalServiceStatusCountsAsync();
@@ -211,6 +225,7 @@ namespace WebAPI.Controllers
         }
        
         [HttpGet("qnb/technical-service-status-counts")]
+        [MenuAuthorize("QnbTechnicianDashboard", MenuPermission.View)]
         public async Task<IActionResult> QnbGetTechnicalServiceStatusCounts() 
         {
             var result = await _dashboardService.QnbGetMyTechnicalServiceStatusCountsAsync();

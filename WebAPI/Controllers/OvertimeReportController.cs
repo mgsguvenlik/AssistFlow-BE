@@ -4,10 +4,12 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.OvertimeReport;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("OvertimeReport", MenuPermission.View)]
     [ApiController]
     [Route("api/[controller]")]
     public class OvertimeReportController : ControllerBase
@@ -27,9 +29,9 @@ namespace WebAPI.Controllers
         /// Belirli bir teknisyenin fazla mesai raporunu getirir
         /// </summary>
         /// <param name="technicianId">Teknisyen ID</param>
-        /// <param name="startDate">Baþlangýç tarihi</param>
-        /// <param name="endDate">Bitiþ tarihi</param>
-        /// <param name="includeCustomerDetails">Müþteri detaylarýný dahil et</param>
+        /// <param name="startDate">BaÅŸlangÄ±Ã§ tarihi</param>
+        /// <param name="endDate">BitiÅŸ tarihi</param>
+        /// <param name="includeCustomerDetails">MÃ¼ÅŸteri detaylarÄ±nÄ± dahil et</param>
         /// <returns>Teknisyen fazla mesai raporu</returns>
         [HttpGet("technician/{technicianId}")]
         [ProducesResponseType(typeof(ResponseModel<TechnicianOvertimeReportDto>), StatusCodes.Status200OK)]
@@ -51,10 +53,10 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Tüm teknisyenlerin fazla mesai özetini getirir
+        /// TÃ¼m teknisyenlerin fazla mesai Ã¶zetini getirir
         /// </summary> 
-        /// <param name="endDate">Bitiþ tarihi</param>
-        /// <returns>Tüm teknisyenler fazla mesai özeti</returns>
+        /// <param name="endDate">BitiÅŸ tarihi</param>
+        /// <returns>TÃ¼m teknisyenler fazla mesai Ã¶zeti</returns>
         [HttpGet("summary")]
         [ProducesResponseType(typeof(ResponseModel<AllTechniciansOvertimeSummaryDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<AllTechniciansOvertimeSummaryDto>), StatusCodes.Status400BadRequest)]
@@ -67,12 +69,12 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Fazla mesai raporunu Excel formatýnda export eder
+        /// Fazla mesai raporunu Excel formatÄ±nda export eder
         /// </summary>
-        /// <param name="technicianId">Teknisyen ID (opsiyonel, belirtilmezse tüm teknisyenler)</param>
-        /// <param name="startDate">Baþlangýç tarihi</param>
-        /// <param name="endDate">Bitiþ tarihi</param>
-        /// <returns>Excel dosyasý</returns>
+        /// <param name="technicianId">Teknisyen ID (opsiyonel, belirtilmezse tÃ¼m teknisyenler)</param>
+        /// <param name="startDate">BaÅŸlangÄ±Ã§ tarihi</param>
+        /// <param name="endDate">BitiÅŸ tarihi</param>
+        /// <returns>Excel dosyasÄ±</returns>
         [HttpGet("export")]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<byte[]>), StatusCodes.Status400BadRequest)]

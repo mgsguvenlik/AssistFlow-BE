@@ -1,12 +1,14 @@
-﻿using Business.Interfaces.Ykb;
+using Business.Interfaces.Ykb;
 using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.OvertimeReport;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("YkbOvertimeReport", MenuPermission.View)]
     [ApiController]
     [Route("api/[controller]")]
     public class YkbOvertimeReportController : ControllerBase

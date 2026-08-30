@@ -3,10 +3,12 @@ using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Menu;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("MenuList")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

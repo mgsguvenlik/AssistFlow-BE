@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.SystemType;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("SystemTypeList")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

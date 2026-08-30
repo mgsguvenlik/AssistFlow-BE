@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.CustomerGroupProductPrice;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
 
     [Authorize]
+    [MenuResource("ProductList")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -29,6 +31,7 @@ namespace WebAPI.Controllers
         /// <param name="customerGroupId">Müşteri Grubu ID</param>
         /// <returns>İlgili fiyat kayıtlarının listesi</returns>
         [HttpGet("get-by-product-and-group")]
+        [MenuAuthorize(new[] { "ProductList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
         public async Task<IActionResult> GetByProductAndCustomerGroup([FromQuery] long productId, [FromQuery] long customerGroupId)
         {
             var result = await _customerGroupProductPriceService.GetByProductAndCustomerGroupAsync(productId, customerGroupId);
