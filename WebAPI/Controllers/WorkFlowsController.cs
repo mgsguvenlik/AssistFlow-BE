@@ -86,6 +86,13 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("active-customer-requests")]
+        public async Task<IActionResult> GetActiveCustomerRequests([FromQuery] long customerId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var result = await _workFlowService.GetActiveCustomerRequestsAsync(customerId, page, pageSize);
+            return Ok(result);
+        }
+
         [HttpPost("delete-workflow/{id:long}")]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
