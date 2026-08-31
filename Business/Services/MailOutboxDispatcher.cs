@@ -111,15 +111,20 @@ namespace Business.Services
                             await uow.Repository.CompleteAsync();
 
                             var fromAddress = _cfg.From;
+                            var fromName = _cfg.FromName;
                             if (m.MessageId is not null && m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
                             {
-                                var helpdeskMailboxAddress = await uow.Repository
+                                var helpdeskMailbox = await uow.Repository
                                     .GetQueryable<HelpdeskTicket>(x => x.TicketNo == m.RequestNo && !x.IsDeleted)
                                     .Where(x => x.MailboxId != null)
-                                    .Select(x => x.Mailbox!.Address)
+                                    .Select(x => new { x.Mailbox!.Address, x.Mailbox.Name })
                                     .FirstOrDefaultAsync(stoppingToken);
-                                if (!string.IsNullOrWhiteSpace(helpdeskMailboxAddress))
-                                    fromAddress = helpdeskMailboxAddress;
+                                if (helpdeskMailbox is not null && !string.IsNullOrWhiteSpace(helpdeskMailbox.Address))
+                                {
+                                    fromAddress = helpdeskMailbox.Address;
+                                    if (!string.IsNullOrWhiteSpace(helpdeskMailbox.Name))
+                                        fromName = helpdeskMailbox.Name;
+                                }
                             }
 
                             // GÖNDER
@@ -137,7 +142,7 @@ namespace Business.Services
                                 user: _cfg.User,
                                 pass: _cfg.Pass,
                                 domain: _cfg.Domain,
-                                fromName: _cfg.FromName,
+                                fromName: fromName,
                                 messageId: m.MessageId,
                                 inReplyTo: m.InReplyTo,
                                 references: m.References

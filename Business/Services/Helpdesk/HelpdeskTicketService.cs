@@ -3,6 +3,7 @@ using Business.Interfaces.Helpdesk;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
+using Core.Utilities.Constants;
 using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -167,8 +168,19 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     {
         var access = await GetAsync(id, ct);
         if (!access.IsSuccess) return ResponseModel<List<HelpdeskTicketMailDto>>.Fail(access.Message, access.StatusCode);
+        var defaultSender = access.Data!.SourceType == HelpdeskTicketSourceType.Manual
+            ? await GetDefaultMailSenderAsync(ct)
+            : default;
         var data = await _db.HelpdeskTicketMails.AsNoTracking().Where(x => x.TicketId == id && !x.IsDeleted)
             .OrderBy(x => x.MailDate).Select(x => new HelpdeskTicketMailDto { Id = x.Id, Direction = x.Direction, FromAddress = x.FromAddress, SenderName = x.Direction == HelpdeskMailDirection.Outgoing ? _db.Users.Where(u => u.Id == x.CreatedUser).Select(u => u.Name).FirstOrDefault() : null, ToRecipients = x.ToRecipients, CcRecipients = x.CcRecipients, Subject = x.Subject, Body = x.Body, MailDate = x.MailDate }).ToListAsync(ct);
+        if (access.Data.SourceType == HelpdeskTicketSourceType.Manual)
+        {
+            foreach (var mail in data.Where(x => x.Direction == HelpdeskMailDirection.Outgoing))
+            {
+                mail.FromAddress = defaultSender.Address;
+                mail.SenderName = defaultSender.Name;
+            }
+        }
         return ResponseModel<List<HelpdeskTicketMailDto>>.Success(data);
     }
 
@@ -199,6 +211,8 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var latest = await _db.HelpdeskTicketMails.AsNoTracking().Where(x => x.TicketId == id).OrderByDescending(x => x.MailDate).FirstOrDefaultAsync(ct);
         var mailboxAddress = ticket.MailboxId.HasValue ? await _db.HelpdeskMailboxes.Where(x => x.Id == ticket.MailboxId).Select(x => x.Address).FirstOrDefaultAsync(ct) : null;
+        var defaultSender = ticket.SourceType == HelpdeskTicketSourceType.Manual ? await GetDefaultMailSenderAsync(ct) : default;
+        var fromAddress = ticket.SourceType == HelpdeskTicketSourceType.Manual ? defaultSender.Address : mailboxAddress;
         var cc = string.Join(';', SplitRecipients(ticket.ToRecipients, ticket.CcRecipients)
             .Where(x => !string.Equals(x, ticket.RequesterEmail, StringComparison.OrdinalIgnoreCase) && !string.Equals(x, mailboxAddress, StringComparison.OrdinalIgnoreCase)));
         var messageId = $"<{Guid.NewGuid():N}@assistflow.helpdesk>";
@@ -206,13 +220,24 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         var subject = $"[{ticket.TicketNo}] {TicketPrefixRegex().Replace(ticket.Subject, string.Empty).Trim()}";
         var senderName = WebUtility.HtmlEncode(user.Name);
         var body = $"<p>{WebUtility.HtmlEncode(dto.Body.Trim()).Replace("\r\n", "<br>").Replace("\n", "<br>")}</p><p style=\"margin-top:24px\">Saygılarımızla,<br><strong>{senderName}</strong></p>";
-        var entity = new HelpdeskTicketMail { TicketId = id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, FromAddress = mailboxAddress, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, Body = body, MailDate = DateTimeOffset.Now, CreatedDate = DateTimeOffset.Now, CreatedUser = user.Id };
+        var entity = new HelpdeskTicketMail { TicketId = id, MailboxId = ticket.MailboxId, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Direction = HelpdeskMailDirection.Outgoing, FromAddress = fromAddress, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, Body = body, MailDate = DateTimeOffset.Now, CreatedDate = DateTimeOffset.Now, CreatedUser = user.Id };
         _db.HelpdeskTicketMails.Add(entity);
         _db.MailOutboxes.Add(new MailOutbox { RequestNo = ticket.TicketNo, ToRecipients = ticket.RequesterEmail, CcRecipients = cc, Subject = subject, BodyHtml = body, MessageId = messageId, InReplyTo = latest?.MessageId, References = references, Status = MailOutboxStatus.Pending, CreatedDate = DateTime.Now, CreatedUser = user.Id });
         AddHistory(id, "ReplyQueued", subject, null, null, user.Id);
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return ResponseModel<HelpdeskTicketMailDto>.Success(new HelpdeskTicketMailDto { Id = entity.Id, Direction = entity.Direction, FromAddress = entity.FromAddress, SenderName = user.Name, ToRecipients = entity.ToRecipients, CcRecipients = entity.CcRecipients, Subject = entity.Subject, Body = entity.Body, MailDate = entity.MailDate });
+        return ResponseModel<HelpdeskTicketMailDto>.Success(new HelpdeskTicketMailDto { Id = entity.Id, Direction = entity.Direction, FromAddress = entity.FromAddress, SenderName = ticket.SourceType == HelpdeskTicketSourceType.Manual ? defaultSender.Name : user.Name, ToRecipients = entity.ToRecipients, CcRecipients = entity.CcRecipients, Subject = entity.Subject, Body = entity.Body, MailDate = entity.MailDate });
+    }
+
+    private async Task<(string? Address, string? Name)> GetDefaultMailSenderAsync(CancellationToken ct)
+    {
+        var configuration = await _db.Configurations.AsNoTracking()
+            .Where(x => x.Name == CommonConstants.MailFrom || x.Name == CommonConstants.MailFromName)
+            .Select(x => new { x.Name, x.Value })
+            .ToListAsync(ct);
+        return (
+            configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFrom)?.Value,
+            configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFromName)?.Value);
     }
 
     private IQueryable<HelpdeskTicket> VisibleTickets(CurrentUserDto user) => CanManage(user) ? _db.HelpdeskTickets : _db.HelpdeskTickets.Where(x => x.Assignments.Any(a => a.IsActive && a.UserId == user.Id));
