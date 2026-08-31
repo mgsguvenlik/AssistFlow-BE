@@ -128,11 +128,11 @@ namespace Business.Services.Qnb
                     .GetQueryable<QnbWorkFlow>()
                     .Include(x => x.ApproverTechnician)
                     .AsNoTracking()
-                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+                    .AnyAsync(x => x.RequestNo == dto.RequestNo);
 
                 if (exists)
                     return ResponseModel<QnbServicesRequestGetDto>.Fail(
-                        "Aynı akış numarası ile başka bir kayıt zaten var.",
+                        "Aynı akış numarası ile başka bir kayıt zaten var. Lütfen tekrar deneyiniz",
                         StatusCode.Conflict
                     );
 
@@ -4014,7 +4014,7 @@ namespace Business.Services.Qnb
 
                 var query = _uow.Repository.GetQueryable<QnbWorkFlow>();
                 bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == candidate && !x.IsDeleted);
+                                         .AnyAsync(x => x.RequestNo == candidate);
 
                 if (!exists)
                     return ResponseModel<string>.Success(candidate, "Yeni Akış Numarası üretildi.");
