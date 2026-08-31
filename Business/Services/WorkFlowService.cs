@@ -2906,6 +2906,24 @@ namespace Business.Services
                     }
                     break;
 
+                case "APR": // Kontrol ve Son Onay → Fiyatlama
+                    targetStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.Code == "PRC");
+                    if (targetStep is null)
+                        return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı adımı (PRC) tanımlı değil.", StatusCode.BadRequest);
+
+                    pricing = await _uow.Repository.GetQueryable<Pricing>()
+                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                    if (pricing is null)
+                        return ResponseModel<WorkFlowGetDto>.Fail("Hedef iş akışı Fiyatlama kaydı bulunamadı.", StatusCode.BadRequest);
+
+                    pricing.Status = PricingStatus.AwaitingReview;
+                    pricing.UpdatedDate = DateTime.Now;
+                    pricing.UpdatedUser = meId;
+                    _uow.Repository.Update(pricing);
+                    break;
+
                 case "SR": // Servis Talebi Adımı (ServicesRequest)
                     var serviceRequest = await _uow.Repository
                         .GetQueryable<ServicesRequest>()
