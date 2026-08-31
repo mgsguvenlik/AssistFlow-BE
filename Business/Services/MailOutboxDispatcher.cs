@@ -27,6 +27,8 @@ namespace Business.Services
             public string Pass { get; init; } = "";
             public string From { get; init; } = "";
             public string FromName { get; init; } = "";
+            public string HelpdeskFrom { get; init; } = "";
+            public string HelpdeskFromName { get; init; } = "";
             public string Domain { get; init; } = "";
         }
         // basit ayarlar
@@ -65,6 +67,8 @@ namespace Business.Services
                     Pass = Get(CommonConstants.MailPassword),
                     From = Get(CommonConstants.MailFrom),
                     FromName = Get(CommonConstants.MailFromName, Messages.MGSHelpDesk),
+                    HelpdeskFrom = Get(CommonConstants.HelpdeskMailFrom),
+                    HelpdeskFromName = Get(CommonConstants.HelpdeskMailFromName),
                     Domain = Get(CommonConstants.MailDomain, Messages.MailDomain)
                 };
             }
@@ -114,16 +118,25 @@ namespace Business.Services
                             var fromName = _cfg.FromName;
                             if (m.MessageId is not null && m.RequestNo.StartsWith("HD-", StringComparison.OrdinalIgnoreCase))
                             {
-                                var helpdeskMailbox = await uow.Repository
+                                var helpdeskTicket = await uow.Repository
                                     .GetQueryable<HelpdeskTicket>(x => x.TicketNo == m.RequestNo && !x.IsDeleted)
-                                    .Where(x => x.MailboxId != null)
-                                    .Select(x => new { x.Mailbox!.Address, x.Mailbox.Name })
+                                    .Select(x => new
+                                    {
+                                        x.SourceType,
+                                        Address = x.MailboxId != null ? x.Mailbox!.Address : null,
+                                        Name = x.MailboxId != null ? x.Mailbox!.Name : null
+                                    })
                                     .FirstOrDefaultAsync(stoppingToken);
-                                if (helpdeskMailbox is not null && !string.IsNullOrWhiteSpace(helpdeskMailbox.Address))
+                                if (helpdeskTicket?.SourceType == HelpdeskTicketSourceType.Manual)
                                 {
-                                    fromAddress = helpdeskMailbox.Address;
-                                    if (!string.IsNullOrWhiteSpace(helpdeskMailbox.Name))
-                                        fromName = helpdeskMailbox.Name;
+                                    fromAddress = _cfg.HelpdeskFrom;
+                                    fromName = _cfg.HelpdeskFromName;
+                                }
+                                else if (helpdeskTicket is not null && !string.IsNullOrWhiteSpace(helpdeskTicket.Address))
+                                {
+                                    fromAddress = helpdeskTicket.Address;
+                                    if (!string.IsNullOrWhiteSpace(helpdeskTicket.Name))
+                                        fromName = helpdeskTicket.Name;
                                 }
                             }
 

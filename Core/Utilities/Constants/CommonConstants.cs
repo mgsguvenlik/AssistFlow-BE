@@ -18,6 +18,8 @@
         public const string MailPassword = "MailPassword";
         public const string MailFrom = "MailFrom";
         public const string MailFromName = "MailFromName";
+        public const string HelpdeskMailFrom = "HelpdeskMailFrom";
+        public const string HelpdeskMailFromName = "HelpdeskMailFromName";
         public const string MailDomain = "MailDomain";
         public const string TurkishCharacters = "MailFrom";
         public const string AsciiEquivalents = "MailFrom";
