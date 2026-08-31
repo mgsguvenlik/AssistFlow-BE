@@ -2579,6 +2579,38 @@ namespace Business.Services.Ykb
                 new PagedResult<YkbServicesRequestGetDto>(items, total, page, pageSize)
             );
         }
+
+        public async Task<ResponseModel<PagedResult<ActiveCustomerRequestDto>>> GetActiveCustomerRequestsAsync(long customerId, int page, int pageSize)
+        {
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Fail("Kullanıcı bulunamadı.", StatusCode.Unauthorized);
+
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            var query = from workflow in _uow.Repository.GetQueryable<YkbWorkFlow>().AsNoTracking()
+                        join request in _uow.Repository.GetQueryable<YkbServicesRequest>().AsNoTracking()
+                            on workflow.RequestNo equals request.RequestNo
+                        where !workflow.IsDeleted
+                              && workflow.WorkFlowStatus == WorkFlowStatus.Pending
+                              && request.CustomerId == customerId
+                              && (me.TenantId == null || request.Customer!.TenantId == me.TenantId)
+                        select new ActiveCustomerRequestDto
+                        {
+                            RequestNo = workflow.RequestNo,
+                            CustomerName = request.Customer!.SubscriberCompany ?? string.Empty,
+                            Title = workflow.RequestTitle,
+                            CurrentStepName = workflow.CurrentStep != null ? workflow.CurrentStep.Name : null,
+                            CreatedDate = workflow.CreatedDate
+                        };
+
+            var total = await query.CountAsync();
+            var items = await query.OrderByDescending(x => x.CreatedDate)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Success(new PagedResult<ActiveCustomerRequestDto>(items, total, page, pageSize));
+        }
         public async Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
             var now = DateTimeOffset.Now;
@@ -3220,6 +3252,24 @@ namespace Business.Services.Ykb
                         servicesRequest.UpdatedUser = meId;
                         _uow.Repository.Update(servicesRequest);
                     }
+                    break;
+
+                case "APR": // Kontrol ve Son Onay → Fiyatlama
+                    targetStep = await _uow.Repository.GetQueryable<YkbWorkFlowStep>()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(s => s.Code == "PRC");
+                    if (targetStep is null)
+                        return ResponseModel<YkbWorkFlowGetDto>.Fail("Hedef iş akışı adımı (PRC) tanımlı değil.", StatusCode.BadRequest);
+
+                    pricing = await _uow.Repository.GetQueryable<YkbPricing>()
+                        .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
+                    if (pricing is null)
+                        return ResponseModel<YkbWorkFlowGetDto>.Fail("Hedef iş akışı Fiyatlama kaydı bulunamadı.", StatusCode.BadRequest);
+
+                    pricing.Status = PricingStatus.AwaitingReview;
+                    pricing.UpdatedDate = DateTime.Now;
+                    pricing.UpdatedUser = meId;
+                    _uow.Repository.Update(pricing);
                     break;
 
                 case "SR": // Servis Talebi Adımı (ServicesRequest)

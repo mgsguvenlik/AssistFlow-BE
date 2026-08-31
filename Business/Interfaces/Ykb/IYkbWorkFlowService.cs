@@ -24,6 +24,7 @@ namespace Business.Interfaces.Ykb
     {
         Task<ResponseModel<YkbCustomerFormGetDto>> CreateCustomerForm(YkbCustomerFormCreateDto dto);
         Task<ResponseModel<PagedResult<YkbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
+        Task<ResponseModel<PagedResult<ActiveCustomerRequestDto>>> GetActiveCustomerRequestsAsync(long customerId, int page, int pageSize);
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
 
         Task<ResponseModel<YkbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
