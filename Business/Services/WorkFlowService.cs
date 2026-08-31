@@ -108,9 +108,9 @@ namespace Business.Services
                     dto.RequestNo = rn.Data!;
                 }
 
-                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().Include(x => x.ApproverTechnician).AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+                bool exists = await _uow.Repository.GetQueryable<WorkFlow>().Include(x => x.ApproverTechnician).AsNoTracking().AnyAsync(x => x.RequestNo == dto.RequestNo);
                 if (exists)
-                    return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
+                    return ResponseModel<ServicesRequestGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var. Lütfen tekrar deneyiniz.", StatusCode.Conflict);
 
                 var serviceTypeExist = await _uow.Repository.GetQueryable<ServiceType>().AsNoTracking().AnyAsync(s => s.Id == dto.ServiceTypeId);
                 if (!serviceTypeExist)
@@ -4548,7 +4548,7 @@ namespace Business.Services
                 // WorkFlow tablosunda var mı?
                 var query = _uow.Repository.GetQueryable<WorkFlow>();
                 bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == candidate && !x.IsDeleted);
+                                         .AnyAsync(x => x.RequestNo == candidate);
 
                 if (!exists)
                     return ResponseModel<string>.Success(candidate, "Yeni Akış Numarası üretildi.");
