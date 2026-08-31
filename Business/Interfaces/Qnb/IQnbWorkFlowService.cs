@@ -22,6 +22,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<QnbServicesRequestGetDto>> CreateRequestAsync(QnbServicesRequestCreateDto dto);
 
         Task<ResponseModel<PagedResult<QnbServicesRequestGetDto>>> GetRequestsAsync(QueryParams q);
+        Task<ResponseModel<PagedResult<ActiveCustomerRequestDto>>> GetActiveCustomerRequestsAsync(long customerId, int page, int pageSize);
         Task<ResponseModel<QnbServicesRequestGetDto>> GetServiceRequestByRequestNoAsync(string requestNo);
         Task<ResponseModel<QnbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id);
         Task<ResponseModel<QnbServicesRequestGetDto>> UpdateServiceRequestAsync(QnbServicesRequestUpdateDto dto);

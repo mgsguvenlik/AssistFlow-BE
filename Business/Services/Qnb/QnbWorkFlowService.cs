@@ -1911,7 +1911,7 @@ namespace Business.Services.Qnb
                 : string.Empty;
 
             var viewLink = baseUrl is not null
-                ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">KaydÄ± gÃ¶rÃ¼ntÃ¼le</a></p>"
+                ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">Kaydý görüntüle</a></p>"
                 : string.Empty;
 
             string customerLocRow = hasCustomerLoc
@@ -2436,6 +2436,37 @@ namespace Business.Services.Qnb
             );
         }
 
+        public async Task<ResponseModel<PagedResult<ActiveCustomerRequestDto>>> GetActiveCustomerRequestsAsync(long customerId, int page, int pageSize)
+        {
+            var me = await _currentUser.GetAsync();
+            if (me is null)
+                return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Fail("Kullanýcý bulunamadý.", StatusCode.Unauthorized);
+
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+
+            var query = from workflow in _uow.Repository.GetQueryable<QnbWorkFlow>().AsNoTracking()
+                        join request in _uow.Repository.GetQueryable<QnbServicesRequest>().AsNoTracking()
+                            on workflow.RequestNo equals request.RequestNo
+                        where !workflow.IsDeleted
+                              && workflow.WorkFlowStatus == WorkFlowStatus.Pending
+                              && request.CustomerId == customerId
+                              && (me.TenantId == null || request.Customer!.TenantId == me.TenantId)
+                        select new ActiveCustomerRequestDto
+                        {
+                            RequestNo = workflow.RequestNo,
+                            CustomerName = request.Customer!.SubscriberCompany ?? string.Empty,
+                            Title = workflow.RequestTitle,
+                            CurrentStepName = workflow.CurrentStep != null ? workflow.CurrentStep.Name : null,
+                            CreatedDate = workflow.CreatedDate
+                        };
+
+            var total = await query.CountAsync();
+            var items = await query.OrderByDescending(x => x.CreatedDate)
+                .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Success(new PagedResult<ActiveCustomerRequestDto>(items, total, page, pageSize));
+        }
         public async Task<ResponseModel<QnbServicesRequestGetDto>> GetServiceRequestByIdAsync(long id)
         {
             var baseDto = await (
