@@ -116,9 +116,9 @@ namespace Business.Services.Ykb
                     .GetQueryable<YkbWorkFlow>()
                     .Include(x => x.ApproverTechnician)
                     .AsNoTracking()
-                    .AnyAsync(x => x.RequestNo == dto.RequestNo && !x.IsDeleted);
+                    .AnyAsync(x => x.RequestNo == dto.RequestNo);
                 if (exists)
-                    return ResponseModel<YkbCustomerFormGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var.", StatusCode.Conflict);
+                    return ResponseModel<YkbCustomerFormGetDto>.Fail("Aynı akış numarasi ile başka bir kayıt zaten var. Lütfen tekrar deneyiniz", StatusCode.Conflict);
 
 
                 var customerExist = await _uow.Repository.GetQueryable<Customer>().AsNoTracking().AnyAsync(c => c.Id == dto.CustomerId);
@@ -5239,7 +5239,7 @@ namespace Business.Services.Ykb
                 // WorkFlow tablosunda var mı?
                 var query = _uow.Repository.GetQueryable<YkbWorkFlow>();
                 bool exists = await query.AsNoTracking()
-                                         .AnyAsync(x => x.RequestNo == candidate && !x.IsDeleted);
+                                         .AnyAsync(x => x.RequestNo == candidate);
 
                 if (!exists)
                     return ResponseModel<string>.Success(candidate, "Yeni Akış Numarası üretildi.");
