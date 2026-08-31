@@ -232,12 +232,12 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
     private async Task<(string? Address, string? Name)> GetDefaultMailSenderAsync(CancellationToken ct)
     {
         var configuration = await _db.Configurations.AsNoTracking()
-            .Where(x => x.Name == CommonConstants.MailFrom || x.Name == CommonConstants.MailFromName)
+            .Where(x => x.Name == CommonConstants.HelpdeskMailFrom || x.Name == CommonConstants.HelpdeskMailFromName)
             .Select(x => new { x.Name, x.Value })
             .ToListAsync(ct);
         return (
-            configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFrom)?.Value,
-            configuration.FirstOrDefault(x => x.Name == CommonConstants.MailFromName)?.Value);
+            configuration.FirstOrDefault(x => x.Name == CommonConstants.HelpdeskMailFrom)?.Value,
+            configuration.FirstOrDefault(x => x.Name == CommonConstants.HelpdeskMailFromName)?.Value);
     }
 
     private IQueryable<HelpdeskTicket> VisibleTickets(CurrentUserDto user) => CanManage(user) ? _db.HelpdeskTickets : _db.HelpdeskTickets.Where(x => x.Assignments.Any(a => a.IsActive && a.UserId == user.Id));
