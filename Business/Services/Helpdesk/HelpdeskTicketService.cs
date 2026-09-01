@@ -127,7 +127,10 @@ public sealed partial class HelpdeskTicketService : IHelpdeskTicketService
         if (!Enum.IsDefined(dto.Status)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Geçersiz ticket durumu.");
         if (dto.Status == HelpdeskTicketStatus.Reopened && !CanReopen(user)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Tamamlanmış ticketı yalnız Helpdesk Yöneticisi, Helpdesk Ekip Lideri veya Admin yeniden açabilir.", StatusCode.Unauthorized);
         if (dto.Status == HelpdeskTicketStatus.Reopened && ticket.Status != HelpdeskTicketStatus.Completed) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Yalnız tamamlanmış ticket yeniden açılabilir.");
-        if (!CanManage(user) && !(IsAgent(user) && ticket.Assignments.Any(a => a.IsActive && a.UserId == user.Id) && dto.Status == HelpdeskTicketStatus.Completed)) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Bu durum değişikliği için yetkiniz yok.", StatusCode.Unauthorized);
+        var assignedAgentStatusChange = IsAgent(user)
+            && ticket.Assignments.Any(a => a.IsActive && a.UserId == user.Id)
+            && dto.Status is HelpdeskTicketStatus.InProgress or HelpdeskTicketStatus.Completed;
+        if (!CanManage(user) && !assignedAgentStatusChange) return ResponseModel<HelpdeskTicketDetailDto>.Fail("Bu durum değişikliği için yetkiniz yok.", StatusCode.Unauthorized);
         var previous = ticket.Status; ticket.Status = dto.Status; ticket.CompletedDate = dto.Status == HelpdeskTicketStatus.Completed ? DateTimeOffset.Now : null; ticket.UpdatedDate = DateTimeOffset.Now; ticket.UpdatedUser = user.Id;
         AddHistory(id, "StatusChanged", dto.Description, previous.ToString(), dto.Status.ToString(), user.Id); await _db.SaveChangesAsync(ct);
         return ResponseModel<HelpdeskTicketDetailDto>.Success(await Detail(ticket, ct));
