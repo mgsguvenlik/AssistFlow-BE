@@ -11,6 +11,7 @@ public sealed class HelpdeskInboundMail
     public string FromAddress { get; init; } = string.Empty;
     public string ToRecipients { get; init; } = string.Empty;
     public string? CcRecipients { get; init; }
+    public string? BccRecipients { get; init; }
     public string Subject { get; init; } = string.Empty;
     public string Body { get; init; } = string.Empty;
     public DateTimeOffset MailDate { get; init; }
