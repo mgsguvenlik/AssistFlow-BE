@@ -140,8 +140,17 @@ public sealed partial class HelpdeskIncomingMailProcessor(
 
     private static bool Match(HelpdeskMailRule rule, HelpdeskInboundMail mail)
     {
-        if (rule.Field == HelpdeskRuleField.Recipient)
-            return SplitRecipients(mail.ToRecipients).Any(recipient => Compare(recipient, rule.Value, rule.Operator));
+        if (rule.Field is HelpdeskRuleField.Recipient or HelpdeskRuleField.CcRecipient or HelpdeskRuleField.BccRecipient)
+        {
+            var recipients = rule.Field switch
+            {
+                HelpdeskRuleField.Recipient => mail.ToRecipients,
+                HelpdeskRuleField.CcRecipient => mail.CcRecipients,
+                HelpdeskRuleField.BccRecipient => mail.BccRecipients,
+                _ => null
+            };
+            return SplitRecipients(recipients).Any(recipient => Compare(recipient, rule.Value, rule.Operator));
+        }
 
         var source = rule.Field switch
         {

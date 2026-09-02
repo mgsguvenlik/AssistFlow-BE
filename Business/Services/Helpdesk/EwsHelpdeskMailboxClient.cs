@@ -71,7 +71,7 @@ public sealed class EwsHelpdeskMailboxClient(ILogger<EwsHelpdeskMailboxClient> l
             new XElement(Messages + "ItemShape", new XElement(Types + "BaseShape", "IdOnly"), new XElement(Types + "BodyType", "Best"),
                 new XElement(Types + "AdditionalProperties", Field("item:Subject"), Field("item:Body"), Field("item:DateTimeReceived"),
                     Field("message:InternetMessageId"), Field("item:InternetMessageHeaders"), Field("message:From"),
-                    Field("message:ToRecipients"), Field("message:CcRecipients"))),
+                    Field("message:ToRecipients"), Field("message:CcRecipients"), Field("message:BccRecipients"))),
             new XElement(Messages + "ItemIds", new XElement(Types + "ItemId", new XAttribute("Id", itemId))));
         var document = await SendAsync(client, endpoint, body, ct);
         var message = document.Descendants(Types + "Message").FirstOrDefault()
@@ -85,6 +85,7 @@ public sealed class EwsHelpdeskMailboxClient(ILogger<EwsHelpdeskMailboxClient> l
             FromName = from?.Element(Types + "Name")?.Value ?? string.Empty,
             FromAddress = from?.Element(Types + "EmailAddress")?.Value ?? string.Empty,
             ToRecipients = Recipients(message, "ToRecipients"), CcRecipients = Recipients(message, "CcRecipients"),
+            BccRecipients = Recipients(message, "BccRecipients"),
             Subject = message.Element(Types + "Subject")?.Value ?? string.Empty,
             Body = message.Element(Types + "Body")?.Value ?? string.Empty, MailDate = received
         };
