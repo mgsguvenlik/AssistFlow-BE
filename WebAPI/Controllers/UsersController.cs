@@ -94,6 +94,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet]
+        [MenuAuthorize(MenuPermission.View)]
         public override async Task<IActionResult> GetPaged([FromQuery] QueryParams q)
         {
             var userQuery = new UserQueryParams
@@ -112,6 +113,13 @@ namespace WebAPI.Controllers
 
             var resp = await _service.GetPagedAsync(userQuery);
             return ToActionResult(resp);
+        }
+
+        [HttpGet("{id}")]
+        [MenuAuthorize(new[] { "UserList", "UserDetail" }, MenuPermission.View)]
+        public override async Task<IActionResult> GetById([FromRoute] long id)
+        {
+            return await base.GetById(id);
         }
 
         private string? GetStringQuery(string key)
@@ -155,7 +163,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-user-activity/{userId}")]
-        [MenuAuthorize("UserList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "UserList", "UserDetail" }, MenuPermission.View)]
         public async Task<IActionResult> GetUserActivityRecords([FromRoute] int userId, [FromQuery] QueryParams q)
         {
             var result = await _activationRecordService.GetUserActivity(userId, q);
@@ -164,7 +172,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-user-activity-grouped/{userId:int}")]
-        [MenuAuthorize("UserList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "UserList", "UserDetail" }, MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<PagedResult<WorkFlowActivityGroupDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetUserActivityGroupedByRequestNo([FromRoute] int userId, [FromQuery] QueryParams q, [FromQuery] int perGroupTake = 50)
         {
@@ -180,6 +188,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("update-user-password")]
+        [MenuAuthorize("UserList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<UserGetDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

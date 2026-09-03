@@ -48,7 +48,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-by-userId/{userId:long}")]
-        [MenuAuthorize(MenuPermission.View)]
+        [MenuAuthorize(new[] { "UserList", "UserDetail" }, MenuPermission.View)]
         [Authorize]
         public async Task<IActionResult> GetMyMenusByUserId(long userId)
         {

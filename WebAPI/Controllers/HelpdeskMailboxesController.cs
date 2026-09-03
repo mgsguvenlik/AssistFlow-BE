@@ -43,32 +43,32 @@ public sealed class HelpdeskMailboxesController(IHelpdeskMailboxService service)
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [HttpGet("{mailboxId:long}/rules")]
-    [MenuAuthorize("HelpdeskMailRules", MenuPermission.View)]
+        [HttpGet("{mailboxId:long}/rules")]
+        [MenuAuthorize(new[] { "HelpdeskMailbox", "HelpdeskMailRules" }, MenuPermission.View)]
     public async Task<IActionResult> Rules(long mailboxId, CancellationToken ct)
     {
         var result = await service.GetRulesAsync(mailboxId, ct);
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [HttpPost("rules")]
-    [MenuAuthorize("HelpdeskMailRules", MenuPermission.Edit)]
+        [HttpPost("rules")]
+        [MenuAuthorize(new[] { "HelpdeskMailbox", "HelpdeskMailRules" }, MenuPermission.Edit)]
     public async Task<IActionResult> CreateRule([FromBody] HelpdeskMailRuleCreateDto dto, CancellationToken ct)
     {
         var result = await service.CreateRuleAsync(dto, ct);
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [HttpPost("rules/{id:long}/update")]
-    [MenuAuthorize("HelpdeskMailRules", MenuPermission.Edit)]
+        [HttpPost("rules/{id:long}/update")]
+        [MenuAuthorize(new[] { "HelpdeskMailbox", "HelpdeskMailRules" }, MenuPermission.Edit)]
     public async Task<IActionResult> UpdateRule(long id, [FromBody] HelpdeskMailRuleUpdateDto dto, CancellationToken ct)
     {
         var result = await service.UpdateRuleAsync(id, dto, ct);
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [HttpPost("rules/{id:long}/delete")]
-    [MenuAuthorize("HelpdeskMailRules", MenuPermission.Edit)]
+        [HttpPost("rules/{id:long}/delete")]
+        [MenuAuthorize(new[] { "HelpdeskMailbox", "HelpdeskMailRules" }, MenuPermission.Edit)]
     public async Task<IActionResult> DeleteRule(long id, CancellationToken ct)
     {
         var result = await service.DeleteRuleAsync(id, ct);

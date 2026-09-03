@@ -49,6 +49,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost]
+        [MenuAuthorize("PeriodicReportList", MenuPermission.Edit)]
         public async Task<IActionResult> Create(
             [FromBody] PeriodicReportUpsertDto dto,
             CancellationToken cancellationToken)
@@ -58,6 +59,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("update/{id:long}")]
+        [MenuAuthorize("PeriodicReportList", MenuPermission.Edit)]
         public async Task<IActionResult> Update(
             [FromRoute] long id,
             [FromBody] PeriodicReportUpsertDto dto,
@@ -68,6 +70,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete/{id:long}")]
+        [MenuAuthorize("PeriodicReportList", MenuPermission.Edit)]
         public async Task<IActionResult> Delete(
             [FromRoute] long id,
             CancellationToken cancellationToken)
@@ -77,6 +80,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("{id:long}/run")]
+        [MenuAuthorize("PeriodicReportList", MenuPermission.Edit)]
         public async Task<IActionResult> RunNow(
             [FromRoute] long id,
             CancellationToken cancellationToken)

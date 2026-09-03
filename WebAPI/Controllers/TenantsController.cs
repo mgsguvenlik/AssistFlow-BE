@@ -23,6 +23,7 @@ namespace WebAPI.Controllers
 
         // 🚩 CREATE: multipart/form-data + FromForm
         [HttpPost]
+        [MenuAuthorize("TenantList", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public override async Task<IActionResult> Create([FromForm] TenantCreateDto dto)
         {
@@ -31,6 +32,7 @@ namespace WebAPI.Controllers
 
         // 🚩 UPDATE: multipart/form-data + FromForm
         [HttpPost("update")]
+        [MenuAuthorize("TenantList", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public override async Task<IActionResult> Update([FromForm] TenantUpdateDto dto)
         {

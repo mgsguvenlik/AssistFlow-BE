@@ -97,6 +97,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("active-customer-requests")]
+        [MenuAuthorize(new[] { "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate" }, MenuPermission.View)]
         public async Task<IActionResult> GetActiveCustomerRequests([FromQuery] long customerId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             var result = await _workFlowService.GetActiveCustomerRequestsAsync(customerId, page, pageSize);

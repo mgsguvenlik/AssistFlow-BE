@@ -29,7 +29,7 @@ public class CustomerSystemAssignmentsController : CrudControllerBase<
     }
 
     [HttpGet("by-customer/{customerId:long}")]
-    [MenuAuthorize(new[] { "CustomerSystemList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
+    [MenuAuthorize(new[] { "CustomerList", "CustomerSystemList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
     public async Task<IActionResult> GetByCustomerId(long customerId)
     {
         if (customerId <= 0)
