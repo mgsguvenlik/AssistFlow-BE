@@ -95,7 +95,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-workflow/{id:long}")]
-        [MenuAuthorize("ServiceRequestList", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "ServiceRequestList", "BasicWorkflowReportsList" }, MenuPermission.Edit)]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);
@@ -267,7 +267,7 @@ namespace WebAPI.Controllers
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
-        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard" }, MenuPermission.View)]
+        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard", "ServiceReportsList" }, MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -275,7 +275,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
-        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard" }, MenuPermission.View)]
+        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard", "ServiceReportsList" }, MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);

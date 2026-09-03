@@ -101,7 +101,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-workflow/{id:long}")]
-        [MenuAuthorize("QnbServiceRequestList", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "QnbServiceRequestList", "QnbBasicWorkflowReportsList" }, MenuPermission.Edit)]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);

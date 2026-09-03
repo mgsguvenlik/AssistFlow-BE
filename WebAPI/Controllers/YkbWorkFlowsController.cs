@@ -97,7 +97,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-workflow/{id:long}")]
-        [MenuAuthorize("YkbServiceRequestList", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "YkbServiceRequestList", "YkbBasicWorkflowReportsList", "YkbAssignedServiceRequestDeleteUpdate" }, MenuPermission.Edit)]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);
@@ -105,7 +105,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("cancel-workflow/{id:long}")]
-        [MenuAuthorize("YkbServiceRequestList", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "YkbServiceRequestList", "YkbAssignedServiceRequestDeleteUpdate" }, MenuPermission.Edit)]
         public async Task<IActionResult> CancelWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.CancelWorkFlowAsync(id);

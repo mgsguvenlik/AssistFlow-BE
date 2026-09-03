@@ -8,7 +8,7 @@ using WebAPI.Authorization;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("MenuList", "RoleListPermission")]
+    [MenuResource("MenuList", "RoleListPermission", "RoleList")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
