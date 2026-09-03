@@ -3,10 +3,12 @@ using Business.Interfaces.Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkOrderType;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("WorkOrderTypeList", "BasicWorkflowReportsList", "YkbBasicWorkflowReportsList", "QnbBasicWorkflowReportsList", "YkbAccountingServiceReportList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

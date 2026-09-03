@@ -50,7 +50,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-warehouse")]
-        [MenuAuthorize("ServiceRequestWarehouse", MenuPermission.Edit)]
+        [MenuAuthorize("ServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendWarehouse([FromBody] SendWarehouseDto dto)
         {
             var result = await _workFlowService.SendWarehouseAsync(dto);
@@ -128,7 +128,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-servicesrequest-byrequestno")]
-        [MenuAuthorize("ServiceRequestList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval" }, MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
@@ -155,7 +155,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-technical-service/image/{id}")]
-        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
         {
             var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
@@ -163,7 +163,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-technical-service")]
-        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("ServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] SendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
@@ -238,7 +238,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("location-override")]
-        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize("ServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] OverrideLocationCheckDto dto)
         {
             var result = await _workFlowService.RequestLocationOverrideAsync(dto);
@@ -247,7 +247,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("send-back-for-review")]
-        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestFinalApproval" }, MenuPermission.Edit)]
         public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
         {
             var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
@@ -267,7 +267,7 @@ namespace WebAPI.Controllers
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
-        [MenuAuthorize("FlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -275,7 +275,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
-        [MenuAuthorize("FlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "FlowStatusList", "ServiceRequestCreate", "ServiceRequestList", "ServiceRequestWarehouse", "ServiceRequestTechnicalService", "ServiceRequestPricing", "ServiceRequestFinalApproval", "TechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);

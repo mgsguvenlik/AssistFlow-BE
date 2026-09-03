@@ -8,7 +8,7 @@ using WebAPI.Authorization;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("CustomerList")]
+    [MenuResource("CustomerList", "ProductList", "PurchaseRequest", "ServiceReportsList", AllowWorkflowRead = true)]
     [Route("api/[controller]")]
     [ApiController]
     public class CustomersController : CrudControllerBase<CustomerCreateDto, CustomerUpdateDto, CustomerGetDto, long>
@@ -62,7 +62,7 @@ namespace WebAPI.Controllers
         /// <param name="q">Sayfalama ve arama parametreleri</param>
         /// <returns>Sayfalanmış müşteri listesi</returns>
         [HttpGet("by-tenant")]
-        [MenuAuthorize(new[] { "CustomerList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetByTenantCode([FromQuery] string? tenantCode, [FromQuery] QueryParams q)
         {
             var result = await _customerService.GetByTenantCodeAsync(tenantCode, q);

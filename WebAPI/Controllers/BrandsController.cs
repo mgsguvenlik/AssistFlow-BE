@@ -7,7 +7,7 @@ using Model.Dtos.Brand;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("BrandList")]
+    [MenuResource("BrandList", "ModelList", "ProductList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

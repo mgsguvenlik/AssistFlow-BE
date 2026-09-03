@@ -52,7 +52,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-warehouse")]
-        [MenuAuthorize("YkbServiceRequestWarehouse", MenuPermission.Edit)]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendWarehouse([FromBody] YkbSendWarehouseDto dto)
         {
             var result = await _workFlowService.SendWarehouseAsync(dto);
@@ -130,7 +130,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-servicesrequest-byrequestno")]
-        [MenuAuthorize("YkbServiceRequestList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement" }, MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
@@ -164,7 +164,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-technical-service")]
-        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] YkbSendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
@@ -193,7 +193,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("delete-technical-service/image/{id}")]
-        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
         {
             var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
@@ -269,7 +269,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("location-override")]
-        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] YkbOverrideLocationCheckDto dto)
         {
             var result = await _workFlowService.RequestLocationOverrideAsync(dto);
@@ -278,7 +278,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("send-back-for-review")]
-        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement" }, MenuPermission.Edit)]
         public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
         {
             var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
@@ -286,7 +286,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-review-message")]
-        [MenuAuthorize("YkbServiceRequestCustomerAgreement", MenuPermission.Edit)]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> SendReviewMessage([FromBody] YkbCustomerReviewMessageDto dto)
         {
             var result = await _workFlowService.SendReviewMessage(dto);
@@ -305,7 +305,7 @@ namespace WebAPI.Controllers
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
-        [MenuAuthorize("YkbFlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "YkbFlowStatusList", "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement", "YkbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -313,7 +313,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
-        [MenuAuthorize("YkbFlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "YkbFlowStatusList", "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement", "YkbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);

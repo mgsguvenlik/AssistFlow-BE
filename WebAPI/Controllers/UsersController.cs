@@ -10,7 +10,7 @@ using WebAPI.Authorization;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("UserList")]
+    [MenuResource("UserList", "PurchaseRequest", "HelpdeskTicketCreate", "HelpdeskTicketList", "ServiceReportsList", AllowWorkflowRead = true)]
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : CrudControllerBase<UserCreateDto, UserUpdateDto, UserGetDto, long>
@@ -142,7 +142,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("technicians")]
-        [MenuAuthorize(new[] { "UserList", "ServiceRequestTechnicalService", "YkbServiceRequestTechnicalService", "QnbServiceRequestTechnicalService" }, MenuPermission.View)]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetTechnicians()
         {
             var resp = await _userService.GetTechniciansAsync();

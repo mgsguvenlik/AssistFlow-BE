@@ -9,6 +9,40 @@ namespace WebAPI.Authorization;
 
 public sealed class MenuAuthorizationFilter : IAsyncAuthorizationFilter
 {
+    private static readonly string[] WorkflowReadMenuKeys =
+    {
+        "ServiceRequestCreate",
+        "ServiceRequestList",
+        "ServiceRequestArchive",
+        "ServiceRequestWarehouse",
+        "ServiceRequestTechnicalService",
+        "ServiceRequestPricing",
+        "ServiceRequestFinalApproval",
+        "TechnicianDashboard",
+
+        "YkbCustomerServiceRequestCreate",
+        "YkbServiceRequestCreate",
+        "YkbServiceRequestList",
+        "YkbServiceRequestArchive",
+        "YkbServiceRequestWarehouse",
+        "YkbServiceRequestTechnicalService",
+        "YkbServiceRequestPricing",
+        "YkbServiceRequestFinalApproval",
+        "YkbServiceRequestCustomerAgreement",
+        "YkbTechnicianDashboard",
+
+        "QnbCustomerServiceRequestCreate",
+        "QnbServiceRequestCreate",
+        "QnbServiceRequestList",
+        "QnbServiceRequestArchive",
+        "QnbServiceRequestWarehouse",
+        "QnbServiceRequestTechnicalService",
+        "QnbServiceRequestPricing",
+        "QnbServiceRequestFinalApproval",
+        "QnbServiceRequestCustomerAgreement",
+        "QnbTechnicianDashboard"
+    };
+
     private readonly AppDataContext _db;
     private readonly IReadOnlyCollection<string> _menuKeys;
     private readonly MenuPermission _permission;
@@ -39,7 +73,22 @@ public sealed class MenuAuthorizationFilter : IAsyncAuthorizationFilter
                 .GetCustomAttributes(typeof(MenuResourceAttribute), inherit: true)
                 .OfType<MenuResourceAttribute>()
                 .SingleOrDefault();
-            menuKeys = resource is null ? Array.Empty<string>() : new[] { resource.MenuKey };
+            if (resource is null)
+            {
+                menuKeys = Array.Empty<string>();
+            }
+            else if (_permission == MenuPermission.Edit)
+            {
+                menuKeys = new[] { resource.MenuKey };
+            }
+            else
+            {
+                menuKeys = new[] { resource.MenuKey }
+                    .Concat(resource.LookupMenuKeys)
+                    .Concat(resource.AllowWorkflowRead ? WorkflowReadMenuKeys : Array.Empty<string>())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
         }
 
         if (!long.TryParse(userIdValue, out var userId) || userId <= 0 || menuKeys.Count == 0)

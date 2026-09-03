@@ -7,7 +7,7 @@ using Model.Dtos.ServiceType;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("ServiceTypeList")]
+    [MenuResource("ServiceTypeList", "ServiceReportsList", "BasicWorkflowReportsList", "YkbBasicWorkflowReportsList", "QnbBasicWorkflowReportsList", "YkbAccountingServiceReportList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

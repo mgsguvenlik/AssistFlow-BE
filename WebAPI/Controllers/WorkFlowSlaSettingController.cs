@@ -8,7 +8,7 @@ using Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("WorkFlowSlaSettingList")]
+    [MenuResource("WorkFlowSlaSettingList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -34,7 +34,7 @@ namespace WebAPI.Controllers
         /// <response code="200">SLA ayarı bulundu</response>
         /// <response code="404">SLA ayarı bulunamadı</response>
         [HttpGet("by-type-priority")]
-        [MenuAuthorize("WorkFlowSlaSettingList", MenuPermission.View)]
+        [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetByTypeAndPriority(
@@ -46,7 +46,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("by-customer-type")]
-        [MenuAuthorize("WorkFlowSlaSettingList", MenuPermission.View)]
+        [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCustomerType(
         [FromQuery] WorkFlowCustomerType customerType)

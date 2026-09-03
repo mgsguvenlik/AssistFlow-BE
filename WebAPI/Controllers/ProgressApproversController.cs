@@ -7,7 +7,7 @@ using Model.Dtos.ProgressApprover;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("ApprovalList")]
+    [MenuResource("ApprovalList", "CustomerList", "CustomerGroupList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -22,7 +22,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("getby-customerid")]
-        [MenuAuthorize("ApprovalList", MenuPermission.View)]
+        [MenuAuthorize(MenuPermission.View)]
         public  async Task<IActionResult> GetByCustomerId(long customerId)
         {
             var resp = await _progressApproverService.GetByCustomerIdAsync(customerId, CancellationToken.None);

@@ -7,7 +7,7 @@ using Model.Dtos.Role;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("RoleList")]
+    [MenuResource("RoleList", "UserList")]
     [Route("api/[controller]")]
     [ApiController]
     public class RolesController

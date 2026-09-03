@@ -7,7 +7,7 @@ using Model.Dtos.ProductType;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("ProductTypeList")]
+    [MenuResource("ProductTypeList", "ProductList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

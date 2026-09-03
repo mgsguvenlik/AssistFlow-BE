@@ -7,7 +7,7 @@ using Model.Dtos.SystemType;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("SystemTypeList")]
+    [MenuResource("SystemTypeList", "ProductList", "PurchaseRequest", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

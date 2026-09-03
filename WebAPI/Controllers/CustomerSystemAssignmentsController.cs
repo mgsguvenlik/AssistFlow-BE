@@ -7,7 +7,7 @@ using WebAPI.Controllers;
 using WebAPI.Authorization;
 
 [Authorize]
-[MenuResource("CustomerSystemList")]
+[MenuResource("CustomerList")]
 [Route("api/[controller]")]
 [ApiController]
 [Produces("application/json")]

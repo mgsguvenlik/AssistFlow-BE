@@ -54,7 +54,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("send-warehouse")]
-        [MenuAuthorize("QnbServiceRequestWarehouse", MenuPermission.Edit)]
+        [MenuAuthorize("QnbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendWarehouse([FromBody] QnbSendWarehouseDto dto)
         {
             var result = await _workFlowService.SendWarehouseAsync(dto);
@@ -133,7 +133,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-servicesrequest-byrequestno")]
-        [MenuAuthorize("QnbServiceRequestList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "QnbCustomerServiceRequestCreate", "QnbServiceRequestCreate", "QnbServiceRequestList", "QnbServiceRequestWarehouse", "QnbServiceRequestTechnicalService", "QnbServiceRequestPricing", "QnbServiceRequestFinalApproval", "QnbServiceRequestCustomerAgreement" }, MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
@@ -162,7 +162,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-technical-service/image/{id}")]
-        [MenuAuthorize("QnbServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("QnbServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
         {
             var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
@@ -170,7 +170,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-technical-service")]
-        [MenuAuthorize("QnbServiceRequestTechnicalService", MenuPermission.Edit)]
+        [MenuAuthorize("QnbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] QnbSendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
@@ -243,7 +243,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("location-override")]
-        [MenuAuthorize("QnbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize("QnbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] QnbOverrideLocationCheckDto dto)
         {
             var result = await _workFlowService.RequestLocationOverrideAsync(dto);
@@ -251,7 +251,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-back-for-review")]
-        [MenuAuthorize("QnbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [MenuAuthorize(new[] { "QnbServiceRequestWarehouse", "QnbServiceRequestTechnicalService", "QnbServiceRequestFinalApproval", "QnbServiceRequestCustomerAgreement" }, MenuPermission.Edit)]
         public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
         {
             var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
@@ -269,7 +269,7 @@ namespace WebAPI.Controllers
 
         // ---------- WorkFlowStep CRUD ----------
         [HttpGet("get-workflow-steps")]
-        [MenuAuthorize("QnbFlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "QnbFlowStatusList", "QnbCustomerServiceRequestCreate", "QnbServiceRequestCreate", "QnbServiceRequestList", "QnbServiceRequestWarehouse", "QnbServiceRequestTechnicalService", "QnbServiceRequestPricing", "QnbServiceRequestFinalApproval", "QnbServiceRequestCustomerAgreement", "QnbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -277,7 +277,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
-        [MenuAuthorize("QnbFlowStatusList", MenuPermission.View)]
+        [MenuAuthorize(new[] { "QnbFlowStatusList", "QnbCustomerServiceRequestCreate", "QnbServiceRequestCreate", "QnbServiceRequestList", "QnbServiceRequestWarehouse", "QnbServiceRequestTechnicalService", "QnbServiceRequestPricing", "QnbServiceRequestFinalApproval", "QnbServiceRequestCustomerAgreement", "QnbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);
