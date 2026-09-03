@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.CustomerSystemAssignment;
 using WebAPI.Controllers;
+using WebAPI.Authorization;
 
 [Authorize]
+[MenuResource("CustomerList")]
 [Route("api/[controller]")]
 [ApiController]
 [Produces("application/json")]
@@ -27,6 +29,7 @@ public class CustomerSystemAssignmentsController : CrudControllerBase<
     }
 
     [HttpGet("by-customer/{customerId:long}")]
+    [MenuAuthorize(new[] { "CustomerSystemList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
     public async Task<IActionResult> GetByCustomerId(long customerId)
     {
         if (customerId <= 0)

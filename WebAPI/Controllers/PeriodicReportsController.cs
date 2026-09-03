@@ -4,11 +4,13 @@ using Core.Common;
 using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.PeriodicReports;
 
 namespace WebAPI.Controllers
 {
     [Authorize(Roles = "ADMIN,Admin")]
+    [MenuAuthorize("PeriodicReportList", MenuPermission.View)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -81,7 +83,7 @@ namespace WebAPI.Controllers
         {
             var me = await _currentUser.GetAsync(cancellationToken);
             if (me == null || me.Id <= 0)
-                return Unauthorized(ResponseModel.Fail("Kullanıcı bilgisi bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+                return Unauthorized(ResponseModel.Fail("KullanÄ±cÄ± bilgisi bulunamadÄ±.", Core.Enums.StatusCode.Unauthorized));
 
             var outcome = await _executionService.ExecuteAsync(
                 id,
@@ -97,13 +99,13 @@ namespace WebAPI.Controllers
             };
 
             if (!outcome.Acquired)
-                return Conflict(ResponseModel<PeriodicReportRunResultDto>.Fail(outcome.Message ?? "Rapor çalıştırılamadı.", Core.Enums.StatusCode.Conflict, dto));
+                return Conflict(ResponseModel<PeriodicReportRunResultDto>.Fail(outcome.Message ?? "Rapor Ã§alÄ±ÅŸtÄ±rÄ±lamadÄ±.", Core.Enums.StatusCode.Conflict, dto));
 
             return outcome.Status == PeriodicReportExecutionStatus.Success
                 ? Ok(ResponseModel<PeriodicReportRunResultDto>.Success(dto, outcome.Message))
                 : StatusCode(
                     StatusCodes.Status500InternalServerError,
-                    ResponseModel<PeriodicReportRunResultDto>.Fail(outcome.Message ?? "Rapor çalıştırılamadı.", Core.Enums.StatusCode.Error, dto));
+                    ResponseModel<PeriodicReportRunResultDto>.Fail(outcome.Message ?? "Rapor Ã§alÄ±ÅŸtÄ±rÄ±lamadÄ±.", Core.Enums.StatusCode.Error, dto));
         }
 
         [HttpPost("preview")]

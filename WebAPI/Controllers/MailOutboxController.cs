@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.MailOutbox;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("Mailbox")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -27,6 +29,7 @@ namespace WebAPI.Controllers
         /// Tek bir mail outbox kaydı için yeniden deneme tetikleme
         /// </summary>
         [HttpPost("retry/{id:long}")]
+        [MenuAuthorize("Mailbox", MenuPermission.Edit)]
         public async Task<IActionResult> Retry(long id, CancellationToken ct)
         {
             var ok = await _mailOutboxService.RetryAsync(id, ct);

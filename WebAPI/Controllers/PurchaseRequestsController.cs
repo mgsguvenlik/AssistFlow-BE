@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Crm.PurchaseAttachment;
 using Model.Dtos.Crm.PurchaseRequest;
+using WebAPI.Authorization;
 using Model.Dtos.Crm.PurchaseRequestItem;
 
 namespace WebAPI.Controllers
@@ -32,6 +33,7 @@ namespace WebAPI.Controllers
         /// Talep Draft durumunda oluşturulur.
         /// </summary>
         [HttpPost("create")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> Create(
             [FromBody] PurchaseRequestCreateDto dto,
             CancellationToken cancellationToken)
@@ -56,6 +58,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebinin ana bilgilerini günceller.
         /// </summary>
         [HttpPost("update/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> Update(
             [FromRoute] long id,
             [FromBody] PurchaseRequestUpdateDto dto,
@@ -82,6 +85,7 @@ namespace WebAPI.Controllers
         /// Talebi Cancelled durumuna geçirir.
         /// </summary>
         [HttpPost("cancel/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> Cancel(
             [FromRoute] long id,
             CancellationToken cancellationToken)
@@ -98,6 +102,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebi detayını getirir.
         /// </summary>
         [HttpGet("detail/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetDetail(
             [FromRoute] long id,
             CancellationToken cancellationToken)
@@ -114,6 +119,7 @@ namespace WebAPI.Controllers
         /// Satın alma taleplerini server-side pagination ile getirir.
         /// </summary>
         [HttpGet("list")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetPaged(
             [FromQuery] QueryParams queryParams,
             CancellationToken cancellationToken)
@@ -134,6 +140,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebine ürün/hizmet kalemi ekler.
         /// </summary>
         [HttpPost("{purchaseRequestId:long}/items/create")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> AddItem(
             [FromRoute] long purchaseRequestId,
             [FromBody] PurchaseRequestItemCreateDto dto,
@@ -152,6 +159,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebi ürün/hizmet kalemini günceller.
         /// </summary>
         [HttpPost("items/update/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> UpdateItem(
             [FromRoute] long id,
             [FromBody] PurchaseRequestItemUpdateDto dto,
@@ -177,6 +185,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebinden ürün/hizmet kalemini siler.
         /// </summary>
         [HttpPost("items/delete/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteItem(
             [FromRoute] long id,
             CancellationToken cancellationToken)
@@ -198,6 +207,7 @@ namespace WebAPI.Controllers
         /// PurchaseRequest attachment metadata kaydını oluşturur.
         /// </summary>
         [HttpPost("{purchaseRequestId:long}/attachments/create")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> AddAttachment(
            [FromRoute] long purchaseRequestId,
@@ -218,6 +228,7 @@ namespace WebAPI.Controllers
         /// ve storage üzerindeki dosyayı siler.
         /// </summary>
         [HttpPost("attachments/delete/{id:long}")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteAttachment(
             [FromRoute] long id,
             CancellationToken cancellationToken)
@@ -234,6 +245,7 @@ namespace WebAPI.Controllers
         /// Talebe ait dosyaları getirir.
         /// </summary>
         [HttpGet("{purchaseRequestId:long}/attachments")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetAttachments(
             [FromRoute] long purchaseRequestId,
             CancellationToken cancellationToken)
@@ -263,6 +275,7 @@ namespace WebAPI.Controllers
         /// vb.
         /// </summary>
         [HttpPost("process-action")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.Edit)]
         public async Task<IActionResult> ProcessAction(
             [FromBody] PurchaseRequestProcessActionDto dto,
             CancellationToken cancellationToken)
@@ -284,6 +297,7 @@ namespace WebAPI.Controllers
         /// kullanabileceği aksiyonları getirir.
         /// </summary>
         [HttpGet("{purchaseRequestId:long}/actions")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetActions(
             [FromRoute] long purchaseRequestId,
             CancellationToken cancellationToken)
@@ -304,6 +318,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebinin workflow geçmişini getirir.
         /// </summary>
         [HttpGet("{purchaseRequestId:long}/history")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetHistory(
             [FromRoute] long purchaseRequestId,
             CancellationToken cancellationToken)
@@ -324,6 +339,7 @@ namespace WebAPI.Controllers
         /// Satın alma talebine ait workflow task kayıtlarını getirir.
         /// </summary>
         [HttpGet("{purchaseRequestId:long}/tasks")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetTasks(
             [FromRoute] long purchaseRequestId,
             CancellationToken cancellationToken)
@@ -344,6 +360,7 @@ namespace WebAPI.Controllers
         /// Aktif satın alma workflow step tanımlarını getirir.
         /// </summary>
         [HttpGet("steps")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetSteps(
             CancellationToken cancellationToken)
         {
@@ -373,6 +390,7 @@ namespace WebAPI.Controllers
         /// ancak şu anda kendi üzerinde olmayan satın alma taleplerini getirir.
         /// </summary>
         [HttpGet("my-requests")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetMyRequests([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
         {
             var result = await _purchaseRequestService.GetMyRequestsAsync(queryParams, cancellationToken);
@@ -385,6 +403,7 @@ namespace WebAPI.Controllers
         /// işlem yaptığı satın alma taleplerini getirir.
         /// </summary>
         [HttpGet("my-processed-requests")]
+        [MenuAuthorize("PurchaseRequest", MenuPermission.View)]
         public async Task<IActionResult> GetMyProcessedRequests([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
         {
             var result = await _purchaseRequestService.GetMyProcessedRequestsAsync(queryParams, cancellationToken);

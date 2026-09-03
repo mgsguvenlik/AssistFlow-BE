@@ -3,10 +3,12 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.TenantProductPrice;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize] 
+    [MenuResource("ProductList")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -23,14 +25,15 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Filtreli sayfalama ile tenant ürün fiyatlarýný getirir.
+        /// Filtreli sayfalama ile tenant Ã¼rÃ¼n fiyatlarÄ±nÄ± getirir.
         /// </summary>
         /// <param name="q">Sorgu parametreleri (ProductId, TenantId filtreleri dahil)</param>
-        /// <returns>Sayfalanmýþ fiyat listesi</returns>
+        /// <returns>SayfalanmÄ±ÅŸ fiyat listesi</returns>
         [HttpGet]
+        [MenuAuthorize("ProductList", MenuPermission.View)]
         public override async Task<IActionResult> GetPaged([FromQuery] QueryParams q)
         {
-            // Eðer Filter.ProductId veya Filter.TenantId varsa özel metodu kullan
+            // EÄŸer Filter.ProductId veya Filter.TenantId varsa Ã¶zel metodu kullan
             if (HttpContext.Request.Query.ContainsKey("Filter.ProductId") || 
                 HttpContext.Request.Query.ContainsKey("Filter.TenantId"))
             {
@@ -54,18 +57,19 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Belirtilen ürün ve tenant için fiyat kayýtlarýný getirir.
+        /// Belirtilen Ã¼rÃ¼n ve tenant iÃ§in fiyat kayÄ±tlarÄ±nÄ± getirir.
         /// </summary>
-        /// <param name="productId">Ürün ID</param>
+        /// <param name="productId">ÃœrÃ¼n ID</param>
         /// <param name="tenantId">Tenant ID</param>
-        /// <returns>Ýlgili fiyat kayýtlarýnýn listesi</returns>
+        /// <returns>Ä°lgili fiyat kayÄ±tlarÄ±nÄ±n listesi</returns>
         [HttpGet("get-by-product-and-tenant")]
+        [MenuAuthorize("ProductList", MenuPermission.View)]
         public async Task<IActionResult> GetByProductAndTenant([FromQuery] long productId, [FromQuery] long tenantId)
         {
             var result = await _tenantProductPriceService.GetByProductAndTenantAsync(productId, tenantId);
 
             if (result == null || !result.Any())
-                return NotFound(new { message = "Kayýt bulunamadý." });
+                return NotFound(new { message = "KayÄ±t bulunamadÄ±." });
 
             return Ok(result);
         }

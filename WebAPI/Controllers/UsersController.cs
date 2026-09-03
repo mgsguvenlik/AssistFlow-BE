@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.User;
 using Model.Dtos.WorkFlowDtos.WorkFlowActivityRecord;
 using Model.Requests;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("UserList", "PurchaseRequest", "HelpdeskTicketCreate", "HelpdeskTicketList", "ServiceReportsList", AllowWorkflowRead = true)]
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : CrudControllerBase<UserCreateDto, UserUpdateDto, UserGetDto, long>
@@ -32,6 +34,7 @@ namespace WebAPI.Controllers
 
         /// POST: api/users/assign-roles
         [HttpPost("assign-roles")]
+        [MenuAuthorize("UserList", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<UserGetDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -76,6 +79,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("by-role/{roleId:long}")]
+        [MenuAuthorize("UserList", MenuPermission.View)]
         public async Task<IActionResult> GetUsersByRole(long roleId)
         {
             if (roleId <= 0)
@@ -138,6 +142,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("technicians")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetTechnicians()
         {
             var resp = await _userService.GetTechniciansAsync();
@@ -150,6 +155,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-user-activity/{userId}")]
+        [MenuAuthorize("UserList", MenuPermission.View)]
         public async Task<IActionResult> GetUserActivityRecords([FromRoute] int userId, [FromQuery] QueryParams q)
         {
             var result = await _activationRecordService.GetUserActivity(userId, q);
@@ -158,6 +164,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-user-activity-grouped/{userId:int}")]
+        [MenuAuthorize("UserList", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<PagedResult<WorkFlowActivityGroupDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetUserActivityGroupedByRequestNo([FromRoute] int userId, [FromQuery] QueryParams q, [FromQuery] int perGroupTake = 50)
         {

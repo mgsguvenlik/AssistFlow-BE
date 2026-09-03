@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("ServiceRequestArchive", MenuPermission.View)]
     [Route("api/[controller]")]
     [ApiController]
     public class WorkFlowArchivesController : ControllerBase

@@ -4,6 +4,7 @@ using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.UserFeedbackDtos;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -29,6 +30,7 @@ namespace WebAPI.Controllers
         /// <param name="dto">Geri bildirim bilgileri</param>
         /// <returns>Oluşturulan geri bildirim</returns>
         [HttpPost]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CreateFeedback([FromBody] CreateUserFeedbackDto dto)
@@ -48,6 +50,7 @@ namespace WebAPI.Controllers
         /// <param name="type">Tip filtresi</param>
         /// <returns>Geri bildirim listesi</returns>
         [HttpGet]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<PaginatedList<UserFeedbackDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetFeedbacks(
             [FromQuery] int page = 1,
@@ -66,6 +69,7 @@ namespace WebAPI.Controllers
         /// <param name="id">Geri bildirim ID</param>
         /// <returns>Geri bildirim detayı</returns>
         [HttpGet("{id}")]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetFeedbackById(long id)
@@ -81,6 +85,7 @@ namespace WebAPI.Controllers
         /// <param name="dto">Güncelleme bilgileri</param>
         /// <returns>Güncellenmiş geri bildirim</returns>
         [HttpPost("update/{id}/status")]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateFeedbackStatus(
@@ -97,6 +102,7 @@ namespace WebAPI.Controllers
         /// <param name="id">Geri bildirim ID</param>
         /// <returns>Başarı durumu</returns>
         [HttpPost("delete/{id}")]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteFeedback(long id)
@@ -110,6 +116,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>İstatistik verileri</returns>
         [HttpGet("statistics")]
+        [MenuAuthorize("UserFeedbackStatistics", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FeedbackStatisticsDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStatistics()
         {
@@ -122,6 +129,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Kullanıcının geri bildirimleri</returns>
         [HttpGet("my-feedbacks")]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<UserFeedbackDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMyFeedbacks()
         {
@@ -133,6 +141,7 @@ namespace WebAPI.Controllers
         /// Geri bildirime bir veya birden fazla dosya ekler.
         /// </summary>
         [HttpPost("{feedbackId:long}/attachments/create")]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(525_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 525_000_000, ValueCountLimit = 32)]
@@ -154,6 +163,7 @@ namespace WebAPI.Controllers
         /// Geri bildirime ait aktif dosyaları getirir.
         /// </summary>
         [HttpGet("{feedbackId:long}/attachments")]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<List<UserFeedbackAttachmentDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAttachments(
             [FromRoute] long feedbackId,
@@ -170,6 +180,7 @@ namespace WebAPI.Controllers
         /// Yetki kontrolünden sonra dosyanın normalize edilmiş indirme bilgisini döndürür.
         /// </summary>
         [HttpGet("attachments/{attachmentId:long}/download")]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackAttachmentDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAttachmentDownload(
             [FromRoute] long attachmentId,
@@ -186,6 +197,7 @@ namespace WebAPI.Controllers
         /// Geri bildirim dosyasını soft-delete eder ve storage nesnesini kaldırır.
         /// </summary>
         [HttpPost("attachments/delete/{attachmentId:long}")]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<bool>), StatusCodes.Status200OK)]
         public async Task<IActionResult> DeleteAttachment(
             [FromRoute] long attachmentId,
