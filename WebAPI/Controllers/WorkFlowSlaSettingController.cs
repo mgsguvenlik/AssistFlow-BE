@@ -2,11 +2,13 @@ using Business.Interfaces;
 using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.WorkFlowDtos.WorkFlowSlaSetting;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("WorkFlowSlaSettingList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -25,13 +27,14 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Belirli bir müþteri tipi ve öncelik için aktif SLA ayarýný getirir
+        /// Belirli bir mÃ¼ÅŸteri tipi ve Ã¶ncelik iÃ§in aktif SLA ayarÄ±nÄ± getirir
         /// </summary>
-        /// <param name="customerType">Müþteri tipi (0=General, 1=Ykb, 2=Individual, 3=Corporate)</param>
-        /// <param name="priority">Öncelik (0=Low, 1=Normal, 2=High, 3=Urgent)</param>
-        /// <response code="200">SLA ayarý bulundu</response>
-        /// <response code="404">SLA ayarý bulunamadý</response>
+        /// <param name="customerType">MÃ¼ÅŸteri tipi (0=General, 1=Ykb, 2=Individual, 3=Corporate)</param>
+        /// <param name="priority">Ã–ncelik (0=Low, 1=Normal, 2=High, 3=Urgent)</param>
+        /// <response code="200">SLA ayarÄ± bulundu</response>
+        /// <response code="404">SLA ayarÄ± bulunamadÄ±</response>
         [HttpGet("by-type-priority")]
+        [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetByTypeAndPriority(
@@ -43,6 +46,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("by-customer-type")]
+        [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetByCustomerType(
         [FromQuery] WorkFlowCustomerType customerType)

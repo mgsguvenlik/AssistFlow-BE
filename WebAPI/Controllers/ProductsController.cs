@@ -3,10 +3,12 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.Product;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("ProductList", "PurchaseRequest", "ServiceReportsList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -23,6 +25,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-by-customer/{customerId:long}")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetProductsByCustomer(long customerId)
         {
             var response = await _productService.GetProductsByCustomerIdAsync(customerId);
@@ -30,6 +33,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-effective-price")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetEffectivePrice([FromQuery] long customerId, [FromQuery] long productId)
         {
             if (customerId <= 0 || productId <= 0)
@@ -40,6 +44,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("get-effective-prices")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetEffectivePrices([FromBody] CustomerProductRequestDto dto)
         {
             if (dto.CustomerId <= 0 || dto.ProductIds == null || !dto.ProductIds.Any())
@@ -50,6 +55,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("get-effective-prices-bycustomer")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetEffectiveByCustomer([FromQuery] QueryParams q, long? customerId)
         {
             var result = await _productService.GetEffectivePriceByCustomerAsync(q, customerId);
@@ -58,6 +64,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("purchase-products")]
+        [MenuAuthorize(MenuPermission.View)]
         public async Task<IActionResult> GetPurchaseProducts([FromQuery] QueryParams queryParams, CancellationToken cancellationToken)
         {
             var result =

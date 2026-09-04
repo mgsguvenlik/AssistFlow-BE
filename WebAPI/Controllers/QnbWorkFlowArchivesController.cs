@@ -3,10 +3,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbArchive;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("QnbServiceRequestArchive", MenuPermission.View)]
     [Route("api/[controller]")]
     [ApiController]
     public class QnbWorkFlowArchivesController : ControllerBase
@@ -23,8 +25,8 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Arþiv kayýtlarý liste (filtre + pagination).
-        /// Örn: GET api/QnbWorkFlowArchives?requestNo=QNB-2025&customerName=YAÞAR&page=1&pageSize=20
+        /// ArÅŸiv kayÄ±tlarÄ± liste (filtre + pagination).
+        /// Ã–rn: GET api/QnbWorkFlowArchives?requestNo=QNB-2025&customerName=YAÅžAR&page=1&pageSize=20
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetArchives([FromQuery] QnbWorkFlowArchiveFilterDto filter)
@@ -38,7 +40,7 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Id ile arþiv detayý (tüm snapshot).
+        /// Id ile arÅŸiv detayÄ± (tÃ¼m snapshot).
         /// GET api/QnbWorkFlowArchives/5
         /// </summary>
         [HttpGet("{id:long}")]
@@ -53,7 +55,7 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// RequestNo ile arþiv detayý (son arþiv kaydý).
+        /// RequestNo ile arÅŸiv detayÄ± (son arÅŸiv kaydÄ±).
         /// GET api/QnbWorkFlowArchives/by-request-no?requestNo=QNB-2025-0001
         /// </summary>
         [HttpGet("by-request-no")]

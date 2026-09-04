@@ -1,11 +1,13 @@
 ﻿using Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.Tenant;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("TenantList", "UserList", "CustomerList", "ProductList", "PurchaseRequest")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -21,6 +23,7 @@ namespace WebAPI.Controllers
 
         // 🚩 CREATE: multipart/form-data + FromForm
         [HttpPost]
+        [MenuAuthorize("TenantList", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public override async Task<IActionResult> Create([FromForm] TenantCreateDto dto)
         {
@@ -29,6 +32,7 @@ namespace WebAPI.Controllers
 
         // 🚩 UPDATE: multipart/form-data + FromForm
         [HttpPost("update")]
+        [MenuAuthorize("TenantList", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public override async Task<IActionResult> Update([FromForm] TenantUpdateDto dto)
         {

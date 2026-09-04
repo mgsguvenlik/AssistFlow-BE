@@ -1,11 +1,13 @@
-﻿using Business.Interfaces;
+using Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WebAPI.Authorization;
 using Model.Dtos.ProgressApprover;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuResource("ApprovalList", "CustomerList", "CustomerGroupList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]
@@ -20,6 +22,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("getby-customerid")]
+        [MenuAuthorize(MenuPermission.View)]
         public  async Task<IActionResult> GetByCustomerId(long customerId)
         {
             var resp = await _progressApproverService.GetByCustomerIdAsync(customerId, CancellationToken.None);
