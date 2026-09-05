@@ -4394,6 +4394,47 @@ namespace Business.Services.Ykb
                 .ToListAsync();
 
 
+            var techService = await _uow.Repository
+                .GetQueryable<YkbTechnicalService>()
+                .AsNoTracking()
+                .Where(ts => ts.RequestNo == dto.RequestNo)
+                .Include(ts => ts.YkbServiceRequestFormImages)
+                .Include(ts => ts.YkbServicesImages)
+                .FirstOrDefaultAsync();
+
+            if (techService != null)
+            {
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                string? NormalizeImageUrl(string? urlOrFileName)
+                {
+                    if (string.IsNullOrWhiteSpace(urlOrFileName)) return urlOrFileName;
+                    if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return urlOrFileName;
+                    if (urlOrFileName.StartsWith("/")) return string.IsNullOrEmpty(baseUrl) ? urlOrFileName : $"{baseUrl}{urlOrFileName}";
+                    var relative = $"/uploads/{urlOrFileName}";
+                    return string.IsNullOrEmpty(baseUrl) ? relative : $"{baseUrl}{relative}";
+                }
+
+                dto.ServicesImages = techService.YkbServicesImages
+                    .Select(img => new YkbTechnicalServiceImageGetDto
+                    {
+                        Id = img.Id,
+                        YkbTechnicalServiceId = img.YkbTechnicalServiceId,
+                        Url = NormalizeImageUrl(img.Url) ?? string.Empty,
+                        Caption = img.Caption
+                    })
+                    .ToList();
+                dto.ServiceRequestFormImages = techService.YkbServiceRequestFormImages
+                    .Select(img => new YkbTechnicalServiceFormImageGetDto
+                    {
+                        Id = img.Id,
+                        Url = NormalizeImageUrl(img.Url) ?? string.Empty,
+                        Caption = img.Caption
+                    })
+                    .ToList();
+            }
+
             //Dosyalar: Attachments (Pricing adımı)
             dto.Attachments = await GetWorkflowAttachmentsAsync(dto.RequestNo);
             dto.CanEditAttachments = true;

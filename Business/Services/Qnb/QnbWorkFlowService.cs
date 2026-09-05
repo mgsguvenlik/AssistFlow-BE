@@ -3759,6 +3759,36 @@ namespace Business.Services.Qnb
                 .ProjectToType<QnbWorkFlowReviewLogDto>(_config)
                 .ToListAsync();
 
+            var techService = await _uow.Repository
+                .GetQueryable<QnbTechnicalService>()
+                .AsNoTracking()
+                .Where(ts => ts.RequestNo == dto.RequestNo)
+                .Include(ts => ts.QnbServiceRequestFormImages)
+                .Include(ts => ts.QnbServicesImages)
+                .FirstOrDefaultAsync();
+
+            if (techService != null)
+            {
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                dto.ServicesImages = techService.QnbServicesImages
+                    .Select(img => new QnbTechnicalServiceImageGetDto
+                    {
+                        Id = img.Id,
+                        QnbTechnicalServiceId = img.QnbTechnicalServiceId,
+                        Url = NormalizeImageUrlInternal(img.Url, baseUrl) ?? string.Empty,
+                        Caption = img.Caption
+                    })
+                    .ToList();
+                dto.ServiceRequestFormImages = techService.QnbServiceRequestFormImages
+                    .Select(img => new QnbTechnicalServiceFormImageGetDto
+                    {
+                        Id = img.Id,
+                        Url = NormalizeImageUrlInternal(img.Url, baseUrl) ?? string.Empty,
+                        Caption = img.Caption
+                    })
+                    .ToList();
+            }
             dto.Attachments = await GetWorkflowAttachmentsAsync(dto.RequestNo);
             dto.CanEditAttachments = true;
 
