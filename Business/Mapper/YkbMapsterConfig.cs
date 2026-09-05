@@ -47,11 +47,13 @@ namespace Business.Mapper
                   .Ignore(dest => dest.YkbWorkFlowStep);
 
             config.NewConfig<YkbServicesRequestUpdateDto, YkbServicesRequest>()
+                  .Ignore(dest => dest.ServiceTypeRelations)
                   .Ignore(dest => dest.CreatedUser)
                   .Ignore(dest => dest.CreatedDate)
                   .Ignore(dest => dest.YkbWorkFlowStep);
 
             config.NewConfig<YkbServicesRequest, YkbServicesRequestGetDto>()
+                  .Map(dest => dest.ServiceTypes, src => src.ServiceTypeRelations.Select(x => x.ServiceType))
                   .Map(dest => dest.CustomerName, src => src.Customer.SubscriberCompany)
                   .Map(dest => dest.ServiceTypeName, src => src.ServiceType.Name)
                   .Map(dest => dest.WorkFlowStepCode, src => src.YkbWorkFlowStep != null ? src.YkbWorkFlowStep.Code : null)

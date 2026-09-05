@@ -378,6 +378,7 @@ namespace Business.Mapper
 
             // --- ServicesRequest: UPDATE (partial) -> ENTITY ---
             config.NewConfig<ServicesRequestUpdateDto, ServicesRequest>()
+                  .Ignore(dest => dest.ServiceTypeRelations)
                   .IgnoreNullValues(true)
                   .Ignore(dest => dest.Id)
                   .Ignore(d => d.Customer)          // nav
@@ -388,6 +389,7 @@ namespace Business.Mapper
 
             // --- ServicesRequest: ENTITY -> GET DTO ---
             config.NewConfig<ServicesRequest, ServicesRequestGetDto>()
+                  .Map(dest => dest.ServiceTypes, src => src.ServiceTypeRelations.Select(x => x.ServiceType))
                   // düz alanlar otomatik eşleşir
                   .Map(d => d.ServicesCostStatusText, s => s.ServicesCostStatus.ToString())
                   .Map(d => d.CustomerName, s => s.Customer != null ? s.Customer.ContactName1 : null)

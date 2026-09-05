@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 using System.ComponentModel.DataAnnotations;
 
@@ -17,6 +17,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
         public long? WorkFlowStepId { get; set; }
         public long CustomerId { get; set; }
         public long ServiceTypeId { get; set; }
+        public List<long>? ServiceTypeIds { get; set; }
         public long? CustomerApproverId { get; set; }
         public WorkFlowPriority Priority { get; set; }
         public ServicesRequestStatus ServicesRequestStatus { get; set; }

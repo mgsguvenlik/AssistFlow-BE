@@ -91,6 +91,14 @@ namespace Business.Services.Qnb
                         .ToDictionary(x => x.Key, x => x.First().Customer!);
                 }
 
+                var selectedTypes = await _uow.Repository.GetQueryable<QnbServicesRequestServiceType>()
+                    .AsNoTracking()
+                    .Where(x => requestNos.Contains(x.QnbServicesRequest.RequestNo))
+                    .Select(x => new { x.QnbServicesRequest.RequestNo, x.ServiceTypeId, x.ServiceType.Name })
+                    .ToListAsync();
+                var typeNames = selectedTypes.GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => string.Join(", ", x.OrderBy(t => t.ServiceTypeId).Select(t => t.Name)));
+
                 var jobs = new List<QnbOvertimeJobDto>();
                 double totalOvertimeHours = 0;
 
@@ -131,7 +139,7 @@ namespace Business.Services.Qnb
                             job.CustomerName = customer.ContactName1 ?? customer.SubscriberCompany;
                             job.CustomerAddress = customer.SubscriberAddress;
                             job.CustomerCity = customer.City;
-                            job.ServiceTypeName = ts.ServiceType?.Name;
+                            job.ServiceTypeName = typeNames.GetValueOrDefault(ts.RequestNo) ?? ts.ServiceType?.Name;
                         }
 
                         jobs.Add(job);

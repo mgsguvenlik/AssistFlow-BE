@@ -1,4 +1,4 @@
-﻿namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage
+namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalServiceImage
 {
     public class YkbTechnicalServiceImageCreateDto
     {

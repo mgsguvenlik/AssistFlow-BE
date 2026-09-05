@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
@@ -9,6 +9,8 @@ namespace Model.Concrete.WorkFlows
     [Index(nameof(RequestNo), IsUnique = true)]
     public class ServicesRequest : AuditableWithUserEntity
     {
+        public ICollection<ServicesRequestServiceType> ServiceTypeRelations { get; set; } = new List<ServicesRequestServiceType>();
+
         public long Id { get; set; }
 
         [Required, MaxLength(100)]

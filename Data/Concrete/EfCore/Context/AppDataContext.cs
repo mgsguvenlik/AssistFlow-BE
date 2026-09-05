@@ -145,6 +145,42 @@ namespace Data.Concrete.EfCore.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<QnbServicesRequestServiceType>(entity =>
+            {
+                entity.HasKey(x => new { x.QnbServicesRequestId, x.ServiceTypeId });
+                entity.HasOne(x => x.QnbServicesRequest)
+                    .WithMany(x => x.ServiceTypeRelations)
+                    .HasForeignKey(x => x.QnbServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.ServiceType).WithMany()
+                    .HasForeignKey(x => x.ServiceTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<YkbServicesRequestServiceType>(entity =>
+            {
+                entity.HasKey(x => new { x.YkbServicesRequestId, x.ServiceTypeId });
+                entity.HasOne(x => x.YkbServicesRequest)
+                    .WithMany(x => x.ServiceTypeRelations)
+                    .HasForeignKey(x => x.YkbServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.ServiceType).WithMany()
+                    .HasForeignKey(x => x.ServiceTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ServicesRequestServiceType>(entity =>
+            {
+                entity.HasKey(x => new { x.ServicesRequestId, x.ServiceTypeId });
+                entity.HasOne(x => x.ServicesRequest)
+                    .WithMany(x => x.ServiceTypeRelations)
+                    .HasForeignKey(x => x.ServicesRequestId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(x => x.ServiceType).WithMany()
+                    .HasForeignKey(x => x.ServiceTypeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
             #region YKB
 
             modelBuilder.Entity<YkbServicesRequestProduct>()

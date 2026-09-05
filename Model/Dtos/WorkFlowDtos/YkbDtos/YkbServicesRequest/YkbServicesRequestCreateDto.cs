@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
 
@@ -24,6 +24,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequest
 
         public long CustomerId { get; set; }
         public long ServiceTypeId { get; set; }
+        public List<long>? ServiceTypeIds { get; set; }
 
         public long? CustomerApproverId { get; set; }
 

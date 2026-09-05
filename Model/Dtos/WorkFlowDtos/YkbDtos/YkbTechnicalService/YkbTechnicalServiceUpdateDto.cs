@@ -1,4 +1,4 @@
-﻿namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService
+namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbTechnicalService
 {
     public class YkbTechnicalServiceUpdateDto : YkbTechnicalServiceCreateDto
     {

@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -8,6 +8,8 @@ namespace Model.Concrete.Ykb
     [Table("YkbServicesRequest", Schema = "ykb")]
     public class YkbServicesRequest : AuditableWithUserEntity
     {
+        public ICollection<YkbServicesRequestServiceType> ServiceTypeRelations { get; set; } = new List<YkbServicesRequestServiceType>();
+
         public long Id { get; set; }
 
         [Required, MaxLength(100)]

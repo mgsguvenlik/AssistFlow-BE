@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -34,7 +34,14 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         public string? CustomerName { get; set; }
 
         public long ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
         public string? WorkFlowStepName { get; set; }
         public DateTimeOffset CreatedDate { get; set; }
         public DateTimeOffset? UpdatedDate { get; set; }

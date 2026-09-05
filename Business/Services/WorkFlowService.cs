@@ -90,6 +90,11 @@ namespace Business.Services
         {
             try
             {
+                var (serviceTypeIds, serviceTypeError) = await ValidateServiceTypeIdsAsync(dto.ServiceTypeIds, dto.ServiceTypeId);
+                if (serviceTypeError is not null)
+                    return ResponseModel<ServicesRequestGetDto>.Fail(serviceTypeError, StatusCode.BadRequest);
+                dto.ServiceTypeId = serviceTypeIds[0];
+
                 #region Validasyon/Kontroller
                 // Başlangıç WorkFlowStep'i Bul
                 var initialStep = await _uow.Repository.GetQueryable<WorkFlowStep>()
@@ -152,6 +157,8 @@ namespace Business.Services
                     })
                     .ToList();
 
+                request.ServiceTypeRelations = serviceTypeIds
+                    .Select(id => new ServicesRequestServiceType { ServiceTypeId = id }).ToList();
                 await _uow.Repository.AddAsync(request);
                 #endregion
 
@@ -1068,7 +1075,7 @@ namespace Business.Services
                 technicalService.ServicesStatus = TechnicalServiceStatus.Completed;
                 technicalService.ProblemDescription = dto.ProblemDescription;
                 technicalService.ResolutionAndActions = dto.ResolutionAndActions;
-                technicalService.ServiceTypeId = dto.ServiceTypeId;
+                technicalService.ServiceTypeId = dto.ServiceTypeId ?? technicalService.ServiceTypeId;
                 technicalService.EndLocation = dto.Longitude + "," + dto.Latitude; ;
                 technicalService.ServicesCostStatus = dto.ServicesCostStatus;
                 technicalService.UpdatedDate = DateTime.Now;
@@ -1267,7 +1274,8 @@ namespace Business.Services
                 //if (dto.WorkOrderTypeIds is not null)
                 //{
                 //    var srEntity = await _uow.Repository.GetQueryable<ServicesRequest>()
-                //        .Include(x => x.ServicesRequestWorkOrderTypes)
+                //        .Include(x => x.ServiceTypeRelations).ThenInclude(x => x.ServiceType)
+                //.Include(x => x.ServicesRequestWorkOrderTypes)
                 //        .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
 
                 //    if (srEntity is not null)
@@ -2036,6 +2044,7 @@ namespace Business.Services
         // -------------------- Services Request --------------------
         private static Func<IQueryable<ServicesRequest>, IIncludableQueryable<ServicesRequest, object>>? RequestIncludes()
            => q => q
+                .Include(x => x.ServiceTypeRelations).ThenInclude(x => x.ServiceType)
                .Include(x => x.Customer)
                    .ThenInclude(x => x.CustomerProductPrices)
                .Include(x => x.Customer)
@@ -2044,7 +2053,8 @@ namespace Business.Services
                .Include(x => x.ServiceType)
                .Include(x => x.CustomerApprover)
                .Include(x => x.WorkFlowStep)
-               .Include(x => x.ServicesRequestWorkOrderTypes)
+               .Include(x => x.ServiceTypeRelations).ThenInclude(x => x.ServiceType)
+                .Include(x => x.ServicesRequestWorkOrderTypes)
             .ThenInclude(x => x.WorkOrderType);
 
         public async Task<ResponseModel<PagedResult<ServicesRequestGetDto>>> GetRequestsAsync(QueryParams q)
@@ -2184,6 +2194,7 @@ namespace Business.Services
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                    ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
@@ -2264,6 +2275,7 @@ namespace Business.Services
             baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
                 .Select(x => x.Id)
                 .ToList();
+            baseDto.ServiceTypes = await GetServiceTypesAsync(baseDto.RequestNo);
 
 
             // 2) Ürünler (tek bağımsız sorgu — sadece ihtiyaç alanlarını seç)
@@ -2404,6 +2416,7 @@ namespace Business.Services
                     CustomerName = sr.Customer != null ? sr.Customer.SubscriberCompany : null,
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                    ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                     WorkFlowStepName = sr.WorkFlowStep != null ? sr.WorkFlowStep.Name : null,
                     CreatedDate = sr.CreatedDate,
                     UpdatedDate = sr.UpdatedDate,
@@ -2484,6 +2497,7 @@ namespace Business.Services
             baseDto.WorkOrderTypeIds = baseDto.WorkOrderTypes
                 .Select(x => x.Id)
                 .ToList();
+            baseDto.ServiceTypes = await GetServiceTypesAsync(baseDto.RequestNo);
             // NEW: CustomerGroup + ProgressApprovers (tek ek sorgu)
             if (baseDto.Customer?.CustomerGroupId is long cgId)
             {
@@ -2626,6 +2640,18 @@ namespace Business.Services
             if (entity is null)
                 return ResponseModel<ServicesRequestGetDto>.Fail("Kayıt bulunamadı.", StatusCode.NotFound);
 
+            await _ctx.Entry(entity).Collection(x => x.ServiceTypeRelations).LoadAsync();
+            var existingServiceTypeIds = entity.ServiceTypeRelations.Select(x => x.ServiceTypeId).ToList();
+            if (existingServiceTypeIds.Count == 0 && entity.ServiceTypeId > 0)
+                existingServiceTypeIds.Add((long)entity.ServiceTypeId);
+            var (updatedServiceTypeIds, serviceTypeError) = await ValidateServiceTypeIdsAsync(
+                dto.ServiceTypeIds,
+                dto.ServiceTypeId > 0 ? dto.ServiceTypeId : entity.ServiceTypeId,
+                existingServiceTypeIds);
+            if (serviceTypeError is not null)
+                return ResponseModel<ServicesRequestGetDto>.Fail(serviceTypeError, StatusCode.BadRequest);
+            dto.ServiceTypeId = updatedServiceTypeIds.FirstOrDefault();
+
             var wf = await _uow.Repository
             .GetQueryable<WorkFlow>()
             .AsNoTracking()
@@ -2668,6 +2694,7 @@ namespace Business.Services
             }
 
             dto.Adapt(entity, _config);
+            SyncServiceTypes(entity, updatedServiceTypeIds);
 
             entity.ServicesRequestStatus = ServicesRequestStatus.Draft;
 
@@ -3144,6 +3171,7 @@ namespace Business.Services
                               CustomerId = sr.CustomerId,
                               CustomerName = sr.Customer.ContactName1,
                               ServiceTypeId = sr.ServiceTypeId,
+                              ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                               CreatedDate = sr.CreatedDate,
                               UpdatedDate = sr.UpdatedDate,
                               CreatedUser = sr.CreatedUser,
@@ -3358,6 +3386,7 @@ namespace Business.Services
                               CustomerId = sr.CustomerId,
                               CustomerName = sr.Customer.ContactName1,
                               ServiceTypeId = sr.ServiceTypeId,
+                              ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                               CreatedDate = sr.CreatedDate,
                               UpdatedDate = sr.UpdatedDate,
                               CreatedUser = sr.CreatedUser,
@@ -3556,6 +3585,7 @@ namespace Business.Services
             dto.WorkOrderTypeIds = dto.WorkOrderTypes
                 .Select(x => x.Id)
                 .ToList();
+            dto.ServiceTypes = await GetServiceTypesAsync(dto.RequestNo);
 
             // --- Customer: ServicesRequest üzerinden tek sorguda projeksiyon ---
             dto.Customer = await _uow.Repository
@@ -4806,7 +4836,7 @@ namespace Business.Services
             {
                 qJoined = qJoined.Where(x =>
                     x.sr != null &&
-                    x.sr.ServiceTypeId == q.ServiceTypeId.Value);
+                    x.sr.ServiceTypeRelations.Any(st => st.ServiceTypeId == q.ServiceTypeId.Value));
             }
 
             if (q.ServiceTypeIds is { Count: > 0 })
@@ -5144,7 +5174,7 @@ namespace Business.Services
                             x.wf.ApproverTechnicianId == longValue ||
                             (x.sr != null && x.sr.Id == longValue) ||
                             (x.sr != null && x.sr.CustomerId == longValue) ||
-                            (x.sr != null && x.sr.ServiceTypeId == longValue) ||
+                            (x.sr != null && x.sr.ServiceTypeRelations.Any(st => st.ServiceTypeId == longValue)) ||
                             (x.customer != null && x.customer.Id == longValue) ||
                             (x.serviceType != null && x.serviceType.Id == longValue) ||
                             (x.customerGroup != null && x.customerGroup.Id == longValue)
@@ -5441,6 +5471,7 @@ namespace Business.Services
                 .Include(x => x.Customer)
                     .ThenInclude(c => c.CustomerGroup)
                         .ThenInclude(g => g.ProgressApprovers)
+                .Include(x => x.ServiceTypeRelations).ThenInclude(x => x.ServiceType)
                 .Include(x => x.ServicesRequestWorkOrderTypes)
                     .ThenInclude(x => x.WorkOrderType)
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo);
@@ -5460,6 +5491,7 @@ namespace Business.Services
                     CustomerApproverId = sr.CustomerApproverId,
                     ServiceTypeId = sr.ServiceTypeId,
                     ServiceTypeName = sr.ServiceType?.Name,
+                    ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                     Priority = sr.Priority.ToString(),
                     ServicesRequestStatus = sr.ServicesRequestStatus.ToString(),
                     WorkOrderTypes = sr.ServicesRequestWorkOrderTypes
@@ -5567,6 +5599,7 @@ namespace Business.Services
                     Id = ts.Id,
                     ServiceTypeId = ts.ServiceTypeId,
                     ServiceTypeName = ts.ServiceType?.Name,
+                    ServiceTypes = await GetServiceTypesAsync(requestNo),
                     StartTime = ts.StartTime,
                     EndTime = ts.EndTime,
                     ProblemDescription = ts.ProblemDescription,
@@ -5712,7 +5745,7 @@ namespace Business.Services
 
                 // 4) SP çağrısı (tipli DTO ile)
                 var rows = await conn.QueryAsync<ReportRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch",
+                    "dbo.usp_ReportSearch_MultiServiceTypes",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,
@@ -5748,6 +5781,17 @@ namespace Business.Services
                         HasImages = q.HasImages ?? false // SP’de döndürürsen r.HasImages
                     });
                 }
+
+                var reportRequestNos = list.Select(x => x.RequestNo).Distinct().ToList();
+                var reportTypes = await _ctx.Set<ServicesRequestServiceType>().AsNoTracking()
+                    .Where(x => reportRequestNos.Contains(x.ServicesRequest.RequestNo))
+                    .Select(x => new { x.ServicesRequest.RequestNo, Type = new Model.Dtos.ServiceType.ServiceTypeGetDto
+                    { Id = x.ServiceTypeId, Name = x.ServiceType.Name, ContractNumber = x.ServiceType.ContractNumber } })
+                    .ToListAsync();
+                var typesByRequest = reportTypes.GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => x.Select(t => t.Type).OrderBy(t => t.Id).ToList());
+                foreach (var item in list)
+                    item.ServiceTypes = typesByRequest.GetValueOrDefault(item.RequestNo) ?? new();
 
                 return new PagedResult<WorkFlowReportListItemDto>(list, total, q.Page, q.PageSize);
             }
@@ -5814,7 +5858,7 @@ namespace Business.Services
 
                 // Çağrı: yeni SP adı
                 var rows = await conn.QueryAsync<ReportLineRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch_Lines",
+                    "dbo.usp_ReportSearch_Lines_MultiServiceTypes",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,
@@ -5933,7 +5977,7 @@ namespace Business.Services
 
                 // SP çağrısı
                 var rows = await conn.QueryAsync<ReportLineRowDto>(new CommandDefinition(
-                    "dbo.usp_ReportSearch_Lines",
+                    "dbo.usp_ReportSearch_Lines_MultiServiceTypes",
                     p,
                     transaction: efTx,
                     commandType: CommandType.StoredProcedure,
@@ -6218,7 +6262,7 @@ namespace Business.Services
                     wfQuery = wfQuery.Where(w =>
                         srQuery.Any(sr =>
                             sr.RequestNo == w.RequestNo &&
-                            sr.ServiceTypeId == q.ServiceTypeId.Value));
+                            sr.ServiceTypeRelations.Any(st => st.ServiceTypeId == q.ServiceTypeId.Value)));
                 }
 
                 if (q.ServicesCostStatus.HasValue)
@@ -6480,6 +6524,7 @@ namespace Business.Services
                         CustomerDistrict = sr.Customer != null ? sr.Customer.District : null,
                         sr.ServiceTypeId,
                         ServiceTypeName = sr.ServiceType != null ? sr.ServiceType.Name : null,
+                    ServiceTypes = sr.ServiceTypeRelations.OrderBy(st => st.ServiceTypeId).Select(st => new Model.Dtos.ServiceType.ServiceTypeGetDto { Id = st.ServiceTypeId, Name = st.ServiceType.Name, ContractNumber = st.ServiceType.ContractNumber }).ToList(),
                         sr.ServicesDate,
                         sr.PlannedCompletionDate,
                         sr.Description,
@@ -6708,6 +6753,7 @@ namespace Business.Services
 
                         ServiceTypeId = sr?.ServiceTypeId,
                         ServiceTypeName = sr?.ServiceTypeName,
+                        ServiceTypes = sr?.ServiceTypes ?? new(),
 
                         ServicesDate = sr?.ServicesDate,
                         PlannedCompletionDate = sr?.PlannedCompletionDate,
@@ -7008,7 +7054,7 @@ namespace Business.Services
             ws.Cell(row, c++).Value = x.CustomerCity ?? string.Empty;
             ws.Cell(row, c++).Value = x.CustomerDistrict ?? string.Empty;
 
-            SetNullableLong(ws.Cell(row, c++), x.ServiceTypeId);
+            ws.Cell(row, c++).Value = string.Join(", ", x.ServiceTypeIds);
             ws.Cell(row, c++).Value = x.ServiceTypeName ?? string.Empty;
 
             ws.Cell(row, c++).Value = FormatWorkOrderTypes(x.WorkOrderTypes);
@@ -7745,6 +7791,48 @@ namespace Business.Services
                 Snapshot = snapshot
             };
         }
+
+
+        private async Task<(List<long> Ids, string? Error)> ValidateServiceTypeIdsAsync(
+            IEnumerable<long>? rawIds, long? legacyId, IReadOnlyCollection<long>? existingIds = null)
+        {
+            var ids = rawIds?.Distinct().ToList()
+                ?? existingIds?.Distinct().ToList()
+                ?? (legacyId > 0 ? new List<long> { legacyId.Value } : new List<long>());
+            // Historical requests without a type may be saved unchanged by an old client.
+            if (ids.Count == 0 && rawIds is null && existingIds is { Count: 0 })
+                return (ids, null);
+            if (ids.Count == 0 || ids.Any(id => id <= 0))
+                return (ids, "En az bir geçerli servis türü seçmelisiniz.");
+            var retainedIds = existingIds ?? Array.Empty<long>();
+            var validIds = await _ctx.ServiceTypes.AsNoTracking()
+                .Where(st => ids.Contains(st.Id) && (!st.IsDeleted || retainedIds.Contains(st.Id)))
+                .Select(st => st.Id).ToListAsync();
+            return ids.Except(validIds).Any()
+                ? (ids, "Geçersiz veya silinmiş servis türü seçildi.")
+                : (ids.OrderBy(id => id).ToList(), null);
+        }
+
+        private void SyncServiceTypes(ServicesRequest request, IReadOnlyCollection<long> ids)
+        {
+            foreach (var relation in request.ServiceTypeRelations.Where(x => !ids.Contains(x.ServiceTypeId)).ToList())
+            {
+                _ctx.Remove(relation);
+                request.ServiceTypeRelations.Remove(relation);
+            }
+            foreach (var id in ids.Except(request.ServiceTypeRelations.Select(x => x.ServiceTypeId)).ToList())
+                request.ServiceTypeRelations.Add(new ServicesRequestServiceType { ServiceTypeId = id });
+        }
+
+        private Task<List<Model.Dtos.ServiceType.ServiceTypeGetDto>> GetServiceTypesAsync(string requestNo)
+            => _ctx.Set<ServicesRequestServiceType>().AsNoTracking()
+                .Where(x => x.ServicesRequest.RequestNo == requestNo)
+                .OrderBy(x => x.ServiceTypeId)
+                .Select(x => new Model.Dtos.ServiceType.ServiceTypeGetDto
+                {
+                    Id = x.ServiceTypeId, Name = x.ServiceType.Name,
+                    ContractNumber = x.ServiceType.ContractNumber
+                }).ToListAsync();
 
         private async Task<(List<long> Ids, string? Error)> ValidateWorkOrderTypeIdsAsync(IEnumerable<long>? rawIds)
         {

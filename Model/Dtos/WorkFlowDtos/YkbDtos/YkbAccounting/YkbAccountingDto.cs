@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -39,6 +39,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
         public List<YkbAccountingProductDto> Products { get; set; } = new();
 
         public YkbAccountingServiceTypeDto? ServiceType { get; set; }
+        public List<YkbAccountingServiceTypeDto> ServiceTypes { get; set; } = new();
         public List<YkbAccountingWorkOrderTypeDto> YkbServicesRequestWorkOrderTypes { get; set; } = new();
     }
 

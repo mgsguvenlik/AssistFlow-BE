@@ -23,6 +23,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
 
         public long CustomerId { get; set; }
         public long ServiceTypeId { get; set; }
+        public List<long>? ServiceTypeIds { get; set; }
 
         public long? CustomerApproverId { get; set; }
 

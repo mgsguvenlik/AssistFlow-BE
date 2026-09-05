@@ -9,6 +9,8 @@ namespace Model.Concrete.Qnb
     [Table("QnbServicesRequest", Schema = "qnb")]
     public class QnbServicesRequest : AuditableWithUserEntity
     {
+        public ICollection<QnbServicesRequestServiceType> ServiceTypeRelations { get; set; } = new List<QnbServicesRequestServiceType>();
+
         public long Id { get; set; }
 
         [Required, MaxLength(100)]

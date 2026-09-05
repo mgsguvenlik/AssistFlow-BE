@@ -21,7 +21,14 @@ namespace Model.Dtos.WorkFlowDtos.Report
         // Servis
         public DateTimeOffset ServicesDate { get; set; }
         public long ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
 
         // Teknisyen
         public long? TechnicianId { get; set; }

@@ -1,4 +1,4 @@
-﻿using Model.Dtos.WorkFlowDtos.Report;
+using Model.Dtos.WorkFlowDtos.Report;
 
 namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 {
@@ -102,7 +102,14 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public long? WorkFlowStepId { get; set; }
         public long? CustomerApproverId { get; set; }
         public long? ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
         public string Priority { get; set; } = "Normal";
         public string ServicesRequestStatus { get; set; } = string.Empty;
         public List<WorkOrderTypeLiteDto> WorkOrderTypes { get; set; } = new();
@@ -112,7 +119,14 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
     {
         public long Id { get; set; }
         public long? ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }
         public string? ProblemDescription { get; set; }

@@ -15,7 +15,14 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalService
         public string ServiceTitle { get; set; } = string.Empty;
         public string ServiceDescription { get; set; } = string.Empty;
         public long? ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
 
         public DateTimeOffset? StartTime { get; set; }
         public DateTimeOffset? EndTime { get; set; }

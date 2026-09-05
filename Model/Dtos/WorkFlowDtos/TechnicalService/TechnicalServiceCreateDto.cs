@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.WorkFlowDtos.TechnicalService

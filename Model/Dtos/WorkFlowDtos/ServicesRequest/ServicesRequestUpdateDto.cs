@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Model.Concrete.WorkFlows;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using System.ComponentModel.DataAnnotations;
@@ -43,6 +43,7 @@ namespace Model.Dtos.WorkFlowDtos.ServicesRequest
         /// <summary>Zorunlu ilişkiler</summary>
         [Required] public long CustomerId { get; set; }
         [Required] public long ServiceTypeId { get; set; }
+        public List<long>? ServiceTypeIds { get; set; }
         public List<ServicesRequestProductUpdateDto>? Products { get; set; }
 
         public WorkFlowPriority Priority { get; set; } = WorkFlowPriority.Normal;

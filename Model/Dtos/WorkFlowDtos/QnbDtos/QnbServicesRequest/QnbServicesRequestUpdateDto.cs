@@ -17,6 +17,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
         public long? WorkFlowStepId { get; set; }
         public long CustomerId { get; set; }
         public long ServiceTypeId { get; set; }
+        public List<long>? ServiceTypeIds { get; set; }
         public long? CustomerApproverId { get; set; }
         public WorkFlowPriority Priority { get; set; }
         public ServicesRequestStatus ServicesRequestStatus { get; set; }
@@ -31,7 +32,7 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequest
         public long? ApproverTechnicianId { get; set; }
         public string? ApproverTechnician { get; set; }
         public List<QnbServicesRequestProductUpdateDto>? Products { get; set; }
-        public long StatuId { get; set; } // Akýþ taleplerin id si. Ekranda seçilecek.
+        public long StatuId { get; set; } // AkÄ±ÅŸ taleplerin id si. Ekranda seÃ§ilecek.
 
         public List<long>? WorkOrderTypeIds { get; set; }
     }

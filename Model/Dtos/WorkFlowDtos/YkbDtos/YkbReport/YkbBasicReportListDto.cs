@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Core.Enums.Ykb;
 using Model.Dtos.WorkFlowDtos.Report;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbServicesRequestProduct;
@@ -80,7 +80,14 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
         public string? CustomerDistrict { get; set; }
 
         public long? ServiceTypeId { get; set; }
-        public string? ServiceTypeName { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
+        private string? serviceTypeName;
+        public string? ServiceTypeName
+        {
+            get => ServiceTypes.Count > 0 ? string.Join(", ", ServiceTypes.Select(x => x.Name)) : serviceTypeName;
+            set => serviceTypeName = value;
+        }
 
         public YkbCustomerFormStatus? CustomerFormStatus { get; set; }
         public DateTime? CustomerFormServicesDate { get; set; }

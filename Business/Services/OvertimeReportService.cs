@@ -91,6 +91,14 @@ namespace Business.Services
                         .ToDictionary(x => x.Key, x => x.First().Customer!);
                 }
 
+                var selectedTypes = await _uow.Repository.GetQueryable<ServicesRequestServiceType>()
+                    .AsNoTracking()
+                    .Where(x => requestNos.Contains(x.ServicesRequest.RequestNo))
+                    .Select(x => new { x.ServicesRequest.RequestNo, x.ServiceTypeId, x.ServiceType.Name })
+                    .ToListAsync();
+                var typeNames = selectedTypes.GroupBy(x => x.RequestNo)
+                    .ToDictionary(x => x.Key, x => string.Join(", ", x.OrderBy(t => t.ServiceTypeId).Select(t => t.Name)));
+
                 var jobs = new List<OvertimeJobDto>();
                 double totalOvertimeHours = 0;
 
@@ -132,7 +140,7 @@ namespace Business.Services
                             job.CustomerName = customer.ContactName1 ?? customer.SubscriberCompany;
                             job.CustomerAddress = customer.SubscriberAddress;
                             job.CustomerCity = customer.City;
-                            job.ServiceTypeName = ts.ServiceType?.Name;
+                            job.ServiceTypeName = typeNames.GetValueOrDefault(ts.RequestNo) ?? ts.ServiceType?.Name;
                         }
 
                         jobs.Add(job);

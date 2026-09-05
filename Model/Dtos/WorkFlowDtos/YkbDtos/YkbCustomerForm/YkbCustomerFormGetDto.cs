@@ -1,4 +1,4 @@
-﻿using Core.Enums;
+using Core.Enums;
 using Core.Enums.Ykb;
 using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
@@ -35,6 +35,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbCustomerForm
         public bool IsDeleted { get; set; }
 
         public long? ServiceTypeId { get; set; }
+        public List<global::Model.Dtos.ServiceType.ServiceTypeGetDto> ServiceTypes { get; set; } = new();
+        public List<long> ServiceTypeIds => ServiceTypes.Select(x => x.Id).ToList();
         public ServicesCostStatus ServicesCostStatus { get; set; }
 
         public List<YkbServicesRequestProductGetDto> ServicesRequestProducts { get; set; } = new();
