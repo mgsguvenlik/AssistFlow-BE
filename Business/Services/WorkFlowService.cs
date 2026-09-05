@@ -3982,6 +3982,44 @@ namespace Business.Services
                 .ProjectToType<WorkFlowReviewLogDto>(_config)
                 .ToListAsync();
 
+            var technicalService = await _uow.Repository
+                .GetQueryable<TechnicalService>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.RequestNo == dto.RequestNo);
+
+            if (technicalService != null)
+            {
+                dto.ServicesImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceImageGetDto { Id = x.Id, Url = x.Url, Caption = x.Caption })
+                    .ToListAsync();
+                dto.ServiceRequestFormImages = await _uow.Repository
+                    .GetQueryable<TechnicalServiceFormImage>()
+                    .AsNoTracking()
+                    .Where(x => x.TechnicalServiceId == technicalService.Id)
+                    .Select(x => new TechnicalServiceFormImageGetDto { Id = x.Id, Url = x.Url, Caption = x.Caption })
+                    .ToListAsync();
+
+                var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
+                var baseUrl = appSettings?.Value.FileUrl?.TrimEnd('/') ?? "";
+                string? NormalizeImageUrl(string? urlOrFileName)
+                {
+                    if (string.IsNullOrWhiteSpace(urlOrFileName)) return urlOrFileName;
+                    if (urlOrFileName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                        urlOrFileName.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return urlOrFileName;
+                    if (urlOrFileName.StartsWith("/")) return string.IsNullOrEmpty(baseUrl) ? urlOrFileName : $"{baseUrl}{urlOrFileName}";
+                    var relative = $"/uploads/{urlOrFileName}";
+                    return string.IsNullOrEmpty(baseUrl) ? relative : $"{baseUrl}{relative}";
+                }
+
+                foreach (var image in dto.ServicesImages)
+                    image.Url = NormalizeImageUrl(image.Url);
+                foreach (var image in dto.ServiceRequestFormImages)
+                    image.Url = NormalizeImageUrl(image.Url);
+            }
+
             dto.Attachments = await GetWorkflowAttachmentsAsync(dto.RequestNo);
             dto.CanEditAttachments = true;
             return ResponseModel<PricingGetDto>.Success(dto);

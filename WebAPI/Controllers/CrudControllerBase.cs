@@ -4,6 +4,7 @@ using Core.Utilities.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -27,6 +28,7 @@ namespace WebAPI.Controllers
 
         /// <summary>GET /api/[controller]  -> Paged list</summary>
         [HttpGet]
+        [MenuAuthorize(MenuPermission.View)]
         public virtual async Task<Microsoft.AspNetCore.Mvc.IActionResult> GetPaged([FromQuery] QueryParams q)
         {
             var resp = await _service.GetPagedAsync(q);
@@ -35,6 +37,7 @@ namespace WebAPI.Controllers
 
         /// <summary>GET /api/[controller]/{id} -> By Id</summary>
         [HttpGet("{id}")]
+        [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(404)]
         public virtual async Task<IActionResult> GetById([FromRoute] TKey id)
         {
@@ -44,6 +47,7 @@ namespace WebAPI.Controllers
 
         /// <summary>POST /api/[controller] -> Create</summary>
         [HttpPost]
+        [MenuAuthorize(MenuPermission.Edit)]
         [ProducesResponseType(400)]
         public virtual async Task<IActionResult> Create([FromBody] TCreateDto dto)
         {
@@ -60,6 +64,7 @@ namespace WebAPI.Controllers
 
         /// <summary>PUT /api/[controller]/{id} -> Update</summary>
         [HttpPost("update")]
+        [MenuAuthorize(MenuPermission.Edit)]
         [ProducesResponseType(400)]
         [ProducesResponseType(404)]
         public virtual async Task<IActionResult> Update([FromBody] TUpdateDto dto)
@@ -70,6 +75,7 @@ namespace WebAPI.Controllers
 
         /// <summary>DELETE /api/[controller]/{id} -> Delete</summary>
         [HttpPost("{id}")]
+        [MenuAuthorize(MenuPermission.Edit)]
         [ProducesResponseType(204)]
         [ProducesResponseType(404)]
         public virtual async Task<IActionResult> Delete([FromRoute] TKey id)

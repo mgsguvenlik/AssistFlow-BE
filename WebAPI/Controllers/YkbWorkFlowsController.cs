@@ -19,6 +19,7 @@ using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWarehouse;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlowStep;
 using System.Net;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -36,12 +37,14 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("generate-request-no")]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.View)]
         public async Task<IActionResult> GetFlowRequestNo(string prfeix = "YKB")
         {
             var result = await _workFlowService.GetRequestNoAsync(prfeix);
             return Ok(result);
         }
         [HttpPost("create-customer-form")]
+        [MenuAuthorize("YkbCustomerServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> CreateCustomerForm([FromBody] YkbCustomerFormCreateDto dto)
         {
             var result = await _workFlowService.CreateCustomerForm(dto);
@@ -49,6 +52,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-warehouse")]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendWarehouse([FromBody] YkbSendWarehouseDto dto)
         {
             var result = await _workFlowService.SendWarehouseAsync(dto);
@@ -56,12 +60,14 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("get-warehouse-byid")]
+        [MenuAuthorize("YkbServiceRequestWarehouse", MenuPermission.View)]
         public async Task<IActionResult> GetWarehouseById([FromBody] long id)
         {
             var result = await _workFlowService.GetWarehouseByIdAsync(id);
             return Ok(result);
         }
         [HttpGet("get-warehouse-byrequestno")]
+        [MenuAuthorize("YkbServiceRequestWarehouse", MenuPermission.View)]
         public async Task<IActionResult> GetWarehouseByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetWarehouseByRequestNoAsync(requestNo);
@@ -69,6 +75,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("complete-delivery")]
+        [MenuAuthorize("YkbServiceRequestWarehouse", MenuPermission.Edit)]
         public async Task<IActionResult> CompleteDelivery([FromBody] YkbCompleteDeliveryDto dto)
         {
             if (dto == null)
@@ -82,6 +89,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-list")]
+        [MenuAuthorize("YkbServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetWorkFlowList([FromQuery] YkbWorkFlowQueryParams p)
         {
             var result = await _workFlowService.GetWorkFlowsAsync(p);
@@ -89,6 +97,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("active-customer-requests")]
+        [MenuAuthorize(new[] { "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate" }, MenuPermission.View)]
         public async Task<IActionResult> GetActiveCustomerRequests([FromQuery] long customerId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             var result = await _workFlowService.GetActiveCustomerRequestsAsync(customerId, page, pageSize);
@@ -96,6 +105,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-workflow/{id:long}")]
+        [MenuAuthorize(new[] { "YkbServiceRequestList", "YkbBasicWorkflowReportsList", "YkbAssignedServiceRequestDeleteUpdate" }, MenuPermission.Edit)]
         public virtual async Task<IActionResult> DeleteWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.DeleteWorkFlowAsync(id);
@@ -103,6 +113,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("cancel-workflow/{id:long}")]
+        [MenuAuthorize(new[] { "YkbServiceRequestList", "YkbAssignedServiceRequestDeleteUpdate" }, MenuPermission.Edit)]
         public async Task<IActionResult> CancelWorkFlow([FromRoute] long id)
         {
             var result = await _workFlowService.CancelWorkFlowAsync(id);
@@ -110,6 +121,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-servicesrequest-byid/{id:long}")]
+        [MenuAuthorize("YkbServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequesById([FromRoute] long id)
         {
             var result = await _workFlowService.GetServiceRequestByIdAsync(id);
@@ -117,6 +129,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-servicesrequest-list")]
+        [MenuAuthorize("YkbServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestList([FromQuery] QueryParams p)
         {
             var result = await _workFlowService.GetRequestsAsync(p);
@@ -125,12 +138,14 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-servicesrequest-byrequestno")]
+        [MenuAuthorize(new[] { "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement" }, MenuPermission.View)]
         public async Task<IActionResult> GetServicesRequestByNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetServiceRequestByRequestNoAsync(requestNo);
             return Ok(result);
         }
         [HttpGet("get-customerform-byrequestno")]
+        [MenuAuthorize("YkbCustomerServiceRequestCreate", MenuPermission.View)]
         public async Task<IActionResult> GetCustomerFormByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetCustomerFormByRequestNoAsync(requestNo);
@@ -138,6 +153,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("update-services-request/{id:long}")]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> UpdateServicesRequest([FromRoute] long id, [FromBody] YkbServicesRequestUpdateDto dto)
         {
             if (dto.Id != id)
@@ -148,6 +164,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-technicalservice-by-requestno")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.View)]
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
@@ -155,6 +172,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-technical-service")]
+        [MenuAuthorize("YkbServiceRequestCreate", MenuPermission.Edit)]
         public async Task<IActionResult> SendTechnicalServiceAsync([FromBody] YkbSendTechnicalServiceDto dto)
         {
             var result = await _workFlowService.SendTechnicalServiceAsync(dto);
@@ -163,6 +181,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("start-technical-service")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> StartTechnicalServiceAsync([FromBody] YkbStartTechnicalServiceDto dto)
         {
             var result = await _workFlowService.StartService(dto);
@@ -170,6 +189,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("finish-technical-service")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(200_000_000)] // 200 MB örnek
         [RequestFormLimits(MultipartBodyLengthLimit = 200_000_000, ValueCountLimit = 2048)]
@@ -181,6 +201,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("delete-technical-service/image/{id}")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteTechnicalServiceImage(long id, TechnicalServiceImageType type, CancellationToken cancellationToken)
         {
             var result = await _workFlowService.DeleteTechnicalServiceImageAsync(id, type, cancellationToken);
@@ -188,6 +209,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("approve-pricing")]
+        [MenuAuthorize("YkbServiceRequestPricing", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(275_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000)]
@@ -198,6 +220,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-pricing-by-requestno")]
+        [MenuAuthorize("YkbServiceRequestPricing", MenuPermission.View)]
         public async Task<IActionResult> GetPricingByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetPricingByRequestNoAsync(requestNo);
@@ -205,6 +228,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("final-approve")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         [RequestSizeLimit(275_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 275_000_000)]
@@ -216,6 +240,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("customer-agreement")]
+        [MenuAuthorize("YkbServiceRequestCustomerAgreement", MenuPermission.Edit)]
         public async Task<IActionResult> CustomerAgreementAsync([FromBody] YkbCustomerAgreementDto dto)
         {
             var result = await _workFlowService.CustomerAgreementAsync(dto);
@@ -226,6 +251,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-finalapproval-by-requestno")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.View)]
         public async Task<IActionResult> GetFinalApprovalByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetFinalApprovalByRequestNoAsync(requestNo);
@@ -235,6 +261,7 @@ namespace WebAPI.Controllers
 
 
         [HttpGet("get-customeragreement-by-requestno")]
+        [MenuAuthorize("YkbServiceRequestCustomerAgreement", MenuPermission.View)]
         public async Task<IActionResult> GetCustomerAgreementByRequestNoAsync([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetCustomerAgreementByRequestNoAsync(requestNo);
@@ -242,6 +269,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-finalapproval-by-id")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.View)]
         public async Task<IActionResult> GetFinalApprovalByIdAsync([FromQuery] long id)
         {
             var result = await _workFlowService.GetFinalApprovalByIdAsync(id);
@@ -249,6 +277,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("location-override")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> RequestLocationOverrideAsync([FromBody] YkbOverrideLocationCheckDto dto)
         {
             var result = await _workFlowService.RequestLocationOverrideAsync(dto);
@@ -257,6 +286,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("send-back-for-review")]
+        [MenuAuthorize(new[] { "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement" }, MenuPermission.Edit)]
         public async Task<IActionResult> SendBackForReviewAsync([FromQuery] string requestNo, [FromQuery] string reviewNotes)
         {
             var result = await _workFlowService.SendBackForReviewAsync(requestNo, reviewNotes);
@@ -264,6 +294,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("send-review-message")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
         public async Task<IActionResult> SendReviewMessage([FromBody] YkbCustomerReviewMessageDto dto)
         {
             var result = await _workFlowService.SendReviewMessage(dto);
@@ -271,6 +302,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("activity-records/{requestNo}")]
+        [MenuAuthorize("YkbServiceRequestList", MenuPermission.View)]
         public async Task<IActionResult> GetLatestActivityRecords([FromRoute] string requestNo)
         {
             var result = await _activationRecordService.GetLatestYkbActivityRecordByRequestNoAsync(requestNo);
@@ -281,6 +313,7 @@ namespace WebAPI.Controllers
         // ---------- WorkFlowStep CRUD ----------
         // GET: /api/workflows/steps
         [HttpGet("get-workflow-steps")]
+        [MenuAuthorize(new[] { "YkbFlowStatusList", "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement", "YkbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetSteps([FromQuery] QueryParams q)
         {
             var resp = await _workFlowService.GetStepsAsync(q);
@@ -288,6 +321,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("get-workflow-steps/{id:long}")]
+        [MenuAuthorize(new[] { "YkbFlowStatusList", "YkbCustomerServiceRequestCreate", "YkbServiceRequestCreate", "YkbServiceRequestList", "YkbServiceRequestWarehouse", "YkbServiceRequestTechnicalService", "YkbServiceRequestPricing", "YkbServiceRequestFinalApproval", "YkbServiceRequestCustomerAgreement", "YkbTechnicianDashboard" }, MenuPermission.View)]
         public async Task<IActionResult> GetStepsById([FromRoute] long id)
         {
             var resp = await _workFlowService.GetStepByIdAsync(id);
@@ -295,6 +329,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("create-steps")]
+        [MenuAuthorize("YkbFlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> CreateSteps([FromBody] YkbWorkFlowStepCreateDto dto)
         {
             var resp = await _workFlowService.CreateStepAsync(dto);
@@ -306,6 +341,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("update-steps/{id:long}")]
+        [MenuAuthorize("YkbFlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> UpdateSteps([FromRoute] long id, [FromBody] YkbWorkFlowStepUpdateDto dto)
         {
             if (dto.Id != id)
@@ -316,6 +352,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("delete-steps/{id:long}")]
+        [MenuAuthorize("YkbFlowStatusList", MenuPermission.Edit)]
         public async Task<IActionResult> DeleteSteps([FromRoute] long id)
         {
             var resp = await _workFlowService.DeleteStepAsync(id);
@@ -336,6 +373,7 @@ namespace WebAPI.Controllers
         /// &WorkFlowStatuses=Pending&WorkFlowStatuses=Complated&TechnicianId=12&ProductCode=ABC
         /// </remarks>
         [HttpGet("workflow-report")]
+        [MenuAuthorize("YkbServiceReportsList", MenuPermission.View)]
         [ProducesResponseType(typeof(PagedResult<YkbWorkFlowReportListItemDto>), (int)HttpStatusCode.OK)]
         public async Task<IActionResult> Get([FromQuery] YkbReportQueryParams q, CancellationToken ct)
         {
@@ -346,6 +384,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("report-lines/export")]
+        [MenuAuthorize("YkbServiceReportsList", MenuPermission.View)]
         public async Task<IActionResult> ExportReportLines([FromQuery] YkbReportQueryParams q)
         {
             var (content, fileName, contentType) = await _workFlowService.ExportReportLinesAsync(q);
@@ -353,6 +392,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("basic-report")]
+        [MenuAuthorize("YkbBasicWorkflowReportsList", MenuPermission.View)]
         public async Task<IActionResult> GetBasicReport([FromQuery] YkbBasicReportQueryParams q)
         {
             var result = await _workFlowService.GetYkbBasicWorkFlowReportAsync(q);
@@ -360,6 +400,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("basic-report/export")]
+        [MenuAuthorize("YkbBasicWorkflowReportsList", MenuPermission.View)]
         public async Task<IActionResult> ExportBasicReport([FromQuery] YkbBasicReportQueryParams q)
         {
             var (content, fileName, contentType) = await _workFlowService.ExportYkbBasicWorkFlowReportAsync(q);
@@ -392,6 +433,7 @@ namespace WebAPI.Controllers
         ///Manitou System Test Zone ilgili işlemler
 
         [HttpPost("start-working")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> StartWorking([FromBody] StartWorkingDto dto)
         {
             var result = await _workFlowService.StartWorking(dto);
@@ -399,6 +441,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("working-status")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.View)]
         public async Task<IActionResult> GetWorkingStatus([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetWorkingStatus(requestNo);
@@ -406,6 +449,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("extend-working")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> ExtendWorking([FromBody] ExtendWorkingDto dto)
         {
             var result = await _workFlowService.ExtendWorking(dto);
@@ -413,6 +457,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("finish-working")]
+        [MenuAuthorize("YkbServiceRequestTechnicalService", MenuPermission.Edit)]
         public async Task<IActionResult> FinishWorking([FromBody] FinishWorkingDto dto)
         {
             var result = await _workFlowService.FinishWorking(dto);
@@ -423,6 +468,7 @@ namespace WebAPI.Controllers
         // ----------- Muhasebe ile ilgili işlemler ------------
 
         [HttpGet("accounting-service-report")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.View)]
         public async Task<IActionResult> GetAccountingServiceReport(
             [FromQuery] YkbAccountingReportQueryParams q)
         {
@@ -434,6 +480,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("accounting-service-report/{requestNo}/toggle")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.Edit)]
         public async Task<IActionResult> ToggleAccountingProcess(
             [FromRoute] string requestNo)
         {
@@ -445,6 +492,7 @@ namespace WebAPI.Controllers
 
 
         [HttpPost("accounting/attachments")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.Edit)]
         [Consumes("multipart/form-data")]
         public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachments([FromForm] string requestNo, [FromForm] List<IFormFile> files, CancellationToken cancellationToken)
         {
@@ -456,6 +504,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("accounting/{requestNo}/attachments")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.View)]
         public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> GetAccountingAttachments(string requestNo, CancellationToken cancellationToken)
         {
             return await _workFlowService
@@ -465,6 +514,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpPost("accounting/{requestNo}/attachments/{attachmentId:long}/delete")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.Edit)]
         public async Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> DeleteAccountingAttachment(string requestNo, long attachmentId, CancellationToken cancellationToken)
         {
             return await _workFlowService.DeleteAccountingAttachmentAsync(

@@ -3,10 +3,12 @@ using Core.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.OvertimeReport;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("QnbOvertimeReport", MenuPermission.View)]
     [ApiController]
     [Route("api/[controller]")]
     public class QnbOvertimeReportController : ControllerBase
@@ -45,7 +47,7 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// Tüm teknisyenlerin QNB fazla mesai özetini getirir
+        /// TÃ¼m teknisyenlerin QNB fazla mesai Ã¶zetini getirir
         /// </summary>
         [HttpGet("summary")]
         [ProducesResponseType(typeof(ResponseModel<QnbAllTechniciansOvertimeSummaryDto>), StatusCodes.Status200OK)]
@@ -62,7 +64,7 @@ namespace WebAPI.Controllers
         }
 
         /// <summary>
-        /// QNB fazla mesai raporunu Excel formatýnda export eder
+        /// QNB fazla mesai raporunu Excel formatÄ±nda export eder
         /// </summary>
         [HttpGet("export")]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]

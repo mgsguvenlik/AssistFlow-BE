@@ -3,6 +3,7 @@ using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbAttachment;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbReviewLog;
 using Model.Dtos.WorkFlowDtos.QnbDtos.QnbServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.QnbDtos.QnbTechnicalServiceImage;
 
 namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbPricing
 {
@@ -26,6 +27,9 @@ namespace Model.Dtos.WorkFlowDtos.QnbDtos.QnbPricing
         public List<QnbServicesRequestProductGetDto> Products { get; set; } = new();
         public List<QnbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<QnbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
+        public List<QnbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
 
         public List<QnbWorkflowAttachmentGetDto> Attachments { get; set; } = new();
         public bool CanEditAttachments { get; set; }

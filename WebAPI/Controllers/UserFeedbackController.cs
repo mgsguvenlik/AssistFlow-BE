@@ -4,6 +4,7 @@ using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.UserFeedbackDtos;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
@@ -48,6 +49,7 @@ namespace WebAPI.Controllers
         /// <param name="type">Tip filtresi</param>
         /// <returns>Geri bildirim listesi</returns>
         [HttpGet]
+        [MenuAuthorize("UserFeedback", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<PaginatedList<UserFeedbackDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetFeedbacks(
             [FromQuery] int page = 1,
@@ -81,6 +83,7 @@ namespace WebAPI.Controllers
         /// <param name="dto">Güncelleme bilgileri</param>
         /// <returns>Güncellenmiş geri bildirim</returns>
         [HttpPost("update/{id}/status")]
+        [MenuAuthorize("UserFeedback", MenuPermission.Edit)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<UserFeedbackDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateFeedbackStatus(
@@ -110,6 +113,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>İstatistik verileri</returns>
         [HttpGet("statistics")]
+        [MenuAuthorize("UserFeedbackStatistics", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FeedbackStatisticsDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStatistics()
         {

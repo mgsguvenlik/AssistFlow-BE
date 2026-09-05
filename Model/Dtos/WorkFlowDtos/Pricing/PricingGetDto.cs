@@ -3,6 +3,7 @@ using Model.Dtos.Customer;
 using Model.Dtos.WorkFlowDtos.ServicesRequestProduct;
 using Model.Dtos.WorkFlowDtos.WorkflowAttachment;
 using Model.Dtos.WorkFlowDtos.WorkFlowReviewLog;
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +33,9 @@ namespace Model.Dtos.WorkFlowDtos.Pricing
         public List<ServicesRequestProductGetDto> Products { get; set; } = new();
         public List<WorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
         public CustomerGetDto? Customer { get; set; }
+
+        public List<TechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
+        public List<TechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
 
 
         public List<WorkflowAttachmentGetDto> Attachments { get; set; } = new();

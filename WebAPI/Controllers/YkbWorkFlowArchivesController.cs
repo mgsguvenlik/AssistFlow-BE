@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Model.Dtos.WorkFlowDtos.WorkFlowArchive;
 using Model.Dtos.WorkFlowDtos.YkbDtos.YkbArchive;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers
 {
     [Authorize]
+    [MenuAuthorize("YkbServiceRequestArchive", MenuPermission.View)]
     [Route("api/[controller]")]
     [ApiController]
     public class YkbWorkFlowArchivesController : ControllerBase
