@@ -169,21 +169,34 @@ namespace WebAPI.Controllers
         {
             try
             {
-                var kpiTask = _dashboardService.GetKpiAsync();
-                var financialTask = _dashboardService.GetFinancialDashboardAsync();
-                var alertsTask = _dashboardService.GetCriticalAlertsAsync();
-                var geoTask = _dashboardService.GetGeographicDistributionAsync();
-                var productTask = _dashboardService.GetProductStatisticsAsync();
+                // These operations share a scoped DbContext and must run sequentially.
+                var kpi = await _dashboardService.GetKpiAsync();
+                if (!kpi.IsSuccess)
+                    return DashboardFailure(kpi);
 
-                await Task.WhenAll(kpiTask, financialTask, alertsTask, geoTask, productTask);
+                var financial = await _dashboardService.GetFinancialDashboardAsync();
+                if (!financial.IsSuccess)
+                    return DashboardFailure(financial);
+
+                var alerts = await _dashboardService.GetCriticalAlertsAsync();
+                if (!alerts.IsSuccess)
+                    return DashboardFailure(alerts);
+
+                var geo = await _dashboardService.GetGeographicDistributionAsync();
+                if (!geo.IsSuccess)
+                    return DashboardFailure(geo);
+
+                var product = await _dashboardService.GetProductStatisticsAsync();
+                if (!product.IsSuccess)
+                    return DashboardFailure(product);
 
                 var fullDashboard = new FullDashboardDto
                 {
-                    Kpi = kpiTask.Result.Data,
-                    Financial = financialTask.Result.Data,
-                    CriticalAlerts = alertsTask.Result.Data,
-                    GeographicDistribution = geoTask.Result.Data,
-                    ProductStatistics = productTask.Result.Data
+                    Kpi = kpi.Data,
+                    Financial = financial.Data,
+                    CriticalAlerts = alerts.Data,
+                    GeographicDistribution = geo.Data,
+                    ProductStatistics = product.Data
                 };
 
                 return Ok(ResponseModel<FullDashboardDto>.Success(fullDashboard));
@@ -199,6 +212,14 @@ namespace WebAPI.Controllers
 
 
 
+
+        private IActionResult DashboardFailure(Core.Abstractions.BaseResponseModel result)
+        {
+            return StatusCode((int)result.StatusCode, ResponseModel<FullDashboardDto>.Fail(
+                result.Message,
+                result.StatusCode,
+                validation: result.ValidationErrors));
+        }
 
         [HttpGet("ykb/kpi")]
         [MenuAuthorize("Dashboard", MenuPermission.View)]
