@@ -15,14 +15,14 @@ namespace Business.Interfaces.Qnb
             bool includeCustomerDetails = false);
 
         /// <summary>
-        /// QNB - Tüm teknisyenlerin fazla mesai özetini getirir
+        /// QNB - TÃ¼m teknisyenlerin fazla mesai Ã¶zetini getirir
         /// </summary>
         Task<ResponseModel<QnbAllTechniciansOvertimeSummaryDto>> GetAllTechniciansOvertimeSummaryAsync(
             DateTime startDate,
             DateTime endDate);
 
         /// <summary>
-        /// QNB - Fazla mesai raporunu Excel formatýnda export eder
+        /// QNB - Fazla mesai raporunu Excel formatÄ±nda export eder
         /// </summary>
         Task<ResponseModel<byte[]>> ExportOvertimeReportToExcelAsync(
             long? technicianId,

@@ -1016,6 +1016,947 @@ namespace Data.Migrations
                     b.ToTable("CustomerType");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbAccountingProcess", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsProcessed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("ProcessedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsProcessed");
+
+                    b.HasIndex("RequestNo")
+                        .IsUnique();
+
+                    b.ToTable("EkbAccountingProcesses", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbCustomerForm", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CustomerApproverId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbServiceTrackNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("PlannedCompletionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("ServicesDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerApproverId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("RequestNo");
+
+                    b.ToTable("EkbCustomerForm", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbFinalApproval", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("CustomerApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CustomerApprovedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CustomerNote")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("DecidedBy")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbFinalApproval", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbPricing", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbPricing", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CustomerApproverId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbServiceTrackNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<long?>("EkbWorkFlowStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsMailSended")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsProductRequirement")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("PlannedCompletionDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<long?>("ServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ServicesCostStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("ServicesDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ServicesRequestStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("WorkFlowStepId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerApproverId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("EkbWorkFlowStepId");
+
+                    b.HasIndex("RequestNo");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.ToTable("EkbServicesRequest", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequestProduct", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("CapturedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CapturedCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<int?>("CapturedSource")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("CapturedTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("CapturedUnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsPriceCaptured")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("EkbServicesRequestProduct", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequestWorkOrderType", b =>
+                {
+                    b.Property<long>("EkbServicesRequestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkOrderTypeId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("EkbServicesRequestId", "WorkOrderTypeId");
+
+                    b.HasIndex("WorkOrderTypeId");
+
+                    b.ToTable("EkbServicesRequestWorkOrderTypes", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalService", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EndLocation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("EndTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocationCheckRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Latitude")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Longitude")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProblemDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ResolutionAndActions")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("ServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ServicesCostStatus")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServicesStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StartLocation")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("StartTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.ToTable("EkbTechnicalService", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalServiceFormImage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<long>("EkbTechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EkbTechnicalServiceId");
+
+                    b.ToTable("EkbTechnicalServiceFormImage", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalServiceImage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<long>("EkbTechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EkbTechnicalServiceId");
+
+                    b.ToTable("EkbTechnicalServiceImage", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalServiceWorkSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ExtendCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FinishDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("FinishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("HasMissingZoneOnFinish")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<long?>("ManitouLogSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MissingZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("PlannedEndAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReceivedZonesText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SerialNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("StartedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("TechnicalServiceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbTechnicalServiceWorkSessions", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWarehouse", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("DeliveryDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("WarehouseStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbWarehouse", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApproverTechnicianId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CurrentStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CustomerApproverName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("IsAgreement")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsLocationValid")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RequestTitle")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("WorkFlowStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApproverTechnicianId");
+
+                    b.HasIndex("CurrentStepId");
+
+                    b.HasIndex("RequestNo");
+
+                    b.ToTable("EkbWorkFlow", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlowActivityRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<short>("ActionType")
+                        .HasColumnType("smallint");
+
+                    b.Property<string>("ClientIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("PerformedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PerformedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RequestNo")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ToStepCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long?>("WorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("WorkFlowId");
+
+                    b.ToTable("EkbWorkFlowActivityRecord", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlowArchive", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ApproverTechnicianJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ArchiveReason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ArchivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerApproverJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CustomerJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbFinalApprovalJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbPricingJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbServicesRequestJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbServicesRequestProductsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbTechnicalServiceFormImagesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbTechnicalServiceImagesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbTechnicalServiceJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbWarehouseJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbWorkFlowJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbWorkFlowReviewLogsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EkbWorkflowAttachmentsJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbWorkFlowArchive", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlowReviewLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("EkbWorkFlowId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FromStepCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("FromStepId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReviewNotes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ToStepCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("ToStepId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbWorkFlowReviewLog", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlowStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EkbWorkFlowStep", "ekb");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkflowAttachment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("LastUpdatedStepCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("RequestNo")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("UploadedStepCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestNo");
+
+                    b.ToTable("EkbWorkflowAttachment", "ekb");
+                });
+
             modelBuilder.Entity("Model.Concrete.Helpdesk.HelpdeskMailRule", b =>
                 {
                     b.Property<long>("Id")
@@ -5627,6 +6568,147 @@ namespace Data.Migrations
                     b.Navigation("CustomerSystem");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbCustomerForm", b =>
+                {
+                    b.HasOne("Model.Concrete.ProgressApprover", "CustomerApprover")
+                        .WithMany()
+                        .HasForeignKey("CustomerApproverId");
+
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("CustomerApprover");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequest", b =>
+                {
+                    b.HasOne("Model.Concrete.ProgressApprover", "CustomerApprover")
+                        .WithMany()
+                        .HasForeignKey("CustomerApproverId");
+
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId");
+
+                    b.HasOne("Model.Concrete.Ekb.EkbWorkFlowStep", "EkbWorkFlowStep")
+                        .WithMany()
+                        .HasForeignKey("EkbWorkFlowStepId");
+
+                    b.HasOne("Model.Concrete.ServiceType", "ServiceType")
+                        .WithMany()
+                        .HasForeignKey("ServiceTypeId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("CustomerApprover");
+
+                    b.Navigation("EkbWorkFlowStep");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequestProduct", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId");
+
+                    b.HasOne("Model.Concrete.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequestWorkOrderType", b =>
+                {
+                    b.HasOne("Model.Concrete.Ekb.EkbServicesRequest", "EkbServicesRequest")
+                        .WithMany("EkbServicesRequestWorkOrderTypes")
+                        .HasForeignKey("EkbServicesRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.WorkOrderType", "WorkOrderType")
+                        .WithMany("EkbServicesRequestWorkOrderTypes")
+                        .HasForeignKey("WorkOrderTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EkbServicesRequest");
+
+                    b.Navigation("WorkOrderType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalService", b =>
+                {
+                    b.HasOne("Model.Concrete.ServiceType", "ServiceType")
+                        .WithMany()
+                        .HasForeignKey("ServiceTypeId");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalServiceFormImage", b =>
+                {
+                    b.HasOne("Model.Concrete.Ekb.EkbTechnicalService", "EkbTechnicalService")
+                        .WithMany("EkbServiceRequestFormImages")
+                        .HasForeignKey("EkbTechnicalServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EkbTechnicalService");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalServiceImage", b =>
+                {
+                    b.HasOne("Model.Concrete.Ekb.EkbTechnicalService", "EkbTechnicalService")
+                        .WithMany("EkbServicesImages")
+                        .HasForeignKey("EkbTechnicalServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EkbTechnicalService");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlow", b =>
+                {
+                    b.HasOne("Model.Concrete.User", "ApproverTechnician")
+                        .WithMany()
+                        .HasForeignKey("ApproverTechnicianId");
+
+                    b.HasOne("Model.Concrete.Ekb.EkbWorkFlowStep", "CurrentStep")
+                        .WithMany()
+                        .HasForeignKey("CurrentStepId");
+
+                    b.Navigation("ApproverTechnician");
+
+                    b.Navigation("CurrentStep");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbWorkFlowActivityRecord", b =>
+                {
+                    b.HasOne("Model.Concrete.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId");
+
+                    b.HasOne("Model.Concrete.Ekb.EkbWorkFlow", "WorkFlow")
+                        .WithMany()
+                        .HasForeignKey("WorkFlowId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("WorkFlow");
+                });
+
             modelBuilder.Entity("Model.Concrete.Helpdesk.HelpdeskMailRule", b =>
                 {
                     b.HasOne("Model.Concrete.Helpdesk.HelpdeskMailbox", "Mailbox")
@@ -6381,6 +7463,18 @@ namespace Data.Migrations
                     b.Navigation("CustomerSystemAssignments");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbServicesRequest", b =>
+                {
+                    b.Navigation("EkbServicesRequestWorkOrderTypes");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Ekb.EkbTechnicalService", b =>
+                {
+                    b.Navigation("EkbServiceRequestFormImages");
+
+                    b.Navigation("EkbServicesImages");
+                });
+
             modelBuilder.Entity("Model.Concrete.Helpdesk.HelpdeskTicket", b =>
                 {
                     b.Navigation("Assignments");
@@ -6478,6 +7572,8 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.WorkOrderType", b =>
                 {
+                    b.Navigation("EkbServicesRequestWorkOrderTypes");
+
                     b.Navigation("QnbServicesRequestWorkOrderTypes");
 
                     b.Navigation("ServicesRequestWorkOrderTypes");

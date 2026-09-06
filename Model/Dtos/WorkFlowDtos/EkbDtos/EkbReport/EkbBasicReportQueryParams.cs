@@ -1,0 +1,77 @@
+﻿using Core.Enums;
+using Core.Enums.Ekb;
+
+namespace Model.Dtos.WorkFlowDtos.EkbDtos.EkbReport
+{
+    public class EkbBasicReportQueryParams
+    {
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 20;
+
+        public string? Search { get; set; }
+        public string? RequestNo { get; set; }
+        public string? EkbServiceTrackNo { get; set; }
+
+        public long? CurrentStepId { get; set; }
+        public string? StepCode { get; set; }
+
+        public long? ApproverTechnicianId { get; set; }
+        public long? CreatedUserId { get; set; }
+
+        public long? CustomerId { get; set; }
+        public long? ServiceTypeId { get; set; }
+
+        public WorkFlowPriority? Priority { get; set; }
+        public List<WorkFlowPriority>? Priorities { get; set; }
+
+        public WorkFlowStatus? WorkFlowStatus { get; set; }
+        public List<WorkFlowStatus>? WorkFlowStatuses { get; set; }
+
+        public EkbCustomerFormStatus? CustomerFormStatus { get; set; }
+        public ServicesRequestStatus? ServicesRequestStatus { get; set; }
+        public ServicesCostStatus? ServicesCostStatus { get; set; }
+        public TechnicalServiceStatus? TechnicalServiceStatus { get; set; }
+        public PricingStatus? PricingStatus { get; set; }
+        public FinalApprovalStatus? FinalApprovalStatus { get; set; }
+
+        public bool? IsAgreement { get; set; }
+        public bool? IsLocationValid { get; set; }
+        public bool? IsProductRequirement { get; set; }
+
+        public DateTimeOffset? CreatedFrom { get; set; }
+        public DateTimeOffset? CreatedTo { get; set; }
+
+        public DateTime? CustomerFormServicesDateFrom { get; set; }
+        public DateTime? CustomerFormServicesDateTo { get; set; }
+
+        public DateTimeOffset? ServicesDateFrom { get; set; }
+        public DateTimeOffset? ServicesDateTo { get; set; }
+
+        public DateTimeOffset? TechnicalStartFrom { get; set; }
+        public DateTimeOffset? TechnicalStartTo { get; set; }
+
+        public DateTimeOffset? TechnicalEndFrom { get; set; }
+        public DateTimeOffset? TechnicalEndTo { get; set; }
+
+        public DateTime? CustomerApprovedFrom { get; set; }
+        public DateTime? CustomerApprovedTo { get; set; }
+
+        public string? SortBy { get; set; } = "createdDate";
+        public bool SortDesc { get; set; } = true;
+
+        public List<long> WorkOrderTypeIds { get; set; } = new();
+
+        public void Normalize(int maxPageSize = 200)
+        {
+            Page = Page <= 0 ? 1 : Page;
+            PageSize = PageSize <= 0 ? 20 : PageSize;
+            PageSize = Math.Min(PageSize, maxPageSize);
+
+            Search = string.IsNullOrWhiteSpace(Search) ? null : Search.Trim();
+            RequestNo = string.IsNullOrWhiteSpace(RequestNo) ? null : RequestNo.Trim();
+            EkbServiceTrackNo = string.IsNullOrWhiteSpace(EkbServiceTrackNo) ? null : EkbServiceTrackNo.Trim();
+            StepCode = string.IsNullOrWhiteSpace(StepCode) ? null : StepCode.Trim().ToUpperInvariant();
+            SortBy = string.IsNullOrWhiteSpace(SortBy) ? "createdDate" : SortBy.Trim();
+        }
+    }
+}

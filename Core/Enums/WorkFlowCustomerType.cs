@@ -3,13 +3,14 @@ namespace Core.Enums
     public enum WorkFlowCustomerType
     {
 
-        /// <summary>Bireysel müþteriler</summary>
+        /// <summary>Bireysel mÃ¼ÅŸteriler</summary>
         Individual = 1,
 
-        /// <summary>YKB (Yapý Kredi Bankasý)</summary>
+        /// <summary>YKB (YapÄ± Kredi BankasÄ±)</summary>
         YKB = 2,
 
-        /// <summary>QNB müþteriler</summary>
-        QNB = 3
+        /// <summary>QNB mÃ¼ÅŸteriler</summary>
+        QNB = 3,
+        EKB = 4
     }
 }

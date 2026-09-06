@@ -31,7 +31,7 @@ namespace WebAPI.Controllers
         /// <param name="customerGroupId">Müşteri Grubu ID</param>
         /// <returns>İlgili fiyat kayıtlarının listesi</returns>
         [HttpGet("get-by-product-and-group")]
-        [MenuAuthorize(new[] { "ProductList", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
+        [MenuAuthorize(new[] { "ProductList", "ServiceRequestCreate", "YkbServiceRequestCreate", "EkbServiceRequestCreate", "QnbServiceRequestCreate" }, MenuPermission.View)]
         public async Task<IActionResult> GetByProductAndCustomerGroup([FromQuery] long productId, [FromQuery] long customerGroupId)
         {
             var result = await _customerGroupProductPriceService.GetByProductAndCustomerGroupAsync(productId, customerGroupId);

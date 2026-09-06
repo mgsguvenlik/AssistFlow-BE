@@ -1,7 +1,7 @@
 namespace Model.Dtos.OvertimeReport
 {
     /// <summary>
-    /// YKB - Teknisyen bazl� fazla mesai raporu
+    /// YKB - Teknisyen bazlı fazla mesai raporu
     /// </summary>
     public class YkbTechnicianOvertimeReportDto
     {

@@ -1911,7 +1911,7 @@ namespace Business.Services.Qnb
                 : string.Empty;
 
             var viewLink = baseUrl is not null
-                ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">Kaydý görüntüle</a></p>"
+                ? $"<p><a href=\"{baseUrl}/technical-service/{dto.RequestNo}\">KaydÄ± gÃ¶rÃ¼ntÃ¼le</a></p>"
                 : string.Empty;
 
             string customerLocRow = hasCustomerLoc
@@ -2440,7 +2440,7 @@ namespace Business.Services.Qnb
         {
             var me = await _currentUser.GetAsync();
             if (me is null)
-                return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Fail("Kullanýcý bulunamadý.", StatusCode.Unauthorized);
+                return ResponseModel<PagedResult<ActiveCustomerRequestDto>>.Fail("KullanÄ±cÄ± bulunamadÄ±.", StatusCode.Unauthorized);
 
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 1, 100);

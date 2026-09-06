@@ -37,6 +37,7 @@
         public const string ApplicationJson = "application/json";
         public const string ManitouTestTenantCodeMGS = "MGS";
         public const string ManitouTestTenantCodeYKB = "YKB";
+        public const string ManitouTestTenantCodeEKB = "EKB";
         public const string ManitouTestTenantCodeQNB = "QNB";
 
 

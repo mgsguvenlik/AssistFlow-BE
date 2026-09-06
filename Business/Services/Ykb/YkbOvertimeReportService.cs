@@ -43,7 +43,7 @@ namespace Business.Services.Ykb
                 var startDateOffset = new DateTimeOffset(startDate, TimeSpan.Zero);
                 var endDateOffset = new DateTimeOffset(endDate, TimeSpan.Zero);
 
-                // Teknisyen kontrol�
+                // Teknisyen kontrolü
                 var technician = await _uow.Repository
                     .GetQueryable<User>()
                     .AsNoTracking()
@@ -51,10 +51,10 @@ namespace Business.Services.Ykb
 
                 if (technician == null)
                     return ResponseModel<YkbTechnicianOvertimeReportDto>.Fail(
-                        "Teknisyen bulunamad�.",
+                        "Teknisyen bulunamadı.",
                         StatusCode.NotFound);
 
-                // YKB WorkFlow'lar� �ek
+                // YKB WorkFlow'ları çek
                 var workFlows = await _uow.Repository
                     .GetQueryable<YkbWorkFlow>()
                     .AsNoTracking()
@@ -63,7 +63,7 @@ namespace Business.Services.Ykb
 
                 var requestNos = workFlows.Select(x => x.RequestNo).ToList();
 
-                // YKB TechnicalService'leri �ek
+                // YKB TechnicalService'leri çek
                 var technicalServices = await _uow.Repository
                     .GetQueryable<YkbTechnicalService>()
                     .AsNoTracking()
@@ -74,7 +74,7 @@ namespace Business.Services.Ykb
                     .Include(x => x.ServiceType)
                     .ToListAsync();
 
-                // M��teri bilgileri (YKB i�in)
+                // Müşteri bilgileri (YKB için)
                 Dictionary<string, Customer>? customers = null;
                 if (includeCustomerDetails)
                 {
@@ -257,7 +257,7 @@ namespace Business.Services.Ykb
             {
                 _logger.LogError(ex, "YKB - GetAllTechniciansOvertimeSummaryAsync");
                 return ResponseModel<YkbAllTechniciansOvertimeSummaryDto>.Fail(
-                    $"Fazla mesai �zeti getirilirken hata: {ex.Message}",
+                    $"Fazla mesai özeti getirilirken hata: {ex.Message}",
                     StatusCode.Error);
             }
         }
@@ -297,31 +297,31 @@ namespace Business.Services.Ykb
                 {
                     var worksheet = workbook.Worksheets.Add("YKB Fazla Mesai Raporu");
 
-                    worksheet.Cell(1, 1).Value = "Teknisyen Ad�";
+                    worksheet.Cell(1, 1).Value = "Teknisyen Adı";
                     worksheet.Cell(1, 2).Value = singleReport.Data.Name;
                     worksheet.Cell(2, 1).Value = "Teknisyen Kodu";
                     worksheet.Cell(2, 2).Value = singleReport.Data.Code;
-                    worksheet.Cell(3, 1).Value = "Ba�lang�� Tarihi";
+                    worksheet.Cell(3, 1).Value = "Başlangıç Tarihi";
                     worksheet.Cell(3, 2).Value = singleReport.Data.StartDate.ToString("dd.MM.yyyy");
-                    worksheet.Cell(4, 1).Value = "Biti� Tarihi";
+                    worksheet.Cell(4, 1).Value = "Bitiş Tarihi";
                     worksheet.Cell(4, 2).Value = singleReport.Data.EndDate.ToString("dd.MM.yyyy");
                     worksheet.Cell(5, 1).Value = "Toplam Fazla Mesai (Saat)";
                     worksheet.Cell(5, 2).Value = singleReport.Data.TotalOvertimeHours;
-                    worksheet.Cell(6, 1).Value = "Toplam �� Say�s�";
+                    worksheet.Cell(6, 1).Value = "Toplam İş Sayısı";
                     worksheet.Cell(6, 2).Value = singleReport.Data.TotalJobs;
 
                     int row = 8;
                     worksheet.Cell(row, 1).Value = "Talep No";
-                    worksheet.Cell(row, 2).Value = "Talep Ba�l���";
+                    worksheet.Cell(row, 2).Value = "Talep Başlığı";
                     worksheet.Cell(row, 3).Value = "Tarih";
-                    worksheet.Cell(row, 4).Value = "Ba�lang��";
-                    worksheet.Cell(row, 5).Value = "Biti�";
+                    worksheet.Cell(row, 4).Value = "Başlangıç";
+                    worksheet.Cell(row, 5).Value = "Bitiş";
                     worksheet.Cell(row, 6).Value = "Toplam Saat";
                     worksheet.Cell(row, 7).Value = "Normal Saat";
                     worksheet.Cell(row, 8).Value = "Fazla Mesai";
                     worksheet.Cell(row, 9).Value = "Breakdown Detay";
-                    worksheet.Cell(row, 10).Value = "M��teri";
-                    worksheet.Cell(row, 11).Value = "�ehir";
+                    worksheet.Cell(row, 10).Value = "Müşteri";
+                    worksheet.Cell(row, 11).Value = "Şehir";
 
                     var headerRange = worksheet.Range(row, 1, row, 11);
                     headerRange.Style.Font.Bold = true;
@@ -352,24 +352,24 @@ namespace Business.Services.Ykb
                 }
                 else if (summaryReport != null && summaryReport.Data != null)
                 {
-                    var worksheet = workbook.Worksheets.Add("YKB Fazla Mesai �zeti");
+                    var worksheet = workbook.Worksheets.Add("YKB Fazla Mesai Özeti");
 
-                    worksheet.Cell(1, 1).Value = "Ba�lang�� Tarihi";
+                    worksheet.Cell(1, 1).Value = "Başlangıç Tarihi";
                     worksheet.Cell(1, 2).Value = summaryReport.Data.StartDate.ToString("dd.MM.yyyy");
-                    worksheet.Cell(2, 1).Value = "Biti� Tarihi";
+                    worksheet.Cell(2, 1).Value = "Bitiş Tarihi";
                     worksheet.Cell(2, 2).Value = summaryReport.Data.EndDate.ToString("dd.MM.yyyy");
                     worksheet.Cell(3, 1).Value = "Toplam Fazla Mesai (Saat)";
                     worksheet.Cell(3, 2).Value = summaryReport.Data.TotalOvertimeHours;
-                    worksheet.Cell(4, 1).Value = "Toplam �� Say�s�";
+                    worksheet.Cell(4, 1).Value = "Toplam İş Sayısı";
                     worksheet.Cell(4, 2).Value = summaryReport.Data.TotalJobs;
-                    worksheet.Cell(5, 1).Value = "Teknisyen Say�s�";
+                    worksheet.Cell(5, 1).Value = "Teknisyen Sayısı";
                     worksheet.Cell(5, 2).Value = summaryReport.Data.TotalTechnicians;
 
                     int row = 7;
                     worksheet.Cell(row, 1).Value = "Teknisyen Kodu";
-                    worksheet.Cell(row, 2).Value = "Teknisyen Ad�";
+                    worksheet.Cell(row, 2).Value = "Teknisyen Adı";
                     worksheet.Cell(row, 3).Value = "Fazla Mesai (Saat)";
-                    worksheet.Cell(row, 4).Value = "�� Say�s�";
+                    worksheet.Cell(row, 4).Value = "İş Sayısı";
 
                     var headerRange = worksheet.Range(row, 1, row, 4);
                     headerRange.Style.Font.Bold = true;
@@ -398,12 +398,12 @@ namespace Business.Services.Ykb
             {
                 _logger.LogError(ex, "YKB - ExportOvertimeReportToExcelAsync");
                 return ResponseModel<byte[]>.Fail(
-                    $"Excel export s�ras�nda hata: {ex.Message}",
+                    $"Excel export sırasında hata: {ex.Message}",
                     StatusCode.Error);
             }
         }
 
-        // Hesaplama metodlar� (Normal OvertimeReportService'teki ile ayn�)
+        // Hesaplama metodları (Normal OvertimeReportService'teki ile aynı)
         private async Task<(double TotalHours, double NormalHours, double TotalOvertimeHours, List<OvertimeBreakdownDto> Breakdown)> 
             CalculateOvertimeWithBreakdownAsync(DateTimeOffset startTime, DateTimeOffset endTime)
         {
@@ -428,8 +428,8 @@ namespace Business.Services.Ykb
                     endTime, 
                     policy?.WorkStartTime, 
                     policy?.WorkEndTime,
-                    policy?.Name ?? "Hafta ��i Mesai Saatleri",
-                    policy?.PolicyTypeText ?? "Hafta ��i Default");
+                    policy?.Name ?? "Hafta İçi Mesai Saatleri",
+                    policy?.PolicyTypeText ?? "Hafta İçi Default");
 
                 normalHours += dayNormal;
                 totalOvertimeHours += dayOvertime;
@@ -473,8 +473,8 @@ namespace Business.Services.Ykb
                         dayEnd, 
                         policy?.WorkStartTime, 
                         policy?.WorkEndTime,
-                        policy?.Name ?? "Hafta ��i Mesai Saatleri",
-                        policy?.PolicyTypeText ?? "Hafta ��i Default");
+                        policy?.Name ?? "Hafta İçi Mesai Saatleri",
+                        policy?.PolicyTypeText ?? "Hafta İçi Default");
 
                     normalHours += dayNormal;
                     totalOvertimeHours += dayOvertime;
@@ -513,7 +513,7 @@ namespace Business.Services.Ykb
                     Hours = Math.Round(duration, 2),
                     StartTime = startTime.DateTime,
                     EndTime = endTime.DateTime,
-                    Description = "T�m g�n fazla mesai"
+                    Description = "Tüm gün fazla mesai"
                 });
 
                 return (normalHours, overtimeHours, breakdown);
@@ -525,7 +525,7 @@ namespace Business.Services.Ykb
             var actualStart = startTime;
             var actualEnd = endTime;
 
-            // Mesai �ncesi
+            // Mesai öncesi
             if (actualStart < workStartDateTime && actualEnd > actualStart)
             {
                 var beforeEnd = actualEnd < workStartDateTime ? actualEnd : new DateTimeOffset(workStartDateTime, startTime.Offset);
@@ -536,12 +536,12 @@ namespace Business.Services.Ykb
                     overtimeHours += beforeHours;
                     breakdown.Add(new OvertimeBreakdownDto
                     {
-                        PolicyName = "Mesai �ncesi",
-                        PolicyTypeText = "Mesai D���",
+                        PolicyName = "Mesai öncesi",
+                        PolicyTypeText = "Mesai Dışı",
                         Hours = Math.Round(beforeHours, 2),
                         StartTime = actualStart.DateTime,
                         EndTime = beforeEnd.DateTime,
-                        Description = $"Normal mesai ba�lang�c�ndan ({workStart.Value:HH:mm}) �nce"
+                        Description = $"Normal mesai başlangıcından ({workStart.Value:HH:mm}) önce"
                     });
                 }
 
@@ -561,7 +561,7 @@ namespace Business.Services.Ykb
                 }
             }
 
-            // Mesai sonras�
+            // Mesai sonrası
             if (actualEnd > workEndDateTime && actualStart < actualEnd)
             {
                 var afterStart = actualStart > workEndDateTime ? actualStart : new DateTimeOffset(workEndDateTime, startTime.Offset);
@@ -572,12 +572,12 @@ namespace Business.Services.Ykb
                     overtimeHours += afterHours;
                     breakdown.Add(new OvertimeBreakdownDto
                     {
-                        PolicyName = "Mesai Sonras�",
-                        PolicyTypeText = "Mesai D���",
+                        PolicyName = "Mesai Sonrası",
+                        PolicyTypeText = "Mesai Dışı",
                         Hours = Math.Round(afterHours, 2),
                         StartTime = afterStart.DateTime,
                         EndTime = actualEnd.DateTime,
-                        Description = $"Normal mesai biti�inden ({workEnd.Value:HH:mm}) sonra"
+                        Description = $"Normal mesai bitiçinden ({workEnd.Value:HH:mm}) sonra"
                     });
                 }
             }

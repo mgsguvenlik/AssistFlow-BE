@@ -9,6 +9,7 @@ using Model.Concrete;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Ekb;
 
 namespace Business.Services
 {
@@ -110,6 +111,10 @@ namespace Business.Services
             {
                 await ProcessYkbWorkFlowsAsync(uow, mailPush, slaSetting, notificationThresholdHours, now, stoppingToken);
             }
+            else if (slaSetting.CustomerType == WorkFlowCustomerType.EKB)
+            {
+                await ProcessEkbWorkFlowsAsync(uow, mailPush, slaSetting, notificationThresholdHours, now, stoppingToken);
+            }
             else if (slaSetting.CustomerType == WorkFlowCustomerType.QNB)
             {
                 await ProcessQnbWorkFlowsAsync(
@@ -201,6 +206,46 @@ namespace Business.Services
                     ykbWorkFlow.RequestNo,
                     slaSetting,
                     ykbWorkFlow.CreatedDate,
+                    now,
+                    stoppingToken);
+            }
+        }
+
+        #endregion
+        #region EKB WorkFlow İşlemleri
+
+        private async Task ProcessEkbWorkFlowsAsync(
+            IUnitOfWork uow,
+            IMailPushService mailPush,
+            WorkFlowSlaSetting slaSetting,
+            int notificationThresholdHours,
+            DateTimeOffset now,
+            CancellationToken stoppingToken)
+        {
+            // EkbWorkFlow tablosundan ilgili kayıtları getir
+            var thresholdDate = now.AddHours(-notificationThresholdHours);
+
+            var ekbWorkFlows = await uow.Repository
+                .GetQueryable<EkbWorkFlow>()
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted
+                    && x.WorkFlowStatus == WorkFlowStatus.Pending
+                    && x.Priority == slaSetting.Priority
+                    && x.CreatedDate <= thresholdDate)
+                .ToListAsync(stoppingToken);
+
+            _logger.LogDebug(
+                "EKB - Priority: {Priority}, Threshold: {Threshold}, WorkFlow Sayısı: {Count}",
+                slaSetting.Priority, thresholdDate, ekbWorkFlows.Count);
+
+            foreach (var ekbWorkFlow in ekbWorkFlows)
+            {
+                await CreateSlaNotificationMailAsync(
+                    uow,
+                    mailPush,
+                    ekbWorkFlow.RequestNo,
+                    slaSetting,
+                    ekbWorkFlow.CreatedDate,
                     now,
                     stoppingToken);
             }

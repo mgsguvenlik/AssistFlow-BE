@@ -39,6 +39,20 @@ namespace Business.Interfaces
 
         Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestYkbActivityRecordByRequestNoAsync(string requestNo);
         #endregion
+        #region EKB
+        Task LogEkbAsync(
+            WorkFlowActionType type,
+            string? requestNo,
+            long? workFlowId,
+            long? customerId,
+            string? fromStepCode,
+            string? toStepCode,
+            string? summary,
+            object? payload,
+            CancellationToken ct = default);
+
+        Task<ResponseModel<List<WorkFlowActivityRecorGetDto>>> GetLatestEkbActivityRecordByRequestNoAsync(string requestNo);
+        #endregion
 
         #region QNB
         Task LogQnbAsync(

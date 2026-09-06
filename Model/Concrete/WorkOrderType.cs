@@ -3,6 +3,7 @@ using Model.Abstractions;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Ekb;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -37,6 +38,8 @@ namespace Model.Concrete
         /// </summary>
         public ICollection<YkbServicesRequestWorkOrderType> YkbServicesRequestWorkOrderTypes { get; set; }
             = new List<YkbServicesRequestWorkOrderType>();
+        public ICollection<EkbServicesRequestWorkOrderType> EkbServicesRequestWorkOrderTypes { get; set; }
+            = new List<EkbServicesRequestWorkOrderType>();
 
         /// <summary>
         ///  Bu iş emri türünün bağlı olduğu servis talepleri.

@@ -57,12 +57,14 @@ namespace Business.Interfaces
         /// <param name="to"></param>
         /// <returns></returns>
         Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null);
+        Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null);
 
         /// <summary>
         /// 
         /// </summary>
         /// <returns></returns>
         Task<ResponseModel<List<YkbTechnicalServiceStatusCountDto>>> YkbGetMyTechnicalServiceStatusCountsAsync();
+        Task<ResponseModel<List<EkbTechnicalServiceStatusCountDto>>> EkbGetMyTechnicalServiceStatusCountsAsync();
 
 
         /// <summary>
