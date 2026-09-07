@@ -5162,7 +5162,8 @@ namespace Business.Services.Ekb
             dto.ReviewLogs = await _uow.Repository
                 .GetQueryable<EkbWorkFlowReviewLog>(x =>
                     x.RequestNo == dto.RequestNo &&
-                    (x.FromStepCode == "APR" || x.ToStepCode == "APR"))
+                    ((x.FromStepCode == "APR" && x.ToStepCode == "CAPR") ||
+                     (x.FromStepCode == "CAPR" && x.ToStepCode == "APR")))
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedDate)
                 .ProjectToType<EkbWorkFlowReviewLogDto>(_config)
