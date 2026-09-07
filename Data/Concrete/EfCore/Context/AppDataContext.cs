@@ -7,6 +7,7 @@ using Model.Concrete.PeriodicReports;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Ekb;
 
 namespace Data.Concrete.EfCore.Context
 {
@@ -90,6 +91,27 @@ namespace Data.Concrete.EfCore.Context
         public DbSet<YkbTechnicalServiceWorkSession> YkbTechnicalServiceWorkSessions { get; set; } = default!;
         public DbSet<YkbWorkflowAttachment> YkbWorkflowAttachments { get; set; }
         public DbSet<YkbAccountingProcess>  YkbAccountingProcesses { get; set; }
+
+        #endregion
+        #region EKB
+        public DbSet<EkbCustomerForm> EkbCustomerForms { get; set; } = default!;
+        public DbSet<EkbServicesRequest> EkbServicesRequests { get; set; } = default!;
+        public DbSet<EkbServicesRequestWorkOrderType> EkbServicesRequestWorkOrderTypes { get; set; } = default!;
+        public DbSet<EkbServicesRequestProduct> EkbServicesRequestProducts { get; set; } = default!;
+        public DbSet<EkbTechnicalService> EkbTechnicalServices { get; set; } = default!;
+        public DbSet<EkbTechnicalServiceImage> EkbTechnicalServiceImages { get; set; } = default!;
+        public DbSet<EkbTechnicalServiceFormImage> EkbTechnicalServiceFormImages { get; set; } = default!;
+        public DbSet<EkbPricing> EkbPricings { get; set; } = default!;
+        public DbSet<EkbFinalApproval> EkbFinalApprovals { get; set; } = default!;
+        public DbSet<EkbWarehouse> EkbWarehouses { get; set; } = default!;
+        public DbSet<EkbWorkFlow> EkbWorkFlows { get; set; } = default!;
+        public DbSet<EkbWorkFlowStep> EkbWorkFlowSteps { get; set; } = default!;
+        public DbSet<EkbWorkFlowActivityRecord> EkbWorkFlowActivityRecords { get; set; } = default!;
+        public DbSet<EkbWorkFlowArchive> EkbWorkFlowArchives { get; set; } = default!;
+        public DbSet<EkbWorkFlowReviewLog> EkbWorkFlowReviewLogs { get; set; } = default!;
+        public DbSet<EkbTechnicalServiceWorkSession> EkbTechnicalServiceWorkSessions { get; set; } = default!;
+        public DbSet<EkbWorkflowAttachment> EkbWorkflowAttachments { get; set; }
+        public DbSet<EkbAccountingProcess>  EkbAccountingProcesses { get; set; }
 
         #endregion  
 
@@ -193,6 +215,67 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.Entity<YkbAccountingProcess>(entity =>
             {
                 entity.ToTable("YkbAccountingProcesses", "ykb");
+
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.RequestNo)
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                entity.HasIndex(x => x.RequestNo)
+                    .IsUnique();
+
+                entity.HasIndex(x => x.IsProcessed);
+            });
+            #endregion
+            #region EKB
+
+            modelBuilder.Entity<EkbServicesRequestProduct>()
+                        .Property(x => x.CapturedUnitPrice)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EkbServicesRequestProduct>()
+                        .Property(x => x.CapturedTotal)
+                        .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EkbTechnicalService>()
+                        .Property(x => x.StartTime)
+                        .HasConversion(
+                            v => v,
+                            v => v.HasValue ? DateTime.SpecifyKind(v.Value.DateTime, DateTimeKind.Utc) : v
+                        );
+
+            // Gerek görürsen EKB için özel index’ler:
+            modelBuilder.Entity<EkbWorkFlow>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<EkbServicesRequest>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<EkbCustomerForm>()
+                        .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<EkbServicesRequestWorkOrderType>()
+                .HasKey(x => new { x.EkbServicesRequestId, x.WorkOrderTypeId });
+
+            modelBuilder.Entity<EkbServicesRequestWorkOrderType>()
+                .HasOne(x => x.EkbServicesRequest)
+                .WithMany(x => x.EkbServicesRequestWorkOrderTypes)
+                .HasForeignKey(x => x.EkbServicesRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<EkbServicesRequestWorkOrderType>()
+                .HasOne(x => x.WorkOrderType)
+                .WithMany(x => x.EkbServicesRequestWorkOrderTypes)
+                .HasForeignKey(x => x.WorkOrderTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<EkbWorkflowAttachment>()
+                .HasIndex(x => x.RequestNo);
+
+            modelBuilder.Entity<EkbAccountingProcess>(entity =>
+            {
+                entity.ToTable("EkbAccountingProcesses", "ekb");
 
                 entity.HasKey(x => x.Id);
 

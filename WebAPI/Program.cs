@@ -172,6 +172,8 @@ builder.Services.AddDataSeeding(
 );
 
 builder.Services.AddDataSeeding(
+    typeof(EkbModuleSeed),
+    typeof(EkbWorkFlowStepSeed),
     typeof(YkbWorkFlowStepSeed)   // buraya diğer seed tiplerini de ekleyebilirsin
 );
 builder.Services.AddDataSeeding(
