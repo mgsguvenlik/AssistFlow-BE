@@ -1,0 +1,43 @@
+﻿using Core.Enums;
+using Model.Dtos.Customer;
+using Model.Dtos.WorkFlowDtos.EkbDtos.EkbReviewLog;
+using Model.Dtos.WorkFlowDtos.EkbDtos.EkbServicesRequestProduct;
+using Model.Dtos.WorkFlowDtos.EkbDtos.EkbTechnicalServiceImage;
+using Model.Dtos.WorkOrderType;
+
+namespace Model.Dtos.WorkFlowDtos.EkbDtos.EkbTechnicalService
+{
+    public class EkbTechnicalServiceGetDto
+    {
+        public long Id { get; set; }
+        public string RequestNo { get; set; } = string.Empty;
+
+        public string ServiceTitle { get; set; } = string.Empty;
+        public string ServiceDescription { get; set; } = string.Empty;
+        public long? ServiceTypeId { get; set; }
+        public string? ServiceTypeName { get; set; }
+
+        public DateTimeOffset? StartTime { get; set; }
+        public DateTimeOffset? EndTime { get; set; }
+
+        public string? ProblemDescription { get; set; }
+        public string? ResolutionAndActions { get; set; }
+
+        public string? Latitude { get; set; }
+        public string? Longitude { get; set; }
+        public string? StartLocation { get; set; }
+        public string? EndLocation { get; set; }
+        public bool IsLocationCheckRequired { get; set; }
+        public TechnicalServiceStatus ServicesStatus { get; set; }
+        public ServicesCostStatus ServicesCostStatus { get; set; }
+
+        public List<EkbTechnicalServiceImageGetDto> ServicesImages { get; set; } = new();
+        public List<EkbTechnicalServiceFormImageGetDto> ServiceRequestFormImages { get; set; } = new();
+        public List<EkbServicesRequestProductGetDto> Products { get; set; } = new();
+
+        public List<EkbWorkFlowReviewLogDto> ReviewLogs { get; set; } = new();
+        public CustomerGetDto? Customer { get; set; }
+        public List<long>? WorkOrderTypeIds { get; set; }
+        public List<WorkOrderTypeGetDto> WorkOrderTypes { get; set; } = new();
+    }
+}

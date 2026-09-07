@@ -16,21 +16,21 @@ namespace Data.Seeding.Seeds
         }
 
         public string Key => "QnbWorkFlowSteps";
-        public int Order => 12; // YKB (11) seed'inden sonra çalýþsýn
+        public int Order => 12; // YKB (11) seed'inden sonra Ã§alÄ±ÅŸsÄ±n
 
         public async Task RunAsync(DbContext db, IServiceProvider sp, CancellationToken ct)
         {
             var workFlowSteps = new List<QnbWorkFlowStep>
             {
-                new() { Name = "Müþteri Formu Oluþturma", Code = "CF",   Order = 1   },
-                new() { Name = "Servis Talebi Oluþturma", Code = "SR",   Order = 2   },
-                new() { Name = "Depo Sevkiyatý",          Code = "WH",   Order = 3   },
-                new() { Name = "Teknik Servis Ýþlemleri", Code = "TS",   Order = 4   },
-                new() { Name = "Fiyatlandýrma",           Code = "PRC",  Order = 5   },
+                new() { Name = "MÃ¼ÅŸteri Formu OluÅŸturma", Code = "CF",   Order = 1   },
+                new() { Name = "Servis Talebi OluÅŸturma", Code = "SR",   Order = 2   },
+                new() { Name = "Depo SevkiyatÄ±",          Code = "WH",   Order = 3   },
+                new() { Name = "Teknik Servis Ä°ÅŸlemleri", Code = "TS",   Order = 4   },
+                new() { Name = "FiyatlandÄ±rma",           Code = "PRC",  Order = 5   },
                 new() { Name = "Onaylama",                Code = "APR",  Order = 6   },
-                new() { Name = "Müþteri Onayýnda",        Code = "CAPR", Order = 7   },
-                new() { Name = "Ýptal Edildi",            Code = "CNC",  Order = 99  },
-                new() { Name = "Tamamlandý",              Code = "CMP",  Order = 100 },
+                new() { Name = "MÃ¼ÅŸteri OnayÄ±nda",        Code = "CAPR", Order = 7   },
+                new() { Name = "Ä°ptal Edildi",            Code = "CNC",  Order = 99  },
+                new() { Name = "TamamlandÄ±",              Code = "CMP",  Order = 100 },
             };
 
             var existingCodes = await db.Set<QnbWorkFlowStep>()

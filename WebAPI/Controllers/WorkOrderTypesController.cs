@@ -8,7 +8,7 @@ using WebAPI.Authorization;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("WorkOrderTypeList", "BasicWorkflowReportsList", "YkbBasicWorkflowReportsList", "QnbBasicWorkflowReportsList", "YkbAccountingServiceReportList", AllowWorkflowRead = true)]
+    [MenuResource("WorkOrderTypeList", "BasicWorkflowReportsList", "YkbBasicWorkflowReportsList", "EkbBasicWorkflowReportsList", "QnbBasicWorkflowReportsList", "YkbAccountingServiceReportList", "EkbAccountingServiceReportList", AllowWorkflowRead = true)]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

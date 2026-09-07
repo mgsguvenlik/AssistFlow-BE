@@ -30,6 +30,18 @@ public sealed class MenuAuthorizationFilter : IAsyncAuthorizationFilter
         "YkbServiceRequestFinalApproval",
         "YkbServiceRequestCustomerAgreement",
         "YkbTechnicianDashboard",
+        
+        "EkbCustomerServiceRequestCreate",
+        "EkbServiceRequestCreate",
+        "EkbServiceRequestList",
+        "EkbServiceRequestArchive",
+        "EkbServiceRequestWarehouse",
+        "EkbServiceRequestTechnicalService",
+        "EkbServiceRequestPricing",
+        "EkbServiceRequestFinalApproval",
+        "EkbServiceRequestCustomerAgreement",
+        "EkbTechnicianDashboard",
+
 
         "QnbCustomerServiceRequestCreate",
         "QnbServiceRequestCreate",

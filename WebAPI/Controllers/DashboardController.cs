@@ -229,6 +229,14 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("ekb/kpi")]
+        [MenuAuthorize(new[] { "Dashboard", "EkbDashboard" }, MenuPermission.View)]
+        public async Task<IActionResult> GetEkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
+        {
+            var result = await _dashboardService.GetEkbKpiAsync(from, to);
+            return Ok(result);
+        }
+
         [HttpGet("technical-service-status-counts")]
         [MenuAuthorize("TechnicianDashboard", MenuPermission.View)]
         public async Task<IActionResult> GetTechnicalServiceStatusCounts()
@@ -242,6 +250,14 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> YkbGetTechnicalServiceStatusCounts()
         {
             var result = await _dashboardService.YkbGetMyTechnicalServiceStatusCountsAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("ekb/technical-service-status-counts")]
+        [MenuAuthorize("EkbTechnicianDashboard", MenuPermission.View)]
+        public async Task<IActionResult> EkbGetTechnicalServiceStatusCounts()
+        {
+            var result = await _dashboardService.EkbGetMyTechnicalServiceStatusCountsAsync();
             return Ok(result);
         }
        

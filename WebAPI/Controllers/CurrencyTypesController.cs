@@ -7,7 +7,7 @@ using Model.Dtos.CurrencyType;
 namespace WebAPI.Controllers
 {
     [Authorize]
-    [MenuResource("CurrencyTypeList", "ProductList", "PurchaseRequest", "ServiceRequestCreate", "YkbServiceRequestCreate", "QnbServiceRequestCreate")]
+    [MenuResource("CurrencyTypeList", "ProductList", "PurchaseRequest", "ServiceRequestCreate", "YkbServiceRequestCreate", "EkbServiceRequestCreate", "QnbServiceRequestCreate")]
     [ApiController]
     [Route("api/[controller]")]
     [Produces("application/json")]

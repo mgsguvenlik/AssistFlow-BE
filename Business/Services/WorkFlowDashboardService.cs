@@ -8,6 +8,7 @@ using Model.Concrete;
 using Model.Concrete.Qnb;
 using Model.Concrete.WorkFlows;
 using Model.Concrete.Ykb;
+using Model.Concrete.Ekb;
 using Model.Dtos.Dashboard;
 
 namespace Business.Services
@@ -1299,6 +1300,159 @@ namespace Business.Services
                     "YkbGetMyTechnicalServiceStatusCountsAsync sırasında hata oluştu.");
 
                 return ResponseModel<List<YkbTechnicalServiceStatusCountDto>>.Fail(
+                    $"Teknik servis durum adetleri alınırken hata oluştu: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        #endregion
+        #region Ekb
+        public async Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null)
+        {
+            try
+            {
+                var query = _uow.Repository
+                    .GetQueryable<EkbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted);
+
+                if (from.HasValue)
+                {
+                    query = query.Where(x => x.CreatedDate >= from.Value);
+                }
+
+                if (to.HasValue)
+                {
+                    // Eğer frontend sadece tarih gönderirse örn: 2026-06-13 00:00,
+                    // o günü komple dahil etmek için bitişi ertesi gün exclusive yapıyoruz.
+                    if (to.Value.TimeOfDay == TimeSpan.Zero)
+                    {
+                        var endExclusive = to.Value.AddDays(1);
+                        query = query.Where(x => x.CreatedDate < endExclusive);
+                    }
+                    else
+                    {
+                        query = query.Where(x => x.CreatedDate <= to.Value);
+                    }
+                }
+
+                var dto = await query
+                    .GroupBy(x => 1)
+                    .Select(g => new EkbDashboardKpiDto
+                    {
+                        TotalWorkFlows = g.Count(),
+
+                        CompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus == WorkFlowStatus.Complated),
+
+                        NotCompletedWorkFlows = g.Count(x =>
+                            x.WorkFlowStatus != WorkFlowStatus.Complated),
+
+                        InServiceRequest = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "SR"),
+
+                        InWarehouse = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "WH"),
+
+                        InTechnicalService = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "TS"),
+
+                        InPricing = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "PRC"),
+
+                        InFinalApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "APR"),
+
+                        InCustomerApproval = g.Count(x =>
+                            x.CurrentStep != null &&
+                            x.CurrentStep.Code == "CAPR")
+                    })
+                    .FirstOrDefaultAsync();
+
+                dto ??= new EkbDashboardKpiDto();
+                return ResponseModel<EkbDashboardKpiDto>.Success(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetEkbKpiAsync");
+
+                return ResponseModel<EkbDashboardKpiDto>.Fail(
+                    $"EKB dashboard KPI verileri getirilirken hata: {ex.Message}",
+                    StatusCode.Error);
+            }
+        }
+
+        public async Task<ResponseModel<List<EkbTechnicalServiceStatusCountDto>>> EkbGetMyTechnicalServiceStatusCountsAsync()
+        {
+            try
+            {
+                var me = await _currentUser.GetAsync();
+                var meId = me?.Id ?? 0;
+
+                if (meId <= 0)
+                {
+                    return ResponseModel<List<EkbTechnicalServiceStatusCountDto>>.Fail(
+                        "Kullanıcı bilgisi alınamadı.",
+                        StatusCode.Unauthorized);
+                }
+
+                var workFlowQuery = _uow.Repository
+                    .GetQueryable<EkbWorkFlow>()
+                    .AsNoTracking()
+                    .Where(wf =>
+                        !wf.IsDeleted &&
+                        wf.ApproverTechnicianId == meId);
+
+                var statusCounts = await _uow.Repository
+                    .GetQueryable<EkbTechnicalService>()
+                    .AsNoTracking()
+                    .Where(ts =>
+                        !ts.IsDeleted &&
+                        workFlowQuery.Any(wf =>
+                            wf.RequestNo == ts.RequestNo))
+                    .GroupBy(ts => ts.ServicesStatus)
+                    .Select(group => new
+                    {
+                        ServicesStatus = group.Key,
+                        RecordCount = group.Count()
+                    })
+                    .ToListAsync();
+
+                var countDictionary = statusCounts.ToDictionary(
+                    x => x.ServicesStatus,
+                    x => x.RecordCount);
+
+                // Kaydı olmayan durumları da 0 adet olarak döndürür.
+                var result = Enum
+                    .GetValues<TechnicalServiceStatus>()
+                    .Select(status => new EkbTechnicalServiceStatusCountDto
+                    {
+                        ServicesStatus = status,
+                        ServicesStatusName = GetTechnicalServiceStatusName(status),
+                        RecordCount = countDictionary.TryGetValue(
+                            status,
+                            out var count)
+                                ? count
+                                : 0
+                    })
+                    .OrderBy(x => (int)x.ServicesStatus)
+                    .ToList();
+
+                return ResponseModel<List<EkbTechnicalServiceStatusCountDto>>
+                    .Success(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "EkbGetMyTechnicalServiceStatusCountsAsync sırasında hata oluştu.");
+
+                return ResponseModel<List<EkbTechnicalServiceStatusCountDto>>.Fail(
                     $"Teknik servis durum adetleri alınırken hata oluştu: {ex.Message}",
                     StatusCode.Error);
             }

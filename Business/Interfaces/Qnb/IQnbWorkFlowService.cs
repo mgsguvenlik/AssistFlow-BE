@@ -81,7 +81,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByRequestNoAsync(string requestNo);
 
 
-        //Manitou System Test Zone ile ilgili iþlemler eklenecek
+        //Manitou System Test Zone ile ilgili iÅŸlemler eklenecek
         Task<ResponseModel<WorkingStatusDto>> StartWorking(StartWorkingDto dto);
         Task<ResponseModel<WorkingStatusDto>> GetWorkingStatus(string requestNo);
         Task<ResponseModel<WorkingStatusDto>> ExtendWorking(ExtendWorkingDto dto);
