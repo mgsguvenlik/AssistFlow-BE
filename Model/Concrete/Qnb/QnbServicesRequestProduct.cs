@@ -14,6 +14,12 @@ namespace Model.Concrete.Qnb
         public required string RequestNo { get; set; }
         public required long ProductId { get; set; }
         public Product Product { get; set; } = default!;
+
+        [NotMapped]
+        public string? ProductName { get; set; }
+
+        [NotMapped]
+        public string? ProductCode { get; set; }
         public Customer? Customer { get; set; } = default!;
         public long? CustomerId { get; set; }
         public int Quantity { get; set; }
@@ -29,14 +35,14 @@ namespace Model.Concrete.Qnb
 
         public (decimal Price, string? CurrencyCode) GetEffectivePriceWithCurrency()
         {
-            // 1. Grup fiyatý
+            // 1. Grup fiyatÄ±
             var groupPrice = Customer?.CustomerGroup?.GroupProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
             if (groupPrice is not null)
             {
                 return (groupPrice.Price, groupPrice.CurrencyCode);
             }
 
-            // 2. Müþteri özel fiyatý
+            // 2. MÃ¼ÅŸteri Ã¶zel fiyatÄ±
             var customerPrice = Customer?.CustomerProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
 
             if (customerPrice is not null)
@@ -44,7 +50,7 @@ namespace Model.Concrete.Qnb
                 return (customerPrice.Price, customerPrice.CurrencyCode);
             }
 
-            // 3. Tenant fiyatý
+            // 3. Tenant fiyatÄ±
             var tenantPrice = Customer?.Tenant?.TenantProductPrices.FirstOrDefault(x => x.ProductId == ProductId);
 
             if (tenantPrice is not null)
@@ -52,7 +58,7 @@ namespace Model.Concrete.Qnb
                 return (tenantPrice.Price, tenantPrice.CurrencyCode);
             }
 
-            // 4. Ürün genel fiyatý
+            // 4. ÃœrÃ¼n genel fiyatÄ±
             return (Product?.Price ?? 0m, Product?.PriceCurrency);
         }
         public decimal GetTotalEffectivePrice()
@@ -72,7 +78,7 @@ namespace Model.Concrete.Qnb
             return Quantity * (Product?.Price ?? 0m);
         }
 
-        // O anki fiyatý sabitleyen alanlar
+        // O anki fiyatÄ± sabitleyen alanlar
         public bool IsPriceCaptured { get; set; }
 
         [Precision(18, 2)]
