@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Model.Abstractions;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Model.Concrete.WorkFlows
 {
@@ -13,6 +14,13 @@ namespace Model.Concrete.WorkFlows
         public required string RequestNo { get; set; }
         public required long ProductId { get; set; }
         public Product Product { get; set; } = default!;
+
+        [NotMapped]
+        public string? ProductName { get; set; }
+
+        [NotMapped]
+        public string? ProductCode { get; set; }
+
         public Customer? Customer { get; set; } = default!;
         public required long CustomerId { get; set; }
         public int Quantity { get; set; }

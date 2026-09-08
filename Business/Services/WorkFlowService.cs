@@ -7393,7 +7393,7 @@ namespace Business.Services
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<WorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -7435,7 +7435,7 @@ namespace Business.Services
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<WorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -7645,7 +7645,7 @@ namespace Business.Services
             return result.ToList();
         }
 
-        private WorkFlowArchiveDetailDto BuildArchiveDetailDto(WorkFlowArchive archive)
+        private async Task<WorkFlowArchiveDetailDto> BuildArchiveDetailDtoAsync(WorkFlowArchive archive)
         {
             ServicesRequest? servicesRequest = null;
             List<ServicesRequestProduct> products = new();
@@ -7676,6 +7676,31 @@ namespace Business.Services
             try { pricing = JsonConvert.DeserializeObject<Pricing>(archive.PricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<FinalApproval>(archive.FinalApprovalJson); } catch { }
             try { workflowAttachments = JsonConvert.DeserializeObject<List<WorkflowAttachment>>(archive.WorkflowAttachmentsJson) ?? new(); } catch { workflowAttachments = new(); }
+
+            var productIdsToResolve = products
+                .Where(x => string.IsNullOrWhiteSpace(x.ProductName) || string.IsNullOrWhiteSpace(x.ProductCode))
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+            if (productIdsToResolve.Count > 0)
+            {
+                var productDetails = await _uow.Repository
+                    .GetQueryable<Product>()
+                    .AsNoTracking()
+                    .Where(x => productIdsToResolve.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Description, x.ProductCode })
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var product in products)
+                {
+                    if (!productDetails.TryGetValue(product.ProductId, out var detail))
+                        continue;
+
+                    product.ProductName ??= detail.Description;
+                    product.ProductCode ??= detail.ProductCode;
+                }
+            }
 
 
             // --------------------------------------------------------------------
@@ -7964,11 +7989,24 @@ namespace Business.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
 
-            var products = await _uow.Repository
+            var productRows = await _uow.Repository
                 .GetQueryable<ServicesRequestProduct>()
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
+                .Select(x => new
+                {
+                    Product = x,
+                    ProductName = x.Product.Description,
+                    ProductCode = x.Product.ProductCode
+                })
                 .ToListAsync(ct);
+
+            var products = productRows.Select(x =>
+            {
+                x.Product.ProductName = x.ProductName;
+                x.Product.ProductCode = x.ProductCode;
+                return x.Product;
+            }).ToList();
 
             // CustomerApprover
             ProgressApprover? customerApprover = null;

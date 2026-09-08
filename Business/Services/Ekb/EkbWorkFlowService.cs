@@ -8447,7 +8447,7 @@ namespace Business.Services.Ekb
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<EkbWorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -8489,7 +8489,7 @@ namespace Business.Services.Ekb
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<EkbWorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -8533,11 +8533,24 @@ namespace Business.Services.Ekb
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
 
-            var products = await _uow.Repository
+            var productRows = await _uow.Repository
                 .GetQueryable<EkbServicesRequestProduct>()
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
+                .Select(x => new
+                {
+                    Product = x,
+                    ProductName = x.Product.Description,
+                    ProductCode = x.Product.ProductCode
+                })
                 .ToListAsync(ct);
+
+            var products = productRows.Select(x =>
+            {
+                x.Product.ProductName = x.ProductName;
+                x.Product.ProductCode = x.ProductCode;
+                return x.Product;
+            }).ToList();
 
             // CustomerApprover
             ProgressApprover? customerApprover = null;
@@ -8880,7 +8893,7 @@ namespace Business.Services.Ekb
             return result.ToList();
         }
 
-        private EkbWorkFlowArchiveDetailDto BuildArchiveDetailDto(EkbWorkFlowArchive archive)
+        private async Task<EkbWorkFlowArchiveDetailDto> BuildArchiveDetailDtoAsync(EkbWorkFlowArchive archive)
         {
             EkbServicesRequest? servicesRequest = null;
             List<EkbServicesRequestProduct> products = new();
@@ -8911,6 +8924,31 @@ namespace Business.Services.Ekb
             try { pricing = JsonConvert.DeserializeObject<EkbPricing>(archive.EkbPricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<EkbFinalApproval>(archive.EkbFinalApprovalJson); } catch { }
             try { workflowAttachments = JsonConvert.DeserializeObject<List<EkbWorkflowAttachment>>(archive.EkbWorkflowAttachmentsJson) ?? new(); } catch { workflowAttachments = new(); }
+
+            var productIdsToResolve = products
+                .Where(x => string.IsNullOrWhiteSpace(x.ProductName) || string.IsNullOrWhiteSpace(x.ProductCode))
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+            if (productIdsToResolve.Count > 0)
+            {
+                var productDetails = await _uow.Repository
+                    .GetQueryable<Product>()
+                    .AsNoTracking()
+                    .Where(x => productIdsToResolve.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Description, x.ProductCode })
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var product in products)
+                {
+                    if (!productDetails.TryGetValue(product.ProductId, out var detail))
+                        continue;
+
+                    product.ProductName ??= detail.Description;
+                    product.ProductCode ??= detail.ProductCode;
+                }
+            }
 
 
             // --------------------------------------------------------------------
