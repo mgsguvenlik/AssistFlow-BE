@@ -14,6 +14,14 @@ namespace Model.Concrete.Ykb
         public required string RequestNo { get; set; }
         public required long ProductId { get; set; }
         public Product Product { get; set; } = default!;
+
+        // Arşiv snapshot'ında canlı ürün kaydından bağımsız olarak saklanır.
+        [NotMapped]
+        public string? ProductName { get; set; }
+
+        [NotMapped]
+        public string? ProductCode { get; set; }
+
         public Customer? Customer { get; set; } = default!;
         public long? CustomerId { get; set; }
         public int Quantity { get; set; }

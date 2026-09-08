@@ -6352,7 +6352,7 @@ namespace Business.Services.Qnb
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<QnbWorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -6394,7 +6394,7 @@ namespace Business.Services.Qnb
                     );
                 }
 
-                var dto = BuildArchiveDetailDto(archive);
+                var dto = await BuildArchiveDetailDtoAsync(archive);
                 return ResponseModel<QnbWorkFlowArchiveDetailDto>.Success(dto);
             }
             catch (Exception ex)
@@ -6436,11 +6436,24 @@ namespace Business.Services.Qnb
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.RequestNo == requestNo && !x.IsDeleted, ct);
 
-            var products = await _uow.Repository
+            var productRows = await _uow.Repository
                 .GetQueryable<QnbServicesRequestProduct>()
                 .AsNoTracking()
                 .Where(x => x.RequestNo == requestNo)
+                .Select(x => new
+                {
+                    Product = x,
+                    ProductName = x.Product.Description,
+                    ProductCode = x.Product.ProductCode
+                })
                 .ToListAsync(ct);
+
+            var products = productRows.Select(x =>
+            {
+                x.Product.ProductName = x.ProductName;
+                x.Product.ProductCode = x.ProductCode;
+                return x.Product;
+            }).ToList();
 
             ProgressApprover? customerApprover = null;
             if (servicesRequest.CustomerApproverId.HasValue)
@@ -6542,7 +6555,7 @@ namespace Business.Services.Qnb
             // Commit — çağıran tarafta yapılacak.
         }
 
-        private QnbWorkFlowArchiveDetailDto BuildArchiveDetailDto(QnbWorkFlowArchive archive)
+        private async Task<QnbWorkFlowArchiveDetailDto> BuildArchiveDetailDtoAsync(QnbWorkFlowArchive archive)
         {
             QnbServicesRequest? servicesRequest = null;
             List<QnbServicesRequestProduct> products = new();
@@ -6573,6 +6586,31 @@ namespace Business.Services.Qnb
             try { pricing = JsonConvert.DeserializeObject<QnbPricing>(archive.QnbPricingJson); } catch { }
             try { finalApproval = JsonConvert.DeserializeObject<QnbFinalApproval>(archive.QnbFinalApprovalJson); } catch { }
             try { attachments = JsonConvert.DeserializeObject<List<QnbWorkflowAttachment>>(archive.QnbWorkflowAttachmentsJson) ?? new(); } catch { attachments = new(); }
+
+            var productIdsToResolve = products
+                .Where(x => string.IsNullOrWhiteSpace(x.ProductName) || string.IsNullOrWhiteSpace(x.ProductCode))
+                .Select(x => x.ProductId)
+                .Distinct()
+                .ToList();
+
+            if (productIdsToResolve.Count > 0)
+            {
+                var productDetails = await _uow.Repository
+                    .GetQueryable<Product>()
+                    .AsNoTracking()
+                    .Where(x => productIdsToResolve.Contains(x.Id))
+                    .Select(x => new { x.Id, x.Description, x.ProductCode })
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var product in products)
+                {
+                    if (!productDetails.TryGetValue(product.ProductId, out var detail))
+                        continue;
+
+                    product.ProductName ??= detail.Description;
+                    product.ProductCode ??= detail.ProductCode;
+                }
+            }
 
             // --------------------------------------------------------------------
             //  🔹 IMAGE URL NORMALİZASYONU (FileUrl bazlı)
