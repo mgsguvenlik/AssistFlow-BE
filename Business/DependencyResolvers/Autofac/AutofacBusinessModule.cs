@@ -12,6 +12,8 @@ using Business.Interfaces.Ykb;
 using Business.Interfaces.Ekb;
 using Business.Services;
 using Business.Services.Crm;
+using Business.Services.Crm.Collections;
+using Core.Settings.Concrete;
 using Business.Services.Helpdesk;
 using Business.Services.Manitou;
 using Business.Services.PeriodicReports;
@@ -37,6 +39,8 @@ namespace Business.DependencyResolvers.Autofac
     {
         public void Load(IServiceCollection services)
         {
+            services.AddScoped<ICollectionContractReadService, CollectionContractReadService>();
+            services.AddOptions<CollectionReadOptions>().BindConfiguration(CollectionReadOptions.SectionName);
             services.AddScoped(typeof(IAuthService), typeof(AuthService));
             services.AddScoped(typeof(IBrandService), typeof(BrandService));
             services.AddScoped(typeof(ICityService), typeof(CityService));
