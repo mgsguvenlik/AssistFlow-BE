@@ -1,7 +1,8 @@
 namespace Business.Services.Crm.Collections.Calculation;
 
 /// <summary>
-/// Calendar primitives for the verified legacy month-based schedule.
+/// Month-interval calendar primitives preserving the supplied billing anchor day.
+/// Legacy month-only records retain day one; new contracts use their actual start day.
 /// Does not decide eligibility, freezing, exchange rates or create financial records.
 /// </summary>
 public static class CollectionPeriodRules
@@ -17,14 +18,12 @@ public static class CollectionPeriodRules
         DateOnly windowFrom,
         DateOnly windowToExclusive)
     {
-        if (effectiveFrom.Day != 1)
-            throw new ArgumentException("Legacy rate periods start on the first day of a month.", nameof(effectiveFrom));
         if (!IsSupportedInterval(intervalMonths))
             throw new ArgumentOutOfRangeException(nameof(intervalMonths));
         if (effectiveToExclusive.HasValue && effectiveToExclusive.Value <= effectiveFrom)
-            throw new ArgumentException("The end must follow the start.", nameof(effectiveToExclusive));
+            throw new ArgumentException("Bitiş tarihi başlangıç tarihinden sonra olmalıdır.", nameof(effectiveToExclusive));
         if (windowToExclusive <= windowFrom)
-            throw new ArgumentException("The query window must be non-empty.", nameof(windowToExclusive));
+            throw new ArgumentException("Sorgu tarih aralığı boş olamaz.", nameof(windowToExclusive));
 
         var upper = effectiveToExclusive.HasValue && effectiveToExclusive.Value < windowToExclusive
             ? effectiveToExclusive.Value : windowToExclusive;
@@ -36,15 +35,18 @@ public static class CollectionPeriodRules
         var anchor = MonthIndex(effectiveFrom);
         var difference = MonthIndex(lower) - anchor;
         var first = anchor + ((difference + intervalMonths - 1) / intervalMonths) * intervalMonths;
-        return Enumerate(first, intervalMonths, lower, upper);
+        return Enumerate(first, intervalMonths, effectiveFrom.Day, lower, upper);
     }
 
-    private static IEnumerable<DateOnly> Enumerate(int monthIndex, int interval, DateOnly lower, DateOnly upper)
+    private static IEnumerable<DateOnly> Enumerate(int monthIndex, int interval, int anchorDay, DateOnly lower, DateOnly upper)
     {
         const int lastMonthIndex = 9999 * 12 - 1;
         while (monthIndex <= lastMonthIndex)
         {
-            var candidate = new DateOnly(monthIndex / 12 + 1, monthIndex % 12 + 1, 1);
+            var year = monthIndex / 12 + 1;
+            var month = monthIndex % 12 + 1;
+            // Short months clamp locally; subsequent periods return to the original anchor day.
+            var candidate = new DateOnly(year, month, Math.Min(anchorDay, DateTime.DaysInMonth(year, month)));
             if (candidate >= upper)
                 yield break;
             if (candidate >= lower)
@@ -61,7 +63,7 @@ public static class CollectionPeriodRules
         if (!inclusiveEnd.HasValue)
             return null;
         if (inclusiveEnd.Value == DateOnly.MaxValue)
-            throw new ArgumentOutOfRangeException(nameof(inclusiveEnd), "An exclusive end cannot represent this source date.");
+            throw new ArgumentOutOfRangeException(nameof(inclusiveEnd), "Kaynak bitiş tarihi hariç bitiş tarihine dönüştürülemiyor.");
         return inclusiveEnd.Value.AddDays(1);
     }
 
@@ -77,9 +79,9 @@ public static class CollectionPeriodRules
         foreach (var period in ordered)
         {
             if (period.Id <= 0 || !identifiers.Add(period.Id))
-                throw new ArgumentException("Each source row needs a distinct positive identifier.", nameof(periods));
+                throw new ArgumentException("Her kaynak satırının farklı ve pozitif bir kimliği olmalıdır.", nameof(periods));
             if (period.EffectiveToExclusive.HasValue && period.EffectiveToExclusive.Value <= period.EffectiveFrom)
-                throw new ArgumentException("Reversed or empty ranges require separate validation.", nameof(periods));
+                throw new ArgumentException("Ters veya boş tarih aralıkları düzeltilmelidir.", nameof(periods));
         }
 
         var overlaps = new List<RatePeriodOverlap>();

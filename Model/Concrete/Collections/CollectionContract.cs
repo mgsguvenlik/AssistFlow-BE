@@ -18,5 +18,11 @@ public sealed class CollectionContract : AuditableWithUserEntity
     public DateOnly? EndDate { get; set; }
     public string? GtsNo { get; set; }
     public string? IvrNo { get; set; }
+    public long? SubscriptionStatusId { get; set; }
+    public CollectionSubscriptionStatus? SubscriptionStatus { get; set; }
+    public long? ContractStatusId { get; set; }
+    public CollectionContractStatus? ContractStatus { get; set; }
+    public long? PaymentMethodId { get; set; }
+    public CollectionPaymentMethod? PaymentMethod { get; set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }

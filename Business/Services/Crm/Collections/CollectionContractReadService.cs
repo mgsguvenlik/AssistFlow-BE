@@ -32,7 +32,7 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
         // Concurrent changes between count and page are possible; no snapshot guarantee is implied.
         var count = await CollectionContractReadQuery.Filter(source, query).CountAsync(cancellationToken);
         var items = await CollectionContractReadQuery.Page(source, query).ToListAsync(cancellationToken);
-        return ResponseModel<PagedResult<CollectionContractListItem>>.Success(new(items, count, query.Page, query.PageSize));
+        return ResponseModel<PagedResult<CollectionContractListItem>>.Success(new(items, count, query.Page, query.PageSize), "Sözleşmeler başarıyla getirildi.");
     }
 
     public async Task<ResponseModel<CollectionContractListItem>> GetDetailAsync(long id, CancellationToken cancellationToken = default)
@@ -46,6 +46,6 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
             .SingleOrDefaultAsync(cancellationToken);
         return item is null
             ? ResponseModel<CollectionContractListItem>.Fail("Sözleşme bulunamadı.", StatusCode.NotFound)
-            : ResponseModel<CollectionContractListItem>.Success(item);
+            : ResponseModel<CollectionContractListItem>.Success(item, "Sözleşme bilgileri başarıyla getirildi.");
     }
 }

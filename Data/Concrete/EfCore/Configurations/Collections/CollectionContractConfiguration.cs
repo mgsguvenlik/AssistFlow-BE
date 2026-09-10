@@ -11,13 +11,15 @@ public sealed class CollectionContractConfiguration : IEntityTypeConfiguration<C
     {
         builder.ToTable("Contract", "collection", table =>
         {
-            table.HasCheckConstraint("CK_Contract_StartMonth", "DAY([StartDate]) = 1");
             table.HasCheckConstraint("CK_Contract_DateRange", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
         builder.Property(x => x.StartDate).HasColumnType("date");
         builder.Property(x => x.EndDate).HasColumnType("date");
+        builder.HasOne(x => x.SubscriptionStatus).WithMany().HasForeignKey(x => x.SubscriptionStatusId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.ContractStatus).WithMany().HasForeignKey(x => x.ContractStatusId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.NoAction);
         builder.Property(x => x.GtsNo).HasMaxLength(50);
         builder.Property(x => x.IvrNo).HasMaxLength(50);
         builder.Property(x => x.RowVersion).IsRowVersion();

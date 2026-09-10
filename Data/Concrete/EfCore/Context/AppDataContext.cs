@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Data.Concrete.EfCore.Configurations;
+using Data.Concrete.EfCore.Configurations.Collections;
 using Model.Concrete;
 using Model.Concrete.Crm;
 using Model.Concrete.Helpdesk;
@@ -1448,6 +1449,16 @@ namespace Data.Concrete.EfCore.Context
                 entity.Property(x => x.MessageId).HasMaxLength(998);
                 entity.Property(x => x.InReplyTo).HasMaxLength(998);
             });
+            modelBuilder.ApplyConfiguration(new CollectionContractConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentFrequencyConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractRatePeriodConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentMethodConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionSubscriptionStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionGroupStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractPeriodFollowUpConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentOperationConfiguration());
         }
     }
 }

@@ -15,9 +15,9 @@ public static class PaymentCurrencyCandidateRules
         foreach (var candidate in candidates)
         {
             if (candidate.SourceRateId <= 0 || !identifiers.Add(candidate.SourceRateId))
-                throw new ArgumentException("Candidates must have distinct positive source rate identifiers.", nameof(candidates));
+                throw new ArgumentException("Adayların kaynak tarife kimlikleri farklı ve pozitif olmalıdır.", nameof(candidates));
             if (candidate.TargetCurrencyTypeId is <= 0)
-                throw new ArgumentException("Mapped currency identifiers must be positive.", nameof(candidates));
+                throw new ArgumentException("Eşlenen para birimi kimlikleri pozitif olmalıdır.", nameof(candidates));
             if (candidate.TargetCurrencyTypeId is int currencyId)
                 currencies.Add(currencyId);
             else

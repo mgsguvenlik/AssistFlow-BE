@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../Business/Services/Crm/Collections/Calculation/CollectionPaymentReplayRules.cs" Link="CollectionPaymentReplayRules.cs" />
+    <Compile Include="../../Business/Services/Crm/Collections/Calculation/LegacyCollectionDefinitionRules.cs" Link="LegacyCollectionDefinitionRules.cs" />
+    <Compile Include="../../Model/Concrete/Collections/CollectionBillingBehavior.cs" Link="CollectionBillingBehavior.cs" />
+    <Compile Include="../../Business/Services/Crm/Collections/Calculation/CollectionAccrualRules.cs" Link="CollectionAccrualRules.cs" />
     <Compile Include="../../Business/Services/Crm/Collections/Calculation/LegacyPaymentFrequencyRules.cs" Link="LegacyPaymentFrequencyRules.cs" />
     <Compile Include="../../Business/Services/Crm/Collections/Queries/CollectionFollowUpPaging.cs" Link="CollectionFollowUpPaging.cs" />
     <Compile Include="../../Business/Services/Crm/Collections/Calculation/PaymentCurrencyCandidateRules.cs" Link="PaymentCurrencyCandidateRules.cs" />

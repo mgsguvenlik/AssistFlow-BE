@@ -1,4 +1,5 @@
 using Business.Services.Crm.Collections.Calculation;
+using Model.Concrete.Collections;
 using Business.Services.Crm.Collections.Queries;
 using Model.Dtos.Crm.Collections;
 using System.ComponentModel.DataAnnotations;
@@ -52,8 +53,12 @@ Check("All legacy intervals use their actual cadence", () =>
 });
 Check("Unsupported intervals are rejected", () => Throws<ArgumentOutOfRangeException>(() =>
     CollectionPeriodRules.GetDueDates(D(2026, 1), null, 5, D(2026, 1), D(2027, 1))));
-Check("Mid-month tariff start is not silently rounded", () => Throws<ArgumentException>(() =>
-    CollectionPeriodRules.GetDueDates(D(2026, 1, 15), null, 1, D(2026, 1), D(2027, 1))));
+Check("Mid-month start renews on the same day", () => Dates([D(2026, 1, 15), D(2026, 2, 15)],
+    CollectionPeriodRules.GetDueDates(D(2026, 1, 15), null, 1, D(2026, 1), D(2026, 3))));
+Check("Short month retains original anniversary for later periods", () => Dates([D(2026, 1, 31), D(2026, 2, 28), D(2026, 3, 31)],
+    CollectionPeriodRules.GetDueDates(D(2026, 1, 31), null, 1, D(2026, 1), D(2026, 4))));
+Check("Leap February anniversary returns in a leap year", () => Dates([D(2025, 2, 28), D(2026, 2, 28), D(2027, 2, 28), D(2028, 2, 29)],
+    CollectionPeriodRules.GetDueDates(D(2024, 2, 29), null, 12, D(2025, 1), D(2029, 1))));
 Check("Empty query window is rejected", () => Throws<ArgumentException>(() =>
     CollectionPeriodRules.GetDueDates(D(2026, 1), null, 1, D(2026, 1), D(2026, 1))));
 Check("Reversed tariff is rejected", () => Throws<ArgumentException>(() =>
@@ -178,4 +183,86 @@ Check("Every mapped frequency is supported by calendar", () =>
     foreach (var id in Enumerable.Range(26, 8))
         Equal(true, CollectionPeriodRules.IsSupportedInterval(LegacyPaymentFrequencyRules.Resolve(id)!.IntervalMonths));
 });
+Check("Mid-period raise keeps renewal day and previous charge", () =>
+{
+    var result = CollectionAccrualRules.Calculate([
+        new(1, D(2026, 1, 15), D(2026, 2, 20), D(2026, 1, 15), 1, 1000m, 1, CollectionBillingBehavior.Billable),
+        new(2, D(2026, 2, 20), null, D(2026, 1, 15), 1, 1500m, 1, CollectionBillingBehavior.Billable)
+    ], D(2026, 1), D(2026, 4));
+    Equal(3, result.Count);
+    Equal(new CollectionCharge(1, D(2026, 2, 15), 1000m, 1), result[1]);
+    Equal(new CollectionCharge(2, D(2026, 3, 15), 1500m, 1), result[2]);
+});
+Check("Suspension creates no catch-up debt on reactivation", () =>
+{
+    var result = CollectionAccrualRules.Calculate([
+        new(1, D(2026, 1, 15), D(2026, 2, 1), D(2026, 1, 15), 1, 1000m, 1, CollectionBillingBehavior.Billable),
+        new(2, D(2026, 2, 1), D(2026, 4, 10), D(2026, 1, 15), 1, 1000m, 1, CollectionBillingBehavior.Suspended),
+        new(3, D(2026, 4, 10), null, D(2026, 4, 10), 1, 1000m, 1, CollectionBillingBehavior.Billable)
+    ], D(2026, 1), D(2026, 6));
+    Equal(3, result.Count);
+    Equal(D(2026, 4, 10), result[1].DueDate);
+    Equal(D(2026, 5, 10), result[2].DueDate);
+});
+Check("Free tariff with nonzero source amount produces no charge", () => Equal(0,
+    CollectionAccrualRules.Calculate([new(1, D(2026, 1), null, D(2026, 1), 1, 1000m, 1,
+        CollectionBillingBehavior.Free)], D(2026, 1), D(2027, 1)).Count));
+Check("Quarterly amount is charged in full without monthly allocation", () =>
+{
+    var result = CollectionAccrualRules.Calculate([new(1, D(2026, 1, 15), null, D(2026, 1, 15), 3, 3000m, 1,
+        CollectionBillingBehavior.Billable)], D(2026, 1), D(2026, 7));
+    Equal(2, result.Count);
+    Equal(3000m, result[1].Amount);
+    Equal(D(2026, 4, 15), result[1].DueDate);
+});
+Check("Missing currency cannot become zero debt", () => Throws<ArgumentException>(() =>
+    CollectionAccrualRules.Calculate([new(1, D(2026, 1), null, D(2026, 1), 1, 1000m, null,
+        CollectionBillingBehavior.Billable)], D(2026, 1), D(2027, 1))));
+Check("Missing timeline cannot become zero debt", () => Throws<ArgumentException>(() =>
+    CollectionAccrualRules.Calculate([], D(2026, 1), D(2027, 1))));
+Check("Overlapping tariffs never double bill", () => Throws<ArgumentException>(() =>
+    CollectionAccrualRules.Calculate([
+        new(1, D(2026, 1), null, D(2026, 1), 1, 1000m, 1, CollectionBillingBehavior.Billable),
+        new(2, D(2026, 2), null, D(2026, 1), 1, 1500m, 1, CollectionBillingBehavior.Billable)
+    ], D(2026, 1), D(2027, 1))));
+Check("Gaps are not silently treated as free periods", () => Throws<ArgumentException>(() =>
+    CollectionAccrualRules.Calculate([
+        new(1, D(2026, 1), D(2026, 2), D(2026, 1), 1, 1000m, 1, CollectionBillingBehavior.Billable),
+        new(2, D(2026, 3), null, D(2026, 1), 1, 1500m, 1, CollectionBillingBehavior.Billable)
+    ], D(2026, 1), D(2027, 1))));
+Check("Separate POS identities remain separate", () =>
+{
+    Equal("FINANSBANK_POS", LegacyCollectionDefinitionRules.PaymentMethod(48));
+    Equal("ISBANK_POS", LegacyCollectionDefinitionRules.PaymentMethod(56));
+});
+Check("Free method preserves source meaning without billing conversion", () => Equal("LEGACY_FREE", LegacyCollectionDefinitionRules.PaymentMethod(55)));
+Check("Contract status does not become subscription status", () =>
+{
+    Equal("EXISTS", LegacyCollectionDefinitionRules.ContractStatus(13));
+    Equal("NONE", LegacyCollectionDefinitionRules.ContractStatus(15));
+    Equal("UNKNOWN", LegacyCollectionDefinitionRules.ContractStatus(14));
+});
+Check("Unknown definition identities have no fallback", () =>
+{
+    foreach (int? id in new int?[] { null, -1, 0, 999 })
+    {
+        Equal<string?>(null, LegacyCollectionDefinitionRules.PaymentMethod(id));
+        Equal<string?>(null, LegacyCollectionDefinitionRules.ContractStatus(id));
+        Equal<string?>(null, LegacyCollectionDefinitionRules.SubscriptionStatus(id));
+        Equal<string?>(null, LegacyCollectionDefinitionRules.GroupStatus(id));
+    }
+});
+Check("All group labels retain distinct identities", () => Equal(7,
+    Enumerable.Range(1, 7).Select(id => LegacyCollectionDefinitionRules.GroupStatus(id)).Distinct().Count()));
+Check("Same actor and payload can replay a committed receipt", () => Equal(true,
+    CollectionPaymentReplayRules.CanReplay(1, 1, new byte[32], new byte[32])));
+Check("Different payload cannot reuse a request", () =>
+{
+    var changed = new byte[32]; changed[31] = 1;
+    Equal(false, CollectionPaymentReplayRules.CanReplay(1, 1, new byte[32], changed));
+});
+Check("Another user cannot replay a receipt", () => Equal(false,
+    CollectionPaymentReplayRules.CanReplay(1, 2, new byte[32], new byte[32])));
+Check("Missing payload hash is rejected", () => Throws<ArgumentException>(() =>
+    CollectionPaymentReplayRules.CanReplay(1, 1, [], new byte[32])));
 Console.WriteLine($"{passed} offline collection checks passed. No database access.");

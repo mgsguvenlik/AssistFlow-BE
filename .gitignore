@@ -352,3 +352,4 @@ healthchecksdb
 /WebAPI/wwwroot/uploads/
 
 /WebAPI/UploadsStorage/
+/.tools/

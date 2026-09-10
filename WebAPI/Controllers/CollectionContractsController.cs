@@ -11,6 +11,7 @@ namespace WebAPI.Controllers;
 
 [Authorize]
 [ApiController]
+[CollectionValidation]
 [Route("api/collections/contracts")]
 public sealed class CollectionContractsController(IOptions<CollectionReadOptions> options) : ControllerBase
 {

@@ -4,11 +4,11 @@ namespace Model.Dtos.Crm.Collections;
 
 public sealed class CollectionContractQuery : IValidatableObject
 {
-    [Range(1, int.MaxValue)] public int Page { get; set; } = 1;
-    [Range(1, 100)] public int PageSize { get; set; } = 25;
-    [Range(1, long.MaxValue)] public long? CustomerId { get; set; }
-    [Range(1, long.MaxValue)] public long? ServiceTypeId { get; set; }
-    [StringLength(200)] public string? Search { get; set; }
+    [Range(1, int.MaxValue, ErrorMessage = "Sayfa numarası en az 1 olmalıdır.")] public int Page { get; set; } = 1;
+    [Range(1, 100, ErrorMessage = "Sayfa başına kayıt sayısı 1 ile 100 arasında olmalıdır.")] public int PageSize { get; set; } = 25;
+    [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir müşteri seçilmelidir.")] public long? CustomerId { get; set; }
+    [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir servis tipi seçilmelidir.")] public long? ServiceTypeId { get; set; }
+    [StringLength(200, ErrorMessage = "Arama metni en fazla 200 karakter olabilir.")] public string? Search { get; set; }
     public CollectionContractSort SortBy { get; set; } = CollectionContractSort.Id;
     public bool Desc { get; set; } = true;
 

@@ -5,13 +5,13 @@ namespace Model.Dtos.Crm.Collections;
 /// <summary>Read-only follow-up query contract. Contains no SQL expressions or tenant scope.</summary>
 public sealed class CollectionFollowUpQuery : IValidatableObject
 {
-    [Range(1, int.MaxValue)]
+    [Range(1, int.MaxValue, ErrorMessage = "Sayfa numarası en az 1 olmalıdır.")]
     public int Page { get; set; } = 1;
 
-    [Range(1, 100)]
+    [Range(1, 100, ErrorMessage = "Sayfa başına kayıt sayısı 1 ile 100 arasında olmalıdır.")]
     public int PageSize { get; set; } = 25;
 
-    [StringLength(200)]
+    [StringLength(200, ErrorMessage = "Arama metni en fazla 200 karakter olabilir.")]
     public string? Search { get; set; }
 
     public CollectionFollowUpView View { get; set; } = CollectionFollowUpView.Individual;
@@ -23,13 +23,13 @@ public sealed class CollectionFollowUpQuery : IValidatableObject
     public DateOnly? PaymentDateTo { get; set; }
     public DateOnly? AsOfDate { get; set; }
 
-    [Range(1, long.MaxValue)]
+    [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir müşteri seçilmelidir.")]
     public long? CustomerId { get; set; }
 
-    [Range(1, long.MaxValue)]
+    [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir servis tipi seçilmelidir.")]
     public long? ServiceTypeId { get; set; }
 
-    [Range(1, long.MaxValue)]
+    [Range(1, long.MaxValue, ErrorMessage = "Geçerli bir para birimi seçilmelidir.")]
     public long? CurrencyTypeId { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
