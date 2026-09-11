@@ -5543,6 +5543,24 @@ namespace Business.Services.Ykb
                     approverTechnician
                 };
 
+            if (q.PlannedCompletionDateIsNull == true)
+            {
+                qJoined = qJoined.Where(x => x.sr != null && !x.sr.PlannedCompletionDate.HasValue);
+            }
+            else if (q.PlannedCompletionDate.HasValue)
+            {
+                var plannedCompletionDateStart = new DateTimeOffset(
+                    q.PlannedCompletionDate.Value.Date,
+                    q.PlannedCompletionDate.Value.Offset);
+                var plannedCompletionDateEnd = plannedCompletionDateStart.AddDays(1);
+
+                qJoined = qJoined.Where(x =>
+                    x.sr != null &&
+                    x.sr.PlannedCompletionDate.HasValue &&
+                    x.sr.PlannedCompletionDate.Value >= plannedCompletionDateStart &&
+                    x.sr.PlannedCompletionDate.Value < plannedCompletionDateEnd);
+            }
+
             // Servis maliyet durumu filtresi
             if (q.ServicesCostStatus.HasValue)
             {
@@ -6201,6 +6219,10 @@ namespace Business.Services.Ykb
                         : x.cfCustomer != null
                             ? x.cfCustomer.SubscriberAddress
                             : null,
+
+                    PlannedCompletionDate = x.sr == null
+                        ? null
+                        : x.sr.PlannedCompletionDate,
 
                     CurrentStep = x.step == null
                         ? null
