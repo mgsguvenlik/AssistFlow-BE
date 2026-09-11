@@ -30,6 +30,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow
         public string? CustomerCode { get; set; }
         public string? CustomerName { get; set; }
         public string? CustomerAddress { get; set; }
+        public DateTimeOffset? PlannedCompletionDate { get; set; }
         public UserGetDto? ApproverTechnician { get; set; }
     }
 
