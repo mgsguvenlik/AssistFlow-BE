@@ -18,6 +18,8 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbWorkFlow
 
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }
+        public DateTimeOffset? PlannedCompletionDate { get; set; }
+        public bool? PlannedCompletionDateIsNull { get; set; }
 
         // Yeni filtreler
         public ServicesCostStatus? ServicesCostStatus { get; set; }
