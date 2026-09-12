@@ -14,6 +14,7 @@ using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Queries;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -8284,8 +8285,9 @@ namespace Business.Services.Ekb
         {
             try
             {
-                var q = _uow.Repository
-                    .GetQueryable<EkbWorkFlowArchive>()
+                // The archive query and product subquery must share the same context instance.
+                var q = _ctx
+                    .Set<EkbWorkFlowArchive>()
                     .AsNoTracking();
 
                 // --- DB taraflı filtreler ---
@@ -8311,6 +8313,8 @@ namespace Business.Services.Ekb
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
                 }
 
+                q = ApplyArchiveTextFilters(q, filter);
+
                 // --- Projection: sadece gereken kolonlar ---
                 var projected = q
                     .Select(a => new
@@ -8323,7 +8327,8 @@ namespace Business.Services.Ekb
                         a.ApproverTechnicianJson,
                         a.EkbWorkFlowJson
                     })
-                    .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
+                    .OrderByDescending(x => x.ArchivedAt)
+                    .ThenByDescending(x => x.Id); // En son arşivler üstte
 
                 // --- Sayfalama parametreleri ---
                 var page = filter.Page <= 0 ? 1 : filter.Page;
@@ -8390,26 +8395,6 @@ namespace Business.Services.Ekb
                     });
                 }
 
-                // (Opsiyonel) CustomerName / Name filtrelerini sadece bu sayfa üzerinde uygula
-                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
-                {
-                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
-                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
-                        .ToList();
-                    // Not: totalCount DB'den geldiği için bu filtreyi totalCount'a yansıtmıyoruz.
-                }
-
-                if (!string.IsNullOrWhiteSpace(filter.Name))
-                {
-                    var tn = filter.Name.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.Name) &&
-                                    x.Name!.ToLowerInvariant().Contains(tn))
-                        .ToList();
-                }
-
                 // --- Sonuç ---
                 var paged = new PagedResult<EkbWorkFlowArchiveListDto>(
                     Items: list,
@@ -8428,6 +8413,33 @@ namespace Business.Services.Ekb
                     StatusCode.Error
                 );
             }
+        }
+
+        private IQueryable<EkbWorkFlowArchive> ApplyArchiveTextFilters(IQueryable<EkbWorkFlowArchive> query, EkbWorkFlowArchiveFilterDto filter)
+        {
+            if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+            {
+                var pattern = $"%{filter.CustomerName.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.CustomerJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.Name))
+            {
+                var pattern = $"%{filter.Name.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.ApproverTechnicianJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                var pattern = $"%{filter.SearchText.Trim()}%";
+                var matchingProductArchives = ArchiveProductSearch.MatchingArchiveIds<EkbWorkFlowArchive>(_ctx, pattern);
+                query = query.Where(x => EF.Functions.Like(x.RequestNo, pattern) || EF.Functions.Like(x.ArchiveReason, pattern) ||
+                    EF.Functions.Like(x.CustomerJson, pattern) || EF.Functions.Like(x.ApproverTechnicianJson, pattern) || EF.Functions.Like(x.CustomerApproverJson, pattern) ||
+                    EF.Functions.Like(x.EkbWorkFlowJson, pattern) || EF.Functions.Like(x.EkbServicesRequestJson, pattern) || EF.Functions.Like(x.EkbServicesRequestProductsJson, pattern) ||
+                    EF.Functions.Like(x.EkbWorkFlowReviewLogsJson, pattern) || EF.Functions.Like(x.EkbTechnicalServiceJson, pattern) || EF.Functions.Like(x.EkbWarehouseJson, pattern) ||
+                    EF.Functions.Like(x.EkbPricingJson, pattern) || EF.Functions.Like(x.EkbFinalApprovalJson, pattern) ||
+                    (x.EkbWorkflowAttachmentsJson != null && EF.Functions.Like(x.EkbWorkflowAttachmentsJson, pattern)) ||
+                    matchingProductArchives.Contains(x.Id));
+            }
+            return query;
         }
 
         public async Task<ResponseModel<EkbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id)

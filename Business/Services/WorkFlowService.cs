@@ -12,6 +12,7 @@ using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Queries;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -7231,8 +7232,9 @@ namespace Business.Services
         {
             try
             {
-                var q = _uow.Repository
-                    .GetQueryable<WorkFlowArchive>()
+                // The archive query and product subquery must share the same context instance.
+                var q = _ctx
+                    .Set<WorkFlowArchive>()
                     .AsNoTracking();
 
                 // --- DB taraflı filtreler ---
@@ -7258,6 +7260,8 @@ namespace Business.Services
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
                 }
 
+                q = ApplyArchiveTextFilters(q, filter);
+
                 // --- Projection: sadece gereken kolonlar ---
                 var projected = q
                     .Select(a => new
@@ -7270,7 +7274,8 @@ namespace Business.Services
                         a.ApproverTechnicianJson,
                         a.WorkFlowJson
                     })
-                    .OrderByDescending(x => x.ArchivedAt); // En son arşivler üstte
+                    .OrderByDescending(x => x.ArchivedAt)
+                    .ThenByDescending(x => x.Id); // En son arşivler üstte
 
                 // --- Sayfalama parametreleri ---
                 var page = filter.Page <= 0 ? 1 : filter.Page;
@@ -7337,29 +7342,10 @@ namespace Business.Services
                     });
                 }
 
-                // --- JSON içi filtreler (in-memory, sadece bu sayfa üzerinde) ---
-                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
-                {
-                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
-                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
-                        .ToList();
-                }
-
-                if (!string.IsNullOrWhiteSpace(filter.Name))
-                {
-                    var tn = filter.Name.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.Name) &&
-                                    x.Name!.ToLowerInvariant().Contains(tn))
-                        .ToList();
-                }
-
                 // --- Sonuç ---
                 var paged = new PagedResult<WorkFlowArchiveListDto>(
                     Items: list,
-                    TotalCount: totalCount, // Not: totalCount JSON filtrelerini içermiyor
+                    TotalCount: totalCount,
                     Page: page,
                     PageSize: pageSize
                 );
@@ -7374,6 +7360,33 @@ namespace Business.Services
                     StatusCode.Error
                 );
             }
+        }
+
+        private IQueryable<WorkFlowArchive> ApplyArchiveTextFilters(IQueryable<WorkFlowArchive> query, WorkFlowArchiveFilterDto filter)
+        {
+            if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+            {
+                var pattern = $"%{filter.CustomerName.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.CustomerJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.Name))
+            {
+                var pattern = $"%{filter.Name.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.ApproverTechnicianJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                var pattern = $"%{filter.SearchText.Trim()}%";
+                var matchingProductArchives = ArchiveProductSearch.MatchingArchiveIds<WorkFlowArchive>(_ctx, pattern);
+                query = query.Where(x => EF.Functions.Like(x.RequestNo, pattern) || EF.Functions.Like(x.ArchiveReason, pattern) ||
+                    EF.Functions.Like(x.CustomerJson, pattern) || EF.Functions.Like(x.ApproverTechnicianJson, pattern) || EF.Functions.Like(x.CustomerApproverJson, pattern) ||
+                    EF.Functions.Like(x.WorkFlowJson, pattern) || EF.Functions.Like(x.ServicesRequestJson, pattern) || EF.Functions.Like(x.ServicesRequestProductsJson, pattern) ||
+                    EF.Functions.Like(x.WorkFlowReviewLogsJson, pattern) || EF.Functions.Like(x.TechnicalServiceJson, pattern) || EF.Functions.Like(x.WarehouseJson, pattern) ||
+                    EF.Functions.Like(x.PricingJson, pattern) || EF.Functions.Like(x.FinalApprovalJson, pattern) ||
+                    (x.WorkflowAttachmentsJson != null && EF.Functions.Like(x.WorkflowAttachmentsJson, pattern)) ||
+                    matchingProductArchives.Contains(x.Id));
+            }
+            return query;
         }
 
         public async Task<ResponseModel<WorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id)
