@@ -13,6 +13,7 @@ using Core.Utilities.Constants;
 using Core.Utilities.IoC;
 using Dapper;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Queries;
 using Mapster;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -6212,8 +6213,9 @@ namespace Business.Services.Qnb
         {
             try
             {
-                var q = _uow.Repository
-                    .GetQueryable<QnbWorkFlowArchive>()
+                // The archive query and product subquery must share the same context instance.
+                var q = _ctx
+                    .Set<QnbWorkFlowArchive>()
                     .AsNoTracking();
 
                 if (!string.IsNullOrWhiteSpace(filter.RequestNo))
@@ -6234,6 +6236,8 @@ namespace Business.Services.Qnb
                 if (filter.ArchivedTo.HasValue)
                     q = q.Where(x => x.ArchivedAt <= filter.ArchivedTo.Value);
 
+                q = ApplyArchiveTextFilters(q, filter);
+
                 var projected = q
                     .Select(a => new
                     {
@@ -6245,7 +6249,8 @@ namespace Business.Services.Qnb
                         a.ApproverTechnicianJson,
                         a.QnbWorkFlowJson
                     })
-                    .OrderByDescending(x => x.ArchivedAt);
+                    .OrderByDescending(x => x.ArchivedAt)
+                    .ThenByDescending(x => x.Id);
 
                 var page = filter.Page <= 0 ? 1 : filter.Page;
                 var pageSize = filter.PageSize <= 0 ? 50 : filter.PageSize;
@@ -6298,24 +6303,6 @@ namespace Business.Services.Qnb
                     });
                 }
 
-                if (!string.IsNullOrWhiteSpace(filter.CustomerName))
-                {
-                    var cn = filter.CustomerName.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.CustomerName) &&
-                                    x.CustomerName!.ToLowerInvariant().Contains(cn))
-                        .ToList();
-                }
-
-                if (!string.IsNullOrWhiteSpace(filter.Name))
-                {
-                    var tn = filter.Name.Trim().ToLowerInvariant();
-                    list = list
-                        .Where(x => !string.IsNullOrEmpty(x.Name) &&
-                                    x.Name!.ToLowerInvariant().Contains(tn))
-                        .ToList();
-                }
-
                 var paged = new PagedResult<QnbWorkFlowArchiveListDto>(
                     Items: list,
                     TotalCount: totalCount,
@@ -6333,6 +6320,33 @@ namespace Business.Services.Qnb
                     StatusCode.Error
                 );
             }
+        }
+
+        private IQueryable<QnbWorkFlowArchive> ApplyArchiveTextFilters(IQueryable<QnbWorkFlowArchive> query, QnbWorkFlowArchiveFilterDto filter)
+        {
+            if (!string.IsNullOrWhiteSpace(filter.CustomerName))
+            {
+                var pattern = $"%{filter.CustomerName.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.CustomerJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.Name))
+            {
+                var pattern = $"%{filter.Name.Trim()}%";
+                query = query.Where(x => EF.Functions.Like(x.ApproverTechnicianJson, pattern));
+            }
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                var pattern = $"%{filter.SearchText.Trim()}%";
+                var matchingProductArchives = ArchiveProductSearch.MatchingArchiveIds<QnbWorkFlowArchive>(_ctx, pattern);
+                query = query.Where(x => EF.Functions.Like(x.RequestNo, pattern) || EF.Functions.Like(x.ArchiveReason, pattern) ||
+                    EF.Functions.Like(x.CustomerJson, pattern) || EF.Functions.Like(x.ApproverTechnicianJson, pattern) || EF.Functions.Like(x.CustomerApproverJson, pattern) ||
+                    EF.Functions.Like(x.QnbWorkFlowJson, pattern) || EF.Functions.Like(x.QnbServicesRequestJson, pattern) || EF.Functions.Like(x.QnbServicesRequestProductsJson, pattern) ||
+                    EF.Functions.Like(x.QnbWorkFlowReviewLogsJson, pattern) || EF.Functions.Like(x.QnbTechnicalServiceJson, pattern) || EF.Functions.Like(x.QnbWarehouseJson, pattern) ||
+                    EF.Functions.Like(x.QnbPricingJson, pattern) || EF.Functions.Like(x.QnbFinalApprovalJson, pattern) ||
+                    (x.QnbWorkflowAttachmentsJson != null && EF.Functions.Like(x.QnbWorkflowAttachmentsJson, pattern)) ||
+                    matchingProductArchives.Contains(x.Id));
+            }
+            return query;
         }
 
         public async Task<ResponseModel<QnbWorkFlowArchiveDetailDto>> GetArchiveDetailByIdAsync(long id)
