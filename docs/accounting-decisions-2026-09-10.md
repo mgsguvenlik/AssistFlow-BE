@@ -1,5 +1,7 @@
 # Muhasebe kararları — 10 Eylül 2026
 
+> Güncelleme: 11 Eylül kullanıcı açıklaması ve teknik karar yetkisiyle VAR/YOK/boş ve başlangıç sınırları kapatılmıştır. Güncel kaynak `accounting-decisions-2026-09-11.md`; aşağıdaki bekleme maddeleri tarihsel kayıttır.
+
 Bu belge müşterinin yeni cevaplarını kaydeder ve önceki teknik varsayımların yerine geçer. Önceki belgeler tarihsel kanıttır, yeni cevaplarla çelişen bölümleri uygulama kuralı değildir.
 
 ## Kabul edilen cevaplar
