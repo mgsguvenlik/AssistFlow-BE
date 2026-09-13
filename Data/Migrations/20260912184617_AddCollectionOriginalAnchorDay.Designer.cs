@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260912184617_AddCollectionOriginalAnchorDay")]
+    partial class AddCollectionOriginalAnchorDay
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -113,12 +116,6 @@ namespace Data.Migrations
                     b.Property<long>("CreatedUser")
                         .HasColumnType("bigint");
 
-                    b.Property<byte[]>("CreationPayloadHash")
-                        .HasColumnType("varbinary(32)");
-
-                    b.Property<Guid?>("CreationRequestId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<long>("CustomerId")
                         .HasColumnType("bigint");
 
@@ -164,11 +161,6 @@ namespace Data.Migrations
 
                     b.HasIndex("ContractStatusId");
 
-                    b.HasIndex("CreationRequestId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Contract_CreationRequestId")
-                        .HasFilter("[CreationRequestId] IS NOT NULL");
-
                     b.HasIndex("PaymentMethodId");
 
                     b.HasIndex("SubscriptionStatusId");
@@ -183,8 +175,6 @@ namespace Data.Migrations
 
                     b.ToTable("Contract", "collection", t =>
                         {
-                            t.HasCheckConstraint("CK_Contract_CreationRequest", "([CreationRequestId] IS NULL AND [CreationPayloadHash] IS NULL) OR ([CreationRequestId] IS NOT NULL AND [CreationPayloadHash] IS NOT NULL AND DATALENGTH([CreationPayloadHash]) = 32)");
-
                             t.HasCheckConstraint("CK_Contract_DateRange", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
                         });
                 });

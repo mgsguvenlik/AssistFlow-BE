@@ -65,11 +65,35 @@ var migration = new Data.Migrations.AddCollectionFoundation
 {
     ActiveProvider = "Microsoft.EntityFrameworkCore.SqlServer"
 };
-var migrationSql = draftContext.GetService<IMigrationsSqlGenerator>().Generate(migration.UpOperations, draft);
-Check("Committed migration exactly matches module-only model delta", migrationSql.Select(x => x.CommandText)
-    .SequenceEqual(schemaCommands.Select(x => x.CommandText)));
+var foundationModel = draftContext.GetService<IModelRuntimeInitializer>().Initialize(migration.TargetModel, true);
+Check("Foundation migration remains limited to collection additions", migration.UpOperations.All(x => x switch
+{
+    EnsureSchemaOperation s => s.Name == "collection",
+    CreateTableOperation t => t.Schema == "collection",
+    CreateIndexOperation i => i.Schema == "collection",
+    _ => false
+}) && migration.UpOperations.OfType<CreateTableOperation>().Count() == 10);
+var dayMigration = new Data.Migrations.AddCollectionOriginalAnchorDay { ActiveProvider = "Microsoft.EntityFrameworkCore.SqlServer" };
+var dayModel = draftContext.GetService<IModelRuntimeInitializer>().Initialize(dayMigration.TargetModel, true);
+var dayDelta = draftContext.GetService<IMigrationsModelDiffer>().GetDifferences(foundationModel.GetRelationalModel(), dayModel.GetRelationalModel());
+Check("Renewal migration contains only nullable day and collection constraint", dayMigration.UpOperations.Count == 2
+    && dayMigration.UpOperations.All(x => x is AddColumnOperation { Schema: "collection", Table: "ContractRatePeriod", Name: "OriginalAnchorDay", IsNullable: true }
+        or AddCheckConstraintOperation { Schema: "collection", Table: "ContractRatePeriod", Name: "CK_ContractRatePeriod_OriginalDay" }));
+Check("Renewal migration matches exact model delta", draftContext.GetService<IMigrationsSqlGenerator>().Generate(dayMigration.UpOperations, draft).Select(x => x.CommandText)
+    .SequenceEqual(draftContext.GetService<IMigrationsSqlGenerator>().Generate(dayDelta, draft).Select(x => x.CommandText)));
+var createMigration = new Data.Migrations.AddCollectionContractCreationRequest { ActiveProvider = "Microsoft.EntityFrameworkCore.SqlServer" };
+var createDelta = draftContext.GetService<IMigrationsModelDiffer>().GetDifferences(dayModel.GetRelationalModel(), draft.GetRelationalModel());
+Check("Creation request migration matches model delta", draftContext.GetService<IMigrationsSqlGenerator>().Generate(createMigration.UpOperations, draft).Select(x => x.CommandText)
+    .SequenceEqual(draftContext.GetService<IMigrationsSqlGenerator>().Generate(createDelta, draft).Select(x => x.CommandText)));
+Check("Creation migration only adds contract request metadata", createMigration.UpOperations.Count == 4 && createMigration.UpOperations.All(x => x switch
+{
+    AddColumnOperation c => c.Schema == "collection" && c.Table == "Contract" && c.IsNullable && c.Name is "CreationRequestId" or "CreationPayloadHash",
+    AddCheckConstraintOperation c => c.Schema == "collection" && c.Table == "Contract",
+    CreateIndexOperation i => i.Schema == "collection" && i.Table == "Contract" && i.IsUnique,
+    _ => false
+}));
 Check("Migration target matches active model", !draftContext.GetService<IMigrationsModelDiffer>()
-    .HasDifferences(draftContext.GetService<IModelRuntimeInitializer>().Initialize(migration.TargetModel, true)
+    .HasDifferences(draftContext.GetService<IModelRuntimeInitializer>().Initialize(createMigration.TargetModel, true)
         .GetRelationalModel(), draft.GetRelationalModel()));
 Check("Contract uses collection schema", contract.GetSchema() == "collection" && contract.GetTableName() == "Contract");
 Check("Identity is generated bigint", contract.FindPrimaryKey()!.Properties.Single().Name == "Id"
@@ -94,8 +118,8 @@ Check("Date columns preserve nullable inclusive end", contract.FindProperty("Sta
 Check("Source references are nullable bounded nonunique values", new[] { "GtsNo", "IvrNo" }.All(name =>
     contract.FindProperty(name) is { IsNullable: true } p && p.GetMaxLength() == 50
     && !contract.GetIndexes().Any(i => i.IsUnique && i.Properties.Any(x => x.Name == name))));
-Check("Date range constraint permits anniversary-day starts", contract.GetCheckConstraints().Count() == 1
-    && contract.GetCheckConstraints().Single().Name == "CK_Contract_DateRange");
+Check("Date range constraint permits anniversary-day starts", contract.GetCheckConstraints().Any(x => x.Name == "CK_Contract_DateRange")
+    && contract.GetCheckConstraints().Count() == 2);
 Check("Lookup indexes have stable descending identity", contract.GetIndexes().Count(i => i.Properties.Count == 3) == 2
     && contract.GetIndexes().Where(i => i.Properties.Count == 3).All(i => !i.IsUnique && i.IsDescending!.SequenceEqual(new[] { false, false, true })));
 Check("Optional definitions never cascade", contract.GetForeignKeys().Where(fk => fk.Properties.Single().Name is
@@ -138,7 +162,7 @@ Check("Rate uses isolated collection table", rate.GetSchema() == "collection" &&
 Check("Rate references never cascade", rate.GetForeignKeys().Count() == 3 && rate.GetForeignKeys().All(x => x.DeleteBehavior == DeleteBehavior.NoAction));
 Check("Rate uses existing currency entity", rate.GetForeignKeys().Single(x => x.Properties.Single().Name == "CurrencyTypeId").PrincipalEntityType.ClrType == typeof(CurrencyType));
 Check("Rate money has explicit precision", rate.FindProperty("Amount")!.GetPrecision() == 18 && rate.FindProperty("Amount")!.GetScale() == 2);
-Check("Rate has separate billing anchor", rate.FindProperty("BillingAnchor")!.GetColumnType() == "date" && rate.GetCheckConstraints().Count() == 5);
+Check("Rate has separate billing anchor", rate.FindProperty("BillingAnchor")!.GetColumnType() == "date" && rate.GetCheckConstraints().Count() == 6);
 Check("Rate concurrency and active uniqueness are configured", rate.FindProperty("RowVersion")!.IsConcurrencyToken
     && rate.GetIndexes().Count(x => x.IsUnique) == 2);
 var contracts = draftContext.Set<CollectionContract>();
@@ -176,8 +200,9 @@ var filteredSql = CollectionContractReadQuery.Filter(contracts,
 Check("Filter SQL is unpaged and parameterized", !filteredSql.Contains("OFFSET")
     && filteredSql.Contains("DECLARE @") && filteredSql.Contains("[IsDeleted]"));
 var detailSql = CollectionContractReadQuery.Detail(contracts, 7).ToQueryString();
-Check("Detail projects only bounded identity fields", !detailSql.Contains("[Phone1]")
-    && !detailSql.Contains("[RowVersion]") && !detailSql.Contains("OFFSET") && detailSql.Contains("[Id] ="));
+Check("Detail projects bounded fields without financial history or shared personal fields", !detailSql.Contains("[Phone1]")
+    && !detailSql.Contains("[CreationPayloadHash]") && !detailSql.Contains("[ContractRatePeriod]")
+    && !detailSql.Contains("OFFSET") && detailSql.Contains("[Id] ="));
 var rejected = false;
 try { CollectionContractReadQuery.Page(contracts, new() { PageSize = 101 }); }
 catch (ValidationException) { rejected = true; }
@@ -190,7 +215,7 @@ Check("Unconfigured model refuses list without database", (int)(await unconfigur
 Check("Unconfigured model refuses detail without database", (int)(await unconfiguredService.GetDetailAsync(1)).StatusCode == 503);
 Check("Controller requires authentication", Attribute.IsDefined(typeof(CollectionContractsController), typeof(AuthorizeAttribute)));
 var actions = typeof(CollectionContractsController).GetMethods().Where(m => Attribute.IsDefined(m, typeof(HttpGetAttribute))).ToArray();
-Check("Only two explicit read actions exist", actions.Length == 2);
+Check("Only list, detail and rate history read actions exist", actions.Select(x => x.Name).Order().SequenceEqual(new[] { "GetDetail", "GetHistory", "GetPage" }));
 Check("Every read action requires collection View", actions.All(m =>
 {
     var permission = (MenuAuthorizeAttribute?)Attribute.GetCustomAttribute(m, typeof(MenuAuthorizeAttribute));
@@ -280,6 +305,62 @@ var canceled = false;
 try { await paymentTransaction.ExecuteAsync(Guid.NewGuid(), 1, paymentCommand, new CancellationToken(true)); }
 catch (OperationCanceledException) { canceled = true; }
 Check("Payment transaction observes cancellation before database access", canceled);
+var definitionController = new CollectionDefinitionsController(Options.Create(new CollectionReadOptions()));
+Check("Disabled definitions never invoke service", (await definitionController.GetPage(new(), null!, default) as ObjectResult)?.StatusCode == 503);
+Check("Definitions require authentication", Attribute.IsDefined(typeof(CollectionDefinitionsController), typeof(AuthorizeAttribute)));
+Check("Definitions require menu permission", Attribute.IsDefined(typeof(CollectionDefinitionsController).GetMethod("GetPage")!, typeof(MenuAuthorizeAttribute)));
+Check("Definition service is registered in business module", registrations.Any(x => x.ServiceType == typeof(ICollectionDefinitionReadService)
+    && x.ImplementationType == typeof(CollectionDefinitionReadService) && x.Lifetime == ServiceLifetime.Scoped));
+var statusSamples = new[]
+{
+    new CollectionContract { Id = 1, ContractStatusId = 7 },
+    new CollectionContract { Id = 2, ContractStatusId = 8 },
+    new CollectionContract { Id = 3, ContractStatusId = null },
+    new CollectionContract { Id = 4, ContractStatusId = 7, IsDeleted = true }
+}.AsQueryable();
+Check("Status filter preserves only selected nondeleted contracts", CollectionContractReadQuery.Filter(statusSamples,
+    new() { ContractStatusId = 7 }).Select(x => x.Id).SequenceEqual(new long[] { 1 }));
+Check("Cleared status filter includes unspecified contracts", CollectionContractReadQuery.Filter(statusSamples, new()).Count() == 3);
+var invalidStatus = false;
+try { CollectionContractReadQuery.Filter(statusSamples, new() { ContractStatusId = 0 }); }
+catch (ValidationException) { invalidStatus = true; }
+Check("Invalid status identity rejected", invalidStatus);
+Check("Status condition is translated into SQL", CollectionContractReadQuery.Filter(contracts,
+    new() { ContractStatusId = 7 }).ToQueryString().Contains("[ContractStatusId] ="));
+Check("Disabled create never invokes service", (await disabledController.Create(new(), null!, default) as ObjectResult)?.StatusCode == 503);
+var createController = new CollectionContractsController(Options.Create(new CollectionReadOptions { Enabled = true, ContractCreateEnabled = true }))
+{ ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+Check("Create refuses missing user claim", (await createController.Create(new(), null!, default) as ObjectResult)?.StatusCode == 401);
+var createPermission = (MenuAuthorizeAttribute)Attribute.GetCustomAttribute(typeof(CollectionContractsController).GetMethod("Create")!, typeof(MenuAuthorizeAttribute))!;
+Check("Create requires collection edit permission", createPermission.Arguments is not null
+    && (MenuPermission)createPermission.Arguments[1] == MenuPermission.Edit
+    && ((string[])createPermission.Arguments[0]).SequenceEqual(new[] { "CollectionFollowUp" }));
+Check("Create service uses business module DI", registrations.Any(x => x.ServiceType == typeof(ICollectionContractCreateService)
+    && x.ImplementationType == typeof(CollectionContractCreateService) && x.Lifetime == ServiceLifetime.Scoped));
+Check("Create stays independently disabled by default", !new CollectionReadOptions().ContractCreateEnabled);
+var createService = new CollectionContractCreateService(baselineContext);
+Check("Invalid creation rejected before database", (int)(await createService.CreateAsync(new(), 1)).StatusCode == 400);
+var historySql = CollectionContractReadQuery.History(draftContext.Set<CollectionContractRatePeriod>(), 7,
+    new() { Page = 2, PageSize = 25 }).ToQueryString();
+Check("Rate history uses SQL pagination", historySql.Contains("OFFSET") && historySql.Contains("FETCH NEXT"));
+Check("Rate history scopes contract and excludes deleted rates", historySql.Contains("[ContractId] =") && historySql.Contains("[IsDeleted]"));
+Check("Rate history keeps inactive historical definitions", !historySql.Contains("[IsActive]"));
+Check("Disabled history never invokes service", (await disabledController.GetHistory(1, new(), null!, default)) is ObjectResult { StatusCode: 503 });
+Check("Unconfigured history refuses database", (int)(await unconfiguredService.GetHistoryAsync(1, new())).StatusCode == 503);
+Check("Detail includes concurrency version", detailSql.Contains("[RowVersion]"));
+var historyPermission = (MenuAuthorizeAttribute)Attribute.GetCustomAttribute(typeof(CollectionContractsController).GetMethod("GetHistory")!, typeof(MenuAuthorizeAttribute))!;
+Check("History requires collection view permission", historyPermission.Arguments is not null
+    && (MenuPermission)historyPermission.Arguments[1] == MenuPermission.View
+    && ((string[])historyPermission.Arguments[0]).SequenceEqual(new[] { "CollectionFollowUp" }));
+Check("Disabled lifecycle never invokes service", (await disabledController.ChangeSubscription(1, new(), null!, default)) is ObjectResult { StatusCode: 503 });
+Check("Lifecycle refuses missing identity", (await createController.ChangeSubscription(1, new(), null!, default)) is ObjectResult { StatusCode: 401 });
+var subscriptionPermission = (MenuAuthorizeAttribute)Attribute.GetCustomAttribute(typeof(CollectionContractsController).GetMethod("ChangeSubscription")!, typeof(MenuAuthorizeAttribute))!;
+Check("Lifecycle requires collection edit", subscriptionPermission.Arguments is [string[] subscriptionKeys, MenuPermission.Edit]
+    && subscriptionKeys.SequenceEqual(new[] { "CollectionFollowUp" }));
+Check("Lifecycle uses Autofac module registration", registrations.Any(x => x.ServiceType == typeof(ICollectionSubscriptionService)
+    && x.ImplementationType == typeof(CollectionSubscriptionService) && x.Lifetime == ServiceLifetime.Scoped));
+Check("Lifecycle rejects invalid rowversion before DB", (int)(await new CollectionSubscriptionService(baselineContext)
+    .ChangeAsync(1, new() { Reason = "Test" }, 1)).StatusCode == 400);
 Console.WriteLine($"{passed} collection model/query/API checks passed. No database access.");
 
 static byte[] RunHashInCulture(string name, CollectionPaymentCommand command)

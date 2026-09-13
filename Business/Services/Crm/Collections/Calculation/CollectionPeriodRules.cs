@@ -16,8 +16,11 @@ public static class CollectionPeriodRules
         DateOnly? effectiveToExclusive,
         int intervalMonths,
         DateOnly windowFrom,
-        DateOnly windowToExclusive)
+        DateOnly windowToExclusive,
+        int? originalAnchorDay = null)
     {
+        if (originalAnchorDay is < 1 or > 31)
+            throw new ArgumentOutOfRangeException(nameof(originalAnchorDay), "Yenileme günü 1 ile 31 arasında olmalıdır.");
         if (!IsSupportedInterval(intervalMonths))
             throw new ArgumentOutOfRangeException(nameof(intervalMonths));
         if (effectiveToExclusive.HasValue && effectiveToExclusive.Value <= effectiveFrom)
@@ -35,7 +38,7 @@ public static class CollectionPeriodRules
         var anchor = MonthIndex(effectiveFrom);
         var difference = MonthIndex(lower) - anchor;
         var first = anchor + ((difference + intervalMonths - 1) / intervalMonths) * intervalMonths;
-        return Enumerate(first, intervalMonths, effectiveFrom.Day, lower, upper);
+        return Enumerate(first, intervalMonths, originalAnchorDay ?? effectiveFrom.Day, lower, upper);
     }
 
     private static IEnumerable<DateOnly> Enumerate(int monthIndex, int interval, int anchorDay, DateOnly lower, DateOnly upper)

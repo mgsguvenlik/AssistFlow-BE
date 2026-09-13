@@ -16,6 +16,7 @@ public static class CollectionContractReadQuery
         var filtered = source.AsNoTracking().Where(x => !x.IsDeleted);
         if (query.CustomerId.HasValue) filtered = filtered.Where(x => x.CustomerId == query.CustomerId.Value);
         if (query.ServiceTypeId.HasValue) filtered = filtered.Where(x => x.ServiceTypeId == query.ServiceTypeId.Value);
+        if (query.ContractStatusId.HasValue) filtered = filtered.Where(x => x.ContractStatusId == query.ContractStatusId.Value);
         var term = query.Search?.Trim();
         if (!string.IsNullOrEmpty(term))
             filtered = filtered.Where(x => (x.Customer.SubscriberCode != null && x.Customer.SubscriberCode.Contains(term))
@@ -39,11 +40,37 @@ public static class CollectionContractReadQuery
         return Project(ordered.ThenBy(x => x.Id).Skip(checked((query.Page - 1) * query.PageSize)).Take(query.PageSize));
     }
 
-    public static IQueryable<CollectionContractListItem> Detail(IQueryable<CollectionContract> source, long id)
+    public static IQueryable<CollectionContractDetail> Detail(IQueryable<CollectionContract> source, long id)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
-        return Project(source.AsNoTracking().Where(x => !x.IsDeleted && x.Id == id));
+        return source.AsNoTracking().Where(x => !x.IsDeleted && x.Id == id).Select(x => new CollectionContractDetail
+        {
+            Id = x.Id, CustomerId = x.CustomerId, SubscriberCode = x.Customer.SubscriberCode,
+            CustomerName = x.Customer.SubscriberCompany, ServiceTypeId = x.ServiceTypeId,
+            ServiceTypeName = x.ServiceType.Name, StartDate = x.StartDate, EndDate = x.EndDate,
+            GtsNo = x.GtsNo, IvrNo = x.IvrNo, RowVersion = x.RowVersion,
+            ContractStatusName = x.ContractStatus == null ? null : x.ContractStatus.Name,
+            SubscriptionStatusName = x.SubscriptionStatus == null ? null : x.SubscriptionStatus.Name,
+            SubscriptionStatusCode = x.SubscriptionStatus == null ? null : x.SubscriptionStatus.Code
+        });
+    }
+
+    public static IQueryable<CollectionRateHistoryItem> History(IQueryable<CollectionContractRatePeriod> source,
+        long contractId, CollectionRateHistoryQuery query)
+    {
+        Validator.ValidateObject(query, new ValidationContext(query), true);
+        if (contractId <= 0) throw new ArgumentOutOfRangeException(nameof(contractId));
+        return source.AsNoTracking().Where(x => !x.IsDeleted && x.ContractId == contractId)
+            .OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.Id)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new CollectionRateHistoryItem
+            {
+                Id = x.Id, EffectiveFrom = x.EffectiveFrom, EffectiveToExclusive = x.EffectiveToExclusive,
+                BillingAnchor = x.BillingAnchor, PaymentFrequencyName = x.PaymentFrequency.Name,
+                Amount = x.Amount, CurrencyCode = x.CurrencyType == null ? null : x.CurrencyType.Code,
+                BillingBehavior = x.BillingBehavior, ChangeReason = x.ChangeReason
+            });
     }
 
     private static IQueryable<CollectionContractListItem> Project(IQueryable<CollectionContract> source) =>

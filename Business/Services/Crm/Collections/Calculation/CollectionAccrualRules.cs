@@ -17,6 +17,8 @@ public static class CollectionAccrualRules
         if (ordered.Length == 0) throw new ArgumentException("Doğrulanmış tarife geçmişi gereklidir.", nameof(segments));
         foreach (var segment in ordered)
         {
+            if (segment.OriginalAnchorDay is < 1 or > 31)
+                throw new ArgumentException("Yenileme günü 1 ile 31 arasında olmalıdır.", nameof(segments));
             if (!Enum.IsDefined(segment.Behavior) || !CollectionPeriodRules.IsSupportedInterval(segment.IntervalMonths))
                 throw new ArgumentException("Tahakkuk davranışı veya ödeme sıklığı geçersiz.", nameof(segments));
             if (segment.BillingAnchor > segment.EffectiveFrom)
@@ -39,7 +41,7 @@ public static class CollectionAccrualRules
             var lower = segment.EffectiveFrom > windowFrom ? segment.EffectiveFrom : windowFrom;
             if (lower >= windowToExclusive) continue;
             foreach (var dueDate in CollectionPeriodRules.GetDueDates(segment.BillingAnchor,
-                segment.EffectiveToExclusive, segment.IntervalMonths, lower, windowToExclusive))
+                segment.EffectiveToExclusive, segment.IntervalMonths, lower, windowToExclusive, segment.OriginalAnchorDay))
                 charges.Add(new(segment.Id, dueDate, segment.Amount!.Value, segment.CurrencyTypeId!.Value));
         }
         return charges;
@@ -48,6 +50,7 @@ public static class CollectionAccrualRules
 
 /// <summary>BillingAnchor changes on reactivation, not on an ordinary price increase.</summary>
 public sealed record CollectionRateSegment(long Id, DateOnly EffectiveFrom, DateOnly? EffectiveToExclusive,
-    DateOnly BillingAnchor, int IntervalMonths, decimal? Amount, long? CurrencyTypeId, CollectionBillingBehavior Behavior);
+    DateOnly BillingAnchor, int IntervalMonths, decimal? Amount, long? CurrencyTypeId, CollectionBillingBehavior Behavior,
+    int? OriginalAnchorDay = null);
 
 public sealed record CollectionCharge(long RateSegmentId, DateOnly DueDate, decimal Amount, long CurrencyTypeId);

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Model.Dtos.Crm.Collections;
 using WebAPI.Authorization;
 using Core.Settings.Concrete;
+using System.Security.Claims;
 
 namespace WebAPI.Controllers;
 
@@ -15,6 +16,18 @@ namespace WebAPI.Controllers;
 [Route("api/collections/contracts")]
 public sealed class CollectionContractsController(IOptions<CollectionReadOptions> options) : ControllerBase
 {
+    [HttpPost]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> Create([FromBody] CollectionContractCreate command,
+        [FromServices] ICollectionContractCreateService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.CreateAsync(command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
     [HttpGet]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
     public async Task<IActionResult> GetPage([FromQuery] CollectionContractQuery query,
@@ -32,6 +45,29 @@ public sealed class CollectionContractsController(IOptions<CollectionReadOptions
     {
         if (!options.Value.Enabled) return Unavailable();
         var result = await service.GetDetailAsync(id, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpGet("{id:long:min(1)}/rate-history")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> GetHistory(long id, [FromQuery] CollectionRateHistoryQuery query,
+        [FromServices] ICollectionContractReadService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var result = await service.GetHistoryAsync(id, query, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/subscription")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> ChangeSubscription(long id, [FromBody] CollectionSubscriptionChange command,
+        [FromServices] ICollectionSubscriptionService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.ChangeAsync(id, command, actorId, cancellationToken);
         return StatusCode((int)result.StatusCode, result);
     }
 

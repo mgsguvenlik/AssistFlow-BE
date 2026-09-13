@@ -10,8 +10,8 @@ using Model.Concrete;
 using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
 
-if (args.Length != 2 || args[0] != "--apply-test-fixtures")
-    throw new InvalidOperationException("Yalnız AssistFlowTest için --apply-test-fixtures <Development JSON yolu> gereklidir.");
+if (args.Length != 2 || args[0] is not ("--apply-test-fixtures" or "--seed-definitions" or "--read-definitions" or "--create-contract-fixtures"))
+    throw new InvalidOperationException("Yalnız AssistFlowTest için --apply-test-fixtures veya --seed-definitions ve Development JSON yolu gereklidir.");
 using var config = JsonDocument.Parse(File.ReadAllText(args[1]), new JsonDocumentOptions
     { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
 var connection = new SqlConnectionStringBuilder(config.RootElement.GetProperty("AppSettings")
@@ -24,6 +24,43 @@ AppDataContext Context(IInterceptor? interceptor = null)
         sql => sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(2), null));
     if (interceptor is not null) options.AddInterceptors(interceptor);
     return new AppDataContext(options.Options);
+}
+if (args[0] == "--create-contract-fixtures")
+{
+    await CollectionContractCreateTests.RunAsync(interceptor =>
+    {
+        var settings = new DbContextOptionsBuilder<AppDataContext>().UseSqlServer(connection.ConnectionString);
+        if (interceptor is not null) settings.AddInterceptors(interceptor);
+        return new AppDataContext(settings.Options);
+    });
+    return;
+}
+if (args[0] == "--read-definitions")
+{
+    await using var db = Context();
+    var reader = new CollectionDefinitionReadService(new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(db)));
+    foreach (var kind in Enum.GetValues<CollectionDefinitionKind>())
+    {
+        var full = await reader.GetPageAsync(new() { Kind = kind, PageSize = 100 });
+        var first = await reader.GetPageAsync(new() { Kind = kind, PageSize = 1 });
+        var second = await reader.GetPageAsync(new() { Kind = kind, PageSize = 1, Page = 2 });
+        if (full.Data is null || first.Data is null || second.Data is null
+            || !full.Data.Items.Take(1).Select(x => x.Id).SequenceEqual(first.Data.Items.Select(x => x.Id))
+            || !full.Data.Items.Skip(1).Take(1).Select(x => x.Id).SequenceEqual(second.Data.Items.Select(x => x.Id))
+            || full.Data.TotalCount != first.Data.TotalCount)
+            throw new InvalidOperationException("Tanım sayfalaması doğrulanamadı.");
+        Console.WriteLine($"PASS: {kind} SQL okuma ve sayfalama; toplam {full.Data.TotalCount}");
+    }
+    if ((int)(await reader.GetPageAsync(new() { Kind = (CollectionDefinitionKind)99 })).StatusCode != 400
+        || (int)(await reader.GetPageAsync(new() { PageSize = 101 })).StatusCode != 400)
+        throw new InvalidOperationException("Tanım doğrulaması başarısız.");
+    Console.WriteLine("PASS: geçersiz tür ve sayfa boyutu reddedildi. Veritabanı değiştirilmedi.");
+    return;
+}
+if (args[0] == "--seed-definitions")
+{
+    await CollectionDefinitionSeedTests.RunAsync(() => Context());
+    return;
 }
 var passed = 0;
 void Check(string name, bool success)

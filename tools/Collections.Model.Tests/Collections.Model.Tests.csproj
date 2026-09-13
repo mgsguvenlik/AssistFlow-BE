@@ -8,6 +8,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="../../WebAPI/Controllers/CollectionContractsController.cs" Link="CollectionContractsController.cs" />
+    <Compile Include="../../WebAPI/Controllers/CollectionDefinitionsController.cs" Link="CollectionDefinitionsController.cs" />
     <Compile Include="../../WebAPI/Authorization/*.cs" Link="Authorization/%(Filename)%(Extension)" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.5" />
     <ProjectReference Include="../../Data/Data.csproj" />

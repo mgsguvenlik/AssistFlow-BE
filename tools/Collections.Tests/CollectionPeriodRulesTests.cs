@@ -5,7 +5,7 @@ using Model.Dtos.Crm.Collections;
 using System.ComponentModel.DataAnnotations;
 
 var passed = 0;
-DateOnly D(int year, int month, int day = 1) => new(year, month, day);
+DateOnly D(int year, int month = 1, int day = 1) => new(year, month, day);
 void Check(string name, Action action)
 {
     action();
@@ -265,4 +265,38 @@ Check("Another user cannot replay a receipt", () => Equal(false,
     CollectionPaymentReplayRules.CanReplay(1, 2, new byte[32], new byte[32])));
 Check("Missing payload hash is rejected", () => Throws<ArgumentException>(() =>
     CollectionPaymentReplayRules.CanReplay(1, 1, [], new byte[32])));
+foreach (var day in new[] { 2, 14, 15, 16, 28, 30 })
+    Check($"Initial cutoff day {day}", () => Equal(D(2026, day <= 15 ? 9 : 10, day),
+        CollectionStartRules.FirstDueDate(D(2026, 9, day))));
+Check("Only EXISTS is included", () =>
+{
+    Equal(true, CollectionStartRules.IsIncluded("EXISTS"));
+    foreach (var code in new string?[] { null, "", "NONE", "UNKNOWN", "invalid" })
+        Equal(false, CollectionStartRules.IsIncluded(code));
+});
+Check("January 31 preserves March 31 after short first month", () => Dates(
+    [D(2026, 2, 28), D(2026, 3, 31), D(2026, 4, 30)],
+    CollectionStartRules.GetInitialDueDates(D(2026, 1, 31), 1, null, D(2026), D(2026, 5))));
+Check("Leap first month preserves original day", () => Dates(
+    [D(2028, 2, 29), D(2028, 3, 31)],
+    CollectionStartRules.GetInitialDueDates(D(2028, 1, 31), 1, null, D(2028), D(2028, 4))));
+Check("Quarterly cadence starts in deferred month", () => Dates(
+    [D(2026, 10, 28), D(2027, 1, 28)],
+    CollectionStartRules.GetInitialDueDates(D(2026, 9, 28), 3, null, D(2026, 9), D(2027, 2))));
+Check("End before first charge gives empty calendar", () => Dates([], CollectionStartRules.GetInitialDueDates(
+    D(2026, 9, 28), 1, D(2026, 10, 15), D(2026, 9), D(2027))));
+Check("Maximum date fails with explicit policy error", () => Throws<ArgumentOutOfRangeException>(() =>
+    CollectionStartRules.FirstDueDate(DateOnly.MaxValue)));
+Check("Invalid anchor day rejected", () => Throws<ArgumentOutOfRangeException>(() =>
+    CollectionPeriodRules.GetDueDates(D(2026), null, 1, D(2026), D(2027), 32)));
+Check("Accrual keeps original day after deferred February start", () =>
+{
+    var charges = CollectionAccrualRules.Calculate([
+        new(1, D(2026, 2, 28), null, D(2026, 2, 28), 1, 3000m, 1, CollectionBillingBehavior.Billable, 31)
+    ], D(2026, 1), D(2026, 5));
+    Dates([D(2026, 2, 28), D(2026, 3, 31), D(2026, 4, 30)], charges.Select(x => x.DueDate));
+    Equal(true, charges.All(x => x.Amount == 3000m));
+});
+Check("Invalid stored original day is rejected even when free", () => Throws<ArgumentException>(() =>
+    CollectionAccrualRules.Calculate([new(1, D(2026), null, D(2026), 1, null, null, CollectionBillingBehavior.Free, 0)], D(2026), D(2027))));
 Console.WriteLine($"{passed} offline collection checks passed. No database access.");

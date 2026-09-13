@@ -10,6 +10,8 @@ public sealed class CollectionContractRatePeriod : AuditableWithUserEntity
     public DateOnly EffectiveFrom { get; set; }
     public DateOnly? EffectiveToExclusive { get; set; }
     public DateOnly BillingAnchor { get; set; }
+    /// <summary>Original renewal day when the first billing month clamps it; null retains legacy anchor-day behavior.</summary>
+    public byte? OriginalAnchorDay { get; set; }
     public long PaymentFrequencyId { get; set; }
     public CollectionPaymentFrequency PaymentFrequency { get; set; } = null!;
     public decimal? Amount { get; set; }

@@ -3,12 +3,13 @@ using Model.Abstractions;
 namespace Model.Concrete.Collections;
 
 /// <summary>
-/// Contract identity draft. Financial terms and pending operational definitions are separate work.
-/// Not registered in AppDataContext until the complete model has been reviewed.
+/// Contract identity and creation receipt. Financial terms are stored in effective rate periods.
 /// </summary>
 public sealed class CollectionContract : AuditableWithUserEntity
 {
     public long Id { get; set; }
+    public Guid? CreationRequestId { get; set; }
+    public byte[]? CreationPayloadHash { get; set; }
     public long CustomerId { get; set; }
     public Customer Customer { get; set; } = null!;
     public long ServiceTypeId { get; set; }

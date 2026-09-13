@@ -35,17 +35,37 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
         return ResponseModel<PagedResult<CollectionContractListItem>>.Success(new(items, count, query.Page, query.PageSize), "Sözleşmeler başarıyla getirildi.");
     }
 
-    public async Task<ResponseModel<CollectionContractListItem>> GetDetailAsync(long id, CancellationToken cancellationToken = default)
+    public async Task<ResponseModel<CollectionContractDetail>> GetDetailAsync(long id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (db.Model.FindEntityType(typeof(CollectionContract)) is null)
-            return ResponseModel<CollectionContractListItem>.Fail(
+            return ResponseModel<CollectionContractDetail>.Fail(
                 "Tahsilat sözleşme modeli henüz etkin değil.", (StatusCode)503);
-        if (id <= 0) return ResponseModel<CollectionContractListItem>.Fail("Geçersiz sözleşme kimliği.");
+        if (id <= 0) return ResponseModel<CollectionContractDetail>.Fail("Geçersiz sözleşme kimliği.");
         var item = await CollectionContractReadQuery.Detail(unitOfWork.Repository.GetQueryable<CollectionContract>(), id)
             .SingleOrDefaultAsync(cancellationToken);
         return item is null
-            ? ResponseModel<CollectionContractListItem>.Fail("Sözleşme bulunamadı.", StatusCode.NotFound)
-            : ResponseModel<CollectionContractListItem>.Success(item, "Sözleşme bilgileri başarıyla getirildi.");
+            ? ResponseModel<CollectionContractDetail>.Fail("Sözleşme bulunamadı.", StatusCode.NotFound)
+            : ResponseModel<CollectionContractDetail>.Success(item, "Sözleşme bilgileri başarıyla getirildi.");
+    }
+
+    public async Task<ResponseModel<PagedResult<CollectionRateHistoryItem>>> GetHistoryAsync(long id,
+        CollectionRateHistoryQuery query, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (db.Model.FindEntityType(typeof(CollectionContractRatePeriod)) is null)
+            return ResponseModel<PagedResult<CollectionRateHistoryItem>>.Fail("Tahsilat tarife modeli henüz etkin değil.", (StatusCode)503);
+        var errors = new List<ValidationResult>();
+        if (id <= 0 || !Validator.TryValidateObject(query, new ValidationContext(query), errors, true))
+            return ResponseModel<PagedResult<CollectionRateHistoryItem>>.Fail("Geçersiz sözleşme veya sayfa bilgisi.");
+        var repository = unitOfWork.Repository;
+        if (!await repository.GetQueryable<CollectionContract>().AsNoTracking()
+            .AnyAsync(x => x.Id == id && !x.IsDeleted, cancellationToken))
+            return ResponseModel<PagedResult<CollectionRateHistoryItem>>.Fail("Sözleşme bulunamadı.", StatusCode.NotFound);
+        var source = repository.GetQueryable<CollectionContractRatePeriod>();
+        var count = await source.CountAsync(x => x.ContractId == id && !x.IsDeleted, cancellationToken);
+        var items = await CollectionContractReadQuery.History(source, id, query).ToListAsync(cancellationToken);
+        return ResponseModel<PagedResult<CollectionRateHistoryItem>>.Success(new(items, count, query.Page, query.PageSize),
+            "Tarife geçmişi başarıyla getirildi.");
     }
 }

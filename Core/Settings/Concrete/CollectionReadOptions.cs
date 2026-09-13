@@ -5,4 +5,5 @@ public sealed class CollectionReadOptions
 {
     public const string SectionName = "CollectionRead";
     public bool Enabled { get; set; }
+    public bool ContractCreateEnabled { get; set; }
 }

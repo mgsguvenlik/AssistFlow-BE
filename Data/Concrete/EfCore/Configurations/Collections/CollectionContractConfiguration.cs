@@ -4,7 +4,7 @@ using Model.Concrete.Collections;
 
 namespace Data.Concrete.EfCore.Configurations.Collections;
 
-/// <summary>Draft mapping; deliberately not applied to the application's active EF model yet.</summary>
+/// <summary>Collection contract mapping; shared tables are references only.</summary>
 public sealed class CollectionContractConfiguration : IEntityTypeConfiguration<CollectionContract>
 {
     public void Configure(EntityTypeBuilder<CollectionContract> builder)
@@ -12,9 +12,13 @@ public sealed class CollectionContractConfiguration : IEntityTypeConfiguration<C
         builder.ToTable("Contract", "collection", table =>
         {
             table.HasCheckConstraint("CK_Contract_DateRange", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
+            table.HasCheckConstraint("CK_Contract_CreationRequest", "([CreationRequestId] IS NULL AND [CreationPayloadHash] IS NULL) OR ([CreationRequestId] IS NOT NULL AND [CreationPayloadHash] IS NOT NULL AND DATALENGTH([CreationPayloadHash]) = 32)");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedOnAdd();
+        builder.Property(x => x.CreationPayloadHash).HasColumnType("varbinary(32)");
+        builder.HasIndex(x => x.CreationRequestId).IsUnique().HasFilter("[CreationRequestId] IS NOT NULL")
+            .HasDatabaseName("UX_Contract_CreationRequestId");
         builder.Property(x => x.StartDate).HasColumnType("date");
         builder.Property(x => x.EndDate).HasColumnType("date");
         builder.HasOne(x => x.SubscriptionStatus).WithMany().HasForeignKey(x => x.SubscriptionStatusId).OnDelete(DeleteBehavior.NoAction);

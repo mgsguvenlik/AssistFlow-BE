@@ -12,6 +12,7 @@ public sealed class CollectionContractRatePeriodConfiguration : IEntityTypeConfi
         {
             table.HasCheckConstraint("CK_ContractRatePeriod_Dates", "[EffectiveToExclusive] IS NULL OR [EffectiveToExclusive] > [EffectiveFrom]");
             table.HasCheckConstraint("CK_ContractRatePeriod_Anchor", "[BillingAnchor] <= [EffectiveFrom]");
+            table.HasCheckConstraint("CK_ContractRatePeriod_OriginalDay", "[OriginalAnchorDay] IS NULL OR [OriginalAnchorDay] BETWEEN 1 AND 31");
             table.HasCheckConstraint("CK_ContractRatePeriod_Amount", "[Amount] IS NULL OR [Amount] >= 0");
             table.HasCheckConstraint("CK_ContractRatePeriod_Behavior", "[BillingBehavior] IN (0,1,2)");
             table.HasCheckConstraint("CK_ContractRatePeriod_Billable", "[BillingBehavior] <> 0 OR ([Amount] IS NOT NULL AND [CurrencyTypeId] IS NOT NULL)");
