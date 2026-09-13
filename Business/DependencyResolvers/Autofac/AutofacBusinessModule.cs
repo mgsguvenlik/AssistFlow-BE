@@ -42,6 +42,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<ICollectionContractReadService, CollectionContractReadService>();
             services.AddScoped<ICollectionContractCreateService, CollectionContractCreateService>();
             services.AddScoped<ICollectionSubscriptionService, CollectionSubscriptionService>();
+            services.AddScoped<ICollectionContractUpdateService, CollectionContractUpdateService>();
             services.AddScoped<ICollectionDefinitionReadService, CollectionDefinitionReadService>();
             services.AddOptions<CollectionReadOptions>().BindConfiguration(CollectionReadOptions.SectionName);
             services.AddScoped(typeof(IAuthService), typeof(AuthService));

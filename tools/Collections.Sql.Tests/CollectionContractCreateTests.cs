@@ -139,6 +139,39 @@ internal static class CollectionContractCreateTests
             var sameDay = await read.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == raceContract);
             Check((int)(await Change(raceContract, false, sameDay.RowVersion)).StatusCode == 409,
                 "Aynı gün ikinci değişiklik sıfır uzunlukta tarife oluşturmaz");
+            var editId = (await Save(Command())).Data!.ContractId;
+            var editBefore = await read.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == editId);
+            var editRateBefore = await read.Set<CollectionContractRatePeriod>().AsNoTracking().SingleAsync(x => x.ContractId == editId);
+            var alternativeService = await read.ServiceTypes.Where(x => !x.IsDeleted && x.Id != service).Select(x => x.Id).FirstOrDefaultAsync();
+            var editCommand = new CollectionContractIdentityUpdate { ServiceTypeId = alternativeService == 0 ? service : alternativeService,
+                GtsNo = marker, IvrNo = "Düzenleme testi", RowVersion = editBefore.RowVersion };
+            async Task<Core.Common.ResponseModel<CollectionContractIdentityUpdated>> Edit(CollectionContractIdentityUpdate payload, IInterceptor? interceptor = null)
+            {
+                await using var db = context(interceptor);
+                return await new CollectionContractUpdateService(db).UpdateIdentityAsync(editId, payload, actor);
+            }
+            Check((await Edit(editCommand)).Data is not null, "Sözleşme referans bilgileri güncellenir");
+            var editAfter = await read.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == editId);
+            var editRateAfter = await read.Set<CollectionContractRatePeriod>().AsNoTracking().SingleAsync(x => x.ContractId == editId);
+            Check(editAfter.IvrNo == editCommand.IvrNo && editAfter.ServiceTypeId == editCommand.ServiceTypeId && editAfter.UpdatedUser == actor
+                && editAfter.CustomerId == editBefore.CustomerId && editAfter.StartDate == editBefore.StartDate
+                && editRateAfter.RowVersion.SequenceEqual(editRateBefore.RowVersion), "Düzenleme müşteri, tarih ve tarifeyi değiştirmez; güncelleyen kullanıcı kaydedilir");
+            Check((int)(await Edit(editCommand)).StatusCode == 409, "Eski sürümle düzenleme reddedilir");
+            editCommand.RowVersion = editAfter.RowVersion;
+            editCommand.ServiceTypeId = long.MaxValue;
+            Check((int)(await Edit(editCommand)).StatusCode == 400, "Geçersiz servis tipi düzenlemesi reddedilir");
+            editCommand.ServiceTypeId = editAfter.ServiceTypeId;
+            editCommand.IvrNo = null;
+            Check((await Edit(editCommand)).Data is not null, "Opsiyonel referans alanı temizlenebilir");
+            var cleared = await read.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == editId);
+            editCommand.RowVersion = cleared.RowVersion;
+            editCommand.IvrNo = "Yanıt kaybı";
+            var editLost = new LoseCommitAcknowledgement();
+            Check((int)(await Edit(editCommand, editLost)).StatusCode == 409 && editLost.Injected,
+                "Düzenleme yanıt kaybında güncel durumu kontrol ettirir");
+            Check((int)(await Edit(editCommand)).StatusCode == 409
+                && (await read.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == editId)).IvrNo == "Yanıt kaybı",
+                "Kayıp düzenleme yanıtı tekrarı veriyi ikinci kez değiştirmez");
             Console.WriteLine($"{checks} sözleşme SQL kontrolü geçti.");
         }
         finally

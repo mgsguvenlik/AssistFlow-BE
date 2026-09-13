@@ -361,6 +361,15 @@ Check("Lifecycle uses Autofac module registration", registrations.Any(x => x.Ser
     && x.ImplementationType == typeof(CollectionSubscriptionService) && x.Lifetime == ServiceLifetime.Scoped));
 Check("Lifecycle rejects invalid rowversion before DB", (int)(await new CollectionSubscriptionService(baselineContext)
     .ChangeAsync(1, new() { Reason = "Test" }, 1)).StatusCode == 400);
+Check("Disabled identity edit never invokes service", (await disabledController.UpdateIdentity(1, new(), null!, default)) is ObjectResult { StatusCode: 503 });
+Check("Identity edit refuses missing actor", (await createController.UpdateIdentity(1, new(), null!, default)) is ObjectResult { StatusCode: 401 });
+var editPermission = (MenuAuthorizeAttribute)Attribute.GetCustomAttribute(typeof(CollectionContractsController).GetMethod("UpdateIdentity")!, typeof(MenuAuthorizeAttribute))!;
+Check("Identity edit requires collection edit permission", editPermission.Arguments is [string[] editKeys, MenuPermission.Edit]
+    && editKeys.SequenceEqual(new[] { "CollectionFollowUp" }));
+Check("Identity edit uses Autofac module", registrations.Any(x => x.ServiceType == typeof(ICollectionContractUpdateService)
+    && x.ImplementationType == typeof(CollectionContractUpdateService) && x.Lifetime == ServiceLifetime.Scoped));
+Check("Identity edit rejects invalid version without DB", (int)(await new CollectionContractUpdateService(baselineContext)
+    .UpdateIdentityAsync(1, new() { ServiceTypeId = 1 }, 1)).StatusCode == 400);
 Console.WriteLine($"{passed} collection model/query/API checks passed. No database access.");
 
 static byte[] RunHashInCulture(string name, CollectionPaymentCommand command)

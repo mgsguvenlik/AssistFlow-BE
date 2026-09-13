@@ -71,6 +71,19 @@ public sealed class CollectionContractsController(IOptions<CollectionReadOptions
         return StatusCode((int)result.StatusCode, result);
     }
 
+    [HttpPatch("{id:long:min(1)}/identity")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> UpdateIdentity(long id, [FromBody] CollectionContractIdentityUpdate command,
+        [FromServices] ICollectionContractUpdateService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.UpdateIdentityAsync(id, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     private ObjectResult Unavailable() => StatusCode(503,
         ResponseModel.Fail("Tahsilat sözleşme görüntüleme henüz kullanıma açılmadı.", (Core.Enums.StatusCode)503));
 }
