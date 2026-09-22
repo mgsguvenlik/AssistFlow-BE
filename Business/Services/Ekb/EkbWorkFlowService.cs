@@ -6867,6 +6867,11 @@ namespace Business.Services.Ekb
                     wfQuery = wfQuery.Where(w => w.RequestNo == q.RequestNo);
                 }
 
+                if (q.WorkFlowId.HasValue)
+                {
+                    wfQuery = wfQuery.Where(w => w.Id == q.WorkFlowId.Value);
+                }
+
                 if (!string.IsNullOrWhiteSpace(q.EkbServiceTrackNo))
                 {
                     wfQuery = wfQuery.Where(w =>
