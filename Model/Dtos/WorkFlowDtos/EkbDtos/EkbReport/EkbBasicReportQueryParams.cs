@@ -10,6 +10,7 @@ namespace Model.Dtos.WorkFlowDtos.EkbDtos.EkbReport
 
         public string? Search { get; set; }
         public string? RequestNo { get; set; }
+        public long? WorkFlowId { get; set; }
         public string? EkbServiceTrackNo { get; set; }
 
         public long? CurrentStepId { get; set; }
