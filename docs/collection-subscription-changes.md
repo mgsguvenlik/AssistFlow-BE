@@ -10,4 +10,12 @@ Günlük model sınırı: tarife bugün başladıysa aynı gün ikinci geçiş y
 
 Doğrulama: toplam 37 gerçek SQL kontrolü (oluşturma dahil), dondurma/aktifleştirme, ücretsiz/YOK, eski sürüm, rollback, commit yanıt kaybı, eşzamanlı gönderim ve aynı gün guard. 124 offline model/API kontrolü. FE lint ve Vite build başarılı. Tarayıcı E2E ve gerçek HTTP yetki matrisi açık. Testler yalnız AssistFlowTest üzerinde rastgele işaretli geçici collection verisini oluşturup temizler.
 
-P05 kalanları: sözleşme kimlik alanı düzenleme, tarihli ücret/ücretsiz/dahil olma değişiklikleri, aynı gün düzeltme akışı, geriye tarihli finansal düzeltme sınırları. Bu endpoint genel sözleşme düzenleme yerine geçmez.
+P05 kalanları: tarihli ücret/ücretsiz/dahil olma değişiklikleri, aynı gün düzeltme akışı, geriye tarihli finansal düzeltme sınırları. Bu endpoint genel sözleşme düzenleme yerine geçmez.
+
+## Referans bilgisi düzenleme
+
+`PATCH /api/collections/contracts/{id}/identity` servis tipi, GTS ve IVR numarasını günceller. DTO: `serviceTypeId`, nullable en fazla 50 karakter `gtsNo`/`ivrNo`, detaydan gelen `rowVersion`. Aynı görüntüleme/yazma feature kapıları ve CollectionFollowUp/Edit geçerlidir. Yeni servis seçimi mevcut aktif dbo.ServiceType kaydı olmalıdır; aynı pasif tarihsel referansı korumak mümkündür. Müşteri, tarihler ve finansal tarife bu komutun kapsamı dışındadır. Güncelleyen kullanıcı/zaman saklanır; tam önce/sonra audit günlüğü mevcut değildir.
+
+Form detay içinde açılır, mevcut aramalı select kullanılır. Düzenleme açıkken dondurma formu gösterilmez; kayıt sırasında kapatma engellenir. Formun ilk sürümü sabit kalır: detay yenilenince eski form otomatik yeni sürümü kullanmaz. Çakışma sonrası formdan vazgeçilip güncel detay üzerinden yeniden açılmalıdır. Yanıt kaybında güncel bilgileri kontrol mesajı verilir; eski sürümle tekrar değişiklik yapılmaz.
+
+Bu dilimle toplam **44 gerçek SQL kontrolü ve 129 model/API kontrolü** geçti. SQL kontrolleri geçerli/geçersiz servis, opsiyonel alan temizleme, müşteri/tarife korunması, eski sürüm ve commit yanıt kaybını kapsar. Geçici işaretli sözleşme/tarifeler temizlendi. FE lint ve build başarılı; gerçek tarayıcı kabulü açık.

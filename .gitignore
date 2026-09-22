@@ -353,3 +353,5 @@ healthchecksdb
 
 /WebAPI/UploadsStorage/
 /.tools/
+/tools/Collections.Import/snapshots/
+/tools/Collections.Snapshot/snapshots/

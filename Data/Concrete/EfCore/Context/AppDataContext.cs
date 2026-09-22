@@ -1450,6 +1450,7 @@ namespace Data.Concrete.EfCore.Context
                 entity.Property(x => x.InReplyTo).HasMaxLength(998);
             });
             modelBuilder.ApplyConfiguration(new CollectionContractConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractAttachmentConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionPaymentFrequencyConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractRatePeriodConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionPaymentMethodConfiguration());
@@ -1459,6 +1460,13 @@ namespace Data.Concrete.EfCore.Context
             modelBuilder.ApplyConfiguration(new CollectionGroupStatusConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractPeriodFollowUpConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionPaymentOperationConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationBatchConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationSourceRowConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationContractStageConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationRatePeriodStageConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationReferenceMapConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationIssueConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationMapConfiguration());
         }
     }
 }

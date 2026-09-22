@@ -10,7 +10,8 @@ using Model.Concrete;
 using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
 
-if (args.Length != 2 || args[0] is not ("--apply-test-fixtures" or "--seed-definitions" or "--read-definitions" or "--create-contract-fixtures"))
+var browserFixture = args.Length == 3 && args[0] is ("--prepare-browser-contract" or "--cleanup-browser-contract");
+if (!browserFixture && (args.Length != 2 || args[0] is not ("--apply-test-fixtures" or "--seed-definitions" or "--read-definitions" or "--read-tracking" or "--read-balance" or "--read-migration-staging" or "--create-contract-fixtures")))
     throw new InvalidOperationException("Yalnız AssistFlowTest için --apply-test-fixtures veya --seed-definitions ve Development JSON yolu gereklidir.");
 using var config = JsonDocument.Parse(File.ReadAllText(args[1]), new JsonDocumentOptions
     { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
@@ -24,6 +25,28 @@ AppDataContext Context(IInterceptor? interceptor = null)
         sql => sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(2), null));
     if (interceptor is not null) options.AddInterceptors(interceptor);
     return new AppDataContext(options.Options);
+}
+if (args[0] == "--read-migration-staging")
+{
+    await using var context = Context();
+    var tableCount = await context.Database.SqlQueryRaw<int>("""
+        SELECT COUNT(*) AS [Value] FROM sys.tables t
+        JOIN sys.schemas s ON s.schema_id = t.schema_id
+        WHERE s.name = 'collection' AND t.name LIKE 'Migration%'
+        """).SingleAsync();
+    var rowCount = await context.Set<CollectionMigrationSourceRow>().AsNoTracking().CountAsync()
+        + await context.Set<CollectionMigrationBatch>().AsNoTracking().CountAsync()
+        + await context.Set<CollectionMigrationIssue>().AsNoTracking().CountAsync()
+        + await context.Set<CollectionMigrationMap>().AsNoTracking().CountAsync();
+    if (tableCount != 7 || rowCount != 0)
+        throw new InvalidOperationException($"Staging doğrulaması başarısız: tablo={tableCount}, kayıt={rowCount}.");
+    Console.WriteLine("Staging doğrulandı: 7 tablo, 0 aktarım kaydı.");
+    return;
+}
+if (browserFixture)
+{
+    await CollectionBrowserFixture.RunAsync(() => Context(), args[0] == "--cleanup-browser-contract", args[2]);
+    return;
 }
 if (args[0] == "--create-contract-fixtures")
 {
@@ -55,6 +78,34 @@ if (args[0] == "--read-definitions")
         || (int)(await reader.GetPageAsync(new() { PageSize = 101 })).StatusCode != 400)
         throw new InvalidOperationException("Tanım doğrulaması başarısız.");
     Console.WriteLine("PASS: geçersiz tür ve sayfa boyutu reddedildi. Veritabanı değiştirilmedi.");
+    return;
+}
+if (args[0] == "--read-tracking")
+{
+    await using var db = Context();
+    var trackingService = new CollectionTrackingService(new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(db)));
+    var result = await trackingService.GetPageAsync(new() { Period = new DateOnly(2026, 9, 1), PageSize = 1 });
+    if (result.Data is null) throw new InvalidOperationException(result.Message);
+    var grouped = await trackingService.GetPageAsync(new()
+        { Period = new DateOnly(2026, 9, 1), PageSize = 1, View = CollectionFollowUpView.Group });
+    if (grouped.Data is null) throw new InvalidOperationException(grouped.Message);
+    Console.WriteLine($"Tahsilat takip sorguları çalıştı; bireysel {result.Data.TotalCount}, grup {grouped.Data.TotalCount} kayıt.");
+    return;
+}
+if (args[0] == "--read-balance")
+{
+    await using var db = Context();
+    var contractId = await db.Set<CollectionContract>().AsNoTracking().Where(x => !x.IsDeleted)
+        .OrderBy(x => x.Id).Select(x => x.Id).FirstOrDefaultAsync();
+    if (contractId == 0) { Console.WriteLine("Bakiye kontrolü için sözleşme yok; DB değiştirilmedi."); return; }
+    var readService = new CollectionContractReadService(db,
+        new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(db)));
+    var period = new DateOnly(2026, 9, 1);
+    var single = await readService.GetBalanceAsync(contractId, new() { Period = period, AsOfDate = new DateOnly(2026, 9, 15) });
+    var carry = await readService.GetBalanceAsync(contractId, new()
+        { Period = period, AsOfDate = new DateOnly(2026, 9, 15), IncludeCarryOver = true });
+    if (single.Data is null || carry.Data is null) throw new InvalidOperationException(single.Data is null ? single.Message : carry.Message);
+    Console.WriteLine($"Bakiye sorguları çalıştı; sözleşme {contractId}, dönem {single.Data.Items.Count}, devirli {carry.Data.Items.Count} para birimi.");
     return;
 }
 if (args[0] == "--seed-definitions")

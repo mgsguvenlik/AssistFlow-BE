@@ -7,6 +7,7 @@ using Model.Dtos.Crm.Collections;
 using WebAPI.Authorization;
 using Core.Settings.Concrete;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 
 namespace WebAPI.Controllers;
 
@@ -16,6 +17,31 @@ namespace WebAPI.Controllers;
 [Route("api/collections/contracts")]
 public sealed class CollectionContractsController(IOptions<CollectionReadOptions> options) : ControllerBase
 {
+    [HttpGet("{id:long:min(1)}/attachments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> GetAttachments(long id, [FromQuery] int page,
+        [FromQuery] int pageSize, [FromServices] ICollectionContractAttachmentService service,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var result = await service.GetPageAsync(id, page == 0 ? 1 : page, pageSize == 0 ? 25 : pageSize, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/attachments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    [RequestSizeLimit(22 * 1024 * 1024)]
+    public async Task<IActionResult> UploadAttachment(long id, [FromForm] IFormFile file,
+        [FromServices] ICollectionContractAttachmentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.UploadAsync(id, file, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [HttpPost]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
     public async Task<IActionResult> Create([FromBody] CollectionContractCreate command,
@@ -71,7 +97,18 @@ public sealed class CollectionContractsController(IOptions<CollectionReadOptions
         return StatusCode((int)result.StatusCode, result);
     }
 
-    [HttpPatch("{id:long:min(1)}/identity")]
+    [HttpPost("{id:long:min(1)}/rate-change")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> ChangeRate(long id, [FromBody] CollectionRateChange command,
+        [FromServices] ICollectionRateChangeService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!TryActor(out var actorId)) return InvalidActor();
+        var result = await service.ChangeAsync(id, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/identity")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
     public async Task<IActionResult> UpdateIdentity(long id, [FromBody] CollectionContractIdentityUpdate command,
         [FromServices] ICollectionContractUpdateService service, CancellationToken cancellationToken)
@@ -83,6 +120,81 @@ public sealed class CollectionContractsController(IOptions<CollectionReadOptions
         var result = await service.UpdateIdentityAsync(id, command, actorId, cancellationToken);
         return StatusCode((int)result.StatusCode, result);
     }
+
+    [HttpGet("{id:long:min(1)}/payments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> GetPayments(long id, [FromQuery] CollectionPaymentQuery query,
+        [FromServices] ICollectionContractReadService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var result = await service.GetPaymentsAsync(id, query, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpGet("{id:long:min(1)}/balance")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> GetBalance(long id, [FromQuery] CollectionBalanceQuery query,
+        [FromServices] ICollectionContractReadService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var result = await service.GetBalanceAsync(id, query, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/payments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> CreatePayment(long id, [FromBody] CollectionPaymentCreate command,
+        [FromServices] ICollectionPaymentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.CreateAsync(id, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("payments/batch")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> CreatePaymentBatch([FromBody] CollectionPaymentBatchCreate command,
+        [FromServices] ICollectionPaymentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!TryActor(out var actorId)) return InvalidActor();
+        var result = await service.CreateBatchAsync(command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/payments/{paymentId:long:min(1)}/update")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> UpdatePayment(long id, long paymentId, [FromBody] CollectionPaymentUpdate command,
+        [FromServices] ICollectionPaymentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!TryActor(out var actorId)) return InvalidActor();
+        var result = await service.UpdateAsync(id, paymentId, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/payments/{paymentId:long:min(1)}/delete")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> DeletePayment(long id, long paymentId, [FromBody] CollectionPaymentDelete command,
+        [FromServices] ICollectionPaymentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!TryActor(out var actorId)) return InvalidActor();
+        var result = await service.DeleteAsync(id, paymentId, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    private bool TryActor(out long actorId)
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return long.TryParse(claim, out actorId) && actorId > 0;
+    }
+
+    private UnauthorizedObjectResult InvalidActor() => Unauthorized(
+        ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
 
     private ObjectResult Unavailable() => StatusCode(503,
         ResponseModel.Fail("Tahsilat sözleşme görüntüleme henüz kullanıma açılmadı.", (Core.Enums.StatusCode)503));

@@ -40,9 +40,16 @@ namespace Business.DependencyResolvers.Autofac
         public void Load(IServiceCollection services)
         {
             services.AddScoped<ICollectionContractReadService, CollectionContractReadService>();
+            services.AddScoped<ICollectionContractAttachmentService, CollectionContractAttachmentService>();
             services.AddScoped<ICollectionContractCreateService, CollectionContractCreateService>();
             services.AddScoped<ICollectionSubscriptionService, CollectionSubscriptionService>();
+            services.AddScoped<ICollectionRateChangeService, CollectionRateChangeService>();
             services.AddScoped<ICollectionContractUpdateService, CollectionContractUpdateService>();
+            services.AddScoped<ICollectionPaymentService, CollectionPaymentService>();
+            services.AddScoped<ICollectionTrackingService, CollectionTrackingService>();
+            services.AddScoped<ICollectionPaymentReportService, CollectionPaymentReportService>();
+            services.AddScoped<ICollectionContractReportService, CollectionContractReportService>();
+            services.AddScoped<ICollectionGroupFollowUpService, CollectionGroupFollowUpService>();
             services.AddScoped<ICollectionDefinitionReadService, CollectionDefinitionReadService>();
             services.AddOptions<CollectionReadOptions>().BindConfiguration(CollectionReadOptions.SectionName);
             services.AddScoped(typeof(IAuthService), typeof(AuthService));

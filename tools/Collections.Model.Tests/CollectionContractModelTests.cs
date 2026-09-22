@@ -215,7 +215,7 @@ Check("Unconfigured model refuses list without database", (int)(await unconfigur
 Check("Unconfigured model refuses detail without database", (int)(await unconfiguredService.GetDetailAsync(1)).StatusCode == 503);
 Check("Controller requires authentication", Attribute.IsDefined(typeof(CollectionContractsController), typeof(AuthorizeAttribute)));
 var actions = typeof(CollectionContractsController).GetMethods().Where(m => Attribute.IsDefined(m, typeof(HttpGetAttribute))).ToArray();
-Check("Only list, detail and rate history read actions exist", actions.Select(x => x.Name).Order().SequenceEqual(new[] { "GetDetail", "GetHistory", "GetPage" }));
+Check("Only contract, history, payment and balance read actions exist", actions.Select(x => x.Name).Order().SequenceEqual(new[] { "GetBalance", "GetDetail", "GetHistory", "GetPage", "GetPayments" }));
 Check("Every read action requires collection View", actions.All(m =>
 {
     var permission = (MenuAuthorizeAttribute?)Attribute.GetCustomAttribute(m, typeof(MenuAuthorizeAttribute));

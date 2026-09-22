@@ -13,13 +13,14 @@ using Model.Dtos.Crm.Collections;
 namespace Business.Services.Crm.Collections;
 
 /// <summary>
-/// Persistence primitive for an already authorized and financially validated command.
-/// Not registered in DI or exposed by an endpoint. Eligibility checks belong to the command service.
+/// Persistence primitive called by the authorized command service, not exposed directly by an endpoint.
+/// The command service supplies eligibility validation to run inside the mutation transaction.
 /// </summary>
 public sealed class CollectionPaymentTransaction(AppDataContext db)
 {
     public async Task<ResponseModel<CollectionPaymentCommitResult>> ExecuteAsync(Guid requestId, long actorUserId,
-        CollectionPaymentCommand command, CancellationToken cancellationToken = default)
+        CollectionPaymentCommand command, CancellationToken cancellationToken = default,
+        Func<CancellationToken, Task<string?>>? validate = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (requestId == Guid.Empty || actorUserId <= 0)
@@ -49,6 +50,10 @@ public sealed class CollectionPaymentTransaction(AppDataContext db)
                     return ResponseModel<CollectionPaymentCommitResult>.Success(
                         new(previous.PaymentId, previous.Kind, true), "İşlem daha önce tamamlanmış.");
                 }
+
+                // Recheck command eligibility inside the same serializable transaction as the mutation.
+                if (validate is not null && await validate(cancellationToken) is { } validationError)
+                    return Fail(validationError);
 
                 var repository = new Repository(db); // Reuse repository, but bind every write to this transaction's context.
                 string? before = null;

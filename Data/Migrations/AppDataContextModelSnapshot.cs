@@ -189,6 +189,66 @@ namespace Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionContractAttachment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<long>("ContractId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<DateTimeOffset?>("UpdatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("UpdatedUser")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoredFileName")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ContractAttachment_StoredFileName");
+
+                    b.HasIndex("ContractId", "IsDeleted", "Id")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("IX_ContractAttachment_Contract_Deleted_Id");
+
+                    b.ToTable("ContractAttachment", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_ContractAttachment_Size", "[SizeBytes] > 0 AND [SizeBytes] <= 20971520");
+                        });
+                });
+
             modelBuilder.Entity("Model.Concrete.Collections.CollectionContractPeriodFollowUp", b =>
                 {
                     b.Property<long>("Id")
@@ -397,6 +457,546 @@ namespace Data.Migrations
                         .HasDatabaseName("UX_GroupStatus_Code");
 
                     b.ToTable("GroupStatus", "collection");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationBatch", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("CompletedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("CreatedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("ManifestHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)");
+
+                    b.Property<string>("NormalizationVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SnapshotKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceSystem", "SnapshotKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationBatch_Source_Snapshot");
+
+                    b.ToTable("MigrationBatch", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationBatch_Hash", "DATALENGTH([ManifestHash]) = 32");
+
+                            t.HasCheckConstraint("CK_MigrationBatch_Status", "[Status] BETWEEN 0 AND 6");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationContractStage", b =>
+                {
+                    b.Property<long>("SourceRowId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AttachmentName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("AttachmentPath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("GtsNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("IvrNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceContractStatusId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceCustomerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourcePaymentMethodId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceServiceTypeId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceSubscriptionStatusId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<short?>("StartingMonth")
+                        .HasColumnType("smallint");
+
+                    b.Property<short?>("StartingYear")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("SubscriberNoNormalized")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SubscriberNoRaw")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long?>("TargetCustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("SourceRowId");
+
+                    b.HasIndex("SubscriberNoNormalized")
+                        .HasDatabaseName("IX_MigrationContractStage_Subscriber");
+
+                    b.HasIndex("TargetCustomerId");
+
+                    b.HasIndex("TargetServiceTypeId");
+
+                    b.HasIndex("Status", "SourceRowId")
+                        .HasDatabaseName("IX_MigrationContractStage_Status_Row");
+
+                    b.ToTable("MigrationContractStage", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationContractStage_Status", "[Status] BETWEEN 0 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationIssue", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("IssueCode")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ResolvedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("ResolvedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte>("Severity")
+                        .HasColumnType("tinyint");
+
+                    b.Property<long>("SourceRowId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceRowId", "IssueCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationIssue_Open_Row_Code")
+                        .HasFilter("[Status] = 0");
+
+                    b.HasIndex("Status", "IssueCode", "SourceRowId", "Id")
+                        .HasDatabaseName("IX_MigrationIssue_Status_Code_Row_Id");
+
+                    b.ToTable("MigrationIssue", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationIssue_Severity", "[Severity] IN (0,1)");
+
+                            t.HasCheckConstraint("CK_MigrationIssue_Status", "[Status] BETWEEN 0 AND 2");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationMap", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<byte[]>("AppliedPayloadHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)");
+
+                    b.Property<DateTimeOffset>("CreatedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EntityCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<long>("FirstBatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("LastBatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("LastSeenDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<long?>("TargetContractId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetPaymentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetRatePeriodId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FirstBatchId");
+
+                    b.HasIndex("LastBatchId");
+
+                    b.HasIndex("TargetContractId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationMap_TargetContract")
+                        .HasFilter("[TargetContractId] IS NOT NULL");
+
+                    b.HasIndex("TargetPaymentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationMap_TargetPayment")
+                        .HasFilter("[TargetPaymentId] IS NOT NULL");
+
+                    b.HasIndex("TargetRatePeriodId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationMap_TargetRate")
+                        .HasFilter("[TargetRatePeriodId] IS NOT NULL");
+
+                    b.HasIndex("SourceSystem", "EntityCode", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationMap_Source_Entity_Id");
+
+                    b.ToTable("MigrationMap", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationMap_Hash", "DATALENGTH([AppliedPayloadHash]) = 32");
+
+                            t.HasCheckConstraint("CK_MigrationMap_Target", "(CASE WHEN [TargetContractId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetRatePeriodId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetPaymentId] IS NULL THEN 0 ELSE 1 END) = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationRatePeriodStage", b =>
+                {
+                    b.Property<long>("SourceRowId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte?>("BillingBehavior")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EffectiveToExclusive")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ProcessType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceContractId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceCurrencyId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceCustomerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourcePaymentTypeId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<long?>("TargetCurrencyTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetPaymentFrequencyId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("SourceRowId");
+
+                    b.HasIndex("TargetCurrencyTypeId");
+
+                    b.HasIndex("TargetPaymentFrequencyId");
+
+                    b.HasIndex("Status", "SourceRowId")
+                        .HasDatabaseName("IX_MigrationRateStage_Status_Row");
+
+                    b.HasIndex("SourceContractId", "EffectiveFrom", "SourceRowId")
+                        .HasDatabaseName("IX_MigrationRateStage_Contract_Date_Row");
+
+                    b.ToTable("MigrationRatePeriodStage", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationRateStage_Behavior", "[BillingBehavior] IS NULL OR [BillingBehavior] IN (0,1,2)");
+
+                            t.HasCheckConstraint("CK_MigrationRateStage_Status", "[Status] BETWEEN 0 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationReferenceMap", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("DecidedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("DecidedUser")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Evidence")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("MatchMethod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ReferenceKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<long?>("TargetContractStatusId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetCurrencyTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetCustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetCustomerTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetPaymentFrequencyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetPaymentMethodId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetServiceTypeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetSubscriptionStatusId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetContractStatusId");
+
+                    b.HasIndex("TargetCurrencyTypeId");
+
+                    b.HasIndex("TargetCustomerId");
+
+                    b.HasIndex("TargetCustomerTypeId");
+
+                    b.HasIndex("TargetPaymentFrequencyId");
+
+                    b.HasIndex("TargetPaymentMethodId");
+
+                    b.HasIndex("TargetServiceTypeId");
+
+                    b.HasIndex("TargetSubscriptionStatusId");
+
+                    b.HasIndex("BatchId", "ReferenceKind", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationReferenceMap_Batch_Kind_Source");
+
+                    b.HasIndex("Status", "ReferenceKind", "Id")
+                        .HasDatabaseName("IX_MigrationReferenceMap_Status_Kind_Id");
+
+                    b.ToTable("MigrationReferenceMap", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationReferenceMap_Kind", "[Status] <> 1 OR ([ReferenceKind] = N'Customer' AND [TargetCustomerId] IS NOT NULL) OR ([ReferenceKind] = N'CustomerType' AND [TargetCustomerTypeId] IS NOT NULL) OR ([ReferenceKind] = N'ServiceType' AND [TargetServiceTypeId] IS NOT NULL) OR ([ReferenceKind] = N'CurrencyType' AND [TargetCurrencyTypeId] IS NOT NULL) OR ([ReferenceKind] = N'PaymentFrequency' AND [TargetPaymentFrequencyId] IS NOT NULL) OR ([ReferenceKind] = N'PaymentMethod' AND [TargetPaymentMethodId] IS NOT NULL) OR ([ReferenceKind] = N'SubscriptionStatus' AND [TargetSubscriptionStatusId] IS NOT NULL) OR ([ReferenceKind] = N'ContractStatus' AND [TargetContractStatusId] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_MigrationReferenceMap_Status", "[Status] BETWEEN 0 AND 2");
+
+                            t.HasCheckConstraint("CK_MigrationReferenceMap_Target", "[Status] <> 1 OR (CASE WHEN [TargetCustomerId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetCustomerTypeId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetServiceTypeId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetCurrencyTypeId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetPaymentFrequencyId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetPaymentMethodId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetSubscriptionStatusId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [TargetContractStatusId] IS NULL THEN 0 ELSE 1 END) = 1");
+                        });
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationSourceRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EntityCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("PayloadHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceParentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("StagedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId", "EntityCode", "Id")
+                        .HasDatabaseName("IX_MigrationSourceRow_Batch_Entity_Id");
+
+                    b.HasIndex("BatchId", "EntityCode", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_MigrationSourceRow_Batch_Entity_Source");
+
+                    b.HasIndex("BatchId", "EntityCode", "SourceParentId", "Id")
+                        .HasDatabaseName("IX_MigrationSourceRow_Batch_Parent_Id");
+
+                    b.ToTable("MigrationSourceRow", "collection", t =>
+                        {
+                            t.HasCheckConstraint("CK_MigrationSourceRow_Hash", "DATALENGTH([PayloadHash]) = 32");
+
+                            t.HasCheckConstraint("CK_MigrationSourceRow_Payload", "ISJSON([Payload]) = 1");
+                        });
                 });
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionPayment", b =>
@@ -6856,6 +7456,17 @@ namespace Data.Migrations
                     b.Navigation("SubscriptionStatus");
                 });
 
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionContractAttachment", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionContract", "Contract")
+                        .WithMany()
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+                });
+
             modelBuilder.Entity("Model.Concrete.Collections.CollectionContractPeriodFollowUp", b =>
                 {
                     b.HasOne("Model.Concrete.Collections.CollectionContract", "Contract")
@@ -6898,6 +7509,185 @@ namespace Data.Migrations
                     b.Navigation("CurrencyType");
 
                     b.Navigation("PaymentFrequency");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationContractStage", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationSourceRow", "SourceRow")
+                        .WithOne()
+                        .HasForeignKey("Model.Concrete.Collections.CollectionMigrationContractStage", "SourceRowId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Customer", "TargetCustomer")
+                        .WithMany()
+                        .HasForeignKey("TargetCustomerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.ServiceType", "TargetServiceType")
+                        .WithMany()
+                        .HasForeignKey("TargetServiceTypeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("SourceRow");
+
+                    b.Navigation("TargetCustomer");
+
+                    b.Navigation("TargetServiceType");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationIssue", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationSourceRow", "SourceRow")
+                        .WithMany()
+                        .HasForeignKey("SourceRowId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("SourceRow");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationMap", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationBatch", "FirstBatch")
+                        .WithMany()
+                        .HasForeignKey("FirstBatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationBatch", "LastBatch")
+                        .WithMany()
+                        .HasForeignKey("LastBatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Collections.CollectionContract", "TargetContract")
+                        .WithMany()
+                        .HasForeignKey("TargetContractId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionPayment", "TargetPayment")
+                        .WithMany()
+                        .HasForeignKey("TargetPaymentId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionContractRatePeriod", "TargetRatePeriod")
+                        .WithMany()
+                        .HasForeignKey("TargetRatePeriodId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("FirstBatch");
+
+                    b.Navigation("LastBatch");
+
+                    b.Navigation("TargetContract");
+
+                    b.Navigation("TargetPayment");
+
+                    b.Navigation("TargetRatePeriod");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationRatePeriodStage", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationSourceRow", "SourceRow")
+                        .WithOne()
+                        .HasForeignKey("Model.Concrete.Collections.CollectionMigrationRatePeriodStage", "SourceRowId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.CurrencyType", "TargetCurrencyType")
+                        .WithMany()
+                        .HasForeignKey("TargetCurrencyTypeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionPaymentFrequency", "TargetPaymentFrequency")
+                        .WithMany()
+                        .HasForeignKey("TargetPaymentFrequencyId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("SourceRow");
+
+                    b.Navigation("TargetCurrencyType");
+
+                    b.Navigation("TargetPaymentFrequency");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationReferenceMap", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Model.Concrete.Collections.CollectionContractStatus", "TargetContractStatus")
+                        .WithMany()
+                        .HasForeignKey("TargetContractStatusId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.CurrencyType", "TargetCurrencyType")
+                        .WithMany()
+                        .HasForeignKey("TargetCurrencyTypeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Customer", "TargetCustomer")
+                        .WithMany()
+                        .HasForeignKey("TargetCustomerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.CustomerType", "TargetCustomerType")
+                        .WithMany()
+                        .HasForeignKey("TargetCustomerTypeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionPaymentFrequency", "TargetPaymentFrequency")
+                        .WithMany()
+                        .HasForeignKey("TargetPaymentFrequencyId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionPaymentMethod", "TargetPaymentMethod")
+                        .WithMany()
+                        .HasForeignKey("TargetPaymentMethodId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.ServiceType", "TargetServiceType")
+                        .WithMany()
+                        .HasForeignKey("TargetServiceTypeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Model.Concrete.Collections.CollectionSubscriptionStatus", "TargetSubscriptionStatus")
+                        .WithMany()
+                        .HasForeignKey("TargetSubscriptionStatusId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Batch");
+
+                    b.Navigation("TargetContractStatus");
+
+                    b.Navigation("TargetCurrencyType");
+
+                    b.Navigation("TargetCustomer");
+
+                    b.Navigation("TargetCustomerType");
+
+                    b.Navigation("TargetPaymentFrequency");
+
+                    b.Navigation("TargetPaymentMethod");
+
+                    b.Navigation("TargetServiceType");
+
+                    b.Navigation("TargetSubscriptionStatus");
+                });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionMigrationSourceRow", b =>
+                {
+                    b.HasOne("Model.Concrete.Collections.CollectionMigrationBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Batch");
                 });
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionPayment", b =>
