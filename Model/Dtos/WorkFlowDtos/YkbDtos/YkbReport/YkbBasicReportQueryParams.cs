@@ -10,6 +10,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbReport
 
         public string? Search { get; set; }
         public string? RequestNo { get; set; }
+        public long? WorkFlowId { get; set; }
         public string? YkbServiceTrackNo { get; set; }
 
         public long? CurrentStepId { get; set; }

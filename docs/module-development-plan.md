@@ -6,6 +6,10 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## Dev eşitlemesi — 27 Eylül 2026
+
+Kullanıcı talebiyle FE dev (`b43065d`) ve BE dev (`1b14f56`) uçları GitHub'dan güncellendi ve her iki `tahsilat-module` branch'ine çakışmasız birleştirildi. Yerel çalışma ağaçları işlem öncesinde temizdi. Tahsilat kodu ve migrationları korundu; diğer branchlere merge veya veritabanı işlemi yapılmadı. FE production build ve BE solution build başarılı. Değişen frontend dosyalarında ESLint 15 hata/34 uyarı verdi; bu dosyalar origin/dev ile birebir aynı olduğundan mevcut dev bulguları olarak kaydedildi. Merge kapsamında ilgisiz lint düzeltmesi yapılmadı. Commitler yereldir; push yapılmadı.
+
 - **27 Eylül — canlıya taşınabilir geliştirme:** Testteki DB çalışmalarının tamamı ileride AssistFlow canlı ortamına uygulanacak şekilde sürümlü migration/script/aktarımı, hedefe özel kimlik eşleştirmesi, önizleme, tekrar güvenliği ve geri dönüş kaydıyla hazırlanır. Test DB canlıya kopyalanmaz; test kimlikleri canlıda varsayılmaz. Ortak müşteri tipi/senkronizasyon/menü değişiklikleri de pakete dahildir. Her DB görevinde [canlı geçiş hazırlığı](collection-production-transition.md) güncellenir. Bu talep hazırlık yetkisidir; mevcut AssistFlow erişimi salt-okunur kalır.
 
 ## Güncel yürütme özeti — 27 Eylül, legacy kapsam denetimi sonrası

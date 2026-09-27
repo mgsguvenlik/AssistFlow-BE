@@ -1,0 +1,39 @@
+{
+  "sourceSystem": "MGS",
+  "snapshotKey": "mgs-20260919-131119Z",
+  "approvalReference": "Tahsilat modülü ana geliştirme sohbetinde kullanıcı ve muhasebe tarafından kesinleştirilen eşlemeler; 20.09.2026 müşteri e-posta kararı dahil",
+  "entries": [
+    { "kind": "PaymentFrequency", "sourceId": "26", "targetId": 6, "expectedValue": "YEARLY", "evidence": "Legacy Yıllık = 12 aylık tam dönem." },
+    { "kind": "PaymentFrequency", "sourceId": "27", "targetId": 3, "expectedValue": "EVERY_3_MONTHS", "evidence": "Legacy 3 Aylık." },
+    { "kind": "PaymentFrequency", "sourceId": "28", "targetId": 2, "expectedValue": "EVERY_2_MONTHS", "evidence": "Legacy 2 Aylık." },
+    { "kind": "PaymentFrequency", "sourceId": "29", "targetId": 8, "expectedValue": "EVERY_36_MONTHS", "evidence": "Legacy 3 Yıllık." },
+    { "kind": "PaymentFrequency", "sourceId": "30", "targetId": 1, "expectedValue": "MONTHLY", "evidence": "Legacy Aylık." },
+    { "kind": "PaymentFrequency", "sourceId": "31", "targetId": 5, "expectedValue": "EVERY_6_MONTHS", "evidence": "Legacy 6 Aylık." },
+    { "kind": "PaymentFrequency", "sourceId": "32", "targetId": 4, "expectedValue": "EVERY_4_MONTHS", "evidence": "Legacy 4 Aylık." },
+    { "kind": "PaymentFrequency", "sourceId": "33", "targetId": 7, "expectedValue": "EVERY_24_MONTHS", "evidence": "Legacy 2 Yıllık." },
+
+    { "kind": "PaymentMethod", "sourceId": "48", "targetId": 1, "expectedValue": "FINANSBANK_POS", "evidence": "Legacy Finansbank Pos." },
+    { "kind": "PaymentMethod", "sourceId": "49", "targetId": 2, "expectedValue": "GTS", "evidence": "Legacy GTS." },
+    { "kind": "PaymentMethod", "sourceId": "50", "targetId": 3, "expectedValue": "IVR", "evidence": "Legacy IVR." },
+    { "kind": "PaymentMethod", "sourceId": "51", "targetId": 4, "expectedValue": "WEB", "evidence": "Legacy Web." },
+    { "kind": "PaymentMethod", "sourceId": "52", "targetId": 5, "expectedValue": "MAIL_ORDER", "evidence": "Legacy Mail Order; kart verisi taşınmaz." },
+    { "kind": "PaymentMethod", "sourceId": "53", "targetId": 6, "expectedValue": "OFFSET", "evidence": "Legacy Mahsup." },
+    { "kind": "PaymentMethod", "sourceId": "54", "targetId": 7, "expectedValue": "CASH_MANUAL", "evidence": "Legacy Elden." },
+    { "kind": "PaymentMethod", "sourceId": "55", "targetId": 8, "expectedValue": "LEGACY_FREE", "evidence": "Legacy Ücretsiz korunur; hizmet sürer, borç oluşmaz." },
+    { "kind": "PaymentMethod", "sourceId": "56", "targetId": 9, "expectedValue": "ISBANK_POS", "evidence": "Legacy İşBankPos." },
+    { "kind": "PaymentMethod", "sourceId": "57", "targetId": 10, "expectedValue": "BANK_TRANSFER", "evidence": "Legacy Havale." },
+
+    { "kind": "SubscriptionStatus", "sourceId": "12", "targetId": 1, "expectedValue": "ACTIVE", "evidence": "Legacy Aktif." },
+    { "kind": "SubscriptionStatus", "sourceId": "13", "targetId": 2, "expectedValue": "FROZEN", "evidence": "Legacy Donuk; donuk dönemde borç oluşmaz." },
+    { "kind": "ContractStatus", "sourceId": "13", "targetId": 1, "expectedValue": "EXISTS", "evidence": "VAR = sözleşme var ve tahsilata dahil." },
+    { "kind": "ContractStatus", "sourceId": "14", "targetId": 1, "expectedValue": "EXISTS", "evidence": "20.09.2026 müşteri kararı: Belirtilmemiş/boş durum sözleşmesi var kabul edilerek tahsilata dahil edilir." },
+    { "kind": "ContractStatus", "sourceId": "15", "targetId": 2, "expectedValue": "NONE", "evidence": "YOK = sözleşme yok ve tahsilata dahil değil." },
+
+    { "kind": "CurrencyType", "sourceId": "13", "targetId": 2, "expectedValue": "USD", "evidence": "Legacy USD." },
+    { "kind": "CurrencyType", "sourceId": "14", "targetId": 1, "expectedValue": "TRY", "evidence": "Legacy TL = TRY." },
+    { "kind": "CurrencyType", "sourceId": "16", "targetId": 3, "expectedValue": "EUR", "evidence": "Legacy EURO = EUR." },
+
+    { "kind": "CustomerType", "sourceId": "N", "targetId": 4, "expectedValue": "BRYSL01", "evidence": "Legacy normal/bireysel müşteri; mevcut müşteri tipi değiştirilmez." },
+    { "kind": "CustomerType", "sourceId": "G", "targetId": 5, "expectedValue": "KRMSL01", "evidence": "Legacy grup üst kartı; mevcut kurumsal/grup karşılığı." }
+  ]
+}
