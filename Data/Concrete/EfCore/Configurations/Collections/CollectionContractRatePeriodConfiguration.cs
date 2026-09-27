@@ -33,5 +33,8 @@ public sealed class CollectionContractRatePeriodConfiguration : IEntityTypeConfi
             .HasFilter("[IsDeleted] = 0").HasDatabaseName("UX_ContractRatePeriod_Start");
         builder.HasIndex(x => x.ContractId).IsUnique()
             .HasFilter("[EffectiveToExclusive] IS NULL AND [IsDeleted] = 0").HasDatabaseName("UX_ContractRatePeriod_Open");
+        builder.HasIndex(x => new { x.EffectiveFrom, x.EffectiveToExclusive, x.ContractId, x.CurrencyTypeId })
+            .HasFilter("[IsDeleted] = 0 AND [BillingBehavior] = 0")
+            .HasDatabaseName("IX_ContractRatePeriod_Tracking");
     }
 }

@@ -44,8 +44,11 @@ public static class CollectionContractReadQuery
     {
         ArgumentNullException.ThrowIfNull(source);
         if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));
+        var groupCodes = CollectionCustomerClassification.GroupCodes.ToArray();
         return source.AsNoTracking().Where(x => !x.IsDeleted && x.Id == id).Select(x => new CollectionContractDetail
         {
+            CollectionGroupId = x.Customer.CustomerGroup != null && groupCodes.Contains(EF.Functions.Collate(x.Customer.CustomerGroup.Code.Trim(), "Turkish_CI_AS")) ? x.Customer.CustomerGroupId : null,
+            IsGroupParent = x.Customer.CustomerType != null && x.Customer.CustomerType.Code == "G",
             Id = x.Id, CustomerId = x.CustomerId, SubscriberCode = x.Customer.SubscriberCode,
             CustomerName = x.Customer.SubscriberCompany, ServiceTypeId = x.ServiceTypeId,
             ServiceTypeName = x.ServiceType.Name, StartDate = x.StartDate, EndDate = x.EndDate,

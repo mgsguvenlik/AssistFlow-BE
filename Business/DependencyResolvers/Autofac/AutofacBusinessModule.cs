@@ -47,6 +47,8 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<ICollectionContractUpdateService, CollectionContractUpdateService>();
             services.AddScoped<ICollectionPaymentService, CollectionPaymentService>();
             services.AddScoped<ICollectionTrackingService, CollectionTrackingService>();
+            services.AddScoped<ICollectionGroupContextService, CollectionGroupContextService>();
+            services.AddScoped<ICollectionCustomerService, CollectionCustomerService>();
             services.AddScoped<ICollectionPaymentReportService, CollectionPaymentReportService>();
             services.AddScoped<ICollectionContractReportService, CollectionContractReportService>();
             services.AddScoped<ICollectionGroupFollowUpService, CollectionGroupFollowUpService>();

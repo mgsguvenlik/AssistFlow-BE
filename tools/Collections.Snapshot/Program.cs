@@ -1,14 +1,17 @@
 using System.Data;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 
 const string connectionVariable = "COLLECTION_LEGACY_CONNECTION";
-if (args.Length is not (2 or 3) || !string.Equals(args[0], "export", StringComparison.OrdinalIgnoreCase)
+if (args.Length is not (2 or 3) || args[0].ToLowerInvariant() is not ("export" or "export-payments")
     || (args.Length == 3 && !string.Equals(args[2], "--inactive-source", StringComparison.OrdinalIgnoreCase)))
     throw new InvalidOperationException(
-        $"Kullanım: {connectionVariable} ortam değişkenini tanımlayın ve export <boş kesit klasörü> [--inactive-source] komutunu çalıştırın.");
+        $"Kullanım: {connectionVariable} ortam değişkenini tanımlayın ve export/export-payments <boş kesit klasörü> [--inactive-source] komutunu çalıştırın.");
+
+var includePayments = string.Equals(args[0], "export-payments", StringComparison.OrdinalIgnoreCase);
 
 var connectionString = Environment.GetEnvironmentVariable(connectionVariable);
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -28,36 +31,51 @@ if (Directory.Exists(outputDirectory) && Directory.EnumerateFileSystemEntries(ou
 Directory.CreateDirectory(outputDirectory);
 
 var snapshotKey = $"mgs-{DateTime.UtcNow:yyyyMMdd-HHmmss}Z";
-var exports = new[]
+var exports = new List<ExportDefinition>
 {
     new ExportDefinition("Core", "Customer", "CustomerID", "customers.ndjson"),
     new ExportDefinition("Core", "Contract", "ContractID", "contracts.ndjson"),
     new ExportDefinition("Core", "ContractHistory", "ContractHistoryID", "contract-history.ndjson")
 };
+// Ödeme sahipliği ve tarife kontrolü aynı kaynak anına ait verilerle yapılmalı.
+// Kesitte bulunmak aktarım kapsamına dahil olmak anlamına gelmez.
+if (includePayments) exports.Add(new("Core", "Payment", "PaymentID", "payments.ndjson"));
 
 await using var connection = new SqlConnection(builder.ConnectionString);
 await connection.OpenAsync();
 var isolationLevel = args.Length == 3 ? IsolationLevel.Serializable : IsolationLevel.Snapshot;
 await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(isolationLevel);
+var committed = false;
 try
 {
+    var files = new List<ExportedFile>();
     foreach (var export in exports)
-        await ExportAsync(connection, transaction, export, outputDirectory);
+        files.Add(await ExportAsync(connection, transaction, export, outputDirectory));
 
     await transaction.CommitAsync();
+    committed = true;
+    // SQL kilitleri bittikten sonra dosyaları akış halinde hash'le; belleğe toplama.
+    for (var i = 0; i < files.Count; i++)
+    {
+        await using var input = File.OpenRead(Path.Combine(outputDirectory, files[i].FileName));
+        files[i] = files[i] with { Sha256 = Convert.ToHexString(await SHA256.HashDataAsync(input)) };
+    }
     var manifest = JsonSerializer.Serialize(new
     {
         sourceSystem = "MGS",
         snapshotKey,
-        ruleVersion = "contract-v1",
-        normalizationVersion = "subscriber-v1"
+        ruleVersion = includePayments ? "payment-review-v1" : "contract-v1",
+        normalizationVersion = "subscriber-v1",
+        exportKind = includePayments ? "payment-review" : "contract",
+        capturedAtUtc = DateTimeOffset.UtcNow,
+        files
     }, new JsonSerializerOptions { WriteIndented = true });
     await File.WriteAllTextAsync(Path.Combine(outputDirectory, "manifest.json"), manifest, new UTF8Encoding(false));
     Console.WriteLine($"Kesit başarıyla oluşturuldu: {snapshotKey}");
 }
 catch (SqlException exception) when (exception.Number == 3952)
 {
-    await transaction.RollbackAsync();
+    if (!committed) await transaction.RollbackAsync();
     Cleanup(outputDirectory, exports);
     throw new InvalidOperationException(
         "Kaynak MGS veritabanında Snapshot Isolation kapalı. Canlı ayar değiştirilmedi; DBA tarafından alınmış tutarlı bir kopya kullanılmalıdır.",
@@ -65,7 +83,7 @@ catch (SqlException exception) when (exception.Number == 3952)
 }
 catch
 {
-    await transaction.RollbackAsync();
+    if (!committed) await transaction.RollbackAsync();
     Cleanup(outputDirectory, exports);
     throw;
 }
@@ -81,7 +99,7 @@ static void Cleanup(string outputDirectory, IEnumerable<ExportDefinition> export
     if (File.Exists(manifest)) File.Delete(manifest);
 }
 
-static async Task ExportAsync(SqlConnection connection, SqlTransaction transaction,
+static async Task<ExportedFile> ExportAsync(SqlConnection connection, SqlTransaction transaction,
     ExportDefinition export, string outputDirectory)
 {
     var target = Path.Combine(outputDirectory, export.FileName);
@@ -114,6 +132,7 @@ static async Task ExportAsync(SqlConnection connection, SqlTransaction transacti
         count++;
     }
     Console.WriteLine($"{export.Table}: {count} kayıt");
+    return new(export.FileName, export.Table, count, "");
 }
 
 static void WriteValue(Utf8JsonWriter writer, object value)
@@ -138,3 +157,4 @@ static void WriteValue(Utf8JsonWriter writer, object value)
 }
 
 internal sealed record ExportDefinition(string Schema, string Table, string Key, string FileName);
+internal sealed record ExportedFile(string FileName, string EntityCode, long Count, string Sha256);

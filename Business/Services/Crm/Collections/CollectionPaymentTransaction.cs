@@ -4,6 +4,7 @@ using Business.Services.Crm.Collections.Calculation;
 using Core.Common;
 using Core.Enums;
 using Data.Concrete;
+using Data.Concrete.EfCore.Collections;
 using Data.Concrete.EfCore.Context;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -55,6 +56,12 @@ public sealed class CollectionPaymentTransaction(AppDataContext db)
                 if (validate is not null && await validate(cancellationToken) is { } validationError)
                     return Fail(validationError);
 
+                var scopeContractId = command.ContractId ?? await db.Set<CollectionPayment>().AsNoTracking()
+                    .Where(x => x.Id == command.PaymentId).Select(x => (long?)x.ContractId).SingleOrDefaultAsync(cancellationToken);
+                if (!await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers)
+                    .AnyAsync(x => x.Id == scopeContractId, cancellationToken))
+                    return Fail(CollectionCustomerClassification.OutsideScopeMessage);
+
                 var repository = new Repository(db); // Reuse repository, but bind every write to this transaction's context.
                 string? before = null;
                 if (command.Kind == CollectionPaymentOperationKind.Create)
@@ -88,7 +95,10 @@ public sealed class CollectionPaymentTransaction(AppDataContext db)
                     payment.Amount = command.Amount!.Value;
                     payment.CurrencyTypeId = command.CurrencyTypeId!.Value;
                     payment.Description = command.Description;
-                    payment.IsFree = command.IsFree!.Value;
+                    // Update does not expose a free/paid conversion. Preserve the stored historical flag.
+                    // Keep the command hash format unchanged so already completed requests can still replay.
+                    if (command.Kind == CollectionPaymentOperationKind.Create)
+                        payment.IsFree = command.IsFree!.Value;
                     if (command.Kind == CollectionPaymentOperationKind.Create) repository.Add(payment);
                     else { payment.UpdatedDate = DateTimeOffset.UtcNow; payment.UpdatedUser = actorUserId; }
                 }

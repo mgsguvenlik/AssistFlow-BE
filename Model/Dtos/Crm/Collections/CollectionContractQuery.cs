@@ -38,6 +38,9 @@ public class CollectionContractListItem
 
 public sealed class CollectionContractDetail : CollectionContractListItem
 {
+    public long? CollectionGroupId { get; init; }
+    public bool IsGroupParent { get; init; }
+    public bool IsCollectionEligible { get; set; }
     public string? GtsNo { get; init; }
     public string? IvrNo { get; init; }
     public string? ContractStatusName { get; init; }

@@ -74,7 +74,8 @@ public sealed class CollectionTrackingController(IOptions<CollectionReadOptions>
             return StatusCode(503, ResponseModel.Fail("Dışa aktarım sorgusu tamamlanamadı. Lütfen tekrar deneyin.", (Core.Enums.StatusCode)503));
         }
         Response.ContentType = "text/csv; charset=utf-8";
-        Response.Headers["Content-Disposition"] = $"attachment; filename=tahsilat-takip-{query.Period:yyyy-MM}.csv";
+        var periodLabel = query.PeriodFrom is { } from ? $"{from:yyyy-MM}_{query.Period:yyyy-MM}" : $"{query.Period:yyyy-MM}";
+        Response.Headers["Content-Disposition"] = $"attachment; filename=tahsilat-takip-{periodLabel}.csv";
         await using var writer = new StreamWriter(Response.Body, new UTF8Encoding(true), 16 * 1024, leaveOpen: true);
         await writer.WriteLineAsync("Grup,Abone No,Müşteri,Servis Tipi,Dönem,Vade,Para Birimi,Borç,Ödeme,Kalan,Kayıt Türü".AsMemory(), cancellationToken);
         if (hasRow) await WriteRow(enumerator.Current);

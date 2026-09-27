@@ -3,6 +3,7 @@ using Business.Interfaces;
 using Core.Common;
 using Core.Enums;
 using Data.Concrete;
+using Data.Concrete.EfCore.Collections;
 using Data.Concrete.EfCore.Context;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -100,9 +101,9 @@ public sealed class CollectionGroupFollowUpService(AppDataContext db) : ICollect
         });
     }
 
-    private Task<bool> GroupContractExistsAsync(long id, CancellationToken token) => db.Set<CollectionContract>()
-        .AsNoTracking().AnyAsync(x => x.Id == id && !x.IsDeleted && !x.Customer.IsDeleted
-            && x.Customer.CustomerGroupId != null, token);
+    private Task<bool> GroupContractExistsAsync(long id, CancellationToken token) =>
+        CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers, CollectionCustomerClass.Group)
+            .AsNoTracking().AnyAsync(x => x.Id == id, token);
 
     private static bool ValidPeriod(long id, DateOnly period) => id > 0 && period != default
         && period.Day == 1 && period.Year < 9999;

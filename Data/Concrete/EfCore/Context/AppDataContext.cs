@@ -1449,6 +1449,8 @@ namespace Data.Concrete.EfCore.Context
                 entity.Property(x => x.MessageId).HasMaxLength(998);
                 entity.Property(x => x.InReplyTo).HasMaxLength(998);
             });
+            modelBuilder.ApplyConfiguration(new CollectionCustomerNoteConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionGroupParentConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractAttachmentConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionPaymentFrequencyConfiguration());

@@ -6,9 +6,77 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 
+// Ödeme komutları kendi kesitini doğrular; transfer-payments yalnız plan hash'iyle yazar.
+if (args.Length is 3 or 4 && args[0] == "customer-notes")
+{
+    await CollectionCustomerNoteTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "group-parents")
+{
+    await CollectionGroupParentTransfer.RunAsync(args[1], args[2], args.Length == 4 && args[3] != "--install" ? args[3] : null,
+        args.Length == 4 && args[3] == "--install");
+    return;
+}
+if (args.Length > 0 && args[0] == "transfer-payments")
+{
+    if (args.Length is not (7 or 8) || !long.TryParse(args[3], out var batchId))
+        throw new InvalidOperationException("Kullanım: transfer-payments <kesit> <Development JSON> <sözleşme batch> <manifest SHA-256> <legacy kanıt JSON> <kanıt SHA-256> [uygulanacak plan SHA-256]. Hash yoksa yalnız önizleme yapılır.");
+    await CollectionPaymentTransfer.RunAsync(args[1], args[2], batchId, args[4], args[5], args[6], args.Length == 8 ? args[7] : null);
+    return;
+}
+if (args.Length > 0 && args[0] == "compare-payment-currency")
+{
+    if (args.Length != 4)
+        throw new InvalidOperationException("Kullanım: compare-payment-currency <ön inceleme rapor klasörü> <legacy kanıt JSON yolu> <kanıt SHA-256>.");
+    await CollectionPaymentCurrencyComparison.RunAsync(args[1], args[2], args[3]);
+    return;
+}
+if (args.Length > 0 && args[0] == "review-payments")
+{
+    if (args.Length != 5 || !long.TryParse(args[3], out var paymentBatchId))
+        throw new InvalidOperationException("Kullanım: review-payments <ödeme kesiti klasörü> <Development JSON yolu> <sözleşme batch kimliği> <manifest SHA-256>.");
+    await CollectionPaymentReviewer.RunAsync(args[1], args[2], paymentBatchId, args[4]);
+    return;
+}
+if (args.Length is 3 or 5 && args[0] == "transfer-attachments")
+{
+    await CollectionAttachmentTransfer.RunAsync(args[1], args[2], args.Length == 5 ? args[3] : null,
+        args.Length == 5 ? int.Parse(args[4]) : 0);
+    return;
+}
+var scopeReview = args.Length is 3 or 4 && args[0] == "review-customer-scope";
+if (args.Length is 4 or 5 && args[0] == "review-item-five-batch" && long.TryParse(args[1], out var itemFiveBatchId))
+{
+    await CollectionItemFiveDecision.RunAsync(itemFiveBatchId, args[2], args[3], args.Length == 5 ? args[4] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "remove-obsolete-item-four-batch" && long.TryParse(args[1], out var removalBatchId))
+{
+    await CollectionObsoleteContractRemoval.RunAsync(removalBatchId, args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] is "review-customer-duplicates-batch" or "review-customer-names-batch" && long.TryParse(args[1], out var duplicateBatchId))
+{
+    await CollectionCustomerDuplicateReviewer.RunAsync(duplicateBatchId, args[2], args.Length == 4 ? args[3] : null,
+        byName: args[0] == "review-customer-names-batch");
+    return;
+}
+if (args.Length is 3 or 4 && args[0] is "transfer-item-two-batch" or "transfer-frozen-batch" or "transfer-item-four-batch" or "transfer-item-five-batch" && long.TryParse(args[1], out var transferBatchId))
+{
+    await CollectionStoredBatchTransfer.RunAsync(transferBatchId, args[2], args.Length == 4 ? args[3] : null,
+        frozenOnly: args[0] == "transfer-frozen-batch", itemFourOnly: args[0] == "transfer-item-four-batch", itemFiveOnly: args[0] == "transfer-item-five-batch");
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "review-customer-scope-batch" && long.TryParse(args[1], out var scopeBatchId))
+{
+    await CollectionCustomerScopeReviewer.RunStoredBatchAsync(scopeBatchId, args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+
 // Only immutable, pre-exported NDJSON files are accepted. The source database is never opened here.
 var isApply = args.Length == 4 && args[0] is "apply" or "exclude-yok" or "include-unknown" or "exclude-unidentified";
-if (!isApply && (args.Length is not (2 or 3) || args[0] is not ("inspect" or "profile" or "stage" or "validate" or "summary" or "prepare-references" or "plan" or "reconcile" or "classify" or "customer-exceptions" or "rate-exceptions" or "attachment-inventory" or "decision-exceptions" or "include-unknown" or "exclude-unidentified")
+if (!scopeReview && !isApply && (args.Length is not (2 or 3) || args[0] is not ("inspect" or "profile" or "stage" or "validate" or "summary" or "prepare-references" or "plan" or "reconcile" or "classify" or "customer-exceptions" or "rate-exceptions" or "attachment-inventory" or "decision-exceptions" or "include-unknown" or "exclude-unidentified")
     || (args[0] is not ("inspect" or "profile") && args.Length != 3)))
 {
     if (args.Length == 3 && args[0] == "map")
@@ -16,7 +84,7 @@ if (!isApply && (args.Length is not (2 or 3) || args[0] is not ("inspect" or "pr
         await CollectionReferenceMapImporter.RunAsync(args[1], args[2]);
         return;
     }
-    throw new InvalidOperationException("Kullanım: inspect/profile <kesit klasörü>, stage/validate/summary/prepare-references/plan/classify/customer-exceptions/rate-exceptions/attachment-inventory/decision-exceptions/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu>, apply/exclude-yok/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu> <plan SHA-256> veya map <eşleme JSON yolu> <Development JSON yolu>.");
+    throw new InvalidOperationException("Kullanım: inspect/profile <kesit klasörü>, stage/validate/summary/prepare-references/plan/classify/customer-exceptions/rate-exceptions/attachment-inventory/decision-exceptions/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu>, apply/exclude-yok/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu> <plan SHA-256>, review-customer-scope <kesit klasörü> <Development JSON yolu> [plan SHA-256], review-customer-scope-batch <batchId> <Development JSON yolu> [plan SHA-256] veya map <eşleme JSON yolu> <Development JSON yolu>.");
 }
 
 var directory = Path.GetFullPath(args[1]);
@@ -25,6 +93,8 @@ var manifestPath = Path.Combine(directory, "manifest.json");
 if (!File.Exists(manifestPath)) throw new InvalidOperationException("Kesit manifest dosyası bulunamadı.");
 using var manifestDocument = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath));
 var manifest = manifestDocument.RootElement;
+if (manifest.TryGetProperty("exportKind", out var exportKind) && exportKind.GetString() == "payment-review")
+    throw new InvalidOperationException("Ödeme inceleme kesiti sözleşme aktarım komutuyla işlenemez. Ödeme doğrulama ve mutabakat adımı gereklidir.");
 var sourceSystem = Required(manifest, "sourceSystem", 50);
 var snapshotKey = Required(manifest, "snapshotKey", 200);
 var ruleVersion = Required(manifest, "ruleVersion", 50);
@@ -40,6 +110,12 @@ var manifestValue = JsonSerializer.Serialize(new object[] { "collection-snapshot
 var manifestHash = SHA256.HashData(Encoding.UTF8.GetBytes(manifestValue));
 Console.WriteLine($"Kesit doğrulandı: {customers.Count} müşteri, {contracts.Count} sözleşme, {histories.Count} tarihçe; SHA-256 manifest {Convert.ToHexString(manifestHash)}.");
 if (args[0] == "inspect") return;
+if (scopeReview)
+{
+    await CollectionCustomerScopeReviewer.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2],
+        args.Length == 4 ? args[3] : null);
+    return;
+}
 if (args[0] == "profile")
 {
     await CollectionSnapshotProfiler.RunAsync(customers.Path, contracts.Path, histories.Path);

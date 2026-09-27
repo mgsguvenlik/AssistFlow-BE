@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Data.Concrete.EfCore.Context;
 using Microsoft.Data.SqlClient;
@@ -10,7 +8,7 @@ using Model.Concrete.Collections;
 internal static class CollectionMigrationApplier
 {
     public static async Task RunAsync(string sourceSystem, string snapshotKey, byte[] expectedManifestHash,
-        string settingsPath, string expectedPlanHash)
+        string settingsPath, string expectedPlanHash, bool itemTwoOnly = false, bool frozenOnly = false, bool itemFourOnly = false, bool itemFiveOnly = false)
     {
         if (expectedPlanHash.Length != 64 || !expectedPlanHash.All(Uri.IsHexDigit))
             throw new InvalidOperationException("Geçerli dry-run plan SHA-256 değeri gereklidir.");
@@ -39,30 +37,18 @@ internal static class CollectionMigrationApplier
         if (!batch.ManifestHash.SequenceEqual(expectedManifestHash) || batch.Status != CollectionMigrationBatchStatus.NeedsReview)
             throw new InvalidOperationException("Kesit doğrulanmış plan durumunda değil veya manifest değişmiş.");
 
-        var existingMaps = await db.Set<CollectionMigrationMap>().Where(x => x.SourceSystem == sourceSystem).ToListAsync();
-        var contractMapIds = existingMaps.Where(x => x.EntityCode == "Contract")
-            .Select(x => NormalizeId(x.SourceId)).ToHashSet(StringComparer.Ordinal);
-        var contracts = await db.Set<CollectionMigrationContractStage>()
-            .Include(x => x.SourceRow)
-            .Where(x => x.SourceRow.BatchId == batch.Id && x.Status == CollectionMigrationRowStatus.Pending)
-            .ToListAsync();
-        var rates = await db.Set<CollectionMigrationRatePeriodStage>()
-            .Include(x => x.SourceRow)
-            .Where(x => x.SourceRow.BatchId == batch.Id && x.Status == CollectionMigrationRowStatus.Pending)
-            .ToListAsync();
-        var rateGroups = rates.Where(x => x.SourceContractId is not null)
+        var plan = await CollectionTransferPlan.LoadAsync(db, batch, itemTwoOnly, frozenOnly, itemFourOnly, itemFiveOnly);
+        var eligible = plan.Contracts;
+        var rateGroups = plan.Rates.Where(x => x.SourceContractId is not null)
             .GroupBy(x => NormalizeId(x.SourceContractId!)).ToDictionary(x => x.Key, x => x.ToList(), StringComparer.Ordinal);
-        var eligible = contracts.Where(x => !contractMapIds.Contains(NormalizeId(x.SourceRow.SourceId))
-            && x.TargetCustomerId.HasValue && x.TargetServiceTypeId.HasValue
-            && x.StartingMonth.HasValue && x.StartingYear.HasValue
-            && rateGroups.TryGetValue(NormalizeId(x.SourceRow.SourceId), out var periods) && periods.Count > 0
-            && periods.All(p => p.Amount.HasValue && p.TargetCurrencyTypeId.HasValue
-                && p.TargetPaymentFrequencyId.HasValue && p.BillingBehavior.HasValue)).ToList();
-        var planMaterial = string.Join('\n', eligible.OrderBy(x => x.SourceRow.SourceId, StringComparer.Ordinal)
-            .Select(x => $"{x.SourceRow.SourceId}:{Convert.ToHexString(x.SourceRow.PayloadHash)}"));
-        var actualPlanHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(planMaterial)));
+        var actualPlanHash = plan.Hash;
         if (!actualPlanHash.Equals(expectedPlanHash, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"Dry-run planı değişmiş; aktarım durduruldu. Güncel hash: {actualPlanHash}");
+        if (eligible.Count == 0)
+        {
+            Console.WriteLine("Aktarılabilir yeni sözleşme yok; veri değiştirilmedi.");
+            return;
+        }
 
         var refs = await db.Set<CollectionMigrationReferenceMap>().AsNoTracking()
             .Where(x => x.BatchId == batch.Id && x.Status == CollectionMigrationDecisionStatus.Accepted).ToListAsync();

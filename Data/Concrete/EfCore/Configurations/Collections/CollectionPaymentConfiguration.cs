@@ -20,6 +20,7 @@ public sealed class CollectionPaymentConfiguration : IEntityTypeConfiguration<Co
         builder.HasOne(x => x.Contract).WithMany().HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.CurrencyType).WithMany().HasForeignKey(x => x.CurrencyTypeId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.ContractId, x.Period, x.CurrencyTypeId, x.Id }).HasDatabaseName("IX_Payment_Contract_Period_Currency_Id");
+        builder.HasIndex(x => new { x.Period, x.ContractId, x.CurrencyTypeId, x.Id }).HasDatabaseName("IX_Payment_Period_Contract_Currency_Id");
         // Negative legacy refunds remain representable; command validation determines allowed new inputs.
     }
 }

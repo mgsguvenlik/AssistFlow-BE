@@ -4,6 +4,7 @@ using Core.Common;
 using Core.Enums;
 using Data.Concrete;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Collections;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
@@ -34,6 +35,9 @@ public sealed class CollectionContractUpdateService(AppDataContext db) : ICollec
                     return Fail("Geçerli kullanıcı bulunamadı.", StatusCode.Unauthorized);
                 contract = await db.Set<CollectionContract>().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, cancellationToken);
                 if (contract is null) return Fail("Sözleşme bulunamadı.", StatusCode.NotFound);
+                if (!await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers)
+                    .AnyAsync(x => x.Id == id, cancellationToken))
+                    return Fail(CollectionCustomerClassification.OutsideScopeMessage);
                 if (!contract.RowVersion.SequenceEqual(command.RowVersion))
                     return Fail("Sözleşme değişmiş veya önceki kayıt tamamlanmış olabilir. Detayı yenileyip tekrar kontrol edin.", StatusCode.Conflict);
                 // An unchanged historical reference can remain even when no longer selectable.

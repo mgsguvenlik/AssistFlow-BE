@@ -268,10 +268,11 @@ Check("Missing payload hash is rejected", () => Throws<ArgumentException>(() =>
 foreach (var day in new[] { 2, 14, 15, 16, 28, 30 })
     Check($"Initial cutoff day {day}", () => Equal(D(2026, day <= 15 ? 9 : 10, day),
         CollectionStartRules.FirstDueDate(D(2026, 9, day))));
-Check("Only EXISTS is included", () =>
+Check("EXISTS and unspecified are included; NONE and invalid codes are excluded", () =>
 {
-    Equal(true, CollectionStartRules.IsIncluded("EXISTS"));
-    foreach (var code in new string?[] { null, "", "NONE", "UNKNOWN", "invalid" })
+    foreach (var code in new string?[] { null, "", " ", "EXISTS", "UNKNOWN" })
+        Equal(true, CollectionStartRules.IsIncluded(code));
+    foreach (var code in new[] { "NONE", "invalid" })
         Equal(false, CollectionStartRules.IsIncluded(code));
 });
 Check("January 31 preserves March 31 after short first month", () => Dates(

@@ -16,7 +16,7 @@ internal static class CollectionStageValidator
         "DATE_INVALID", "RANGE_REVERSED", "CONTRACT_PARENT_MISSING", "HISTORY_CUSTOMER_MISMATCH",
         "PERIOD_START_DUPLICATE", "PERIOD_OVERLAP", "MULTIPLE_OPEN_PERIODS", "HISTORY_MISSING", "HISTORY_INVALID",
         "SERVICE_TYPE_MAP_MISSING", "CURRENCY_MAP_MISSING", "CUSTOMER_TYPE_MAP_MISSING",
-        "CUSTOMER_TYPE_MISMATCH", "CONTRACT_STATUS_MAP_MISSING", "SUBSCRIPTION_STATUS_MAP_MISSING",
+        "CUSTOMER_TYPE_MISMATCH", "CUSTOMER_COLLECTION_EXCLUDED", "CUSTOMER_COLLECTION_UNKNOWN", "CONTRACT_STATUS_MAP_MISSING", "SUBSCRIPTION_STATUS_MAP_MISSING",
         "PAYMENT_METHOD_MAP_MISSING", "PAYMENT_FREQUENCY_MAP_MISSING", "AMOUNT_INVALID",
         "CONTRACT_NOT_INCLUDED", "SUBSCRIPTION_STATUS_UNKNOWN", "PROCESS_TYPE_UNKNOWN",
         "CONTRACT_CURRENT_RATE_MISMATCH", "ATTACHMENT_METADATA_TOO_LONG", "ATTACHMENT_METADATA_INCOMPLETE"
@@ -119,7 +119,9 @@ internal static class CollectionStageValidator
         }
         var targetCodes = new Dictionary<string, List<TargetCustomer>>(StringComparer.Ordinal);
         var targetCustomers = await db.Set<Customer>().AsNoTracking()
-            .Select(x => new TargetCustomer(x.Id, x.SubscriberCode, x.IsDeleted, x.CustomerTypeId)).ToListAsync();
+            .Select(x => new TargetCustomer(x.Id, x.SubscriberCode, x.IsDeleted,
+                x.CustomerType == null ? null : x.CustomerType.Code,
+                x.CustomerGroup == null ? null : x.CustomerGroup.Code)).ToListAsync();
         var targetById = targetCustomers.ToDictionary(x => x.Id);
         foreach (var target in targetCustomers)
         {
@@ -161,12 +163,16 @@ internal static class CollectionStageValidator
             var service = Mapped("ServiceType", Text(root, "ServiceTypeID"));
             resolvedServices[row.Id] = service;
             if (service is null || !activeServiceTypes.Contains(service.Value)) Add(row.Id, "SERVICE_TYPE_MAP_MISSING");
-            if (customerTypeById.TryGetValue(customerId, out var sourceCustomerType))
+            if (targetId.HasValue)
+            {
+                var target = targetById[targetId.Value];
+                if (CollectionCustomerClassification.Issue(target.GroupCode, target.TypeCode) is { } scopeIssue)
+                    Add(row.Id, scopeIssue);
+            }
+            else if (customerTypeById.TryGetValue(customerId, out var sourceCustomerType))
             {
                 var mappedType = Mapped("CustomerType", sourceCustomerType);
                 if (mappedType is null) Add(row.Id, "CUSTOMER_TYPE_MAP_MISSING");
-                else if (targetId.HasValue && targetById[targetId.Value].CustomerTypeId != mappedType)
-                    Add(row.Id, "CUSTOMER_TYPE_MISMATCH");
             }
             var sourceContractStatus = Text(root, "ContractStatusID");
             var mappedContractStatus = Mapped("ContractStatus", sourceContractStatus);
@@ -434,6 +440,7 @@ internal static class CollectionStageValidator
     };
 
     private sealed record SourceRow(long Id, string EntityCode, string SourceId, string? SourceParentId, string Payload);
-    private sealed record TargetCustomer(long Id, string? Code, bool IsDeleted, long? CustomerTypeId);
+    private sealed record TargetCustomer(long Id, string? Code, bool IsDeleted,
+        string? TypeCode, string? GroupCode);
     private sealed record HistoryRange(long RowId, DateOnly From, DateOnly? ToExclusive);
 }

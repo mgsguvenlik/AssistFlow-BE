@@ -120,7 +120,7 @@ public sealed class CollectionPaymentService(AppDataContext db) : ICollectionPay
         if (contractId <= 0 || paymentId <= 0 || command.RequestId == Guid.Empty)
             return Fail("Geçerli sözleşme, ödeme ve işlem anahtarı gereklidir.");
         if (!ValidTerms(command.Period, command.PaymentDate, command.Amount))
-            return Fail("Geçerli dönem, ödeme tarihi ve sıfırdan büyük tutar gereklidir.");
+            return Fail("Geçerli dönem, ödeme tarihi ve en fazla iki ondalık basamaklı tutar gereklidir.");
         try
         {
             if (!await ValidActorAsync(actorId, cancellationToken))
@@ -129,8 +129,7 @@ public sealed class CollectionPaymentService(AppDataContext db) : ICollectionPay
                 command.RowVersion, contractId, command.Period, command.PaymentDate, command.Amount,
                 command.CurrencyTypeId, command.Description, false);
             return await new CollectionPaymentTransaction(db).ExecuteAsync(command.RequestId, actorId, payload,
-                cancellationToken, token => ValidateMutationAsync(contractId, paymentId, command.Period,
-                    command.CurrencyTypeId, token));
+                cancellationToken, token => ValidateMutationAsync(contractId, paymentId, command, token));
         }
         catch (Exception ex) when (IsStorageFailure(ex))
         {
@@ -161,20 +160,30 @@ public sealed class CollectionPaymentService(AppDataContext db) : ICollectionPay
         }
     }
 
-    private async Task<string?> ValidateMutationAsync(long contractId, long paymentId, DateOnly period,
-        long currencyTypeId, CancellationToken token)
+    private async Task<string?> ValidateMutationAsync(long contractId, long paymentId,
+        CollectionPaymentUpdate command, CancellationToken token)
     {
-        if (!await db.Set<CollectionPayment>().AsNoTracking()
-            .AnyAsync(x => x.Id == paymentId && x.ContractId == contractId, token))
+        var payment = await db.Set<CollectionPayment>().AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Id == paymentId && x.ContractId == contractId, token);
+        if (payment is null)
             return "Ödeme kaydı bu sözleşmede bulunamadı.";
         if (!await db.Set<CollectionContract>().AsNoTracking()
             .AnyAsync(x => x.Id == contractId && !x.IsDeleted && !x.Customer.IsDeleted, token))
             return "Tahsilata uygun sözleşme veya müşteri bulunamadı.";
-        var until = period.AddMonths(1);
+        // Description-only corrections must not reinterpret historical tariff/amount eligibility.
+        // This check runs within the existing serializable transaction; rowversion is checked before writing.
+        if (payment.Period == command.Period && payment.PaymentDate == command.PaymentDate
+            && payment.Amount == command.Amount && payment.CurrencyTypeId == command.CurrencyTypeId)
+            return null;
+        if (payment.IsFree || payment.Amount <= 0)
+            return "Tarihsel ücretsiz, sıfır veya negatif ödemelerde yalnız açıklama düzenlenebilir. Finansal bilgiler korunur.";
+        if (command.Amount <= 0)
+            return "Tahsilat tutarı sıfırdan büyük olmalıdır.";
+        var until = command.Period.AddMonths(1);
         return await db.Set<CollectionContractRatePeriod>().AsNoTracking().AnyAsync(x =>
             x.ContractId == contractId && !x.IsDeleted && x.EffectiveFrom < until
-            && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > period)
-            && x.CurrencyTypeId == currencyTypeId
+            && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > command.Period)
+            && x.CurrencyTypeId == command.CurrencyTypeId
             && x.BillingBehavior == CollectionBillingBehavior.Billable, token)
                 ? null : "Seçilen dönem ve para biriminde ücretli tarife bulunamadı. Dönemi ve para birimini kontrol edin.";
     }
@@ -227,7 +236,7 @@ public sealed class CollectionPaymentService(AppDataContext db) : ICollectionPay
 
     private static bool ValidTerms(DateOnly period, DateOnly paymentDate, decimal amount) =>
         period != default && period.Day == 1 && period.Year < 9999 && paymentDate != default
-        && amount > 0 && amount <= 9999999999999999.99m && decimal.Round(amount, 2) == amount;
+        && amount >= -9999999999999999.99m && amount <= 9999999999999999.99m && decimal.Round(amount, 2) == amount;
 
     private static bool IsStorageFailure(Exception ex) => ex is DbUpdateException or SqlException or TimeoutException
         || ex is InvalidOperationException && ex.GetBaseException() is SqlException;

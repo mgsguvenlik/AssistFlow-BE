@@ -4,6 +4,7 @@ using Business.Services.Crm.Collections.Calculation;
 using Core.Common;
 using Core.Enums;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Collections;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
@@ -38,6 +39,9 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                     return Fail("Geçerli kullanıcı bulunamadı.", StatusCode.Unauthorized);
                 contract = await db.Set<CollectionContract>().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, cancellationToken);
                 if (contract is null) return Fail("Sözleşme bulunamadı.", StatusCode.NotFound);
+                if (!await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers)
+                    .AnyAsync(x => x.Id == id, cancellationToken))
+                    return Fail(CollectionCustomerClassification.OutsideScopeMessage);
                 if (!contract.RowVersion.SequenceEqual(command.RowVersion))
                     return Fail("Sözleşme değişmiş olabilir. Detayı yenileyip tekrar deneyin.", StatusCode.Conflict);
                 if (contract.StartDate > today || contract.EndDate < today)

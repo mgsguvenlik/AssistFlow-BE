@@ -1,5 +1,9 @@
 # Legacy sözleşme kesiti
 
+## Ödeme inceleme uzantısı — 26 Eylül
+
+`export-payments <boş kesit klasörü> [--inactive-source]` mevcut üç tabloya `Core.Payment` ekler. Aynı transaction'da okur; dosya başına satır adedi ve SHA-256 manifestte tutulur. Bu kesit sözleşme importer'ı tarafından reddedilir; hedefe ödeme/sözleşme yazmaz. Mevcut `export` komutu geriye uyumludur. [Gerçek kesit ve sonraki adımlar](collection-payment-migration-preparation-2026-09-26.md).
+
 `tools/Collections.Snapshot`, legacy MGS veritabanından `Core.Customer`, `Core.Contract` ve
 `Core.ContractHistory` tablolarını tek bir SQL Snapshot transaction içinde salt-okuma olarak dışa aktarır.
 Kaynakta hiçbir create/update/delete/alter komutu çalıştırmaz.

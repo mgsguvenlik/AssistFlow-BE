@@ -23,9 +23,11 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
             "Turkey Standard Time").DateTime);
         var monthEnd = query.Period != default && query.Period.Year < 9999
             ? query.Period.AddMonths(1).AddDays(-1) : DateOnly.MaxValue;
-        var asOf = query.AsOfDate ?? (today < monthEnd ? today : monthEnd);
+        var asOf = query.FullPeriod ? monthEnd : query.AsOfDate ?? (today < monthEnd ? today : monthEnd);
+        if (query.FullPeriod && query.AsOfDate.HasValue)
+            return ResponseModel<CollectionPeriodBalance>.Fail("Tam dönem hesabında ayrıca hesap tarihi seçilemez.");
         if (id <= 0 || query.Period == default || query.Period.Day != 1 || query.Period.Year >= 9999
-            || asOf < query.Period || asOf > monthEnd || asOf > today)
+            || asOf < query.Period || asOf > monthEnd || !query.FullPeriod && asOf > today)
             return ResponseModel<CollectionPeriodBalance>.Fail("Geçerli muhasebe ayı ve bu ay içinde, en fazla bugün olan hesap tarihi seçin.");
         if (db.Model.FindEntityType(typeof(CollectionContractRatePeriod)) is null)
             return ResponseModel<CollectionPeriodBalance>.Fail("Tahsilat modeli henüz etkin değil.", (StatusCode)503);
@@ -66,10 +68,20 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
             ? firstRatePeriod : query.Period;
         var until = query.Period.AddMonths(1);
         if (asOf < until) until = asOf.AddDays(1);
+        // A single-period balance must not fail because an unrelated older rate period has a gap.
+        // Devirli hesapta, by contrast, the complete interval remains mandatory to avoid inventing debt.
+        var scopeRates = query.IncludeCarryOver
+            ? calculationRates
+            : calculationRates.Where(x => x.EffectiveFrom < until
+                && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > from)).ToArray();
         IReadOnlyList<CollectionCharge> charges;
         try
         {
-            charges = CollectionAccrualRules.Calculate(calculationRates, from, until);
+            // A selected month inside a known historical gap has no supported tariff charge.
+            // Payments for that accounting month remain visible below; no debt is fabricated.
+            charges = scopeRates.Length == 0
+                ? Array.Empty<CollectionCharge>()
+                : CollectionAccrualRules.Calculate(scopeRates, from, until);
         }
         catch (ArgumentException)
         {
@@ -77,7 +89,8 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
         }
 
         var payments = await repository.GetQueryable<CollectionPayment>().AsNoTracking()
-            .Where(x => x.ContractId == id && x.Period >= from && x.Period <= query.Period && x.PaymentDate <= asOf)
+            .Where(x => x.ContractId == id && x.Period >= from && x.Period <= query.Period
+                && (query.FullPeriod || x.PaymentDate <= asOf))
             .GroupBy(x => new { x.CurrencyTypeId, x.CurrencyType.Code })
             .Select(g => new { g.Key.CurrencyTypeId, g.Key.Code, Amount = g.Sum(x => x.Amount) })
             .OrderBy(x => x.CurrencyTypeId).Take(101).ToListAsync(cancellationToken);
@@ -92,7 +105,7 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
             new CollectionCurrencyBalance(currencyId, currencyCodes[currencyId], accrued.GetValueOrDefault(currencyId),
                 paid.GetValueOrDefault(currencyId), accrued.GetValueOrDefault(currencyId) - paid.GetValueOrDefault(currencyId))).ToList();
         return ResponseModel<CollectionPeriodBalance>.Success(new(query.Period, from, asOf,
-            query.IncludeCarryOver, items), query.IncludeCarryOver ? "Devirli bakiye hesaplandı." : "Dönem bakiyesi hesaplandı.");
+            query.IncludeCarryOver, items, query.FullPeriod), query.IncludeCarryOver ? "Devirli bakiye hesaplandı." : "Dönem bakiyesi hesaplandı.");
     }
 
     public async Task<ResponseModel<PagedResult<CollectionPaymentItem>>> GetPaymentsAsync(long id,
@@ -152,6 +165,11 @@ public sealed class CollectionContractReadService(AppDataContext db, IUnitOfWork
         if (id <= 0) return ResponseModel<CollectionContractDetail>.Fail("Geçersiz sözleşme kimliği.");
         var item = await CollectionContractReadQuery.Detail(unitOfWork.Repository.GetQueryable<CollectionContract>(), id)
             .SingleOrDefaultAsync(cancellationToken);
+        if (item is not null)
+            item.IsCollectionEligible = await CollectionCustomerScopeQuery.Contracts(
+                    unitOfWork.Repository.GetQueryable<CollectionContract>(),
+                    unitOfWork.Repository.GetQueryable<Model.Concrete.Customer>())
+                .AnyAsync(x => x.Id == id, cancellationToken);
         return item is null
             ? ResponseModel<CollectionContractDetail>.Fail("Sözleşme bulunamadı.", StatusCode.NotFound)
             : ResponseModel<CollectionContractDetail>.Success(item, "Sözleşme bilgileri başarıyla getirildi.");

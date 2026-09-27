@@ -1,15 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 using Business.Interfaces;
-using Business.UnitOfWork;
+using Data.Concrete;
 using Core.Common;
 using Core.Enums;
+using Data.Concrete.EfCore.Collections;
+using Data.Concrete.EfCore.Context;
+using Model.Concrete;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
 
 namespace Business.Services.Crm.Collections;
 
-public sealed class CollectionTrackingService(IUnitOfWork unitOfWork) : ICollectionTrackingService
+public sealed class CollectionTrackingService(AppDataContext db) : ICollectionTrackingService
 {
     public async Task<ResponseModel<PagedResult<CollectionTrackingItem>>> GetPageAsync(CollectionTrackingQuery query,
         CancellationToken cancellationToken = default)
@@ -46,115 +49,124 @@ public sealed class CollectionTrackingService(IUnitOfWork unitOfWork) : ICollect
 
     private IQueryable<CollectionTrackingItem> BuildRows(CollectionTrackingQuery query)
     {
-        var repository = unitOfWork.Repository;
-        var period = query.Period;
-        var nextPeriod = period.AddMonths(1);
-        var monthDays = DateTime.DaysInMonth(period.Year, period.Month);
+        // The shared repository factory creates its own context. Bind this composed query to one
+        // existing repository instance on the injected context, including its SQL calendar source.
+        var repository = new Repository(db);
+        var firstPeriod = query.PeriodFrom ?? query.Period;
+        var until = query.Period.AddMonths(1);
+        var monthCount = (query.Period.Year - firstPeriod.Year) * 12 + query.Period.Month - firstPeriod.Month + 1;
+        // Only the small calendar is built locally. Financial rows, grouping, filtering and paging stay in SQL.
+        var periods = CollectionTrackingCalendarQuery.Months(db, firstPeriod, monthCount);
+        var kind = query.View == CollectionFollowUpView.Group || query.CustomerGroupId.HasValue
+            ? CollectionCustomerClass.Group : CollectionCustomerClass.Individual;
+        var contracts = CollectionCustomerScopeQuery.Contracts(repository.GetQueryable<CollectionContract>(),
+            repository.GetQueryable<Customer>(), kind).AsNoTracking();
+        if (query.CustomerId.HasValue) contracts = contracts.Where(x => x.CustomerId == query.CustomerId);
+        if (query.CustomerGroupId.HasValue) contracts = contracts.Where(x => x.Customer.CustomerGroupId == query.CustomerGroupId);
+        if (query.ServiceTypeId.HasValue) contracts = contracts.Where(x => x.ServiceTypeId == query.ServiceTypeId);
+        if (query.SubscriptionStatusId.HasValue) contracts = contracts.Where(x => x.SubscriptionStatusId == query.SubscriptionStatusId);
+        if (query.PaymentMethodId.HasValue)
+            contracts = query.ExcludePaymentMethod
+                ? contracts.Where(x => x.PaymentMethodId == null || x.PaymentMethodId != query.PaymentMethodId)
+                : contracts.Where(x => x.PaymentMethodId == query.PaymentMethodId);
+        var term = query.Search?.Trim();
+        if (!string.IsNullOrEmpty(term)) contracts = contracts.Where(x =>
+            x.Customer.SubscriberCode != null && x.Customer.SubscriberCode.Contains(term)
+            || x.Customer.SubscriberCompany != null && x.Customer.SubscriberCompany.Contains(term)
+            || x.Customer.CustomerGroup != null && (x.Customer.CustomerGroup.GroupName.Contains(term)
+                || x.Customer.CustomerGroup.Code.Contains(term))
+            || x.GtsNo != null && x.GtsNo.Contains(term) || x.IvrNo != null && x.IvrNo.Contains(term)
+            || x.Customer.Phone1 != null && x.Customer.Phone1.Contains(term)
+            || x.Customer.Phone2 != null && x.Customer.Phone2.Contains(term)
+            || x.Customer.Email1 != null && x.Customer.Email1.Contains(term)
+            || x.Customer.Email2 != null && x.Customer.Email2.Contains(term)
+            || x.Customer.City != null && x.Customer.City.Contains(term)
+            || x.Customer.Note != null && x.Customer.Note.Contains(term));
+        var contractIds = contracts.Select(x => x.Id);
         var payments = repository.GetQueryable<CollectionPayment>().AsNoTracking()
-            .Where(x => x.Period == period)
-            .GroupBy(x => new { x.ContractId, x.CurrencyTypeId })
-            .Select(g => new { g.Key.ContractId, g.Key.CurrencyTypeId, Amount = (decimal?)g.Sum(x => x.Amount) });
+            .Where(x => x.Period >= firstPeriod && x.Period < until && contractIds.Contains(x.ContractId)
+                && (!query.CurrencyTypeId.HasValue || x.CurrencyTypeId == query.CurrencyTypeId))
+            .Select(x => new { x.ContractId, x.Period, x.CurrencyTypeId, x.Amount });
         var rates = repository.GetQueryable<CollectionContractRatePeriod>().AsNoTracking()
             .Where(x => !x.IsDeleted && x.BillingBehavior == CollectionBillingBehavior.Billable
-                && x.Amount != null && x.CurrencyTypeId != null && !x.Contract.IsDeleted && !x.Contract.Customer.IsDeleted
-                && x.EffectiveFrom < nextPeriod && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > period)
-                && (x.Contract.EndDate == null || x.Contract.EndDate >= period));
-        var candidates = rates.Select(x => new
+                && x.Amount != null && x.CurrencyTypeId != null && contractIds.Contains(x.ContractId)
+                && x.EffectiveFrom < until && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > firstPeriod)
+                && (x.Contract.EndDate == null || x.Contract.EndDate >= firstPeriod)
+                && (!query.CurrencyTypeId.HasValue || x.CurrencyTypeId == query.CurrencyTypeId));
+        var candidates = rates.SelectMany(rate => periods, (rate, period) => new
         {
-            Rate = x,
-            MonthDifference = EF.Functions.DateDiffMonth(x.BillingAnchor, period),
-            AnchorDay = x.OriginalAnchorDay ?? (byte)x.BillingAnchor.Day
-        }).Where(x => x.MonthDifference >= 0 && x.MonthDifference % x.Rate.PaymentFrequency.IntervalMonths == 0)
+            Rate = rate, Period = period,
+            MonthDifference = EF.Functions.DateDiffMonth(rate.BillingAnchor, period),
+            AnchorDay = rate.OriginalAnchorDay ?? (byte)rate.BillingAnchor.Day,
+            MonthDays = period.AddMonths(1).AddDays(-1).Day
+        }).Where(x => x.Period.AddMonths(1) > x.Rate.EffectiveFrom
+                && (x.Rate.EffectiveToExclusive == null || x.Period < x.Rate.EffectiveToExclusive)
+                && (x.Rate.Contract.EndDate == null || x.Period <= x.Rate.Contract.EndDate)
+                && x.MonthDifference >= 0 && x.MonthDifference % x.Rate.PaymentFrequency.IntervalMonths == 0)
             .Select(x => new
             {
-                x.Rate,
-                DueDay = x.AnchorDay > monthDays ? monthDays : x.AnchorDay
-            }).Where(x =>
-                (x.Rate.EffectiveFrom.Year < period.Year || x.Rate.EffectiveFrom.Year == period.Year
-                    && (x.Rate.EffectiveFrom.Month < period.Month || x.Rate.EffectiveFrom.Month == period.Month && x.Rate.EffectiveFrom.Day <= x.DueDay))
-                && (x.Rate.EffectiveToExclusive == null || x.Rate.EffectiveToExclusive.Value.Year > period.Year
-                    || x.Rate.EffectiveToExclusive.Value.Year == period.Year && (x.Rate.EffectiveToExclusive.Value.Month > period.Month
-                    || x.Rate.EffectiveToExclusive.Value.Month == period.Month && x.Rate.EffectiveToExclusive.Value.Day > x.DueDay))
-                && (x.Rate.Contract.EndDate == null || x.Rate.Contract.EndDate.Value.Year > period.Year
-                    || x.Rate.Contract.EndDate.Value.Year == period.Year && (x.Rate.Contract.EndDate.Value.Month > period.Month
-                    || x.Rate.Contract.EndDate.Value.Month == period.Month && x.Rate.Contract.EndDate.Value.Day >= x.DueDay)));
-        var contracts = repository.GetQueryable<CollectionContract>().AsNoTracking()
-            .Where(x => !x.IsDeleted && !x.Customer.IsDeleted);
-        var currencies = repository.GetQueryable<Model.Concrete.CurrencyType>().AsNoTracking();
-        var dueCandidates = candidates.Select(x => new
+                x.Rate, x.Period,
+                DueDate = x.Period.AddDays((x.AnchorDay > x.MonthDays ? x.MonthDays : x.AnchorDay) - 1)
+            }).Where(x => x.Rate.EffectiveFrom <= x.DueDate
+                && (x.Rate.EffectiveToExclusive == null || x.Rate.EffectiveToExclusive > x.DueDate)
+                && (x.Rate.Contract.EndDate == null || x.Rate.Contract.EndDate >= x.DueDate));
+        // UNION ALL contributions once, then aggregate once. Rejoining two aggregates through their
+        // unioned keys repeats the full calendar scan and payment grouping for long historical ranges.
+        var contributions = candidates.Select(x => new
         {
-            x.Rate.ContractId,
-            CurrencyTypeId = x.Rate.CurrencyTypeId!.Value,
-            DueDay = (int?)x.DueDay,
-            Amount = (decimal?)x.Rate.Amount!.Value
-        });
-        var chargeKeys = dueCandidates.Select(x => new { x.ContractId, x.CurrencyTypeId });
-        var paymentKeys = payments.Select(x => new { x.ContractId, x.CurrencyTypeId });
-        var keys = chargeKeys.Union(paymentKeys);
+            x.Rate.ContractId, x.Period, CurrencyTypeId = x.Rate.CurrencyTypeId!.Value,
+            DueDate = (DateOnly?)x.DueDate, AccruedAmount = x.Rate.Amount!.Value, PaymentAmount = 0m
+        }).Concat(payments.Select(x => new
+        {
+            x.ContractId, x.Period, x.CurrencyTypeId,
+            DueDate = (DateOnly?)null, AccruedAmount = 0m, PaymentAmount = x.Amount
+        }));
+        var balances = contributions.GroupBy(x => new { x.ContractId, x.Period, x.CurrencyTypeId })
+            .Select(g => new
+            {
+                g.Key.ContractId, g.Key.Period, g.Key.CurrencyTypeId,
+                DueDate = g.Min(x => x.DueDate),
+                AccruedAmount = g.Sum(x => x.AccruedAmount), PaymentAmount = g.Sum(x => x.PaymentAmount)
+            });
+        var currencies = repository.GetQueryable<Model.Concrete.CurrencyType>().AsNoTracking();
         IQueryable<CollectionTrackingItem> rows =
-            from key in keys
-            join contract in contracts on key.ContractId equals contract.Id
-            join currency in currencies on key.CurrencyTypeId equals currency.Id
-            join candidate in dueCandidates on key equals new
-                { candidate.ContractId, candidate.CurrencyTypeId } into candidateJoin
-            from candidate in candidateJoin.DefaultIfEmpty()
-            join payment in payments on key equals new
-                { payment.ContractId, payment.CurrencyTypeId } into paymentJoin
-            from payment in paymentJoin.DefaultIfEmpty()
+            from balance in balances
+            join contract in contracts on balance.ContractId equals contract.Id
+            join currency in currencies on balance.CurrencyTypeId equals currency.Id
             select new CollectionTrackingItem
             {
-                ContractId = contract.Id, CustomerId = contract.CustomerId,
-                ServiceTypeId = contract.ServiceTypeId,
+                ContractId = contract.Id, CustomerId = contract.CustomerId, ServiceTypeId = contract.ServiceTypeId,
                 CustomerGroupId = contract.Customer.CustomerGroupId,
-                CustomerGroupName = contract.Customer.CustomerGroup == null
-                    ? null : contract.Customer.CustomerGroup.GroupName,
-                Period = period,
-                DueDate = candidate.DueDay == null ? null : period.AddDays(candidate.DueDay.Value - 1),
-                SubscriberCode = contract.Customer.SubscriberCode,
-                CustomerName = contract.Customer.SubscriberCompany,
-                ServiceTypeName = contract.ServiceType.Name,
-                CurrencyTypeId = key.CurrencyTypeId, CurrencyCode = currency.Code,
-                AccruedAmount = candidate.Amount ?? 0,
-                PaymentAmount = payment.Amount ?? 0,
-                RemainingAmount = (candidate.Amount ?? 0)
-                    - (payment.Amount ?? 0),
-                HasAccrual = candidate.DueDay != null, IsGroup = false, ContractCount = 1
+                CustomerGroupName = contract.Customer.CustomerGroup == null ? null : contract.Customer.CustomerGroup.GroupName,
+                Period = balance.Period, DueDate = balance.DueDate,
+                SubscriberCode = contract.Customer.SubscriberCode, CustomerName = contract.Customer.SubscriberCompany,
+                ServiceTypeName = contract.ServiceType.Name, CurrencyTypeId = balance.CurrencyTypeId, CurrencyCode = currency.Code,
+                AccruedAmount = balance.AccruedAmount, PaymentAmount = balance.PaymentAmount,
+                RemainingAmount = balance.AccruedAmount - balance.PaymentAmount,
+                HasAccrual = balance.DueDate != null, IsGroup = false,
+                IsGroupCustomer = kind == CollectionCustomerClass.Group, ContractCount = 1
             };
-        var term = query.Search?.Trim();
-        if (!string.IsNullOrEmpty(term)) rows = rows.Where(x =>
-            x.SubscriberCode != null && x.SubscriberCode.Contains(term)
-            || x.CustomerName != null && x.CustomerName.Contains(term)
-            || x.CustomerGroupName != null && x.CustomerGroupName.Contains(term));
-        if (query.CustomerId.HasValue) rows = rows.Where(x => x.CustomerId == query.CustomerId.Value);
-        if (query.CustomerGroupId.HasValue) rows = rows.Where(x => x.CustomerGroupId == query.CustomerGroupId.Value);
-        if (query.ServiceTypeId.HasValue) rows = rows.Where(x => x.ServiceTypeId == query.ServiceTypeId.Value);
-        if (query.CurrencyTypeId.HasValue) rows = rows.Where(x => x.CurrencyTypeId == query.CurrencyTypeId.Value);
         if (query.View == CollectionFollowUpView.Group)
             rows = rows.Where(x => x.CustomerGroupId != null)
-                .GroupBy(x => new { x.CustomerGroupId, x.CustomerGroupName, x.CurrencyTypeId, x.CurrencyCode })
+                .GroupBy(x => new { x.CustomerGroupId, x.CustomerGroupName, x.Period, x.CurrencyTypeId, x.CurrencyCode })
                 .Select(g => new CollectionTrackingItem
                 {
                     ContractId = 0, CustomerId = 0, ServiceTypeId = 0,
-                    CustomerGroupId = g.Key.CustomerGroupId,
-                    CustomerGroupName = g.Key.CustomerGroupName,
-                    Period = period, DueDate = null, SubscriberCode = null,
-                    CustomerName = g.Key.CustomerGroupName ?? "Adsız müşteri grubu",
-                    ServiceTypeName = "Birden fazla",
+                    CustomerGroupId = g.Key.CustomerGroupId, CustomerGroupName = g.Key.CustomerGroupName,
+                    Period = g.Key.Period, DueDate = null, SubscriberCode = null,
+                    CustomerName = g.Key.CustomerGroupName ?? "Adsız müşteri grubu", ServiceTypeName = "Birden fazla",
                     CurrencyTypeId = g.Key.CurrencyTypeId, CurrencyCode = g.Key.CurrencyCode,
-                    AccruedAmount = g.Sum(x => x.AccruedAmount),
-                    PaymentAmount = g.Sum(x => x.PaymentAmount),
-                    RemainingAmount = g.Sum(x => x.RemainingAmount),
-                    HasAccrual = g.Any(x => x.HasAccrual), IsGroup = true,
-                    ContractCount = g.Select(x => x.ContractId).Distinct().Count()
+                    AccruedAmount = g.Sum(x => x.AccruedAmount), PaymentAmount = g.Sum(x => x.PaymentAmount),
+                    RemainingAmount = g.Sum(x => x.RemainingAmount), HasAccrual = g.Any(x => x.HasAccrual),
+                    IsGroup = true, IsGroupCustomer = true, ContractCount = g.Select(x => x.ContractId).Distinct().Count()
                 });
-        rows = query.BalanceFilter switch
+        return query.BalanceFilter switch
         {
             CollectionTrackingBalanceFilter.Outstanding => rows.Where(x => x.RemainingAmount > 0),
             CollectionTrackingBalanceFilter.NoOutstanding => rows.Where(x => x.RemainingAmount <= 0),
             CollectionTrackingBalanceFilter.PaymentOnly => rows.Where(x => !x.HasAccrual && x.PaymentAmount > 0),
             _ => rows
         };
-        return rows;
     }
 
     private static IOrderedQueryable<CollectionTrackingItem> OrderRows(IQueryable<CollectionTrackingItem> rows,
@@ -162,6 +174,7 @@ public sealed class CollectionTrackingService(IUnitOfWork unitOfWork) : ICollect
     {
         var ordered = query.SortBy switch
         {
+            CollectionFollowUpSort.Period => query.Desc ? rows.OrderByDescending(x => x.Period) : rows.OrderBy(x => x.Period),
             CollectionFollowUpSort.CustomerName => query.Desc ? rows.OrderByDescending(x => x.CustomerName) : rows.OrderBy(x => x.CustomerName),
             CollectionFollowUpSort.ServiceTypeName => query.Desc ? rows.OrderByDescending(x => x.ServiceTypeName) : rows.OrderBy(x => x.ServiceTypeName),
             CollectionFollowUpSort.ContractAmount => query.Desc ? rows.OrderByDescending(x => x.AccruedAmount) : rows.OrderBy(x => x.AccruedAmount),
@@ -169,6 +182,6 @@ public sealed class CollectionTrackingService(IUnitOfWork unitOfWork) : ICollect
             CollectionFollowUpSort.RemainingAmount => query.Desc ? rows.OrderByDescending(x => x.RemainingAmount) : rows.OrderBy(x => x.RemainingAmount),
             _ => query.Desc ? rows.OrderByDescending(x => x.SubscriberCode) : rows.OrderBy(x => x.SubscriberCode)
         };
-        return ordered.ThenBy(x => x.CustomerGroupId).ThenBy(x => x.ContractId).ThenBy(x => x.CurrencyTypeId);
+        return ordered.ThenBy(x => x.Period).ThenBy(x => x.CustomerGroupId).ThenBy(x => x.ContractId).ThenBy(x => x.CurrencyTypeId);
     }
 }

@@ -2,13 +2,15 @@ using System.ComponentModel.DataAnnotations;
 using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
+using Data.Concrete.EfCore.Collections;
+using Model.Concrete;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
 
 namespace Business.Services.Crm.Collections;
 
-/// <summary>Active choices only. Historical details must not use this list to erase inactive references.</summary>
+/// <summary>Active choices by default; historical list filters may explicitly request inactive definitions.</summary>
 public sealed class CollectionDefinitionReadService(IUnitOfWork unitOfWork) : ICollectionDefinitionReadService
 {
     public async Task<ResponseModel<PagedResult<CollectionDefinitionItem>>> GetPageAsync(CollectionDefinitionQuery query,
@@ -22,16 +24,18 @@ public sealed class CollectionDefinitionReadService(IUnitOfWork unitOfWork) : IC
         var repository = unitOfWork.Repository;
         IQueryable<CollectionDefinitionItem> source = query.Kind switch
         {
+            CollectionDefinitionKind.Customer => CollectionCustomerScopeQuery.Customers(repository.GetQueryable<Customer>()).AsNoTracking()
+                .Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.SubscriberCode ?? "", Name = x.SubscriberCompany ?? "" }),
             CollectionDefinitionKind.PaymentFrequency => repository.GetQueryable<CollectionPaymentFrequency>().AsNoTracking()
-                .Where(x => x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name, IntervalMonths = x.IntervalMonths }),
+                .Where(x => query.IncludeInactive || x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name, IntervalMonths = x.IntervalMonths }),
             CollectionDefinitionKind.ContractStatus => repository.GetQueryable<CollectionContractStatus>().AsNoTracking()
-                .Where(x => x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
+                .Where(x => query.IncludeInactive || x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
             CollectionDefinitionKind.SubscriptionStatus => repository.GetQueryable<CollectionSubscriptionStatus>().AsNoTracking()
-                .Where(x => x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
+                .Where(x => query.IncludeInactive || x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
             CollectionDefinitionKind.GroupStatus => repository.GetQueryable<CollectionGroupStatus>().AsNoTracking()
-                .Where(x => x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
+                .Where(x => query.IncludeInactive || x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name }),
             _ => repository.GetQueryable<CollectionPaymentMethod>().AsNoTracking()
-                .Where(x => x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name })
+                .Where(x => query.IncludeInactive || x.IsActive).Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.Name })
         };
         var search = query.Search?.Trim();
         if (!string.IsNullOrEmpty(search))

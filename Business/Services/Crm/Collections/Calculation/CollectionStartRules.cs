@@ -6,7 +6,9 @@ namespace Business.Services.Crm.Collections.Calculation;
 /// </summary>
 public static class CollectionStartRules
 {
-    public static bool IsIncluded(string? contractStatusCode) => contractStatusCode == "EXISTS";
+    // Blank/unspecified is included by the customer's 20 September decision; unknown codes fail closed.
+    public static bool IsIncluded(string? contractStatusCode) =>
+        string.IsNullOrWhiteSpace(contractStatusCode) || contractStatusCode is "EXISTS" or "UNKNOWN";
 
     public static DateOnly FirstDueDate(DateOnly signatureDate)
     {

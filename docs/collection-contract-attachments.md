@@ -8,6 +8,18 @@ Upload'da CDN yazısı başarılı olup DB commit sonucu belirsizleşirse CDN ne
 
 ## Legacy dosya envanteri
 
+### Güncel kaynak — kullanıcı tarafından sağlanan Contract.rar
+
+Sunucu erişim denemesinden sonra kullanıcı fiziksel kaynak arşivini sağladı. 26 Eylül'de 1.769 dosya listelendi; kullanıcı onayı sonrasında CRC, imza/boyut/hash ve antivirüs kontrolü tamamlandı. Güncel aktarılmış sözleşmelerde **1.830 bağlantı / 1.119 fiziksel kaynak yolu** mevcut CDN'in `uploads-test` alanına yüklendi ve test sözleşmelerine bağlandı. Bütün içerikler geri okunarak hash doğrulandı; son SQL alan/eşleme farkı 0. Arşivde yolu bulunamayan 74 ve boş dosyalı 19 sözleşme ayrı raporlandı, sözleşmeleri korundu. [Uygulama sonuçları ve işletim notları](collection-item-eight-file-migration-plan-2026-09-26.md) güncel kayıttır; aşağıdaki 20 Eylül sayıları tarihseldir.
+
+**Önceki çoklu bağlantı niyeti hakkında düzeltme:** Mevcut `UX_ContractAttachment_StoredFileName` tekillik kuralı aynı CDN anahtarının birden fazla attachment satırında kullanılmasını engeller. Ortak altyapıyı ve şemayı değiştirmemek için yeni planda sözleşme–dosya ilişkisi başına kararlı ayrı anahtar kullanılacak; tekrar denemede aynı ilişki çoğaltılmayacak. Aşağıdaki eski “aynı fiziksel nesneyi bir kez yükleyip çok sözleşmeye bağlama” ifadesi uygulanmış davranış değildir ve güncel planla değiştirilmiştir.
+
+### 26 Eylül — fiziksel kaynak sunucusuna erişim kontrolü
+
+Kullanıcı sözleşme dosyalarının `192.168.1.20` sunucusunda bulunduğunu belirtti ve ilgili dosyaların burada salt-okunur aranmasını istedi. SMB TCP 445 erişimi başarılı; ancak mevcut Windows oturumuyla `net view \\192.168.1.20` paylaşım listelemesi **sistem hatası 5 / Erişim engellendi** sonucunu verdi. Paylaşımlar ve fiziksel dosyalar henüz listelenemedi. Bu bir dosya yokluğu sonucu değildir.
+
+Sonraki adım: kullanıcı sunucu paylaşımına Windows üzerinden okuma yetkili oturum açmalı ve erişilebilir UNC paylaşım/klasör yolunu sağlamalı. Ardından güncel sözleşme metadata envanteriyle fiziksel yollar eşleştirilecek; bulunan, bulunamayan ve erişilemeyen kayıtlar ayrı raporlanacak. Bu erişim kontrolünde sunucu/DB/CDN yazması, dosya taşıma veya silme yapılmadı. Aşağıdaki 20 Eylül sayıları tarihseldir; yeni aramada güncel aktarım kapsamı esas alınacak.
+
 20 Eylül 2026 tarihinde başarıyla aktarılmış 2.439 sözleşme için staging dosya
 alanları yeniden sınıflandırıldı. İlk plan yalnız null kontrolü yaptığı için iki
 alanı da boş metin olan 809 kaydı metadata var gibi saymıştı. Düzeltilmiş sonuç:

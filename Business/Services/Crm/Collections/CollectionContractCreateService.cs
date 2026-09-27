@@ -7,6 +7,7 @@ using Business.Services.Crm.Collections.Calculation;
 using Core.Common;
 using Core.Enums;
 using Data.Concrete;
+using Data.Concrete.EfCore.Collections;
 using Data.Concrete.EfCore.Context;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -54,8 +55,9 @@ public sealed class CollectionContractCreateService(AppDataContext db) : ICollec
                         : Fail("İşlem anahtarı farklı kullanıcı veya içerikle kullanılmış.", StatusCode.Conflict);
                 if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == actorId && !x.IsDeleted, cancellationToken))
                     return Fail("Geçerli kullanıcı bulunamadı.", StatusCode.Unauthorized);
-                if (!await db.Customers.AsNoTracking().AnyAsync(x => x.Id == command.CustomerId && !x.IsDeleted, cancellationToken))
-                    return Fail("Geçerli müşteri bulunamadı.");
+                if (!await CollectionCustomerScopeQuery.Customers(db.Customers).AsNoTracking()
+                    .AnyAsync(x => x.Id == command.CustomerId, cancellationToken))
+                    return Fail(CollectionCustomerClassification.OutsideScopeMessage);
                 if (!await db.ServiceTypes.AsNoTracking().AnyAsync(x => x.Id == command.ServiceTypeId && !x.IsDeleted, cancellationToken))
                     return Fail("Geçerli servis tipi bulunamadı.");
                 if (!await db.CurrencyTypes.AsNoTracking().AnyAsync(x => x.Id == command.CurrencyTypeId, cancellationToken))

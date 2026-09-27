@@ -22,6 +22,51 @@ namespace Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionCustomerNote", b =>
+            {
+                b.Property<long>("Id").ValueGeneratedOnAdd().HasColumnType("bigint");
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                b.Property<long>("CustomerId").HasColumnType("bigint");
+                b.Property<string>("Text").IsRequired().HasMaxLength(10000).HasColumnType("nvarchar(max)");
+                b.Property<byte[]>("RowVersion").IsRequired().IsConcurrencyToken().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+                b.Property<DateTimeOffset>("CreatedDate").HasColumnType("datetimeoffset");
+                b.Property<DateTimeOffset?>("UpdatedDate").HasColumnType("datetimeoffset");
+                b.Property<long>("CreatedUser").HasColumnType("bigint");
+                b.Property<long?>("UpdatedUser").HasColumnType("bigint");
+                b.Property<bool>("IsDeleted").HasColumnType("bit");
+                b.Property<long?>("LegacyCommentId").HasColumnType("bigint");
+                b.Property<long?>("LegacyCustomerId").HasColumnType("bigint");
+                b.Property<string>("LegacyCreatedBy").HasMaxLength(200).HasColumnType("nvarchar(200)");
+                b.Property<string>("LegacyModifiedBy").HasMaxLength(200).HasColumnType("nvarchar(200)");
+                b.Property<DateTime?>("LegacyCreatedOn").HasColumnType("datetime2");
+                b.Property<DateTime?>("LegacyModifiedOn").HasColumnType("datetime2");
+                b.Property<byte[]>("SourceHash").HasColumnType("binary(32)");
+                b.HasKey("Id");
+                b.HasIndex("CustomerId", "IsDeleted", "CreatedDate", "Id");
+                b.HasIndex("LegacyCommentId").IsUnique().HasFilter("[LegacyCommentId] IS NOT NULL");
+                b.ToTable("CustomerNote", "collection");
+                b.HasOne("Model.Concrete.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.NoAction).IsRequired();
+            });
+
+            modelBuilder.Entity("Model.Concrete.Collections.CollectionGroupParent", b =>
+            {
+                b.Property<long>("CustomerId").ValueGeneratedNever().HasColumnType("bigint");
+                b.Property<long>("CustomerGroupId").HasColumnType("bigint");
+                b.Property<long>("LegacyCustomerId").HasColumnType("bigint");
+                b.Property<string>("AccountNo").HasMaxLength(200).HasColumnType("nvarchar(200)");
+                b.Property<bool>("IsCorporate").HasColumnType("bit");
+                b.Property<byte[]>("SourceHash").IsRequired().HasColumnType("binary(32)");
+                b.Property<DateTimeOffset>("CreatedDate").HasColumnType("datetimeoffset");
+                b.Property<long>("CreatedUser").HasColumnType("bigint");
+                b.HasKey("CustomerId");
+                b.HasIndex("LegacyCustomerId").IsUnique();
+                b.HasIndex("CustomerGroupId").IsUnique();
+                b.HasIndex("AccountNo");
+                b.ToTable("GroupParent", "collection");
+                b.HasOne("Model.Concrete.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.NoAction).IsRequired();
+                b.HasOne("Model.Concrete.CustomerGroup", null).WithMany().HasForeignKey("CustomerGroupId").OnDelete(DeleteBehavior.NoAction).IsRequired();
+            });
+
             modelBuilder.Entity("Data.Seeding.Infrastructure.SeedHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -377,6 +422,10 @@ namespace Data.Migrations
                     b.HasIndex("CurrencyTypeId");
 
                     b.HasIndex("PaymentFrequencyId");
+
+                    b.HasIndex("EffectiveFrom", "EffectiveToExclusive", "ContractId", "CurrencyTypeId")
+                        .HasDatabaseName("IX_ContractRatePeriod_Tracking")
+                        .HasFilter("[IsDeleted] = 0 AND [BillingBehavior] = 0");
 
                     b.HasIndex("ContractId", "EffectiveFrom")
                         .IsUnique()
@@ -1054,6 +1103,9 @@ namespace Data.Migrations
 
                     b.HasIndex("ContractId", "Period", "CurrencyTypeId", "Id")
                         .HasDatabaseName("IX_Payment_Contract_Period_Currency_Id");
+
+                    b.HasIndex("Period", "ContractId", "CurrencyTypeId", "Id")
+                        .HasDatabaseName("IX_Payment_Period_Contract_Currency_Id");
 
                     b.ToTable("Payment", "collection", t =>
                         {

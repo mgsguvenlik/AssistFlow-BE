@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Business.Interfaces;
 using Business.UnitOfWork;
 using Core.Common;
+using Data.Concrete.EfCore.Collections;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
@@ -24,7 +25,10 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
             DateTimeOffset.UtcNow, "Turkey Standard Time").DateTime);
         var repository = unitOfWork.Repository;
         var rates = repository.GetQueryable<CollectionContractRatePeriod>().AsNoTracking();
-        var contracts = repository.GetQueryable<CollectionContract>()
+        var source = repository.GetQueryable<CollectionContract>();
+        if (query.EligibleOnly)
+            source = CollectionCustomerScopeQuery.Contracts(source, repository.GetQueryable<Model.Concrete.Customer>());
+        var contracts = source
             .AsNoTracking()
             .Where(x => !x.IsDeleted && !x.Customer.IsDeleted)
             .Select(x => new

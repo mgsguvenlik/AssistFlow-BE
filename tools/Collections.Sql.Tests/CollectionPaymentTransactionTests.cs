@@ -11,7 +11,7 @@ using Model.Concrete.Collections;
 using Model.Dtos.Crm.Collections;
 
 var browserFixture = args.Length == 3 && args[0] is ("--prepare-browser-contract" or "--cleanup-browser-contract");
-if (!browserFixture && (args.Length != 2 || args[0] is not ("--apply-test-fixtures" or "--seed-definitions" or "--read-definitions" or "--read-tracking" or "--read-balance" or "--read-migration-staging" or "--create-contract-fixtures")))
+if (!browserFixture && (args.Length != 2 || args[0] is not ("--apply-test-fixtures" or "--seed-definitions" or "--read-definitions" or "--read-tracking" or "--read-balance" or "--read-migration-staging" or "--create-contract-fixtures" or "--apply-tracking-indexes")))
     throw new InvalidOperationException("Yalnız AssistFlowTest için --apply-test-fixtures veya --seed-definitions ve Development JSON yolu gereklidir.");
 using var config = JsonDocument.Parse(File.ReadAllText(args[1]), new JsonDocumentOptions
     { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
@@ -25,6 +25,31 @@ AppDataContext Context(IInterceptor? interceptor = null)
         sql => sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(2), null));
     if (interceptor is not null) options.AddInterceptors(interceptor);
     return new AppDataContext(options.Options);
+}
+if (args[0] == "--apply-tracking-indexes")
+{
+    const string migrationId = "20260927123000_AddCollectionTrackingIndexes";
+    await using var context = Context();
+    var pending = (await context.Database.GetPendingMigrationsAsync()).ToArray();
+    if (pending.Length > 0 && (pending.Length != 1 || pending[0] != migrationId))
+        throw new InvalidOperationException($"Yalnız {migrationId} uygulanabilir; bekleyen migrationlar: {string.Join(", ", pending)}.");
+
+    if (pending.Length == 1)
+        await context.Database.MigrateAsync();
+
+    var indexCount = await context.Database.SqlQueryRaw<int>("""
+        SELECT COUNT(*) AS [Value]
+        FROM sys.indexes i
+        INNER JOIN sys.tables t ON t.object_id = i.object_id
+        INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+        WHERE (s.name = 'collection' AND t.name = 'ContractRatePeriod' AND i.name = 'IX_ContractRatePeriod_Tracking')
+           OR (s.name = 'collection' AND t.name = 'Payment' AND i.name = 'IX_Payment_Period_Contract_Currency_Id')
+        """).SingleAsync();
+    if (indexCount != 2)
+        throw new InvalidOperationException("Tahsilat takip indeksleri doğrulanamadı.");
+
+    Console.WriteLine("Tahsilat takip indeksleri AssistFlowTest'te uygulandı ve doğrulandı.");
+    return;
 }
 if (args[0] == "--read-migration-staging")
 {
@@ -83,13 +108,78 @@ if (args[0] == "--read-definitions")
 if (args[0] == "--read-tracking")
 {
     await using var db = Context();
-    var trackingService = new CollectionTrackingService(new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(db)));
+    var trackingService = new CollectionTrackingService(db);
     var result = await trackingService.GetPageAsync(new() { Period = new DateOnly(2026, 9, 1), PageSize = 1 });
     if (result.Data is null) throw new InvalidOperationException(result.Message);
     var grouped = await trackingService.GetPageAsync(new()
         { Period = new DateOnly(2026, 9, 1), PageSize = 1, View = CollectionFollowUpView.Group });
     if (grouped.Data is null) throw new InvalidOperationException(grouped.Message);
     Console.WriteLine($"Tahsilat takip sorguları çalıştı; bireysel {result.Data.TotalCount}, grup {grouped.Data.TotalCount} kayıt.");
+    var timer = System.Diagnostics.Stopwatch.StartNew();
+    var rangeQuery = new CollectionTrackingQuery { PeriodFrom = new(2026, 1, 1), Period = new(2026, 3, 1), PageSize = 10, SortBy = CollectionFollowUpSort.Period };
+    var range = await trackingService.GetPageAsync(rangeQuery);
+    if (range.Data is null) throw new InvalidOperationException(range.Message);
+    var count = 0;
+    for (var month = 1; month <= 3; month++)
+    {
+        var one = await trackingService.GetPageAsync(new() { Period = new(2026, month, 1), PageSize = 1 });
+        if (one.Data is null) throw new InvalidOperationException(one.Message);
+        count += one.Data.TotalCount;
+    }
+    if (count != range.Data.TotalCount || range.Data.Items.Any(x => x.Period < rangeQuery.PeriodFrom || x.Period > rangeQuery.Period))
+        throw new InvalidOperationException("Üç aylık aralık/tek ay sayım mutabakatı başarısız.");
+    var reader = new CollectionContractReadService(db, new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(db)));
+    var matched = 0;
+    foreach (var row in range.Data.Items)
+    {
+        var detail = await reader.GetBalanceAsync(row.ContractId, new() { Period = row.Period, FullPeriod = true });
+        var item = detail.Data?.Items.SingleOrDefault(x => x.CurrencyTypeId == row.CurrencyTypeId);
+        if (item is null || item.AccruedAmount != row.AccruedAmount || item.PaymentAmount != row.PaymentAmount)
+            throw new InvalidOperationException($"Aralık/detay bakiye farkı: {row.ContractId}/{row.Period}; liste {row.AccruedAmount}/{row.PaymentAmount}; detay {item?.AccruedAmount}/{item?.PaymentAmount}; {detail.Message}.");
+        matched++;
+    }
+    var groupRange = await trackingService.GetPageAsync(new() { PeriodFrom = rangeQuery.PeriodFrom, Period = rangeQuery.Period, View = CollectionFollowUpView.Group, PageSize = 3 });
+    if (groupRange.Data is null) throw new InvalidOperationException(groupRange.Message);
+    foreach (var row in groupRange.Data.Items)
+    {
+        var members = await trackingService.GetPageAsync(new() { Period = row.Period, CustomerGroupId = row.CustomerGroupId, CurrencyTypeId = row.CurrencyTypeId, PageSize = 100 });
+        if (members.Data is null) throw new InvalidOperationException(members.Message);
+        if (members.Data.TotalCount <= 100 && (members.Data.Items.Sum(x => x.AccruedAmount) != row.AccruedAmount
+            || members.Data.Items.Sum(x => x.PaymentAmount) != row.PaymentAmount))
+            throw new InvalidOperationException("Grup/dönem üye toplamı uyuşmuyor.");
+    }
+    var invalid = await trackingService.GetPageAsync(new() { PeriodFrom = new(2026, 4, 1), Period = new(2026, 3, 1) });
+    if (invalid.IsSuccess) throw new InvalidOperationException("Ters dönem aralığı kabul edildi.");
+    if (matched == 0) throw new InvalidOperationException("Doğrulanabilen detay örneği yok.");
+    Console.WriteLine($"Aralık kontrolü: {range.Data.TotalCount} satır; {matched} detay eşleşti, 3 grup ve ters aralık başarılı. Süre {timer.Elapsed.TotalSeconds:F2} sn; yalnız SELECT.");
+    var sample = await db.Set<CollectionContract>().AsNoTracking().SingleAsync(x => x.Id == range.Data.Items[0].ContractId);
+    if (sample.PaymentMethodId.HasValue)
+    {
+        var included = await trackingService.GetPageAsync(new() { Period = new(2026, 9, 1), PaymentMethodId = sample.PaymentMethodId, PageSize = 1 });
+        var excluded = await trackingService.GetPageAsync(new() { Period = new(2026, 9, 1), PaymentMethodId = sample.PaymentMethodId, ExcludePaymentMethod = true, PageSize = 1 });
+        if (included.Data is null || excluded.Data is null || included.Data.TotalCount + excluded.Data.TotalCount != result.Data.TotalCount)
+            throw new InvalidOperationException("Ödeme yöntemi dahil/hariç sayım mutabakatı başarısız.");
+    }
+    if (sample.SubscriptionStatusId.HasValue)
+    {
+        var filtered = await trackingService.GetPageAsync(new() { Period = new(2026, 9, 1), SubscriptionStatusId = sample.SubscriptionStatusId, PageSize = 25 });
+        if (filtered.Data is null) throw new InvalidOperationException(filtered.Message);
+        var ids = filtered.Data.Items.Select(x => x.ContractId).ToArray();
+        if (await db.Set<CollectionContract>().AnyAsync(x => ids.Contains(x.Id) && x.SubscriptionStatusId != sample.SubscriptionStatusId))
+            throw new InvalidOperationException("Abonelik durumu filtresi başarısız.");
+    }
+    var exportQuery = new CollectionTrackingQuery { PeriodFrom = rangeQuery.PeriodFrom, Period = rangeQuery.Period, CustomerId = sample.CustomerId, PageSize = 1 };
+    var exportPage = await trackingService.GetPageAsync(exportQuery);
+    var export = trackingService.GetExportRows(exportQuery);
+    if (exportPage.Data is null || export.Data is null) throw new InvalidOperationException("Dışa aktarım sorgusu başarısız.");
+    var exported = 0;
+    await foreach (var row in export.Data) exported++;
+    if (exported != exportPage.Data.TotalCount) throw new InvalidOperationException("CSV/liste sayım farkı.");
+    Console.WriteLine($"Yöntem/durum filtreleri ve CSV/liste sayımı başarılı ({exported} satır).");
+    timer.Restart();
+    var history = await trackingService.GetPageAsync(new() { PeriodFrom = new(2006, 1, 1), Period = new(2026, 9, 1), BalanceFilter = CollectionTrackingBalanceFilter.Outstanding, PageSize = 25, SortBy = CollectionFollowUpSort.Period });
+    if (history.Data is null || history.Data.Items.Any(x => x.RemainingAmount <= 0)) throw new InvalidOperationException("Geçmiş açık dönem sorgusu başarısız.");
+    Console.WriteLine($"2006–2026 açık dönem: {history.Data.TotalCount} kayıt, {history.Data.Items.Count} satır sayfa, {timer.Elapsed.TotalSeconds:F2} sn.");
     return;
 }
 if (args[0] == "--read-balance")
@@ -106,6 +196,19 @@ if (args[0] == "--read-balance")
         { Period = period, AsOfDate = new DateOnly(2026, 9, 15), IncludeCarryOver = true });
     if (single.Data is null || carry.Data is null) throw new InvalidOperationException(single.Data is null ? single.Message : carry.Message);
     Console.WriteLine($"Bakiye sorguları çalıştı; sözleşme {contractId}, dönem {single.Data.Items.Count}, devirli {carry.Data.Items.Count} para birimi.");
+    var trackingService = new CollectionTrackingService(db);
+    var page = await trackingService.GetPageAsync(new() { Period = period, PageSize = 10 });
+    if (page.Data is null) throw new InvalidOperationException(page.Message);
+    foreach (var row in page.Data.Items)
+    {
+        var balance = await readService.GetBalanceAsync(row.ContractId, new() { Period = period, FullPeriod = true });
+        if (balance.Data is null) throw new InvalidOperationException(balance.Message);
+        var item = balance.Data.Items.SingleOrDefault(x => x.CurrencyTypeId == row.CurrencyTypeId);
+        if (!balance.Data.FullPeriod || item is null || item.AccruedAmount != row.AccruedAmount
+            || item.PaymentAmount != row.PaymentAmount || item.RemainingAmount != row.RemainingAmount)
+            throw new InvalidOperationException($"Liste/detay dönem mutabakatı başarısız: {row.ContractId}/{row.CurrencyTypeId}.");
+    }
+    Console.WriteLine($"Tam dönem liste/detay mutabakatı: {page.Data.Items.Count} satır. Veritabanı değiştirilmedi.");
     return;
 }
 if (args[0] == "--seed-definitions")

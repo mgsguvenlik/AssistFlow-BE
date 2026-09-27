@@ -35,9 +35,7 @@ namespace Business.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var runEveryMinutes = _appSettings.ManitouRunEveryMinutes <= 0
-                ? 60
-                : _appSettings.ManitouRunEveryMinutes;
+            var runEveryMinutes = _appSettings.ManitouRunEveryMinutes <= 0 ? 60 : _appSettings.ManitouRunEveryMinutes;
 
             var delay = TimeSpan.FromMinutes(runEveryMinutes);
 
@@ -120,6 +118,34 @@ namespace Business.Services
                         "Manitou customer çekme/insert hata aldı. GroupCode={GroupCode}",
                         group.Id);
                 }
+            }
+
+
+            // ============================================================
+            // GROUP BİLGİSİ OLMAYAN MÜŞTERİLER
+            // Mevcut grup bazlı müşteri senkronizasyonu tamamlandıktan sonra
+            // ayrıca grup bilgisi NULL olan müşteriler çekilir.
+            // ============================================================
+
+            try
+            {
+                var customersWithoutGroup = await manitouApiService.GetCustomersWithoutGroupAsync(token, ct);
+
+                _log.LogInformation(
+                    "Manitou grup bilgisi olmayan customer çekildi. Count={Count}",
+                    customersWithoutGroup.Count);
+
+                await UpsertCustomersAsync(customersWithoutGroup, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(
+                    ex,
+                    "Manitou grup bilgisi olmayan customer çekme/insert hata aldı.");
             }
 
             _log.LogInformation("Manitou staging sync tamamlandı.");

@@ -2,10 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Crm.Collections;
 
-public enum CollectionDefinitionKind { PaymentFrequency, ContractStatus, SubscriptionStatus, GroupStatus, PaymentMethod }
+public enum CollectionDefinitionKind { PaymentFrequency, ContractStatus, SubscriptionStatus, GroupStatus, PaymentMethod, Customer }
 
 public sealed class CollectionDefinitionQuery
 {
+    public bool IncludeInactive { get; set; }
     [EnumDataType(typeof(CollectionDefinitionKind), ErrorMessage = "Tanım türü geçersiz.")]
     public CollectionDefinitionKind Kind { get; set; }
     [Range(1, 1000000, ErrorMessage = "Sayfa numarası 1 ile 1000000 arasında olmalıdır.")]
