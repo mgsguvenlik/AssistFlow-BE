@@ -15,6 +15,9 @@ public sealed class CollectionContractPeriodFollowUpConfiguration : IEntityTypeC
         builder.Property(x => x.Period).HasColumnType("date");
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.Property(x => x.SourceHash).HasColumnType("binary(32)");
+        builder.HasIndex(x => x.LegacyFollowGroupStatusId).IsUnique().HasFilter("[LegacyFollowGroupStatusId] IS NOT NULL");
+        builder.HasIndex(x => new { x.IsDeleted, x.Period, x.Id });
         builder.HasOne(x => x.Contract).WithMany().HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.NoAction);
         builder.HasOne(x => x.GroupStatus).WithMany().HasForeignKey(x => x.GroupStatusId).OnDelete(DeleteBehavior.NoAction);
         builder.HasIndex(x => new { x.ContractId, x.Period }).IsUnique().HasFilter("[IsDeleted] = 0")

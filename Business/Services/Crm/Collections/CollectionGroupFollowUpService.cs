@@ -14,6 +14,38 @@ namespace Business.Services.Crm.Collections;
 
 public sealed class CollectionGroupFollowUpService(AppDataContext db) : ICollectionGroupFollowUpService
 {
+    public async Task<ResponseModel<PagedResult<CollectionGroupHistoryItem>>> GetHistoryAsync(CollectionGroupHistoryQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(query, new ValidationContext(query), errors, true))
+            return ResponseModel<PagedResult<CollectionGroupHistoryItem>>.Fail(errors.First().ErrorMessage!);
+        var contracts = CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers, CollectionCustomerClass.Group);
+        var source = db.Set<CollectionContractPeriodFollowUp>().AsNoTracking()
+            .Where(x => !x.IsDeleted && contracts.Select(c => c.Id).Contains(x.ContractId));
+        if (query.ContractId.HasValue) source = source.Where(x => x.ContractId == query.ContractId);
+        if (query.CustomerGroupId.HasValue) source = source.Where(x => x.Contract.Customer.CustomerGroupId == query.CustomerGroupId);
+        if (query.GroupStatusId.HasValue) source = source.Where(x => x.GroupStatusId == query.GroupStatusId);
+        if (query.From.HasValue) source = source.Where(x => x.Period >= query.From);
+        if (query.To.HasValue) source = source.Where(x => x.Period <= query.To);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            source = source.Where(x => x.Contract.Customer.SubscriberCompany != null && x.Contract.Customer.SubscriberCompany.Contains(term)
+                || x.Contract.Customer.SubscriberCode != null && x.Contract.Customer.SubscriberCode.Contains(term)
+                || x.Description != null && x.Description.Contains(term));
+        }
+        var count = await source.CountAsync(cancellationToken);
+        var rows = await source.OrderByDescending(x => x.Period).ThenByDescending(x => x.Id)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(x => new CollectionGroupHistoryItem(x.Id, x.ContractId, x.Period, x.Contract.CustomerId,
+                x.Contract.Customer.SubscriberCompany, x.Contract.Customer.SubscriberCode,
+                x.Contract.Customer.CustomerGroup == null ? null : x.Contract.Customer.CustomerGroup.GroupName,
+                x.Contract.ServiceType.Name, x.GroupStatusId, x.GroupStatus == null ? null : x.GroupStatus.Name,
+                x.Description, x.CreatedDate, x.UpdatedDate, x.LegacyFollowGroupStatusId != null)).ToListAsync(cancellationToken);
+        return ResponseModel<PagedResult<CollectionGroupHistoryItem>>.Success(new(rows, count, query.Page, query.PageSize), "Grup durum geçmişi getirildi.");
+    }
+
     public async Task<ResponseModel<CollectionGroupFollowUpItem>> GetAsync(long contractId, DateOnly period,
         CancellationToken cancellationToken = default)
     {

@@ -13,4 +13,6 @@ public sealed class CollectionContractPeriodFollowUp : AuditableWithUserEntity
     public CollectionGroupStatus? GroupStatus { get; set; }
     public string? Description { get; set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public long? LegacyFollowGroupStatusId { get; set; }
+    public byte[]? SourceHash { get; set; }
 }

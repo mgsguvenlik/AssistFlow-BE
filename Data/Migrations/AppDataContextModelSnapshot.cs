@@ -296,6 +296,9 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionContractPeriodFollowUp", b =>
                 {
+                    b.Property<long?>("LegacyFollowGroupStatusId").HasColumnType("bigint");
+                    b.Property<byte[]>("SourceHash").HasColumnType("binary(32)");
+                    b.HasIndex("LegacyFollowGroupStatusId").IsUnique().HasFilter("[LegacyFollowGroupStatusId] IS NOT NULL");
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
@@ -344,6 +347,8 @@ namespace Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_ContractPeriodFollowUp_Contract_Period")
                         .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("IsDeleted", "Period", "Id");
 
                     b.ToTable("ContractPeriodFollowUp", "collection", t =>
                         {

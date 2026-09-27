@@ -16,6 +16,17 @@ namespace WebAPI.Controllers;
 [Route("api/collections/tracking")]
 public sealed class CollectionTrackingController(IOptions<CollectionReadOptions> options) : ControllerBase
 {
+    [HttpGet("group-status-history")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> GetGroupHistory([FromQuery] CollectionGroupHistoryQuery query,
+        [FromServices] ICollectionGroupFollowUpService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled)
+            return StatusCode(503, ResponseModel.Fail("Tahsilat modülü kullanıma kapalı.", (Core.Enums.StatusCode)503));
+        var result = await service.GetHistoryAsync(query, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [HttpGet("{contractId:long:min(1)}/group-status")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
     public async Task<IActionResult> GetGroupStatus(long contractId, [FromQuery] DateOnly period,

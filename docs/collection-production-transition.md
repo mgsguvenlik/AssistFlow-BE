@@ -30,7 +30,8 @@ Durum: hazırlık aşaması. Kullanıcının 27 Eylül 2026 talebiyle testteki t
 | Sözleşme/tarife/ödeme | Collections.Import, ilgili aktarım raporları | Kabul edilmiş kararlar, kaynak kimliği, para birimi/tutar ve alan mutabakatı; elenen eski abonelikler korunmaz |
 | Menü/yetki/uygulama ayarları | Mevcut CRM Tahsilat menüsü ve işlem yetkileri | Hedefte eksik kayıtlar ve açılış ayarları ayrı yayın adımı; genel seed çalıştırılmaz |
 | K04 müşteri notları | 20260927180000_AddCollectionCustomerNotes; Collections.Import customer-notes; collection-k04-customer-card-notes-2026-09-27.md | Testte 8.387 not; 4.431 eşleme istisnası/2 kapsam dışı. Legacy kimlik/hash/audit korunur. Canlı müşteri/migration eşlemesi yeniden çözülür; test ID ve plan hash'i canlıda kullanılmaz. UI ve komut kabulü tamamlanmadan yayın kabulü verilmez |
-| K05–K11 çıktıları | Görev tamamlandıkça buraya eklenecek | Fatura/grup dönemi/dosya yükleme/senkronizasyon/bildirim bağımlılıkları ayrı kayıt |
+| K05 grup dönem geçmişi | 20260927190000_AddCollectionGroupFollowUpSource; Collections.Import group-history; collection-k05-group-history-2026-09-27.md | Testte 26.207 dönem. Kaynak kimliği/hash/indeksler; tam adla durum eşlemesi ve korunmuş sözleşme eşlemesi. 2 birebir tekrar tekilleştirildi; kaynak kimlikleri raporda. Canlıda yeniden önizleme; otomatik Ödendi davranışı ve UI kabulü açık |
+| K06–K11 çıktıları | Görev tamamlandıkça buraya eklenecek | Fatura/dosya yükleme/senkronizasyon/bildirim bağımlılıkları ayrı kayıt |
 
 Bu envanter başlangıç listesidir. Canlıya geçişten önce migration dışındaki SQL/prosedür/menü/ayar değişiklikleri dahil testte uygulanmış tüm adımlar taranıp uygulama paketiyle birebir karşılaştırılır.
 

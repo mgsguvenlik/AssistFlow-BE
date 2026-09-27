@@ -22,8 +22,12 @@ public sealed class CollectionDefinitionReadService(IUnitOfWork unitOfWork) : IC
         if (!Validator.TryValidateObject(query, new ValidationContext(query), errors, true))
             return ResponseModel<PagedResult<CollectionDefinitionItem>>.Fail(string.Join(" ", errors.Select(x => x.ErrorMessage)));
         var repository = unitOfWork.Repository;
+        var groupCodes = CollectionCustomerClassification.GroupCodes.ToArray();
         IQueryable<CollectionDefinitionItem> source = query.Kind switch
         {
+            CollectionDefinitionKind.CustomerGroup => repository.GetQueryable<CustomerGroup>().AsNoTracking()
+                .Where(x => groupCodes.Contains(EF.Functions.Collate(x.Code.Trim(), "Turkish_CI_AS")))
+                .Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.Code, Name = x.GroupName }),
             CollectionDefinitionKind.Customer => CollectionCustomerScopeQuery.Customers(repository.GetQueryable<Customer>()).AsNoTracking()
                 .Select(x => new CollectionDefinitionItem { Id = x.Id, Code = x.SubscriberCode ?? "", Name = x.SubscriberCompany ?? "" }),
             CollectionDefinitionKind.PaymentFrequency => repository.GetQueryable<CollectionPaymentFrequency>().AsNoTracking()

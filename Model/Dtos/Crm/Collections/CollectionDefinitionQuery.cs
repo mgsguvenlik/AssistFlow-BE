@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Crm.Collections;
 
-public enum CollectionDefinitionKind { PaymentFrequency, ContractStatus, SubscriptionStatus, GroupStatus, PaymentMethod, Customer }
+public enum CollectionDefinitionKind { PaymentFrequency, ContractStatus, SubscriptionStatus, GroupStatus, PaymentMethod, Customer, CustomerGroup }
 
 public sealed class CollectionDefinitionQuery
 {

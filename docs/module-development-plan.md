@@ -26,7 +26,7 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 2. **K02 tamamlandı:** geçmiş dönem aralığı, dönem bazlı grup özeti, güncel abonelik/yöntem filtreleri, geniş arama, liste–detay kapsam uyumu ve tarayıcı kabulü tamamlandı. 162/192 tarihçe boşlukları için tarife uydurmayan güvenli dönem kuralı uygulandı; iki takip indeksi AssistFlowTest'te doğrulandı.
 3. **K03 geliştirmesi tamamlandı:** Testte G tipli 56 üst müşteri ve collection.GroupParent ilişkisi oluşturuldu; GM üyeler korundu. Grup/cari okuma servisi ve sözleşmede Grup Bilgileri sekmesi eklendi. 18 istisna ve üst kartların 49 sözleşmesinin kontrollü aktarımı K12 veri listesinde açık. [Uygulama/kanıt](collection-k03-customer-context-2026-09-27.md).
 4. **K04 uygulandı, nihai kabul açık:** müşteri detay/sekme, kendi sözleşme ve ödemeleri, not CRUD, collection.CustomerNote migration ve testte 8.387 not aktarımı. 4.431 eşleşmeyen/2 kapsam dışı not raporlandı; yeniden aktarım adayı 0. API yeniden başlatma ve oturumlu UI/komut kabulü bekliyor. [Sonuç ve kabul](collection-k04-customer-card-notes-2026-09-27.md).
-5. K05: grup dönem geçmişinin kapsamlı önizlemesi/aktarımı ve durum çalışma listesi.
+5. **K05 uygulandı, son kabul açık:** filtreli grup dönem listesi ve detay geçmiş sekmesi, kaynak kimliği/hash migrationı; testte 26.207 dönem kaydı aktarıldı, birebir aynı 2 fazla satır tekilleştirildi. 29.089 eşleşmeyen/96 kimliği boş/203 grup kapsamı dışı satır raporlandı; tekrar aktarım adayı 0. Oturumlu UI kabulü ve otomatik Ödendi davranışının nihai değerlendirmesi açık. [K05 sonuçları](collection-k05-group-history-2026-09-27.md).
 6. K06–K07: kesilen fatura/fatura ödemeleri ve B/K dosya yükleme.
 7. K08: GTS/IVR dosyasından ödeme akışı (güncel format/kullanım teyidiyle).
 8. K09: kontrollü sözleşme yaşam döngüsü/düzeltme ve ayrı müşteri dosyası kapsamı.
@@ -353,7 +353,7 @@ K01–K13 görevleri ve kabul kriterleri [karşılaştırma raporu §10](collect
   - [x] Boşluklu tarihçelerde güvenli liste/detay uyumu (162/192 örnekleri); geniş aralık optimizasyonu ve browser kabulü.
 - [x] K03: müşteri/grup/kurumsal üst kart ve cari kod altyapısı; 56 net test kaydı, mevcut dışlamalar korundu. 18 istisna ve eski üst kart sözleşmelerinin aktarımı aşağıda açık.
 - [ ] K04 nihai kabul: müşteri detay/not CRUD ve 8.387 not aktarımı uygulandı; API yeniden başlatma, oturumlu UI ve komut/yetki/çakışma kabulü açık. K12: 4.431 notun eksik eşleme nedenlerini ayrıştır.
-- [ ] K05: grup dönem durumu geçmişi + liste/filtre; Ödendi otomasyon sınırı.
+- [ ] K05 son kabul: liste/filtre/geçmiş sekmesi ve testte 26.207 dönem aktarımı uygulandı. Oturumlu UI/komut kabulü ve otomatik Ödendi davranışının nihai değerlendirmesi açık. Eşleşmeyen/kimliği boş kayıtların mutabakatı K12'de izlenir.
 - [ ] K06: kesilen fatura ve faturaya bağlı ödeme defteri/aktarımı.
 - [ ] K07: B/K fatura Excel yükleme önizleme/kuyruk/hata/tekrar güvenliği.
 - [ ] K08: GTS/IVR ödeme dosyası yükleme; mevcut ödeme altyapısının kullanımı.
