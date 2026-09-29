@@ -21,7 +21,8 @@ public sealed class CollectionPaymentTransaction(AppDataContext db)
 {
     public async Task<ResponseModel<CollectionPaymentCommitResult>> ExecuteAsync(Guid requestId, long actorUserId,
         CollectionPaymentCommand command, CancellationToken cancellationToken = default,
-        Func<CancellationToken, Task<string?>>? validate = null)
+        Func<CancellationToken, Task<string?>>? validate = null,
+        Func<long, CancellationToken, Task>? persistRelated = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (requestId == Guid.Empty || actorUserId <= 0)
@@ -113,6 +114,8 @@ public sealed class CollectionPaymentTransaction(AppDataContext db)
                 };
                 repository.Add(receipt);
                 await repository.CompleteAsync(cancellationToken);
+                // Optional bank-import receipt is committed atomically with the payment and its audit.
+                if (persistRelated is not null) await persistRelated(payment.Id, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return ResponseModel<CollectionPaymentCommitResult>.Success(
                     new(payment.Id, command.Kind, false), "Ödeme işlemi başarıyla tamamlandı.");

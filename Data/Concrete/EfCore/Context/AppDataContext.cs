@@ -1450,6 +1450,16 @@ namespace Data.Concrete.EfCore.Context
                 entity.Property(x => x.InReplyTo).HasMaxLength(998);
             });
             modelBuilder.ApplyConfiguration(new CollectionCustomerNoteConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoicePaymentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceOperationConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceAccountConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceLoadConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankLoadConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankLoadRowConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankTransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankBaselineConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceLoadRowConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionGroupParentConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractConfiguration());
             modelBuilder.ApplyConfiguration(new CollectionContractAttachmentConfiguration());

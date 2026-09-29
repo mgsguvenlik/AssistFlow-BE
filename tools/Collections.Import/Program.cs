@@ -7,6 +7,51 @@ using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 
 // Ödeme komutları kendi kesitini doğrular; transfer-payments yalnız plan hash'iyle yazar.
+if (args.Length == 2 && args[0] == "bank-load-check")
+{
+    await CollectionBankLoadCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length is 2 or 3 && args[0] == "bank-setup")
+{
+    await CollectionBankSetup.RunAsync(args[1], args.Length == 3 ? args[2] : null);
+    return;
+}
+if (args.Length == 1 && args[0] == "bank-file-check")
+{
+    CollectionBankFileCheck.Run();
+    return;
+}
+if (args.Length == 2 && args[0] == "invoice-load-check")
+{
+    await CollectionInvoiceLoadCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "invoice-accounts")
+{
+    await CollectionInvoiceAccountSetup.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length == 1 && args[0] == "invoice-file-check")
+{
+    CollectionInvoiceFileCheck.Run();
+    return;
+}
+if (args.Length == 4 && args[0] == "invoice-transfer")
+{
+    await CollectionInvoicePreview.RunAsync(args[1], args[2], args[3]);
+    return;
+}
+if (args.Length == 3 && args[0] == "invoice-preview")
+{
+    await CollectionInvoicePreview.RunAsync(args[1], args[2]);
+    return;
+}
+if (args.Length == 3 && args[0] == "invoice-setup")
+{
+    await CollectionInvoiceSetup.RunAsync(args[1], args[2]);
+    return;
+}
 if (args.Length is 3 or 4 && args[0] == "group-history")
 {
     await CollectionGroupHistoryTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);

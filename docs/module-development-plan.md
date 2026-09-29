@@ -6,6 +6,53 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## K08 yürütme — 29 Eylül 2026
+
+- Geliştirme + test SQL/CDN entegrasyonu tamamlandı. GTS/IVR yükleme/geçmiş ve /:id özet+sekme; server-side satırlar, banka sonucu/inceleme/mükerrer ayrımı, dönem seçimi ve 100'er ödeme onayı eklendi. GET/POST, ortak toast ve Autofac kayıtları kullanılır.
+- MGS salt okunur profilinde GTS Mail Order / IVR Satış doğrulandı. 83.387 tarihsel banka kimliği testte tekrar aktarım korumasına alındı; bu işlem ödeme aktarımı değildir. Orijinal kartlı Excel saklanmaz; yalnız ayıklanmış veri mevcut CDN'ye gider.
+- K08 collection tabloları ve GTS/IVR indeksleri yalnız testte kuruldu. Mevcut ödeme transaction'ıyla ödeme+audit+banka kimliği+kuyruk sonucu atomiktir; fiziksel silme banka kimliğini serbest bırakmaz. İadeler/iptaller otomatik ödemeye dönüşmez.
+- GTS/IVR gerçek SQL/CDN kontrolü ve eşzamanlı aktarım/tekrar/silinmiş ödeme/eski sürüm kontrolleri geçti. Deneme kayıtları temizlendi. BE/FE build başarılı, değişen FE lint temiz; genel TS hataları proje genelinde sürüyor, K08 hatası yok.
+- Oturumlu tarayıcı/gerçek banka dosyası/HTTP yetki kabulü açık; yerel uygulamalar dinlemiyordu. İade/iptallerin manuel incelemede tutulması sorusuna kullanıcı yanıtı bekleniyor; otomatik negatif işlem açılmadı. [K08 sonuçları ve kabul kriterleri](collection-k08-bank-payments-2026-09-29.md).
+
+## K07 yürütme — 29 Eylül 2026
+
+### Güncel sonuç — geliştirme ve CDN/SQL entegrasyon kontrolü tamamlandı
+
+- `/crm/collections/invoice-loads` yükleme/geçmiş ve `/:id` özet+sekme ekranları eklendi. Kesilen fatura listesinden erişilir. Önizleme/hatalar server-side sayfalıdır; B/K seçimi, hazır/hatalı/mükerrer/aktarılmış filtreleri, kaynak dosyayı mevcut CDN'den indirme ve onayla aktarım vardır. GET/POST, mevcut View/Edit ve Türkçe toast kullanılır.
+- `collection.InvoiceAccount`, `InvoiceLoad`, `InvoiceLoadRow` ve satır bazlı uygulayan/tarih audit migrationları yalnız AssistFlowTest'te uygulandı. Ortak Customer ve CDN altyapısı değiştirilmedi.
+- Cari inceleme: 13.766 koddan **2.910 tekil/onaylı hedef eşlemesi**; 699 çoklu legacy müşteri kodu, 10.156 korunan tekil hedefi olmayan kod, 1 kapsam dışı kod ayrı hatadır. Bu sayıların tamamı aktif tahsilat müşterisi veya aktarılacak fatura sayısı değildir. Kodlar source-ID/plan hash'iyle kayıtlı; belirsiz kod için TOP 1/isim/abone no tahmini yok.
+- Dosya hash'i+tür aynı dosyayı tek önizlemede tutar; müşteri+tür+normalize fatura no aynı faturayı başka dosyada engeller. Önizleme onayında eşlemeler ve mükerrerlik yeniden kontrol edilir; değişmişse onay yenilenir. Yalnız hazır satırlar atomik faturaya çevrilir. Hata satırları kalır; Ödendi mi alanı ödeme üretmez. Silinen fatura dosyayla tekrar oluşturulamaz.
+- Gerçek IFileStorage/R2 ve AssistFlowTest üzerinde geçici dosyalarla uçtan uca kontrol geçti: upload, dosya adı değişikliğiyle tekrar, sayfalama/hata filtresi, net satır aktarımı, eski sürüm reddi, farklı dosyada mükerrerlik, silinmiş faturayı koruma; ödeme kaydı oluşmadı. Yalnız bu koşunun geçici DB/CDN kayıtları temizlendi. Hiçbir gerçek fatura dosyası toplu aktarılmadı.
+- BE solution/import ve FE build başarılı; değişen FE lint temiz. Genel TS denetimi mevcut proje hatalarıyla başarısız; K07 dosyalarında hata kalmadı. Oturumlu tarayıcı/kullanıcı kabulü ve gerçek müşteri dosyasıyla prova açık; test entegrasyonunu production kabulü saymıyoruz. Cari istisnalar K12 takibinde. Sonraki geliştirme K08: GTS/IVR dosyasından ödeme.
+
+### Önceki ilk parça kaydı
+
+- Başlandı. Legacy InvoiceFollowLoad formatı ve kuyruk → fatura akışı yeniden incelendi. Mevcut ClosedXML ile saf dosya okuma/doğrulama katmanı eklendi: .xlsx, başlıklar, cari/fatura no metin koruması, tarih/tutar, formül, satır tekrarı ve kaynak hash'i. Mevcut CDN yapısı değiştirilmedi; doğrulama öncesinde CDN/DB yazılmıyor.
+- Henüz yükleme ekranı/API, kalıcı CDN kaydı, batch/row tabloları veya cari eşleme tamamlanmadı. Bir sonraki bağımlılık bireysel cari eşlemesi: ortak Customer'da AccountNo yok; GroupParent tüm müşterileri temsil etmez. Mevcut korunan legacy müşteri haritasından collection altında finansal cari eşleme hazırlanacak; isim/abone no cari yerine kullanılmayacak.
+- [K07 uygulama sırası ve kabul kriterleri](collection-k07-invoice-upload-2026-09-29.md). K06'nın açık kullanıcı kabulü ve K12 veri istisnaları aynen takipte.
+
+## K06 yürütme — 29 Eylül 2026
+
+### Güncel sonuç — K06 geliştirme ve net aktarım tamamlandı; tarayıcı kabulü açık
+
+- Teste **1.847 fatura / 1.939 fatura ödemesi** atomik aktarıldı; 1.847 faturanın tamamında kaynak/hedef fatura tutarı, ödeme sayısı ve ödeme toplamı eşleşti. TL fatura toplamı 7.152.481,01; ödeme toplamı 7.145.597,04; kalan 6.883,97 TL. Bir USD fatura 0,00 USD tutarlı, ödemesiz tarihsel kayıt olarak korundu.
+- Son önizleme: 1.847/1.939 AlreadyApplied, **0 Ready**; 3.631 fatura / 3.883 ödeme incelemede. Bu istisnalar zorlanarak aktarılmadı; K12 veri eşleme/eksik para birimi karar listesine devredildi, silinmedi. MGS/canlı değişmedi.
+- Ödeme ekleme/düzenleme/fiziksel silme, fatura açıklama güncelleme, ödemesi olmayan faturayı kontrollü silme: backend POST komutları ve frontend İşlem sekmesi tamamlandı. View/Edit mevcut menü izinleri; Türkçe toast; işlem anahtarı, rowversion, serializable transaction ve silmeden sonra kalan audit. Belirsiz cevapta aynı istekle tekrar deneme; silinen legacy kaydı yeniden aktarmama kontrolü var.
+- `20260929084242_AddCollectionInvoiceOperations` yalnız testte uygulandı. Komut kontrolleri tek geçici test faturasında yapıldı: kısmi bakiye, create/replay, farklı içerikle aynı anahtar reddi, eski sürüm reddi, ödemeli fatura silme reddi, update/delete/comment, kalıcı audit geçti. Geçici kayıt ve yalnız ona ait audit temizlendi; gerçek aktarım verisi değişmedi.
+- BE solution/import build, FE build ve değişen FE dosyaları lint başarılı. Tüm proje TypeScript hataları mevcut; K06 dosyalarında hata yok. Tarayıcı açma denemesi `localhost:5173` bağlantı reddiyle sonuçlandı; ekran kabulü ile HTTP üzerinden gerçek kullanıcı yetki kabulü açık. Yerel uygulama yeni backend/frontend ile çalıştırılmalı. **Production-ready veya tüm legacy veri aktarımı tamamlandı denmiyor.**
+- Sıradaki geliştirme K07: kesilen fatura dosyası yükleme; K06 açık kabul kontrolleri ve K12 istisnaları takipte kalır.
+
+### Önceki parça kayıtları (aşağıdaki aktarılmadı ifadeleri tarihsel aşamayı anlatır)
+
+- İkinci parça tamamlandı: `invoice-preview` salt-okunur aracı MGS kaynakları ve AssistFlowTest korunan müşteri/grup üst kart eşlemeleri üzerinde çalıştırıldı. 5.478 fatura: **1.847 hazır / 3.631 inceleme**; 5.822 ödeme: **1.939 hazır / 3.883 inceleme**. Henüz aktarım yapılmadı. İnceleme nedenleri faturalarda 3.620 korunan müşteri eşlemesi yok, 42 para birimi, 3 tarih, 1 tutar (nedenler örtüşebilir). Ödemelerin 3.883'ü hazır olmayan faturaya bağlı. Tür alanı DB'de Bireysel/Kurumsal, yeni hedefte B/K olarak açık eşlenir.
+- Sonraki uygulanabilir iş: bu önizlemeyi yeniden doğrulayan hash-korumalı, atomik fatura + ödeme aktarımı; ardından kaynak/hedef para birimi bazlı tutar–ödeme–kalan mutabakatı. Önizleme `Ready` durumu müşteri eşleşmesi dışındaki incelemeleri atlamak veya kalan 3.631 faturayı kalıcı silmek anlamına gelmez.
+
+- Tamamlanan ilk parça: kesilen fatura okuma modeli/API, server-side sayfalı B/K–tarih–ödeme durumu–müşteri araması, `/crm/collections/invoices` ve `/invoices/:id` sekmeli detay, müşteri kartında Kesilen Faturalar sekmesi. Fatura ve bağlı ödemeler sözleşme bakiyesine dahil edilmez.
+- `20260929080736_AddCollectionInvoices` yalnız AssistFlowTest üzerinde uygulandı. `collection.Invoice` ve `collection.InvoicePayment` tabloları oluşturuldu; mevcut müşteri/para birimi tabloları değiştirilmedi. Kaynak MGS ve canlı AssistFlow'a yazılmadı, bu parçada fatura verisi aktarılmadı.
+- BE solution/import aracı ve FE production build başarılı. Değişen FE dosyalarının lint kontrolü başarılı (detay ekranındaki iki sıralama uyarısı giderildi). Genel TypeScript denetimi mevcut proje hataları nedeniyle temiz değil; bu parçanın dosyalarında hata görülmedi. Test SQL Server üzerinde dokuz filtre kombinasyonu ve bulunamayan detay sorgusu doğrulandı. Gerçek fatura/ödeme tutar mutabakatı ile tarayıcı kabulü henüz yapılmadı; çalışan API yeni sürümle yeniden başlatılmalıdır.
+- Sıradaki K06 parçası: legacy müşteri/para birimi eşleşmelerini koruyan aktarım önizlemesi; ardından fatura ödemesi ekleme/düzeltme/fiziksel silme için yetki, rowversion, tekrar güvenliği ve kalıcı işlem izi. Net eşleşmeler aktarılıp para birimi bazlı mutabakat yapılacak. **K06 bütünü tamamlanmadı; K07'ye henüz geçilmedi.**
+- Detay ve kabul sınırları: [K06 ilk parça](collection-k06-invoices-2026-09-29.md).
+
 ## Dev eşitlemesi — 27 Eylül 2026
 
 Kullanıcı talebiyle FE dev (`b43065d`) ve BE dev (`1b14f56`) uçları GitHub'dan güncellendi ve her iki `tahsilat-module` branch'ine çakışmasız birleştirildi. Yerel çalışma ağaçları işlem öncesinde temizdi. Tahsilat kodu ve migrationları korundu; diğer branchlere merge veya veritabanı işlemi yapılmadı. FE production build ve BE solution build başarılı. Değişen frontend dosyalarında ESLint 15 hata/34 uyarı verdi; bu dosyalar origin/dev ile birebir aynı olduğundan mevcut dev bulguları olarak kaydedildi. Merge kapsamında ilgisiz lint düzeltmesi yapılmadı. Commitler yereldir; push yapılmadı.
@@ -280,6 +327,8 @@ Kod varlığı ile entegrasyon/kabul tamamlanması farklıdır:
 
 ## Güncel aktif işler
 
+- **K08 nihai kabul:** teknik geliştirme ve gerçek test SQL/CDN kontrolü tamam; oturumlu UI, gerçek banka dosyası ve HTTP yetki kabulü açık. İade/iptal manuel inceleme politikasının teyidi bekleniyor. Sonraki geliştirme sırası K09; bu açık kabul maddeleri plan üzerinde korunur.
+
 - **K04 nihai kabul:** müşteri kartı ve not CRUD geliştirildi; 8.387 not testte aktarıldı. Yeni API sürümüyle oturumlu UI/komut kabulü yapılacak. 4.431 eşleşmeyen/2 kapsam dışı not ve K03'ün 18 veri istisnası/49 üst kart sözleşmesi K12'de izlenir. [K04 sonuçları](collection-k04-customer-card-notes-2026-09-27.md).
 - **Netleşen ödeme dalgası kapandı:** 139.678 ödeme testte aktarıldı; hedef sözleşmeli 1.800 inceleme kaydı ve diğer kapsamlar ayrı bekliyor. Açık aktarım transaction'ı yok. Son kabulden önce not/fatura/banka dosyası/grup otomasyonu dahil audit'te bulunan operasyonel eksikler kapatılmalı. [Sonuç](collection-payment-transfer-2026-09-26.md).
 
@@ -359,8 +408,9 @@ K01–K13 görevleri ve kabul kriterleri [karşılaştırma raporu §10](collect
 - [ ] K04 nihai kabul: müşteri detay/not CRUD ve 8.387 not aktarımı uygulandı; API yeniden başlatma, oturumlu UI ve komut/yetki/çakışma kabulü açık. K12: 4.431 notun eksik eşleme nedenlerini ayrıştır.
 - [ ] K05 son kabul: liste/filtre/geçmiş sekmesi ve testte 26.207 dönem aktarımı uygulandı. Oturumlu UI/komut kabulü ve otomatik Ödendi davranışının nihai değerlendirmesi açık. Eşleşmeyen/kimliği boş kayıtların mutabakatı K12'de izlenir.
 - [ ] K06: kesilen fatura ve faturaya bağlı ödeme defteri/aktarımı.
-- [ ] K07: B/K fatura Excel yükleme önizleme/kuyruk/hata/tekrar güvenliği.
-- [ ] K08: GTS/IVR ödeme dosyası yükleme; mevcut ödeme altyapısının kullanımı.
+- [x] K07 geliştirme: B/K fatura Excel yükleme, mevcut CDN, önizleme/kuyruk/hata ve tekrar güvenliği; test entegrasyonu geçti. Oturumlu kullanıcı kabulü/cari istisnalar ayrıca açık.
+- [x] K08 teknik geliştirme: GTS/IVR dosyası, önizleme, eşleme, tarihsel banka kimliği koruması, mevcut ödeme altyapısıyla atomik uygulama, SQL/CDN entegrasyonu.
+- [ ] K08 nihai kabul: oturumlu UI/HTTP yetki ve güncel gerçek banka dosyası; iade/iptal manuel inceleme teyidi.
 - [ ] K09: gerekli sözleşme/tarife manuel düzeltmeleri, dosya silme/değiştirme ve müşteri dosyası kapsamı.
 - [ ] K10: dış sistem abonelik etkisi + yeni GM sözleşmesi; kullanım dışı destructive eşitleme yok.
 - [ ] K11: grup bilgilendirme UI + mevcut ortak mail altyapısına zamanlanmış üretici.

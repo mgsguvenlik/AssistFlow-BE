@@ -26,6 +26,10 @@ public sealed class CollectionContractConfiguration : IEntityTypeConfiguration<C
         builder.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.NoAction);
         builder.Property(x => x.GtsNo).HasMaxLength(50);
         builder.Property(x => x.IvrNo).HasMaxLength(50);
+        builder.HasIndex(x => x.GtsNo).HasFilter("[GtsNo] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("IX_Contract_GtsNo_Active");
+        builder.HasIndex(x => x.IvrNo).HasFilter("[IvrNo] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("IX_Contract_IvrNo_Active");
         builder.Property(x => x.RowVersion).IsRowVersion();
         builder.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.NoAction);

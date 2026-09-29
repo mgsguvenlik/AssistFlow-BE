@@ -4,6 +4,14 @@ Durum: hazırlık aşaması. Kullanıcının 27 Eylül 2026 talebiyle testteki t
 
 ## Ortam ve temel yaklaşım
 
+### K07 geçiş paketi — 29 Eylül
+
+- `20260929100739_AddCollectionInvoiceLoads`, ardından `20260929101445_AddCollectionInvoiceLoadRowAudit` yalnız testte uygulandı. Canlıya sürümlü migration ile alınacak; mevcut müşteri veya CDN şemasını değiştirmez.
+- `invoice-accounts <Development JSON> <rapor> [--install | plan SHA-256]` test-only araçtır. Önizleme/hash uygulanmadan cari bağlanmaz. 2.910 test eşlemesi canlı CustomerId olarak kullanılamaz; canlı korunan stage/map/GroupParent üzerinden ayrı plan gerekir. Güncelleme eski kaynakta kalmayan kodu otomatik aktif bırakmaz; hata durumuna geçirir.
+- Kaynak dosyalar mevcut R2FileStorage'da değişmez hash anahtarıyla tutulur. Varsayılan sağlayıcı/izinler/CDN yapısı değiştirilmedi. DB+CDN atomik olmadığından belirsiz sonuçta nesne silinmez, aynı içerikle yeniden deneme yapılır. Test doğrulama dosyaları temizlendi; gerçek müşteri dosyası bu geliştirmede toplu yüklenmedi.
+- InvoiceLoadRow ImportedKey ve uygulayan/tarih kayıtları finansal silme sonrasında korunur. Canlı geri dönüşte faturaları/queue/audit'i Down ile toplu silmek yerine yedek+mutabakat ve kontrollü uygulama geri dönüşü gerekir. Yeniden dosya yükleme silinmiş faturayı canlandırmamalıdır.
+- Test CDN/SQL entegrasyonu ve build/lint geçti. 699 çoklu cari kod ve diğer eşleme istisnaları K12'de; gerçek dosya/browser kabulü ve canlı yayın onayı açık.
+
 - AssistFlowTest geliştirme/prova hedefidir; AssistFlow canlı hedefi şu anda yalnız okunur. MGS kaynaktır, değiştirilmez.
 - Test veritabanı canlı üzerine kopyalanmaz. Onaylı şema değişiklikleri ve kaynak veriler hedef ortamın mevcut kimlikleriyle yeniden eşlenir.
 - Testteki CustomerId, CustomerGroupId, CustomerTypeId, ServiceTypeId, CurrencyTypeId, sözleşme/dosya kimlikleri canlıda aynı varsayılmaz. Her ortamın eşleştirme raporu ayrı üretilir; belirsiz/çoklu eşleşmeler uygulanmaz.
@@ -73,3 +81,24 @@ Görev tamamlanırken: kaynak migration/script/araç yolu, uygulandığı ortam,
 - [ ] Son kaynak kesiti, Job geçişi, yedek/geri dönüş ve uygulama onayı.
 
 İlgili kayıtlar: [ana plan](module-development-plan.md), [temel kurulum](collection-foundation-installation.md), [K03](collection-k03-customer-context-2026-09-27.md), [ödeme aktarımı](collection-payment-transfer-2026-09-26.md).
+# K06 ek paketi — 29 Eylül 2026
+
+Güncel: K06 net test aktarımı tamamlandı (1.847 fatura / 1.939 ödeme), fatura bazlı mutabakat geçti; kaynak/canlı değişmedi. İkinci migration `20260929084242_AddCollectionInvoiceOperations` yalnız testte uygulandı. İlk fatura migrationından sonra dağıtılır. Ödeme komutları bu audit tablosu olmadan etkinleştirilmez.
+
+`invoice-transfer` yalnız AssistFlowTest'e izin verir; hash-korumalı atomik aktarım, legacy silme izlerini dikkate alma ve kaynak/hedef mutabakatı içerir. Canlı için hedef koruması körlemesine kaldırılmaz: ayrı onay, canlı kimlik eşlemesi/önizleme ve yedekleme gerekir. Audit tablosu gerçek işlem aldıktan sonra Down ile silinmez. İnceleme listesi 3.631 fatura / 3.883 ödeme K12'de kalır. Tarayıcı/oturumlu yetki kabulü yerel uygulama çalışmadığından açık; canlıya çıkış onayı verilmiş değildir.
+
+Önceki aşama notları:
+
+Fatura önizleme aracı eklendi ve test hedef eşlemeleriyle çalıştırıldı: 1.847 fatura / 1.939 ödeme hazır. Bu sayılar test eşlemesine özgüdür; canlıya doğrudan uygulanmaz. Tam kaynak sayıları 5.478 / 5.822. Canlı geçişte korunan müşteri ve para birimi eşlemesi yeniden çıkarılıp önizleme/hash yenilenmelidir. Önizleme aracı yalnız okur; fatura/ödeme aktarımı henüz uygulanmadı.
+
+`20260929080736_AddCollectionInvoices` migrationı yalnız testte uygulandı; canlıda uygulanmadı. collection.Invoice / InvoicePayment ve indekslerini oluşturur, ortak Customer/CurrencyType şemasını değiştirmez. Uygulama yeni sürümü çalıştırılmadan önce hedef şema hazır olmalıdır. Test kurulum aracı `invoice-setup` canlıya karşı çalışmaz; canlı migration mevcut onaylı dağıtım süreciyle, yedek/geri dönüş planı sonrasında uygulanır.
+
+Fatura aktarımı bu pakette yapılmadı. Canlı aktarımda test CustomerId/CurrencyTypeId taşınmaz; hedefe özel eşleme ve kaynak hash'i yeniden doğrulanır. Tablolara finansal veri yazıldıktan sonra Down ile tablo silmek geri dönüş yöntemi değildir; veri yedeği ve mutabakat zorunludur. K06 ödeme komutları/audit/aktarımı ve gerçek veri kabulü tamamlanmadan bu pakete production-ready denmez.
+# K08 hazırlık notu — 29 Eylül 2026
+
+- K08 migration sırası: `20260929111421_AddCollectionBankLoads`, `20260929112405_AddCollectionBankReferenceIndexes`. Testte uygulandı; canlıda henüz uygulanmadı. Yalnız collection tabloları/indeksleri etkilenir.
+- `bank-setup <Development JSON> --install` yalnız beklenen K08 migrationlarını testte kurar. Parametresiz önizleme MGS'den kimlikleri SELECT ile okuyup hash verir; aynı hash ile çalıştırma hedef collection.BankTransaction/Baseline'a geçmiş korumasını ekler. Araç test-only; canlı için aynı kaynak kesitiyle ayrı gözden geçirilmiş plan gerekir, test CustomerId/ContractId değerleri kopyalanmaz.
+- Son kaynak kesiti: 83.387 kayıt/83.387 tekil kimlik/0 boş; hash `27B3A18F5A1448A89CECAEB49A9D87A6D045498A11E83EE55BD8B1C06D4E77CE`. Kaynakta yeni işlemler varsa yayından önce yeniden salt okunur profil ve hash mutabakatı gerekir. Baseline yokken hazır ödeme oluşmaz. Aktarılmayan eski aboneliklerin banka kimlikleri de korumaya dahildir.
+- Finansal silme sonrası BankTransaction ve PaymentOperation audit'i korunur. Geri dönüşte bu tabloları Down ile silmek tekrar ödeme riskidir; yedek + mutabakat + uygulama sürümü geri dönüşü tercih edilir. Başarılı/yarım batch'i yeniden çalıştırma yalnız kalan satırları işleyebilir.
+- Orijinal kart içeren dosya saklanmaz; izinli ödeme alanlarından üretilen JSON mevcut CDN'ye gider. Sağlayıcı/config değişmedi. Belirsiz upload sonucunda aynı dosya/dönemle tekrar edilir; paylaşılan hash dosyası körlemesine silinmez.
+- Test SQL/CDN ve eşzamanlı çift komut kontrolü geçti, geçici kayıtlar temizlendi. Gerçek müşteri dosyası + oturumlu UI/HTTP yetki kabulü yapılmadan canlı yayın onayı verilmez. İadeler/iptaller otomatik ödeme değildir. Ayrıntı: [K08 sonucu](collection-k08-bank-payments-2026-09-29.md).

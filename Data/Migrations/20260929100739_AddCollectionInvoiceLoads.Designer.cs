@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260929100739_AddCollectionInvoiceLoads")]
+    partial class AddCollectionInvoiceLoads
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -96,163 +99,6 @@ namespace Data.Migrations
                     b.ToTable("Cities");
                 });
 
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankBaseline", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("int");
-
-                    b.Property<long>("SourceCount")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("SourceHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTimeOffset>("VerifiedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("BankBaseline", "collection");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankLoad", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long>("CreatedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("FileHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.Property<DateOnly>("Period")
-                        .HasColumnType("date");
-
-                    b.Property<DateTimeOffset>("ReviewedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
-                    b.Property<string>("StoredFileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("nvarchar(3)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Type", "FileHash", "Period")
-                        .IsUnique();
-
-                    b.ToTable("BankLoad", "collection");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankLoadRow", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset?>("AppliedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("AppliedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ContractId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("CurrencyTypeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Issue")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<long>("LoadId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PaymentId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("RowNumber")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SourceJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("TransactionKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LoadId", "RowNumber")
-                        .IsUnique();
-
-                    b.HasIndex("LoadId", "Status", "RowNumber");
-
-                    b.ToTable("BankLoadRow", "collection");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankTransaction", b =>
-                {
-                    b.Property<string>("Key")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<long?>("LoadRowId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PaymentId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("RecordedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("Key");
-
-                    b.ToTable("BankTransaction", "collection");
-                });
-
             modelBuilder.Entity("Model.Concrete.Collections.CollectionContract", b =>
                 {
                     b.Property<long>("Id")
@@ -325,14 +171,6 @@ namespace Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Contract_CreationRequestId")
                         .HasFilter("[CreationRequestId] IS NOT NULL");
-
-                    b.HasIndex("GtsNo")
-                        .HasDatabaseName("IX_Contract_GtsNo_Active")
-                        .HasFilter("[GtsNo] IS NOT NULL AND [IsDeleted] = 0");
-
-                    b.HasIndex("IvrNo")
-                        .HasDatabaseName("IX_Contract_IvrNo_Active")
-                        .HasFilter("[IvrNo] IS NOT NULL AND [IsDeleted] = 0");
 
                     b.HasIndex("PaymentMethodId");
 
@@ -941,12 +779,6 @@ namespace Data.Migrations
                         .HasColumnType("bigint");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTimeOffset?>("AppliedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("AppliedUser")
-                        .HasColumnType("bigint");
 
                     b.Property<long?>("CurrencyTypeId")
                         .HasColumnType("bigint");
@@ -8090,17 +7922,6 @@ namespace Data.Migrations
                     b.ToTable("YkbWorkflowAttachment", "ykb");
                 });
 
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankLoadRow", b =>
-                {
-                    b.HasOne("Model.Concrete.Collections.CollectionBankLoad", "Load")
-                        .WithMany("Rows")
-                        .HasForeignKey("LoadId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Load");
-                });
-
             modelBuilder.Entity("Model.Concrete.Collections.CollectionContract", b =>
                 {
                     b.HasOne("Model.Concrete.Collections.CollectionContractStatus", "ContractStatus")
@@ -9592,11 +9413,6 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Concrete.City", b =>
                 {
                     b.Navigation("Regions");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionBankLoad", b =>
-                {
-                    b.Navigation("Rows");
                 });
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionInvoice", b =>

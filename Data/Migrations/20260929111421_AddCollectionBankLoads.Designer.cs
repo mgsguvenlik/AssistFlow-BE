@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260929111421_AddCollectionBankLoads")]
+    partial class AddCollectionBankLoads
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -325,14 +328,6 @@ namespace Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Contract_CreationRequestId")
                         .HasFilter("[CreationRequestId] IS NOT NULL");
-
-                    b.HasIndex("GtsNo")
-                        .HasDatabaseName("IX_Contract_GtsNo_Active")
-                        .HasFilter("[GtsNo] IS NOT NULL AND [IsDeleted] = 0");
-
-                    b.HasIndex("IvrNo")
-                        .HasDatabaseName("IX_Contract_IvrNo_Active")
-                        .HasFilter("[IvrNo] IS NOT NULL AND [IsDeleted] = 0");
 
                     b.HasIndex("PaymentMethodId");
 
