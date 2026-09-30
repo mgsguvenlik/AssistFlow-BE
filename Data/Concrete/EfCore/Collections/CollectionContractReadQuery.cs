@@ -53,6 +53,7 @@ public static class CollectionContractReadQuery
             CustomerName = x.Customer.SubscriberCompany, ServiceTypeId = x.ServiceTypeId,
             ServiceTypeName = x.ServiceType.Name, StartDate = x.StartDate, EndDate = x.EndDate,
             GtsNo = x.GtsNo, IvrNo = x.IvrNo, RowVersion = x.RowVersion,
+            PaymentMethodId = x.PaymentMethodId, PaymentMethodName = x.PaymentMethod == null ? null : x.PaymentMethod.Name,
             ContractStatusName = x.ContractStatus == null ? null : x.ContractStatus.Name,
             SubscriptionStatusName = x.SubscriptionStatus == null ? null : x.SubscriptionStatus.Name,
             SubscriptionStatusCode = x.SubscriptionStatus == null ? null : x.SubscriptionStatus.Code
@@ -70,6 +71,7 @@ public static class CollectionContractReadQuery
             .Select(x => new CollectionRateHistoryItem
             {
                 Id = x.Id, EffectiveFrom = x.EffectiveFrom, EffectiveToExclusive = x.EffectiveToExclusive,
+                RowVersion = x.RowVersion, PaymentFrequencyId = x.PaymentFrequencyId, CurrencyTypeId = x.CurrencyTypeId,
                 BillingAnchor = x.BillingAnchor, PaymentFrequencyName = x.PaymentFrequency.Name,
                 Amount = x.Amount, CurrencyCode = x.CurrencyType == null ? null : x.CurrencyType.Code,
                 BillingBehavior = x.BillingBehavior, ChangeReason = x.ChangeReason

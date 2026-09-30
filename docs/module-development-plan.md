@@ -6,6 +6,22 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## K09 yürütme — 29 Eylül 2026
+
+**Son kontrol:** API yeniden başlatıldı; para birimi toplamı gerçek oturumda TRY 734.205,17 / 602.547,17 / 131.658,00 (Haziran 2026) doğrulandı. Yıllık zam/form alanları görüldü. GTS ve banka havalesi eski seed'de pasif olduğundan müşteri talebiyle yalnız bu iki mevcut tanım için `EnableCollectionRequestedPaymentMethods` test veri migrationı uygulandı; canlıya uygulanmadı. Kod/SQL doğrulamaları tamam; negatif HTTP yetki ve finansal UI kabulü açık, K09 nihai kabul işareti kaldırılmadı.
+
+**Tahsilat ekibi geri bildirimi (30 Eylül):** Takip ekranının altına tüm filtre sonuçlarının SQL para birimi toplamları, üst sağa Excel uyumlu CSV butonu; yeni sözleşmeye mevcut ödeme yöntemi seçimi ve detay özetine gösterimi eklendi. Toplu zam sözleşme yıl dönümüne göre ileri tarihli tarife planlar; kullanıcı kararıyla oranı ekip her yıl girip onaylar. Ay filtresi/yıl seçimi var, otomatik oran/job yok. SQL toplam/yıllık zam/tekrar/geçmiş koruma testleri geçti. Yeni BE kodu için tekrar restart istendi; son HTTP/UI/yetki kabulü açık. Ayrıntı K09 belgesindedir. Yeni DB migrationı veya gerçek sözleşmelere zam uygulanmadı.
+
+**30 Eylül son geliştirme:** Müşteri dosyası yükleme/listeden kaldırma mevcut CDN, GET/POST, ortak toast ve menü yetkileriyle tamamlandı. Test migrationı `AddCollectionCustomerFileActions` uygulandı; gerçek SQL/CDN tekrar/sahiplik/audit/arşiv kontrolleri başarılı ve geçici veriler temizlendi. Oturumlu müşteri16838 ekranında üç dosya listelendi. BE Release/FE Vite build ve değişen lint başarılı; genel TS hataları sürüyor. Sonraki bağımlılık: çalışan API'yi yeni kodla yeniden başlatıp yeni uçların HTTP/yetki ve finansal ekran kabulünü tamamlamak. 12 dosyanın eşleme istisnası sürüyor; K09 nihai kabulü açık. Ayrıntı: [K09 güncel durum](collection-k09-lifecycle-2026-09-29.md).
+
+**30 Eylül dosya devri sonucu:** Kullanıcı elenen aboneliklerin 6 dosyasının doğrulanmış güncel karta devrini onayladı. 924 → 291401 → test müşteri16838 eşleşmesiyle **3 dosya mevcut CDN'e aktarıldı**, içerik hash'leri doğrulandı; tekrar çalıştırma 0 yeni/3 mevcut. Müşteri detayına Müşteri Dosyaları sekmesi, GET liste ve `collection.CustomerAttachment` eklendi; migration yalnız testte. 2206 → 87400 için uygun hedef doğrulanamadığından diğer 3 dosya bekliyor; eski16598 kartına bağlanmadı. Diğer9 dosya istisnası sürüyor. Arşiv toplamı 3/15 aktarılmış; K09 browser/HTTP kabulü ve kalan eşlemeler açık. Ödeme/sözleşme/ortak müşteri bilgileri değiştirilmedi.
+
+**30 Eylül güncellemesi:** Kullanıcı YOK geçişinde geçmiş borçların korunmasını onayladı. UI/servis tamamlandı; bugün dahil tahakkuklar ve ödemeler korunup ertesi günden itibaren Suspended dilimle yeni borç durdurulur. Geçici test SQL/CDN kontrolü başarılı; gerçek sözleşme değiştirilmedi. Aktivite.rar incelendi: 7 müşteride 15 asıl dosya ve 6 küçük resim var. Asıl dosyalarda kesin korunmuş müşteri eşlemesi yok (6 elenen eski abonelik dosyası, 4 hedef müşteri eksik, 2 eşlenmemiş A tipi, 3 kaynak kimliği bulunamayan). Otomatik CDN aktarımı yapılmadı. Dosya sahipliği kararları ve müşteri dosyası ekranı/aktarım-kabulü açık; K09 bütünü kapatılmadı. [Müşteri bazında sonuçlar](collection-k09-lifecycle-2026-09-29.md).
+
+- Başlandı. Mevcut aktif/donuk, ücretsiz tarife ve ödeme düzeltme/silme servisleri incelendi; yeniden yazılmayacak. Eksikler ve bağımlılıklar [K09 planında](collection-k09-lifecycle-2026-09-29.md) ayrıldı.
+- İlk bağımsız parça: sözleşme dosyasını onayla listeden kaldırma (POST, Edit, kapsam/sahiplik kontrolü, kullanıcı/tarih izi). CDN fiziksel dosyası ve aktarım metadata'sı korunur; kaldırma URL iptali değildir. Değiştirme için önce yeni dosya yüklenip sonra eski ilişki kaldırılır. Yeni tablo/migration ve gerçek veri silmesi yok.
+- Tarih/ödeme yöntemi ve geçmiş tarife tarih aralığı/tutar/para birimi/dönem düzeltmeleri, ödeme taşıma, bağımlılık kontrollü fiziksel sözleşme silme ve kalıcı audit tamamlandı. `AddCollectionContractCorrections` yalnız testte uygulandı. Geçici kayıtlarla SQL/CDN kontrolü geçti; gerçek müşteri kaydı silinmedi. VAR/YOK değişiminin geçmişe etkisi, ayrı müşteri dosyası kaynağı ve browser/HTTP kabulü açık; K09 tamamlanmış sayılmıyor. Yenileme günü ve borç davranışı manuel düzeltme formunda korunur.
+
 ## K08 yürütme — 29 Eylül 2026
 
 - Geliştirme + test SQL/CDN entegrasyonu tamamlandı. GTS/IVR yükleme/geçmiş ve /:id özet+sekme; server-side satırlar, banka sonucu/inceleme/mükerrer ayrımı, dönem seçimi ve 100'er ödeme onayı eklendi. GET/POST, ortak toast ve Autofac kayıtları kullanılır.
@@ -326,6 +342,8 @@ Kod varlığı ile entegrasyon/kabul tamamlanması farklıdır:
 # In Progress
 
 ## Güncel aktif işler
+
+- **K09 geliştirme:** dosya yükleme/kaldırma, sözleşme/tarife düzeltmesi, ödeme taşıma, kontrollü silme/audit ve YOK geçişi geliştirildi; SQL/CDN kontrolü geçti. YOK kararı net, müşteri dosyası ekranı mevcut. HTTP/finansal UI nihai kabulü ve 12 dosyanın eşleme istisnası açık. [Görevler/kabul kriterleri](collection-k09-lifecycle-2026-09-29.md).
 
 - **K08 nihai kabul:** teknik geliştirme ve gerçek test SQL/CDN kontrolü tamam; oturumlu UI, gerçek banka dosyası ve HTTP yetki kabulü açık. İade/iptal manuel inceleme politikasının teyidi bekleniyor. Sonraki geliştirme sırası K09; bu açık kabul maddeleri plan üzerinde korunur.
 

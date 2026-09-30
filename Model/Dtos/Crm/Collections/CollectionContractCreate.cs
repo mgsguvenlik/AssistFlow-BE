@@ -5,6 +5,7 @@ namespace Model.Dtos.Crm.Collections;
 public sealed class CollectionContractCreate : IValidatableObject
 {
     public Guid RequestId { get; set; }
+    [Range(1, long.MaxValue, ErrorMessage = "Ödeme yöntemi geçersiz.")] public long? PaymentMethodId { get; set; }
     [Range(1, long.MaxValue, ErrorMessage = "Müşteri seçilmelidir.")] public long CustomerId { get; set; }
     [Range(1, long.MaxValue, ErrorMessage = "Servis tipi seçilmelidir.")] public long ServiceTypeId { get; set; }
     public DateOnly StartDate { get; set; }

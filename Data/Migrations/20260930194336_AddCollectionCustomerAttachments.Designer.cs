@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260930194336_AddCollectionCustomerAttachments")]
+    partial class AddCollectionCustomerAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -672,6 +675,7 @@ namespace Data.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<string>("ArchiveHash")
+                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
@@ -688,9 +692,6 @@ namespace Data.Migrations
                     b.Property<DateTimeOffset>("CreatedDate")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<long?>("CreatedUser")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("CustomerId")
                         .HasColumnType("bigint");
 
@@ -699,10 +700,7 @@ namespace Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<long?>("LegacyCustomerId")
+                    b.Property<long>("LegacyCustomerId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("OriginalFileName")
@@ -710,13 +708,7 @@ namespace Data.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
 
-                    b.Property<DateTimeOffset?>("RemovedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("RemovedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("RetainedLegacyCustomerId")
+                    b.Property<long>("RetainedLegacyCustomerId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("SizeBytes")

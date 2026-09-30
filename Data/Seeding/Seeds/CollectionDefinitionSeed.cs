@@ -56,8 +56,8 @@ public sealed class CollectionDefinitionSeed : IDataSeed
             ("WEB", "Web"), ("MAIL_ORDER", "Mail Order"), ("OFFSET", "Mahsup"),
             ("CASH_MANUAL", "Nakit / Manuel"), ("LEGACY_FREE", "Ücretsiz"),
             ("ISBANK_POS", "İş Bankası POS"), ("BANK_TRANSFER", "Banka Havalesi") },
-            // Preserve historical identities; active new-contract methods require separate selection policy.
-            (code, name) => new CollectionPaymentMethod { Code = code, Name = name, IsActive = false }, x => x.Code, x => x.Name, ct);
+            // Customer-approved choices; other legacy identities remain historical only.
+            (code, name) => new CollectionPaymentMethod { Code = code, Name = name, IsActive = code is "GTS" or "BANK_TRANSFER" }, x => x.Code, x => x.Name, ct);
     }
 
     private static bool SameName(string left, string right) => string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);

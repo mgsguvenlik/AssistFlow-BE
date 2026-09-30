@@ -6,6 +6,8 @@ namespace Business.Interfaces;
 
 public interface ICollectionPaymentService
 {
+    Task<ResponseModel<CollectionPaymentCommitResult>> MoveAsync(long contractId, long paymentId,
+        CollectionPaymentMove command, long actorId, CancellationToken cancellationToken = default);
     Task<ResponseModel<CollectionPaymentCommitResult>> CreateAsync(long contractId, CollectionPaymentCreate command,
         long actorId, CancellationToken cancellationToken = default);
     Task<ResponseModel<CollectionPaymentCommitResult>> UpdateAsync(long contractId, long paymentId,

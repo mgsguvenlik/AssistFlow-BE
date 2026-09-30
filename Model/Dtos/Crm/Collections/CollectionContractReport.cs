@@ -5,6 +5,8 @@ namespace Model.Dtos.Crm.Collections;
 public sealed class CollectionContractReportQuery : IValidatableObject
 {
     public bool EligibleOnly { get; init; }
+    [Range(1, 12, ErrorMessage = "Yıl dönümü ayı geçersiz.")]
+    public int? AnniversaryMonth { get; init; }
     [Range(1, 1000000, ErrorMessage = "Sayfa numarası 1 ile 1000000 arasında olmalıdır.")]
     public int Page { get; init; } = 1;
 

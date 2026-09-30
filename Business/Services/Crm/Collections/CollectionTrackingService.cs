@@ -14,6 +14,16 @@ namespace Business.Services.Crm.Collections;
 
 public sealed class CollectionTrackingService(AppDataContext db) : ICollectionTrackingService
 {
+    public async Task<ResponseModel<List<CollectionTrackingTotal>>> GetTotalsAsync(CollectionTrackingQuery query, CancellationToken cancellationToken = default)
+    {
+        var error = Validate(query);
+        if (error is not null) return ResponseModel<List<CollectionTrackingTotal>>.Fail(error);
+        var totals = await BuildRows(query).GroupBy(x => new { x.CurrencyTypeId, x.CurrencyCode })
+            .Select(g => new CollectionTrackingTotal(g.Key.CurrencyTypeId, g.Key.CurrencyCode,
+                g.Sum(x => x.AccruedAmount), g.Sum(x => x.PaymentAmount), g.Sum(x => x.RemainingAmount)))
+            .ToListAsync(cancellationToken);
+        return ResponseModel<List<CollectionTrackingTotal>>.Success(totals.OrderBy(x => x.CurrencyCode).ToList());
+    }
     public async Task<ResponseModel<PagedResult<CollectionTrackingItem>>> GetPageAsync(CollectionTrackingQuery query,
         CancellationToken cancellationToken = default)
     {

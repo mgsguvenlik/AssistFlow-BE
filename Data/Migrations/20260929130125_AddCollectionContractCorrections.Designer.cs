@@ -4,6 +4,7 @@ using Data.Concrete.EfCore.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Data.Migrations
 {
     [DbContext(typeof(AppDataContext))]
-    partial class AppDataContextModelSnapshot : ModelSnapshot
+    [Migration("20260929130125_AddCollectionContractCorrections")]
+    partial class AddCollectionContractCorrections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -661,85 +664,6 @@ namespace Data.Migrations
                         .HasDatabaseName("UX_ContractStatus_Code");
 
                     b.ToTable("ContractStatus", "collection");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionCustomerAttachment", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ArchiveHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTimeOffset>("CreatedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("CreatedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("CustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<long?>("LegacyCustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.Property<DateTimeOffset?>("RemovedDate")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<long?>("RemovedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("RetainedLegacyCustomerId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("SourcePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("StoredFileName")
-                        .IsRequired()
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SourcePath")
-                        .IsUnique();
-
-                    b.HasIndex("CustomerId", "Id");
-
-                    b.ToTable("CustomerAttachment", "collection");
                 });
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionCustomerNote", b =>
@@ -8326,15 +8250,6 @@ namespace Data.Migrations
                     b.Navigation("CurrencyType");
 
                     b.Navigation("PaymentFrequency");
-                });
-
-            modelBuilder.Entity("Model.Concrete.Collections.CollectionCustomerAttachment", b =>
-                {
-                    b.HasOne("Model.Concrete.Customer", null)
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Model.Concrete.Collections.CollectionCustomerNote", b =>

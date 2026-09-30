@@ -38,6 +38,8 @@ public class CollectionContractListItem
 
 public sealed class CollectionContractDetail : CollectionContractListItem
 {
+    public long? PaymentMethodId { get; init; }
+    public string? PaymentMethodName { get; init; }
     public long? CollectionGroupId { get; init; }
     public bool IsGroupParent { get; init; }
     public bool IsCollectionEligible { get; set; }
@@ -59,6 +61,9 @@ public sealed class CollectionRateHistoryQuery
 
 public sealed class CollectionRateHistoryItem
 {
+    public byte[] RowVersion { get; init; } = [];
+    public long PaymentFrequencyId { get; init; }
+    public long? CurrencyTypeId { get; init; }
     public long Id { get; init; }
     public DateOnly EffectiveFrom { get; init; }
     public DateOnly? EffectiveToExclusive { get; init; }

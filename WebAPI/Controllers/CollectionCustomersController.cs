@@ -18,6 +18,38 @@ public sealed class CollectionCustomersController(IOptions<CollectionReadOptions
 {
     private IActionResult Unavailable() => StatusCode(503, ResponseModel.Fail("Tahsilat işlemi kullanıma kapalı.", (Core.Enums.StatusCode)503));
 
+    [HttpGet("{id:long:min(1)}/attachments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> Attachments(long id, [FromServices] ICollectionContractAttachmentService attachments,
+        CancellationToken ct, int page = 1, int pageSize = 25)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var result = await attachments.GetCustomerPageAsync(id, page, pageSize, ct);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/attachments")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    [RequestSizeLimit(22 * 1024 * 1024)]
+    public async Task<IActionResult> UploadAttachment(long id, [FromForm] IFormFile file, [FromForm] Guid requestId,
+        [FromServices] ICollectionContractAttachmentService attachments, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub"), out var actor) || actor <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı."));
+        var result = await attachments.UploadCustomerAsync(id, file, requestId, actor, ct);
+        return StatusCode((int)result.StatusCode, result);
+    }
+    [HttpPost("{id:long:min(1)}/attachments/{attachmentId:long:min(1)}/remove")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> RemoveAttachment(long id, long attachmentId, [FromServices] ICollectionContractAttachmentService attachments, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        if (!long.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub"), out var actor) || actor <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı."));
+        var result = await attachments.RemoveCustomerAsync(id, attachmentId, actor, ct);
+        return StatusCode((int)result.StatusCode, result);
+    }
     [HttpGet("{id:long:min(1)}")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
     public async Task<IActionResult> Get(long id, CancellationToken ct)
@@ -71,4 +103,3 @@ public sealed class CollectionCustomersController(IOptions<CollectionReadOptions
         return StatusCode((int)result.StatusCode, result);
     }
 }
-

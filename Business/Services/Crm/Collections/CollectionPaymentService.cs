@@ -2,6 +2,7 @@ using Business.Interfaces;
 using Core.Common;
 using Core.Enums;
 using Data.Concrete.EfCore.Context;
+using Data.Concrete.EfCore.Collections;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
@@ -13,6 +14,47 @@ namespace Business.Services.Crm.Collections;
 
 public sealed class CollectionPaymentService(AppDataContext db) : ICollectionPaymentService
 {
+    public async Task<ResponseModel<CollectionPaymentCommitResult>> MoveAsync(long contractId, long paymentId,
+        CollectionPaymentMove command, long actorId, CancellationToken cancellationToken = default)
+    {
+        var p = command.Payment;
+        if (p is null || contractId <= 0 || paymentId <= 0 || command.TargetContractId <= 0 || command.TargetContractId == contractId ||
+            string.IsNullOrWhiteSpace(command.Reason) || command.Reason.Trim().Length is < 3 or > 200 ||
+            !ValidTerms(p.Period, p.PaymentDate, p.Amount) || p.Amount <= 0)
+            return Fail("Geçerli ödeme, farklı hedef sözleşme ve düzeltme gerekçesi gereklidir.");
+        var description = $"{p.Description}\nSözleşme düzeltmesi ({contractId} → {command.TargetContractId}): {command.Reason.Trim()}".Trim();
+        if (description.Length > 1000) return Fail("Mevcut açıklama ve düzeltme gerekçesi toplamı 1000 karakteri aşamaz.");
+        try
+        {
+            if (!await ValidActorAsync(actorId, cancellationToken)) return Fail("Geçerli kullanıcı bulunamadı.", StatusCode.Unauthorized);
+            var payload = new CollectionPaymentCommand(CollectionPaymentOperationKind.Update, paymentId, p.RowVersion,
+                command.TargetContractId, p.Period, p.PaymentDate, p.Amount, p.CurrencyTypeId, description, false);
+            return await new CollectionPaymentTransaction(db).ExecuteAsync(p.RequestId, actorId, payload, cancellationToken, async token =>
+            {
+                var payment = await db.Set<CollectionPayment>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == paymentId && x.ContractId == contractId, token);
+                if (payment is null) return "Ödeme kaynak sözleşmede bulunamadı.";
+                if (payment.IsFree || payment.Amount <= 0) return "Tarihsel ücretsiz, sıfır veya negatif ödeme taşınamaz.";
+                if (payment.Period != p.Period || payment.PaymentDate != p.PaymentDate || payment.Amount != p.Amount ||
+                    payment.CurrencyTypeId != p.CurrencyTypeId || payment.Description != p.Description)
+                    return "Taşıma sırasında ödeme tutarı, tarihi, dönemi, para birimi veya açıklaması değiştirilemez. Listeyi yenileyin.";
+                if (!await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers).AnyAsync(x => x.Id == contractId, token))
+                    return CollectionCustomerClassification.OutsideScopeMessage;
+                var until = p.Period.AddMonths(1);
+                if (!await db.Set<CollectionContractRatePeriod>().AsNoTracking().AnyAsync(x => x.ContractId == command.TargetContractId && !x.IsDeleted &&
+                    x.EffectiveFrom < until && (x.EffectiveToExclusive == null || x.EffectiveToExclusive > p.Period) &&
+                    x.CurrencyTypeId == p.CurrencyTypeId && x.BillingBehavior == CollectionBillingBehavior.Billable, token))
+                    return "Hedef sözleşmede ödeme dönemine ve para birimine uygun ücretli tarife bulunamadı.";
+                return null;
+            }, async (movedPaymentId, token) =>
+            {
+                await db.Set<CollectionBankLoadRow>().Where(x => x.PaymentId == movedPaymentId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.ContractId, command.TargetContractId)
+                        .SetProperty(x => x.Issue, "Ödemenin bağlı olduğu sözleşme manuel düzeltildi; özgün banka referansı korunuyor."), token);
+            });
+        }
+        catch (Exception ex) when (IsStorageFailure(ex)) { return Uncertain(); }
+    }
+
     public async Task<ResponseModel<CollectionPaymentBatchResult>> CreateBatchAsync(CollectionPaymentBatchCreate command,
         long actorId, CancellationToken cancellationToken = default)
     {

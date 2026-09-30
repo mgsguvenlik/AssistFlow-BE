@@ -73,6 +73,8 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
                 || x.GtsNo != null && x.GtsNo.Contains(term)
                 || x.IvrNo != null && x.IvrNo.Contains(term));
 
+        if (query.AnniversaryMonth.HasValue)
+            contracts = contracts.Where(x => x.StartDate.Month == query.AnniversaryMonth);
         var count = await contracts.CountAsync(cancellationToken);
         var ordered = query.SortBy switch
         {

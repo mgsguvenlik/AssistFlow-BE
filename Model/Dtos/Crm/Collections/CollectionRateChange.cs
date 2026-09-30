@@ -4,6 +4,8 @@ namespace Model.Dtos.Crm.Collections;
 
 public sealed class CollectionRateChange : IValidatableObject
 {
+    [Range(2000, 9998, ErrorMessage = "Zam yılı geçersiz.")]
+    public int? AnniversaryYear { get; set; }
     public decimal Amount { get; set; }
     public bool IsFree { get; set; }
     [Required(ErrorMessage = "Kayıt sürümü gereklidir.")]

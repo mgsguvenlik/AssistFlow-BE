@@ -35,6 +35,17 @@ public sealed class CollectionPaymentDelete
     public string RowVersion { get; init; } = string.Empty;
 }
 
+public sealed class CollectionPaymentMove
+{
+    [Required(ErrorMessage = "Ödeme bilgisi gereklidir.")]
+    public CollectionPaymentUpdate Payment { get; init; } = null!;
+    [Range(1, long.MaxValue, ErrorMessage = "Hedef sözleşme seçilmelidir.")]
+    public long TargetContractId { get; init; }
+    [Required(ErrorMessage = "Düzeltme gerekçesi gereklidir.")]
+    [StringLength(200, MinimumLength = 3, ErrorMessage = "Gerekçe 3–200 karakter olmalıdır.")]
+    public string Reason { get; init; } = "";
+}
+
 public sealed class CollectionPaymentBatchCreate
 {
     public Guid RequestId { get; init; }

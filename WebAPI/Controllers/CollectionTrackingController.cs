@@ -16,6 +16,16 @@ namespace WebAPI.Controllers;
 [Route("api/collections/tracking")]
 public sealed class CollectionTrackingController(IOptions<CollectionReadOptions> options) : ControllerBase
 {
+    [HttpGet("totals")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> Totals([FromQuery] CollectionTrackingQuery query,
+        [FromServices] ICollectionTrackingService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled)
+            return StatusCode(503, ResponseModel.Fail("Tahsilat modülü kullanıma kapalı.", (Core.Enums.StatusCode)503));
+        var result = await service.GetTotalsAsync(query, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
     [HttpGet("group-status-history")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
     public async Task<IActionResult> GetGroupHistory([FromQuery] CollectionGroupHistoryQuery query,

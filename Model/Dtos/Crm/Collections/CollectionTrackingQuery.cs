@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Model.Dtos.Crm.Collections;
 
+public sealed record CollectionTrackingTotal(long CurrencyTypeId, string CurrencyCode,
+    decimal AccruedAmount, decimal PaymentAmount, decimal RemainingAmount);
+
 public sealed class CollectionTrackingQuery : IValidatableObject
 {
     [Range(1, 1000000, ErrorMessage = "Sayfa numarası 1 ile 1000000 arasında olmalıdır.")]

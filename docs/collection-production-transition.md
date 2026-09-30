@@ -4,6 +4,27 @@ Durum: hazırlık aşaması. Kullanıcının 27 Eylül 2026 talebiyle testteki t
 
 ## Ortam ve temel yaklaşım
 
+### K09 geçiş paketi — 29 Eylül
+
+- **Son ödeme yöntemi tespiti:** `20260930230000_EnableCollectionRequestedPaymentMethods` yalnız GTS/BANK_TRANSFER mevcut kayıtlarını aktif yapar; testte uygulandı. Canlı yayında bu veri migrationı da gereklidir (aşağıdaki “yeni migration yok” önceki kod dilimini anlatır). Yeni kurulum seed'i bu iki tanımı aktif oluşturur. Diğer POS/online/legacy tanımlar pasif kalır; otomatik Down desteklenmez. Gerçek sözleşme ödeme yöntemi topluca değiştirilmez.
+
+- **Tahsilat ekibi geri bildirimi:** toplamlar API'si, yeni sözleşme PaymentMethodId ve AnniversaryYear ile yıllık tarife planlama için BE önce, FE sonra yayınlanmalı. Yeni DB migrationı gerektirmez. Eski istemcinin AnniversaryYear göndermediği tekil tarife davranışı değişmez; ödeme yöntemsiz oluşturma isteği hash'i korunur. Ekip yıl/oran seçip onaylar; canlı gerçek sözleşmelere otomatik zam yüklemesi yapılmaz. İleri tarife dilimi standart hesaplayıcıyla devreye girer. Son HTTP/UI kabulü tamamlanmadan yayın onayı verilmiş sayılmaz.
+
+- **30 Eylül manuel müşteri dosyaları:** `AddCollectionCustomerFileActions`, `AddCollectionCustomerAttachments` sonrasında ve yeni API yayını öncesinde uygulanmalıdır; testte uygulandı, canlıya uygulanmadı. Legacy kimlikler/hash nullable, CreatedUser/IsDeleted/RemovedUser/RemovedDate eklenir. Eski aktarımların metadata'sı korunur. Down audit alanlarını kaybettirir; otomatik geri dönüş yapılmaz. Mevcut CDN servisi kullanılır; listeden kaldırma fiziksel CDN silme değildir. Tekil SourcePath ve kaldırılmış kayıtlar korunmalı, aktarım makbuzu silinerek yeniden etkinleştirme yapılmamalıdır. Test SQL/CDN kontrolü geçti; oturumlu GET liste görüldü, yeni API yeniden başlatma/HTTP yetki kabulü açık.
+
+- **30 Eylül müşteri dosyaları:** `20260930194336_AddCollectionCustomerAttachments` sadece testte uygulandı. Mevcut CDN sağlayıcısı değişmeden müşteri kartına ayrı arşiv ilişkisi; kaynak yol/iki legacy kimlik/karar ve SHA256 kanıtları tutulur. Canlıda migration BE/FE yayını öncesinde uygulanmalıdır. SourcePath tekilliği korunmalı; Down/makbuz silme tekrar aktarım stratejisi değildir.
+- Kullanıcı eski aboneliğin dosyalarını doğrulanmış güncel karta devretmeyi onayladı, ödemeleri devretmeyi değil. Testte924→291401→16838 için 3 dosya uygulandı; içerik ve tekrar güvenliği doğrulandı. Bu hedef ID canlıya kopyalanmaz. 2206→87400 için hedef eşlemesi doğrulanmadı;16598 eski kartı kullanılmadı. Canlıda aynı karar + güncel abone tekilliği/kapsam doğrulaması ve ayrı plan hash'i gerekir.
+- `activity-transfer <Development JSON> <Aktivite.rar> [--install|plan hash]` test-only, arşiv hash'i ve doğrulanmış924devriyle sınırlı araçtır; canlı yayın aracı değildir. Diğer dosyalar için otomatik isim/tahmin eşlemesi yok. SQL/CDN atomik değildir; belirsiz durumda içerik nesnesi tutulur, hash+makbuz üzerinden yeniden deneme yapılır. Müşteri dosyası ekranı ve HTTP yetki kabulü hâlâ açık.
+
+- **30 Eylül ek kararı:** YOK geçişi geçmişi korur; Türkiye saatine göre ertesi gün yeni Suspended tarife açılır. Aynı günün oluşmuş borçları da korunur. Mevcut audit tablosuyla çalışır; ek migration yok. Test doğrulaması geçti, gerçek sözleşmeler topluca değiştirilmedi. Tarife tarih düzeltmesinde kesintisiz tarihçe şartı korunur.
+- Aktivite.rar doğrulandı ancak 15 asıl dosyanın hiçbirinde kesin korunmuş tahsilat müşteri eşlemesi yok. Kaynak dosya eksikliği değil, sahiplik/kapsam kararı bekleniyor. Dosyalar CDN'e aktarılmadı. Canlı müşteri kimlikleri test adaylarından kopyalanamaz; yeniden eşleme ve dosya kimlik/hash mutabakatı gerekir.
+
+- `20260929130125_AddCollectionContractCorrections` yalnız testte uygulandı. Uyumlu BE/FE yayını öncesinde uygulanmalı: sözleşme oluşturma işlemi de silme makbuzunu bu tabloda kontrol eder. Ortak dbo tabloları değişmez.
+- ContractCorrection ve PaymentOperation kayıtları kalıcı audit/tekrar korumasıdır. Down, toplu temizlik veya test ID'lerini canlıya kopyalama yayın/geri dönüş yöntemi değildir. Fiziksel silinen sözleşmenin makbuzu korunmazsa eski oluşturma isteği yeniden kayıt üretebilir.
+- Yeni düzeltme/taşıma/silme komutları mevcut CollectionFollowUp Edit ve ContractCreateEnabled kapısına bağlı. Müşteri dosyasını listeden kaldırma CDN URL'sini iptal etmez; fiziksel dosya arşivde kalır.
+- Test-only `k09-check` geçici SQL/CDN kayıtlarıyla doğrulandı ve kendi kayıtlarını temizledi; canlıda çalıştırılmaz. Gerçek veri düzeltmesi/silmesi ayrıca hedef ve etki onayı gerektirir. Banka işlem kimliği ve legacy makbuzları ödeme taşıma/silmede korunmalıdır.
+- K09 bütünü kapatılmadı: VAR/YOK geçmiş etkisi, ayrı müşteri dosyası kaynağı ve HTTP/browser kabulü açık. Bunlar çözülmeden nihai yayın kabulü verilmez. Tarihsel tarife aralığı düzeltmesi komşu dilim çakışmasını ve eski/yeni aralıktaki ödemeleri kontrol eder; yenileme günü/borç davranışı korunur.
+
 ### K07 geçiş paketi — 29 Eylül
 
 - `20260929100739_AddCollectionInvoiceLoads`, ardından `20260929101445_AddCollectionInvoiceLoadRowAudit` yalnız testte uygulandı. Canlıya sürümlü migration ile alınacak; mevcut müşteri veya CDN şemasını değiştirmez.

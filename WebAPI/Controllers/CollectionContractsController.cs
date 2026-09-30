@@ -17,6 +17,50 @@ namespace WebAPI.Controllers;
 [Route("api/collections/contracts")]
 public sealed class CollectionContractsController(IOptions<CollectionReadOptions> options) : ControllerBase
 {
+    [HttpGet("{id:long:min(1)}/corrections")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
+    public async Task<IActionResult> Corrections(long id, [FromServices] ICollectionContractCorrectionService service, CancellationToken ct, int page = 1, int pageSize = 25)
+    {
+        if (!options.Value.Enabled) return Unavailable();
+        var r = await service.HistoryAsync(id, page, pageSize, ct); return StatusCode((int)r.StatusCode, r);
+    }
+    [HttpPost("{id:long:min(1)}/corrections")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> Correct(long id, CollectionContractCorrectionCommand command,
+        [FromServices] ICollectionContractCorrectionService service, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0) return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı gereklidir.", Core.Enums.StatusCode.Unauthorized));
+        var r = await service.ExecuteAsync(id, command, actorId, ct); return StatusCode((int)r.StatusCode, r);
+    }
+
+    [HttpPost("{id:long:min(1)}/payments/{paymentId:long:min(1)}/move")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> MovePayment(long id, long paymentId, CollectionPaymentMove command,
+        [FromServices] ICollectionPaymentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.MoveAsync(id, paymentId, command, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
+    [HttpPost("{id:long:min(1)}/attachments/{attachmentId:long:min(1)}/remove")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> RemoveAttachment(long id, long attachmentId,
+        [FromServices] ICollectionContractAttachmentService service, CancellationToken cancellationToken)
+    {
+        if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Unavailable();
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!long.TryParse(claim, out var actorId) || actorId <= 0)
+            return Unauthorized(ResponseModel.Fail("Geçerli kullanıcı kimliği bulunamadı.", Core.Enums.StatusCode.Unauthorized));
+        var result = await service.RemoveAsync(id, attachmentId, actorId, cancellationToken);
+        return StatusCode((int)result.StatusCode, result);
+    }
+
     [HttpGet("{id:long:min(1)}/attachments")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.View)]
     public async Task<IActionResult> GetAttachments(long id, [FromQuery] int page,

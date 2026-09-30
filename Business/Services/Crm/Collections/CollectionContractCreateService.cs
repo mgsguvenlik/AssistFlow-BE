@@ -38,6 +38,9 @@ public sealed class CollectionContractCreateService(AppDataContext db) : ICollec
             command.ContractStatusId, command.SubscriptionStatusId, command.PaymentFrequencyId, command.CurrencyTypeId,
             Amount = command.Amount.ToString("G29", CultureInfo.InvariantCulture), command.IsFree, command.GtsNo, command.IvrNo
         }));
+        // Preserve old request hashes when no method was supplied by older clients.
+        if (command.PaymentMethodId is { } methodId)
+            hash = SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { Original = Convert.ToHexString(hash), PaymentMethodId = methodId }));
         // Global context registration has no retries. Keep bounded SQL transient retries local to this idempotent command.
         var strategy = new ContractExecutionStrategy(db);
         return await strategy.ExecuteAsync(async () =>
@@ -47,6 +50,10 @@ public sealed class CollectionContractCreateService(AppDataContext db) : ICollec
             CollectionContractRatePeriod? rate = null;
             try
             {
+                // Keep the deletion receipt check and create in the same serializable transaction.
+                if (await db.Database.SqlQuery<long>($"SELECT Id AS [Value] FROM collection.ContractCorrection WHERE Kind = N'Delete' AND TRY_CONVERT(uniqueidentifier, JSON_VALUE(BeforeJson, '$.CreationRequestId')) = {command.RequestId}")
+                    .AnyAsync(cancellationToken))
+                    return Fail("Bu oluşturma işleminin sözleşmesi daha sonra silinmiş; aynı işlem yeniden oluşturulamaz.", StatusCode.Conflict);
                 var previous = await db.Set<CollectionContract>().AsNoTracking().SingleOrDefaultAsync(x => x.CreationRequestId == command.RequestId, cancellationToken);
                 if (previous is not null)
                     return previous.CreatedUser == actorId && previous.CreationPayloadHash is not null
@@ -63,6 +70,9 @@ public sealed class CollectionContractCreateService(AppDataContext db) : ICollec
                 if (!await db.CurrencyTypes.AsNoTracking().AnyAsync(x => x.Id == command.CurrencyTypeId, cancellationToken))
                     return Fail("Para birimi bulunamadı.");
                 var frequency = await db.Set<CollectionPaymentFrequency>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.PaymentFrequencyId && x.IsActive, cancellationToken);
+                if (command.PaymentMethodId.HasValue && !await db.Set<CollectionPaymentMethod>().AsNoTracking()
+                    .AnyAsync(x => x.Id == command.PaymentMethodId && x.IsActive, cancellationToken))
+                    return Fail("Geçerli ödeme yöntemi seçin.");
                 var subscription = await db.Set<CollectionSubscriptionStatus>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.SubscriptionStatusId && x.IsActive, cancellationToken);
                 var status = command.ContractStatusId is null ? null : await db.Set<CollectionContractStatus>().AsNoTracking()
                     .SingleOrDefaultAsync(x => x.Id == command.ContractStatusId && x.IsActive, cancellationToken);
@@ -77,6 +87,7 @@ public sealed class CollectionContractCreateService(AppDataContext db) : ICollec
                     CreationRequestId = command.RequestId, CreationPayloadHash = hash,
                     CustomerId = command.CustomerId, ServiceTypeId = command.ServiceTypeId,
                     StartDate = command.StartDate, EndDate = command.EndDate, ContractStatusId = command.ContractStatusId,
+                    PaymentMethodId = command.PaymentMethodId,
                     SubscriptionStatusId = command.SubscriptionStatusId, GtsNo = command.GtsNo, IvrNo = command.IvrNo,
                     CreatedUser = actorId, CreatedDate = DateTimeOffset.UtcNow
                 };

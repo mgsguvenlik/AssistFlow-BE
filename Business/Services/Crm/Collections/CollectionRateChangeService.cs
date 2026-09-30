@@ -39,6 +39,17 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                     return Fail("Geçerli kullanıcı bulunamadı.", StatusCode.Unauthorized);
                 contract = await db.Set<CollectionContract>().SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, cancellationToken);
                 if (contract is null) return Fail("Sözleşme bulunamadı.", StatusCode.NotFound);
+                var effective = today;
+                if (command.AnniversaryYear is { } year)
+                {
+                    if (year <= contract.StartDate.Year || command.IsFree)
+                        return Fail("Yıllık zam en az bir yılını tamamlayan ücretli sözleşmelere uygulanır.");
+                    effective = contract.StartDate.AddYears(year - contract.StartDate.Year);
+                    if (effective <= today) return Fail("Geçmiş veya bugünkü borcu değiştirmemek için gelecek yıl dönümünü seçin.");
+                    if (contract.EndDate < effective) return Fail("Sözleşme zam tarihinden önce sona eriyor.");
+                    if (await db.Set<CollectionPayment>().AnyAsync(x => x.ContractId == id && x.Period >= new DateOnly(effective.Year, effective.Month, 1), cancellationToken))
+                        return Fail("Zam dönemi veya sonrasında ödeme mevcut; manuel inceleme gereklidir.");
+                }
                 if (!await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers)
                     .AnyAsync(x => x.Id == id, cancellationToken))
                     return Fail(CollectionCustomerClassification.OutsideScopeMessage);
@@ -68,14 +79,14 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                 var upper = current.EffectiveToExclusive is { } rateEnd && (endExclusive is null || rateEnd < endExclusive)
                     ? rateEnd : endExclusive;
                 if (upper is null) upper = DateOnly.MaxValue;
-                if (today == DateOnly.MaxValue || today.AddDays(1) >= upper)
+                if (effective == DateOnly.MaxValue || effective >= upper)
                     return Fail("Sözleşmede sonraki bir yenileme dönemi bulunamadı.");
                 var anchorDay = current.OriginalAnchorDay ?? (byte)current.BillingAnchor.Day;
-                if (CollectionPeriodRules.GetDueDates(current.BillingAnchor, upper, frequency.IntervalMonths,
+                if (!command.AnniversaryYear.HasValue && CollectionPeriodRules.GetDueDates(current.BillingAnchor, upper, frequency.IntervalMonths,
                     today, today.AddDays(1), anchorDay).Any())
                     return Fail("Bugün yenileme günü. Mevcut dönem borcunu değiştirmemek için tarife yarın güncellenebilir.", StatusCode.Conflict);
                 var nextDue = CollectionPeriodRules.GetDueDates(current.BillingAnchor, upper, frequency.IntervalMonths,
-                    today.AddDays(1), upper.Value, anchorDay).FirstOrDefault();
+                    command.AnniversaryYear.HasValue ? effective : today.AddDays(1), upper.Value, anchorDay).FirstOrDefault();
                 if (nextDue == default)
                     return Fail("Sözleşmede sonraki bir yenileme dönemi bulunamadı.");
                 if (current.CurrencyTypeId is null)
@@ -84,7 +95,7 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                 next = new CollectionContractRatePeriod
                 {
                     ContractId = id,
-                    EffectiveFrom = today,
+                    EffectiveFrom = effective,
                     EffectiveToExclusive = current.EffectiveToExclusive,
                     BillingAnchor = current.BillingAnchor,
                     OriginalAnchorDay = current.OriginalAnchorDay,
@@ -92,11 +103,11 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                     Amount = command.Amount,
                     CurrencyTypeId = current.CurrencyTypeId,
                     BillingBehavior = command.IsFree ? CollectionBillingBehavior.Free : CollectionBillingBehavior.Billable,
-                    ChangeReason = "Tarife: " + command.Reason.Trim(),
+                    ChangeReason = (command.AnniversaryYear.HasValue ? "Yıllık zam: " : "Tarife: ") + command.Reason.Trim(),
                     CreatedUser = actorId,
                     CreatedDate = now
                 };
-                current.EffectiveToExclusive = today;
+                current.EffectiveToExclusive = effective;
                 current.UpdatedUser = actorId;
                 current.UpdatedDate = now;
                 contract.UpdatedUser = actorId;
@@ -105,8 +116,9 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                 db.Set<CollectionContractRatePeriod>().Add(next);
                 await db.SaveChangesAsync(cancellationToken);
                 await tx.CommitAsync(cancellationToken);
-                return ResponseModel<CollectionRateChanged>.Success(new(id, today, nextDue),
-                    command.IsFree
+                return ResponseModel<CollectionRateChanged>.Success(new(id, effective, nextDue),
+                    command.AnniversaryYear.HasValue ? $"Yıllık zam {effective:dd.MM.yyyy} sözleşme yıl dönümü için kaydedildi."
+                    : command.IsFree
                         ? "Tarife ücretsiz olarak güncellendi. Sonraki dönemlerde yeni borç oluşmaz."
                         : "Tarife güncellendi. Yeni tutar sonraki yenileme döneminden itibaren uygulanır.");
             }
