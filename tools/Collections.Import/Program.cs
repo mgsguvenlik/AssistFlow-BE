@@ -7,6 +7,11 @@ using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 
 // Ödeme komutları kendi kesitini doğrular; transfer-payments yalnız plan hash'iyle yazar.
+if (args.Length is 2 or 3 && args[0] == "copy-live-customers")
+{
+    await CustomerTestCopy.RunAsync(args[1], args.Length == 3 ? args[2] : null);
+    return;
+}
 if (args.Length is 3 or 4 && args[0] == "activity-transfer")
 {
     await CollectionActivityTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);

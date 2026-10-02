@@ -4,6 +4,8 @@ Durum: hazırlık aşaması. Kullanıcının 27 Eylül 2026 talebiyle testteki t
 
 ## Ortam ve temel yaklaşım
 
+- **1 Ekim test müşteri tamamlama:** canlıdan 1.324 müşteri ve iki eksik grup tanımı teste eklendi; kaynak salt-okunur. Bu işlem canlıya taşınacak migration değildir. Test müşteri/grup Id'leri canlı eşlemesine kopyalanmamalı; canlı yayın sırasında abone numarası ve tanım kodları yeniden çözülmelidir. K03/dosya eşleme istisnalarının testteki müşteri eksikliğine bağlı kısmı ayrı görevlerde yeniden değerlendirilebilir. [Sonuç ve kanıt](customer-test-copy-2026-10-01.md).
+
 ### K09 geçiş paketi — 29 Eylül
 
 - **Son ödeme yöntemi tespiti:** `20260930230000_EnableCollectionRequestedPaymentMethods` yalnız GTS/BANK_TRANSFER mevcut kayıtlarını aktif yapar; testte uygulandı. Canlı yayında bu veri migrationı da gereklidir (aşağıdaki “yeni migration yok” önceki kod dilimini anlatır). Yeni kurulum seed'i bu iki tanımı aktif oluşturur. Diğer POS/online/legacy tanımlar pasif kalır; otomatik Down desteklenmez. Gerçek sözleşme ödeme yöntemi topluca değiştirilmez.

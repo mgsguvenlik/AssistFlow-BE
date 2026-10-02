@@ -6,6 +6,10 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 1 Ekim — canlıda bulunup testte eksik müşteriler
+
+Kullanıcı isteğiyle AssistFlow/AssistFlowTest Customers abone numarası karşılaştırması yapıldı. **1.324 eksik müşteri** testte yeni kimliklerle eklendi; iki eksik grup (EMLK/STBT) kaynak kodlarıyla eklendi. Mevcut müşteri kartları ve canlı veri değişmedi. Daha önce onaylı test müşteri tipi sınıflandırması yeni kartlarda korundu. Son test toplamı **18.917**, kalan eksik abone **0**; tam alan eşitliği ve bağımsız son sayım doğrulandı. Bu iş tamamdır; finansal/legacy dosya aktarımı tetiklenmedi. [Aktarım sonucu, eşleme ve kanıt](customer-test-copy-2026-10-01.md).
+
 ## K09 yürütme — 29 Eylül 2026
 
 **Son kontrol:** API yeniden başlatıldı; para birimi toplamı gerçek oturumda TRY 734.205,17 / 602.547,17 / 131.658,00 (Haziran 2026) doğrulandı. Yıllık zam/form alanları görüldü. GTS ve banka havalesi eski seed'de pasif olduğundan müşteri talebiyle yalnız bu iki mevcut tanım için `EnableCollectionRequestedPaymentMethods` test veri migrationı uygulandı; canlıya uygulanmadı. Kod/SQL doğrulamaları tamam; negatif HTTP yetki ve finansal UI kabulü açık, K09 nihai kabul işareti kaldırılmadı.
