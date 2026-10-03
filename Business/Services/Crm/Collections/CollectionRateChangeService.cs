@@ -12,7 +12,7 @@ using Model.Dtos.Crm.Collections;
 
 namespace Business.Services.Crm.Collections;
 
-public sealed class CollectionRateChangeService(AppDataContext db) : ICollectionRateChangeService
+public sealed class CollectionRateChangeService(AppDataContext db, CollectionSmsService? sms = null) : ICollectionRateChangeService
 {
     public async Task<ResponseModel<CollectionRateChanged>> ChangeAsync(long id, CollectionRateChange command,
         long actorId, CancellationToken cancellationToken = default)
@@ -115,12 +115,14 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
                 await db.SaveChangesAsync(cancellationToken);
                 db.Set<CollectionContractRatePeriod>().Add(next);
                 await db.SaveChangesAsync(cancellationToken);
+                var smsMessage = sms is not null ? await sms.QueueRateAsync(current, next, actorId, cancellationToken) : null;
                 await tx.CommitAsync(cancellationToken);
                 return ResponseModel<CollectionRateChanged>.Success(new(id, effective, nextDue),
-                    command.AnniversaryYear.HasValue ? $"Yıllık zam {effective:dd.MM.yyyy} sözleşme yıl dönümü için kaydedildi."
+                    (command.AnniversaryYear.HasValue ? $"Yıllık zam {effective:dd.MM.yyyy} sözleşme yıl dönümü için kaydedildi."
                     : command.IsFree
                         ? "Tarife ücretsiz olarak güncellendi. Sonraki dönemlerde yeni borç oluşmaz."
-                        : "Tarife güncellendi. Yeni tutar sonraki yenileme döneminden itibaren uygulanır.");
+                        : "Tarife güncellendi. Yeni tutar sonraki yenileme döneminden itibaren uygulanır.")
+                    + (smsMessage is null ? "" : " " + smsMessage));
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -146,6 +148,8 @@ public sealed class CollectionRateChangeService(AppDataContext db) : ICollection
             {
                 if (next is not null) db.Entry(next).State = EntityState.Detached;
                 foreach (var entry in db.ChangeTracker.Entries<CollectionContractRatePeriod>().ToArray()) entry.State = EntityState.Detached;
+                foreach (var entry in db.ChangeTracker.Entries().Where(x => x.Entity is CollectionSmsNotification or CollectionSmsAttempt).ToArray())
+                    entry.State = EntityState.Detached;
                 if (contract is not null) db.Entry(contract).State = EntityState.Detached;
             }
         });

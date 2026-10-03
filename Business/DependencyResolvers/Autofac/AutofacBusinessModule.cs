@@ -39,11 +39,18 @@ namespace Business.DependencyResolvers.Autofac
     {
         public void Load(IServiceCollection services)
         {
+            services.AddOptions<SmsServiceOptions>().BindConfiguration(SmsServiceOptions.SectionName);
+            services.AddScoped<Data.Seeding.Abstractions.IDataSeed, Data.Seeding.Seeds.CollectionSmsConfigurationSeed>();
+            services.AddHttpClient<ISmsSender, Business.Services.Sms.TelsamSmsService>(client =>
+                client.Timeout = TimeSpan.FromSeconds(20))
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
             services.AddScoped<ICollectionContractReadService, CollectionContractReadService>();
             services.AddScoped<ICollectionContractAttachmentService, CollectionContractAttachmentService>();
             services.AddScoped<ICollectionContractCreateService, CollectionContractCreateService>();
             services.AddScoped<ICollectionSubscriptionService, CollectionSubscriptionService>();
             services.AddScoped<ICollectionRateChangeService, CollectionRateChangeService>();
+            services.AddScoped<CollectionSmsService>();
+            services.AddHostedService<CollectionSmsDispatcher>();
             services.AddScoped<ICollectionContractUpdateService, CollectionContractUpdateService>();
             services.AddScoped<ICollectionPaymentService, CollectionPaymentService>();
             services.AddScoped<ICollectionTrackingService, CollectionTrackingService>();

@@ -7,6 +7,55 @@ using Microsoft.EntityFrameworkCore;
 using Model.Concrete.Collections;
 
 // Ödeme komutları kendi kesitini doğrular; transfer-payments yalnız plan hash'iyle yazar.
+if (args.Length == 2 && args[0] == "sms-workflow-check")
+{
+    await CollectionSmsWorkflowCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length == 2 && args[0] == "sms-setup")
+{
+    await CollectionSmsSetup.RunAsync(args[1]);
+    return;
+}
+if (args.Length == 1 && args[0] == "sms-service-check")
+{
+    await CollectionSmsServiceCheck.RunAsync();
+    return;
+}
+if (args.Length == 1 && args[0] == "bank-example-check")
+{
+    var bytes = Convert.FromBase64String((await Console.In.ReadToEndAsync()).Trim());
+    var preview = Business.Services.Crm.Collections.CollectionBankFileParser.Parse(bytes, "example.xlsx", "IVR", new(2026, 9, 1));
+    if (preview.Type != "GTS" || preview.Rows.Count != 6 || preview.Rows.Sum(x => x.Amount) != 12100m ||
+        preview.Rows.Any(x => x.Status != "Candidate" || x.CurrencyCode != "TRY" || x.PaymentDate?.Date != new DateTime(2026, 9, 30) ||
+            x.SubscriberSuffix?.Length != 4 || string.IsNullOrWhiteSpace(x.CustomerName)))
+        throw new InvalidOperationException("Örnek ödeme Excel'inin alan/tutar/tarih kontrolü başarısız.");
+    var clean = JsonSerializer.Serialize(preview);
+    if (clean.Contains("****") || clean.Contains("Net Tutar") || clean.Contains("Kart"))
+        throw new InvalidOperationException("Örnek dosyada kart/ek alan dışlama kontrolü başarısız.");
+    Console.WriteLine("Örnek Excel kontrolü başarılı: 6 aday satır, Tutar toplamı 12.100 TRY, 30.09.2026, GTS RRN kimliği, dört haneli abone/metin/tarih ve kart dışlama. Ödeme/DB/CDN yazılmadı.");
+    return;
+}
+if (args.Length == 2 && args[0] == "profile-bulk-rate-filters")
+{
+    using var cfg = JsonDocument.Parse(await File.ReadAllTextAsync(args[1]), new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+    var cs = new SqlConnectionStringBuilder(cfg.RootElement.GetProperty("AppSettings").GetProperty("MSSQLConnectionString").GetString());
+    if (cs.DataSource != "192.168.1.8" || cs.InitialCatalog != "AssistFlowTest") throw new InvalidOperationException("Yalnız test okuma kontrolü yapılabilir.");
+    await using var filterDb = new AppDataContext(new DbContextOptionsBuilder<AppDataContext>().UseSqlServer(cs.ConnectionString).Options);
+    var service = new Business.Services.Crm.Collections.CollectionContractReportService(new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(filterDb)));
+    var baseline = await service.GetPageAsync(new Model.Dtos.Crm.Collections.CollectionContractReportQuery { EligibleOnly = true, PageSize = 100 });
+    if (!baseline.IsSuccess) throw new InvalidOperationException(baseline.Message);
+    var sample = baseline.Data!.Items.First(x => x.Amount > 0 && x.PaymentFrequencyId.HasValue);
+    var serviceId = await filterDb.Set<CollectionContract>().Where(x => x.Id == sample.ContractId).Select(x => x.ServiceTypeId).SingleAsync();
+    var filtered = await service.GetPageAsync(new Model.Dtos.Crm.Collections.CollectionContractReportQuery { EligibleOnly = true, PageSize = 100,
+        AnniversaryMonth = sample.StartDate.Month, StartYear = sample.StartDate.Year, ServiceTypeId = serviceId,
+        PaymentFrequencyId = sample.PaymentFrequencyId, Amount = sample.Amount });
+    if (!filtered.IsSuccess || filtered.Data!.TotalCount == 0 || filtered.Data.Items.Any(x => x.StartDate.Month != sample.StartDate.Month || x.StartDate.Year != sample.StartDate.Year
+        || x.Amount != sample.Amount || x.PaymentFrequencyId != sample.PaymentFrequencyId || x.ServiceTypeName != sample.ServiceTypeName))
+        throw new InvalidOperationException("Birleşik zam filtrelerinin SQL kontrolü başarısız.");
+    Console.WriteLine($"Salt-okunur SQL kontrolü başarılı: ay/yıl/servis/ödeme dönemi/tutar birleşik filtre sonucu {filtered.Data.TotalCount} kayıt.");
+    return;
+}
 if (args.Length is 2 or 3 && args[0] == "copy-live-customers")
 {
     await CustomerTestCopy.RunAsync(args[1], args.Length == 3 ? args[2] : null);

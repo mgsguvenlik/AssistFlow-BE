@@ -44,8 +44,18 @@ public static partial class CollectionBankFileParser
             var headerCells = sheet.Row(1).CellsUsed(XLCellsUsedOptions.Contents).ToArray();
             if (headerCells.Any(x => x.HasFormula)) throw new InvalidDataException("Başlık hücrelerinde formül bulunamaz.");
             var groups = headerCells.GroupBy(x => x.GetString().Trim(), StringComparer.Create(Turkish, true)).ToArray();
-            if (groups.Any(x => x.Count() > 1)) throw new InvalidDataException("Tekrarlanan kolon başlıklarını düzeltin.");
-            var columns = groups.ToDictionary(x => x.Key, x => x.Single().Address.ColumnNumber, StringComparer.Create(Turkish, true));
+            var customerReport = groups.Any(x => x.Key.Equals("ABONE NO", StringComparison.OrdinalIgnoreCase))
+                && groups.Any(x => StringComparer.Create(Turkish, true).Equals(x.Key, "Müşteri Adı"));
+            if (customerReport)
+            {
+                // RRN/Mail Order exports use the GTS bank identity even when Kayıt No is kept in IvrNo.
+                type = "GTS";
+                headers = ["RRN", "Kayıt No", "İşlem Tarihi", "İşlem Tipi", "Tutar", "Kur", "Dönüş Kodu"];
+            }
+            if (groups.Any(x => x.Count() > 1 && !(customerReport && x.Key.Equals("Kur", StringComparison.OrdinalIgnoreCase) && x.Count() == 2)))
+                throw new InvalidDataException("Tekrarlanan kolon başlıklarını düzeltin.");
+            // In the supplied export the first Kur column is currency; the second is a numeric rate.
+            var columns = groups.ToDictionary(x => x.Key, x => x.First().Address.ColumnNumber, StringComparer.Create(Turkish, true));
             var missing = headers.Where(x => !columns.ContainsKey(x)).ToArray();
             if (missing.Length != 0) throw new InvalidDataException("Eksik kolonlar: " + string.Join(", ", missing));
             var rows = new List<CollectionBankFileRow>();
@@ -55,6 +65,9 @@ public static partial class CollectionBankFileParser
                 if (cells.All(x => x.IsEmpty())) continue;
                 var issues = new List<string>();
                 var formula = cells.Any(x => x.HasFormula);
+                var suffixCell = customerReport ? sheet.Cell(n, columns["ABONE NO"]) : null;
+                var nameCell = customerReport ? sheet.Cell(n, columns["Müşteri Adı"]) : null;
+                formula |= suffixCell?.HasFormula == true || nameCell?.HasFormula == true;
                 if (formula) issues.Add("Formüllü satır işlenmez; hücreleri değer olarak yapıştırın.");
                 string Text(int i) => cells[i].HasFormula ? "" : cells[i].GetString().Trim();
                 var reference = Text(1);
@@ -73,6 +86,12 @@ public static partial class CollectionBankFileParser
                 if (currency is not ("TRY" or "USD" or "EUR" or "GBP"))
                     issues.Add("Para birimi doğrulanmalı; kur dönüşümü otomatik yapılmaz.");
                 var result = Text(6);
+                var suffix = suffixCell is null || suffixCell.HasFormula ? null : suffixCell.GetString().Trim();
+                var customerName = nameCell is null || nameCell.HasFormula ? null : nameCell.GetString().Trim();
+                if (customerReport && (suffixCell!.DataType == XLDataType.Number || suffix is null || !Regex.IsMatch(suffix, @"^\d{4}$")))
+                    issues.Add("ABONE NO baştaki sıfırları koruyan dört haneli metin olmalıdır.");
+                if (customerReport && (string.IsNullOrWhiteSpace(customerName) || customerName.Length > 500))
+                    issues.Add("Müşteri adı boş olamaz ve en fazla 500 karakter olabilir.");
                 // A numeric zero is not silently treated as the bank's textual success code 00.
                 var success = type == "GTS" ? result == "00" : string.Equals(result, "Başarılı", StringComparison.OrdinalIgnoreCase);
                 if (result.Length == 0) issues.Add("Banka işlem sonucu boş.");
@@ -84,7 +103,8 @@ public static partial class CollectionBankFileParser
                 var status = result.Length > 0 && !success ? "BankFailed" : issues.Count > 0 ? "Review" : "Candidate";
                 rows.Add(new(n, transaction[..Math.Min(transaction.Length, 100)], reference[..Math.Min(reference.Length, 100)],
                     date, process[..Math.Min(process.Length, 100)], amount, currency[..Math.Min(currency.Length, 20)],
-                    result[..Math.Min(result.Length, 100)], status, issues));
+                    result[..Math.Min(result.Length, 100)], status, issues,
+                    suffix?[..Math.Min(suffix.Length, 4)], customerName?[..Math.Min(customerName.Length, 500)]));
             }
             if (rows.Count == 0) throw new InvalidDataException("Dosyada işlenecek banka satırı bulunamadı.");
             var duplicates = rows.Where(x => x.TransactionNumber.Length > 0).GroupBy(x => x.TransactionNumber, StringComparer.Ordinal)
@@ -103,7 +123,7 @@ public static partial class CollectionBankFileParser
         if (cell.DataType == XLDataType.DateTime) return cell.GetDateTime();
         if (cell.DataType == XLDataType.Number) return null;
         return DateTime.TryParseExact(cell.GetString().Trim(),
-            ["dd/MM/yyyy HH:mm:ss", "d/M/yyyy H:mm:ss", "dd.MM.yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "dd.MM.yyyy", "yyyy-MM-dd"],
+            ["dd/MM/yyyy HH:mm:ss", "d/M/yyyy H:mm:ss", "dd.MM.yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.FFFFFFF", "dd.MM.yyyy", "yyyy-MM-dd"],
             Turkish, DateTimeStyles.None, out var date) ? date : null;
     }
 

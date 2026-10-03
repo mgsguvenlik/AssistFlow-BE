@@ -28,6 +28,10 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
         var source = repository.GetQueryable<CollectionContract>();
         if (query.EligibleOnly)
             source = CollectionCustomerScopeQuery.Contracts(source, repository.GetQueryable<Model.Concrete.Customer>());
+        if (query.ServiceTypeId.HasValue)
+            source = source.Where(x => x.ServiceTypeId == query.ServiceTypeId);
+        if (query.StartYear.HasValue)
+            source = source.Where(x => x.StartDate.Year == query.StartYear);
         var contracts = source
             .AsNoTracking()
             .Where(x => !x.IsDeleted && !x.Customer.IsDeleted)
@@ -41,6 +45,7 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
                     .Select(r => new
                     {
                         r.Amount,
+                        r.PaymentFrequencyId,
                         CurrencyCode = r.CurrencyType == null ? null : r.CurrencyType.Code,
                         PaymentFrequencyName = r.PaymentFrequency.Name,
                         r.BillingBehavior
@@ -61,6 +66,7 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
                 Amount = x.Rate == null ? null : x.Rate.Amount,
                 CurrencyCode = x.Rate == null ? null : x.Rate.CurrencyCode,
                 PaymentFrequencyName = x.Rate == null ? null : x.Rate.PaymentFrequencyName,
+                PaymentFrequencyId = x.Rate == null ? (long?)null : x.Rate.PaymentFrequencyId,
                 IsFree = x.Rate != null && x.Rate.BillingBehavior == CollectionBillingBehavior.Free,
                 RowVersion = x.Contract.RowVersion
             });
@@ -75,6 +81,10 @@ public sealed class CollectionContractReportService(IUnitOfWork unitOfWork) : IC
 
         if (query.AnniversaryMonth.HasValue)
             contracts = contracts.Where(x => x.StartDate.Month == query.AnniversaryMonth);
+        if (query.PaymentFrequencyId.HasValue)
+            contracts = contracts.Where(x => x.PaymentFrequencyId == query.PaymentFrequencyId);
+        if (query.Amount.HasValue)
+            contracts = contracts.Where(x => x.Amount == query.Amount);
         var count = await contracts.CountAsync(cancellationToken);
         var ordered = query.SortBy switch
         {

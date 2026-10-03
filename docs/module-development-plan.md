@@ -6,6 +6,80 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 3 Ekim — Toplu Zam SMS kısayolu
+
+- `/crm/collections/rate-changes` ekranındaki SMS takip bağlantısı Tahsilat Takibi kart standardına uygun mavi mesaj ikonu, yön oku ve tamamı tıklanabilir kart şeklinde düzenlendi. Mobilde tam genişlik, geniş ekranda kompakt genişlik kullanılır; mevcut SMS route'u, yetkiler ve zam işlemleri korunur. Yalnız frontend/UI değişikliğidir.
+
+## 3 Ekim — SMS Takibi filtre yerleşimi
+
+- SMS filtre grid'i dış `form` yerine mevcut Form bileşeninin iç `containerClassName` alanına taşındı. Form'un tek iç kapsayıcısı nedeniyle alanlar tek sütunda ve ekranın sağında boşlukla görünüyordu. Mobilde tek, orta ekranda iki, geniş ekranda üç sütun; Sorgula en sondaki hücrede sağa hizalıdır. Filtre değerleri, sorgu, validasyon ve API işleyişi değişmedi.
+
+## 3 Ekim — Takip ekranı hızlı işlem kartları
+
+- Tahsilat Takibi üstündeki GTS/IVR dosyasından ödeme, kesilen fatura takibi, grup durum geçmişi ve SMS takibi bağlantıları örneğe uygun ikonlu kısayol kartlarına dönüştürüldü. Kartın tamamı mevcut route'a bağlantıdır; klavye odağı, hover ve koyu tema desteklenir. Mobilde tek, orta ekranda iki, geniş ekranda dört sütun kullanılır. Yalnız bu ekranın UI düzenlemesidir; işleyiş, yetki, API ve DB değişmedi.
+
+## 3 Ekim — Tahsilat formlarında alan bazlı doğrulama
+
+- Eksik/hatalı form alanları toast yerine mevcut FormItem `invalid/errorMessage` ile kırmızı çerçeve ve Türkçe alan altı açıklamayla gösterilir. İlk hatalı alana DOM sırasıyla kaydırılır ve kontrol odaklanır. İşlem, sunucu, yetki ve bağlantı hataları mevcut toast yapısında kalır.
+- Tamamlanan kapsam: sözleşme oluşturma/düzenleme, tarife değişimi, aktif/donuk işlemi, manuel finansal düzeltme ve etki onayı, ödeme oluşturma/düzenleme/taşıma, fatura ödeme işlemleri, not, müşteri/sözleşme dosyası yükleme, Excel ödeme/fatura yükleme, banka satırı sözleşme seçimi, grup durum kaydı ve Tahsilat filtre formları. Toplu zam oran/yeni fiyat, yıl, açıklama ve sözleşme seçimi doğrulamaları alanlara ayrıldı. Zorunlu alanlar için gönderim düğmesi doğrulama gösterebilir; işlem sürerken, yetkisizken veya belirsiz finansal sonuç nedeniyle mevcut kilitler korunur.
+- Ortak Tahsilat hook'u mevcut FormItem ve Form bileşenlerini kullanır. Native required/min/max kontrolleri de alan altı mesajına dönüştürülür; mali/koşullu kurallar kendi formlarında korunur. Uzun alan hataları normal akışta yer kaplar, sonraki alanlarla üst üste binmez. Yalnız Tahsilat frontend değişti; API, DB, CDN ve diğer modüller değiştirilmedi.
+- Doğrulama: Tahsilat dizininde ESLint başarılı; hedeflenen TS kontrolünde Tahsilat dosyalarında hata yok (repository genelinde önceden var olan TS hataları devam ediyor). Vite build başarılı. Tarayıcı sözleşme formu kontrolü oturum girişine yönlendi; görsel/odak kabulü kullanıcı girişi sonrasında doğrulanacak. Boş form kontrolü dışında kayıt/ödeme/SMS oluşturulmadı.
+
+## 3 Ekim — Tahsilat bildirimlerinin okunabilirliği
+
+- Kapatma düzeltmesi: ortak toast dış kapsayıcısındaki `pointer-events: none` bildirime miras kaldığı için kapatma düğmesi tıklama almıyordu. Yalnız Tahsilat Notification yüzeyinde `pointerEvents: auto` tanımlandı; kapatma düğmesi ve içerik kaydırması etkileşim alır, bildirimin dışındaki ekran tıklamaları engellenmez.
+
+- Ortak `pushCollectionToast` mevcut toast.push/Notification yapısını kullanır. 140 karakterden uzun veya çok satırlı mesajlar kullanıcı kapatana kadar kalır; kısa başarılar 5, diğer kısa bildirimler 8 saniyede kapanır. Tüm bildirimler elle kapatılabilir. Uzun mesaj genişliği 520 px, mobilde ekran genişliğiyle sınırlı; içerik satırları korunur ve çok uzun içerik kaydırılabilir. Yalnız Tahsilat bildirimleri etkilendi; global toast altyapısı ve backend değiştirilmedi.
+
+## 2 Ekim — Zam SMS bildirimi
+
+- Onaylı karar: zam kaydı onaylanınca mesaj gönderilecek; gelecekteki yürürlük tarihi mesajda belirtilecek. Sözleşme bazlı bildirim, Phone1 geçerli cep telefonuysa Phone1 aksi halde Phone2. Grup üyeleri için alıcı mevcut collection.GroupParent → Customers üst kartındaki grup sorumlusudur; eşleşme yoksa üyeye otomatik gönderim yapılmaz.
+- Şablon `/settings-management/configuration` içinde `CollectionRateChangeSmsTemplate` parametresinden alınacak. Seed yalnız eksik parametreyi ekler, düzenlenen metni değiştirmez. İlk metin varsayılandır; canlı gönderimden önce ekip kontrol eder. Onaylı şablon sürümü/metin snapshotı gönderim kaydında korunacak.
+- Tamamlanan ilk parça: ortak ISmsSender/TelsamSmsService, Autofac kayıtları, tüm appsettings dosyalarında güvenli varsayılanlar; gerçek credential Git'e yazılmadı. Dev/test/staging ortamlarında ayar yanlışlıkla false olsa da servis simülasyon yapar; gerçek gönderim yalnız Production + SmsSimulationEnabled=false ile mümkündür. HTTPS zorunlu, redirect kapalı, timeout/bozuk cevap sonucu belirsiz; otomatik tekrar gönderim yok. HTTP 2xx tek başına başarı değildir; err=null + pozitif pkgID servis kabulü sayılır, teslim edildi diye gösterilmez.
+- Gerçek servis kontrolü: 2 Ekim yalnız kullanıcının izin verdiği test numarasına bir deneme, HTTPS HTTP 200 / paket 88657576 / err=null. Boş mesajla bir hata denemesi HTTP 417 / ERR_INVALID_PARAM. Müşteri numarasına gerçek mesaj gönderilmedi; gerçek credential yalnız deneme belleğinde kullanıldı. Resmi protokol: https://sms.telsam.com.tr/api-docs/.
+- **3 Ekim / ikinci parça tamamlandı:** `collection.SmsNotification` (tarife başına tek kayıt) ve `collection.SmsAttempt` (değişmez alıcı/metin/şablon/neden/aktör + durum/tarih/paket/hata) migration `20261002210728_AddCollectionSmsNotifications` ile AssistFlowTest'e kuruldu. `CollectionRateChangeService` başarılı pozitif fiyat artışını aynı transactionda kuyruğa yazar; ücretsiz/tutar düşüşü bildirim değildir. Hazırlama hatası finansal zam kaydını iptal etmez, Failed geçmişi oluşur. Provider çağrısı transaction dışındadır. Autofac kayıtlı BackgroundService SQL claim ile işler; stale Sending → Unknown, otomatik tekrar yok. Kuyruğa simülasyon olarak giren mesaj ayar sonradan değişse de canlıya dönüşmez. Genel logda telefon/metin/credential yok.
+- Sözleşme detayında **Zam SMS / Geçmiş** tabı: son fiyat artışının alıcı/metin/oran/yürürlük/simülasyon önizlemesi, neden girerek manuel kuyruklama, durum filtreli server-side sayfalı gönderim geçmişi. GET preview/history ve POST send mevcut CollectionFollowUp View/Edit izinleriyle korundu. Önizleme hash'i telefon/şablon/finansal bilgi/durum değişiminde yenileme ister; Pending/Sending/Accepted/Unknown/Simulation mükerrer gönderimi engeller. Failed kayıt için en fazla 10 kontrollü manuel deneme; önceki mesaj/neden korunur. Finansal düzeltme bildirim kanıtını silmez; bildirimde finansal tarife/sözleşme FK'si bilerek yoktur.
+- Doğrulama: WebAPI/aktarım aracı Release, FE Vite build, değişen FE lint başarılı; hedeflenen TS dosyalarında hata yok (genel TS hataları sürüyor). AssistFlowTest kontrolü atomik yıllık zam/kuyruk, iki worker eşzamanlı claim, sıfır gerçek provider çağrılı simülasyon, manuel önizleme/mükerrer reddi, sahte servis reddi sonrası deneme geçmişi, sıfır eski tutarda finansal zamı koruyan hata kaydı, stale claim Unknown ve grup üst kart alıcısını geçti. Yalnız bu koşunun oluşturduğu geçici collection kayıtları temizlendi. Ortak Customers ve mevcut sözleşme/ödeme verileri değiştirilmedi.
+- Dev/Test `CollectionSmsEnabled=true`, `SmsSimulationEnabled=true`; base/Production `CollectionSmsEnabled=false` ve simülasyon açık kalır. Test şablon seed'i çalıştırıldı; parametre `/settings-management/configuration` içinde yönetilebilir. Son kodla backend restartı sonrası HTTP/tarayıcı kabulü yapılacak. Canlıya migration + seed + şablon/telefon kontrolü + güvenli deploy token olmadan özellik açılmaz. Kullanıcının tek test numarası dışındaki gerçek müşteri gönderimleri bu çalışma kapsamında açılmadı.
+- Production hazırlığı: yalnız yeni SMS tablolarını oluşturan idempotent migration script'i `docs/sql/20261002210728_AddCollectionSmsNotifications.sql`; production üzerinde çalıştırılmadı. Test kurulumu `sms-setup WebAPI/appsettings.Test.json` ile hedefi AssistFlowTest ve bekleyen migrationı yalnız SMS olarak sınırlar; başka migration varsa durur. API ve worker DI kayıtları mevcut Autofac modülünde, Program.cs değiştirilmedi. Kullanıcıya dönen zam başarı mesajı SMS kuyruğa alınma/hazırlama hatasını da belirtir.
+- **3 Ekim / genel takip tamamlandı:** CRM → Tahsilat → SMS Takibi (`/crm/collections/sms`) tüm sözleşmelerin denemelerini tek ekran altında gösterir. Tarih, durum, abone/müşteri/telefon araması ve son deneme/tüm denemeler filtreleri, durum toplamları ve server-side pagination bulunur. Sözleşme SMS tabına doğrudan geçişle hata nedeni ve kontrollü tekrar gönderim incelenir. Mevcut CollectionFollowUp View izni kullanılır; yeni ortak tablo veya izin modeli kurulmadı. Silinen sözleşmenin SMS kanıtı listede korunur.
+- Son doğrulama: backend Release build, değişen frontend dosyalarında ESLint ve Vite build başarılı. AssistFlowTest SQL kontrolü son/tüm denemeler, tarih/durum filtreleri ve kaldırılan geçici sözleşmede SMS kanıtını doğruladı; önceki kuyruk/simülasyon/mükerrer/Unknown kontrolleri de tekrar geçti. Yalnız kontrolün oluşturduğu geçici collection kayıtları temizlendi. Bu parçada yeni migration, mevcut müşteri/veri değişikliği veya gerçek SMS gönderimi yoktur. Son backend ile HTTP/tarayıcı kabulü henüz doğrulanmadı.
+
+## 2 Ekim — Abone son dört hane içeren Excel'den ödeme
+
+- Kullanıcı kararları: ödeme tutarı **Tutar**, Net Tutar değil. Kayıt No, GTS ödemesine ait IVR/referans numarasıdır. Müşterinin birden fazla sözleşmesi varsa kullanıcı seçer. Muhasebe dönemi yüklemede kullanıcı tarafından seçilir ve tüm dosyaya uygulanır.
+- Mevcut GTS/IVR yükleme–önizleme–onay akışı genişletildi; yeni ödeme mekanizması/CDN/DI altyapısı kurulmadı. `.xls`, mevcut FE SheetJS ile bellekte `.xlsx`e dönüştürülür; yalnız ödeme/eşleştirme sütunları gönderilir. Sunucu ham `.xls` kabul etmez. `.xlsx` mevcut doğrudan yükleme yolunu kullanır. Kart/son kullanma/iletişim/Net Tutar kayıt veya CDN içeriğine alınmaz. Yeni NuGet/npm paketi ve DB migrationı yok.
+- RRN/Kayıt No + ABONE NO/Müşteri Adı formatı otomatik tanınır. Tekrarlanan iki Kur sütununda ilki para birimidir; diğer mükerrer başlıklar reddedilir. Milisaniyeli işlem tarihleri desteklenir. Mail Order / 00 başarı kontrolü, pozitif tutar, metin kimliği/baştaki sıfırlar, formül/iade/başarısız banka ayırımı korunur. Bu rapor mevcut GTS/RRN mükerrer kimliğini kullanır; GTS veya IVR seçilerek aynı ödeme yeniden oluşturulamaz.
+- Son dört hane **tek başına** eşleştirme yapmaz: müşteri adı Türkçe normalize edilerek birlikte kontrol edilir. Birden çok sözleşme veya adın yalnız ön eki eşleştiğinde satır incelemede kalır; kullanıcı önerilen sözleşmelerden seçim yapar. Kayıt No GTS/IVR alanları aday sorgusunda dikkate alınır; eski ayrı GTS/IVR dosyalarının referans eşleme davranışı korunur. Genel müşteri/sözleşme alanları otomatik güncellenmez.
+- Seçim GET sayfalı aday listesi / POST kaydet ile, View/Edit izinleri altında ve batch rowversion + serializable transaction kontrolüyle yapılır. Seçim aktörü/tarihi ve önceki seçimler mevcut satır SourceJson'unda tutulur. Başka müşterinin sözleşmesi, kapsam dışı/ücretsiz dönem, geçmiş sürüm, aktarılmış/mükerrer/başarısız/geçersiz satır reddedilir. Seçim ödeme oluşturmaz. Onayda eşleşme/para birimi/dönem ve banka kimliği yeniden doğrulanır; mevcut ödeme+kalıcı audit+banka kimliği işlemi kullanılır.
+- Tamamlanan doğrulama: kullanıcının gerçek `.xls` dosyası, gerçek FE dönüştürücü → BE parser yolunda **6 aday / 12.100 TRY / 30.09.2026** olarak doğrulandı; kart alanları dışlandı. Eski bank-file-check geçti. BE WebAPI/aktarım aracı Release ve FE Vite build başarılı, değişen FE dosyalarında lint ve hedeflenmiş TS hata taraması temiz (genel proje TS hataları sürüyor). AssistFlowTest/mevcut CDN üzerinde geçici kayıtlarla eski GTS/IVR tekrar/eşzamanlılık ve yeni formatta çoklu sözleşmeyi incelemede bırakma, aday listeleme, ilgisiz sözleşme reddi, manuel seçim/aktör izi, eski sürüm reddi, seçilen sözleşmeye doğru tutar/dönem ödemesi ve aktarılmış satırı değiştirme reddi başarılı. Yalnız bu koşunun geçici DB/CDN kayıtları temizlendi. Gerçek dosyanın ödemeleri aktarılmadı. Tarayıcı/HTTP kabulü yeni API restartı sonrasında yapılacak; örnekte müşterinin/sözleşmenin bulunamaması veri istisnasıdır, zorlanarak eşleştirme yapılmaz.
+
+## 2 Ekim — Tahsilat liste/rapor UI standardı
+
+- Yeni sözleşme: Geri butonu ortak detay düzenindeki aynı `HiOutlineArrowLeft` ikonu ve küçük boyuta alındı; sağ başlık hizası korunur. Formdaki Kaydet/Vazgeç butonları küçük ve işlem ikonlu oldu. Form validasyonu, kayıt/tekrar güvenliği, bekleme durumları ve yönlendirme değişmedi.
+- Ödeme Raporu ve Sözleşme Raporu etiketli alanlar, responsive yerleşim, açılır/kapanır filtre paneli ve sonda sağa yaslı ikonlu Sorgula ile düzenlendi. Kesilen Fatura Takibi ve Grup Durum Geçmişi (müşteri/sözleşme detayındaki kullanımları dahil) aynı standarda alındı.
+- Tahsilat'a özel `CollectionFilterPanel` mevcut UI/ikon bileşenleriyle oluşturuldu; önceki Takip, Sözleşmeler ve Toplu Zam panelleri de bunu kullanır. Yedi liste/rapor filtresi tek görünümden yönetilir. Panel aç/kapat filtre değerlerini korur, sorgu tetiklemez. Dosya yükleme formları filtre değildir; bu formlar korunup responsive alanlar ve sağa yaslı yükleme ikonlu butonlarla toparlandı. Yeni sözleşmedeki Geri butonu küçük/ikonlu oldu. Detayların mevcut ortak özet/sekme düzeni korunur.
+- Yalnız frontend/UI değişikliği: yeni filtre/iş kuralı yok; mevcut alanlar, izinler, validasyonlar, query/store, server-side sayfalama, Excel, tahsilat ve yükleme davranışları korunur. Backend/API/DB değişmedi. Değişen 11 FE dosyasının ESLint kontrolü ve FE test-mode Vite build başarılı; görsel kullanıcı kabulü açık.
+
+## 2 Ekim — Sözleşmeler liste yerleşimi
+
+- Tamamlandı: mevcut arama ve sözleşme durumu filtreleri diğer Tahsilat listeleriyle uyumlu, etiketli iki sütun/telefon için tek sütun açılır-kapanır panele alındı. Panel kapanınca filtre değerleri korunur. İkonlu Sorgula panelin sonunda sağdadır.
+- Yeni sözleşme butonu başlığın sağına küçük ve artı ikonlu taşındı; satırdaki İncele butonlarına göz ikonu eklendi. Mevcut menü izinleri, yönlendirmeler, liste store'u/sıralama/sayfalama ve sorgu davranışı korundu. Yalnız UI değişti; backend/API/DB değişmedi. Değişen dosyada ESLint ve FE test-mode Vite build başarılı; görsel kullanıcı kabulü açık.
+
+## 2 Ekim — Tahsilat Takibi filtre yerleşimi
+
+- Tamamlandı: Takip ekranının mevcut filtreleri Toplu Zam ile aynı açılır/kapanır panel düzenine alındı. Panel ilk açılışta açık; kapanınca seçilen değerler korunur. Etiketli alanlar geniş ekranda üç, orta ekranda iki, dar ekranda tek sütundur. Ödeme yöntemini hariç tut seçeneği ilgili alanın altındadır; ikonlu Sorgula butonu panelin sonunda sağdadır.
+- Kapsam yalnız frontend/UI: mevcut dönem, arama, müşteri, görünüm, bakiye, servis, para birimi, abonelik durumu ve ödeme yöntemi alanları/validasyonları korundu. API, DB, sorgu, toplamlar, Excel ve tahsilat davranışı değiştirilmedi. Değişen dosyada ESLint ve FE test-mode Vite build başarılı; görsel kullanıcı kabulü ayrıca yapılacak.
+
+## 2 Ekim — Toplu Zam filtreleri
+
+- Yetki düzeltmesi: Tahsilat ekranlarında ortak kullanılan `ServiceTypes` ve `CurrencyTypes` GET liste/kimlik uçlarına mevcut `MenuResource.LookupMenuKeys` üzerinden `CollectionFollowUp` görüntüleme izni eklendi. Tahsilat ekranları ve servislerindeki çağrılar tarandı; diğer veri/dosya/grup çağrıları `collections/*` uçlarında mevcut View/Edit kontrollerini kullanıyor. Ortak tanımları değiştirme yetkileri kendi `ServiceTypeList`/`CurrencyTypeList` Edit izinlerinde kaldı; genel izin filtresi, roller veya DB değiştirilmedi. WebAPI Release build başarılı (0 hata). Yeni API ile gerçek Tahsilat kullanıcısında GET kabulü, izinsiz GET ve Tahsilat izniyle ortak tanım değiştirme reddi HTTP kontrolü açık.
+- Tamamlandı: Toplu Zam ekranına sözleşme ayı/yılı, mevcut ödeme dönemi (aylık, yıllık ve diğer dönemler), mevcut servis tipi (Gözlem/Kiralık vb.) ve güncel dönem tutarı filtreleri eklendi. Abone/müşteri/GTS/IVR araması korundu. Filtreler SQL tarafında toplam sayım ve sayfalama öncesinde birlikte uygulanır.
+- Filtreler açılır/kapanır panelde, etiketli ve responsive yerleşimde gösterilir; ikonlu **Sorgula** butonu panelin sonundadır. Zam oranı, sabit yeni fiyat, açıklama ve **Zam uygulanacak yıl** ayrı bölümde kaldı. Mevcut zam onayı ve finansal işleyiş değiştirilmedi.
+- Karar: ay/yıl filtresi sözleşmenin başlangıç tarihini esas alır; zam uygulanacak yıl ayrı seçimdir. Tutar filtresi güncel tarifenin tam dönem tutarına eşitlik uygular, para birimi dönüşümü yapmaz. Ödeme tipi burada ödeme yöntemini değil dönemi ifade eder. Mevcut tanımlar kullanıldı; yeni tablo/migration yok.
+- Kabul/doğrulama: BE WebAPI ve aktarım aracı Release derlemeleri, FE test-mode Vite build ve değişen FE dosyalarında ESLint başarılı. Genel TypeScript denetimi mevcut proje hataları nedeniyle temiz değil; değişen iki FE dosyasında hata bulunmadı. `profile-bulk-rate-filters` ile AssistFlowTest üzerinde salt-okunur gerçek servis sorgusunda beş birleşik filtre ve dönen kayıt alanları doğrulandı (1 eşleşme). Veri değiştirilmedi.
+- Açık kontrol: `localhost:5173` bağlantıyı reddettiğinden tarayıcıdaki görsel kabul yapılamadı. FE ve yeni backend kodu çalıştırıldıktan sonra panel aç/kapat, filtre sorgulama/sayfalama ve zam alanlarının ayrı yerleşimi kullanıcı ekranında doğrulanacak. Bu değişiklik K09'un önceki açık kabul/veri istisnalarını kapatmaz.
+
 ## 1 Ekim — canlıda bulunup testte eksik müşteriler
 
 Kullanıcı isteğiyle AssistFlow/AssistFlowTest Customers abone numarası karşılaştırması yapıldı. **1.324 eksik müşteri** testte yeni kimliklerle eklendi; iki eksik grup (EMLK/STBT) kaynak kodlarıyla eklendi. Mevcut müşteri kartları ve canlı veri değişmedi. Daha önce onaylı test müşteri tipi sınıflandırması yeni kartlarda korundu. Son test toplamı **18.917**, kalan eksik abone **0**; tam alan eşitliği ve bağımsız son sayım doğrulandı. Bu iş tamamdır; finansal/legacy dosya aktarımı tetiklenmedi. [Aktarım sonucu, eşleme ve kanıt](customer-test-copy-2026-10-01.md).
@@ -148,6 +222,8 @@ Kabul: her adımın kodu/kanıtı ve bekleyen sınırı ilgili raporda kayıtlı
 - Her iki repo `tahsilat-module`; başka branch'e merge yok. Mevcut değişiklikler korunur; production/legacy DB'ye yazma, seed/migration çalıştırma, dosya silme gibi riskli operasyonlar ayrıca onaya tabidir.
 
 # Completed
+
+- **2–3 Ekim / zam SMS:** ortak servis, güvenli ortam ayarları, Configuration şablon seed'i, kalıcı SMS kuyruğu/deneme modeli, zam transaction bağlantısı, arka plan gönderici, GET/POST yetkili endpointler ve sözleşme SMS tabı tamamlandı. AssistFlowTest migration/seed ve geçici kayıtlarla uçtan uca simülasyon kontrolü başarılı. HTTP/tarayıcı kabulü için backend restartı beklenir; canlı gönderim açık değildir.
 
 - **K03 uygulaması:** Testte collection.GroupParent migrationı, eksik G müşteri tipi ve 56 net üst kart/ilişkisi uygulandı. Son önizleme 0 yeni/56 uygulanmış/18 inceleme; mevcut müşteri değişikliği 0, finansal sayımlar aynı. Üst kart ve üyeler ayrıldı; kurumsal/cari bağlam GET API, Autofac kaydı ve Tahsilat sözleşme detay sekmesi tamamlandı. BE/FE build, hedefli lint ve servis/veri mutabakatı geçti. Üst kartların eski sözleşmelerinin aktarımı ve 18 istisna ayrıca açık. [K03 sonuçları](collection-k03-customer-context-2026-09-27.md).
 
@@ -345,6 +421,8 @@ Kod varlığı ile entegrasyon/kabul tamamlanması farklıdır:
 
 # In Progress
 
+- **Zam SMS / kabul:** geliştirmeler ve genel SMS Takibi tamamlandı; son backend koduyla HTTP/ekran kabul kontrolü kaldı. Test/dev simülasyonu açık; gerçek müşteri gönderimi kapalıdır.
+
 ## Güncel aktif işler
 
 - **K09 geliştirme:** dosya yükleme/kaldırma, sözleşme/tarife düzeltmesi, ödeme taşıma, kontrollü silme/audit ve YOK geçişi geliştirildi; SQL/CDN kontrolü geçti. YOK kararı net, müşteri dosyası ekranı mevcut. HTTP/finansal UI nihai kabulü ve 12 dosyanın eşleme istisnası açık. [Görevler/kabul kriterleri](collection-k09-lifecycle-2026-09-29.md).
@@ -416,6 +494,8 @@ Aşağıdaki eski “sonraki”/“bekliyor” kayıtları yukarıdaki güncel �
 - Sıradaki parça P03 typed komut içeriğinin kanonik hash üretimi ve P07 ödeme/receipt/audit tek transaction servis taslağı. Unique indeks yarışı, rollback ve fiziksel silme retry testi gerçek izole DB kabulüne dahil. Audit modeli tek başına immutability veya exactly-once garantisi sağlamaz. P02 banka canonical map, seed taslağı ve kaynak uzunluk kontrolleri açık.
 
 # Todo
+
+- **Zam SMS devreye alma:** backend restartı sonrasında HTTP/tarayıcı kabulü; canlı migration/seed ve şablon metni/alıcı telefonları kontrol edilerek onaylı devreye alma. Genel SMS hata/bekleyen takip ekranı tamamlandı. Gerçek token deploy override ile tanımlanır; Git'teki token boş ve simülasyon açık kalır. Teslim raporu entegrasyonu yapılmadan servis kabulü “teslim edildi” olarak gösterilmez. Production/MGS bu parçada değiştirilmedi.
 
 ## 27 Eylül kapsam denetimi görevleri — güncel öncelik
 

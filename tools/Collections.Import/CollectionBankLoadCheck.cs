@@ -28,12 +28,17 @@ internal static class CollectionBankLoadCheck
         await using var db = new AppDataContext(new DbContextOptionsBuilder<AppDataContext>().UseSqlServer(cs.ConnectionString, o => o.CommandTimeout(120)).Options);
         if ((await db.Database.GetPendingMigrationsAsync()).Any() || db.Database.HasPendingModelChanges()) throw new InvalidOperationException("Şema hazır değil.");
         var actor = await db.Users.Where(x => !x.IsDeleted).Select(x => x.Id).FirstAsync();
-        var template = await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>().AsNoTracking(), db.Customers).FirstAsync();
+        var template = await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>().AsNoTracking(), db.Customers)
+            .Where(x => x.Customer.SubscriberCompany != null && x.Customer.SubscriberCode != null &&
+                EF.Functions.Like(x.Customer.SubscriberCode, "%[0-9][0-9][0-9][0-9]"))
+            .Include(x => x.Customer).FirstAsync();
         var currency = await db.Set<CurrencyType>().Where(x => x.Code == "TRY" || x.Code == "TL").Select(x => x.Id).FirstAsync();
         var frequency = await db.Set<CollectionPaymentFrequency>().Select(x => x.Id).FirstAsync();
         var marker = "K08-" + Guid.NewGuid().ToString("N"); var period = new DateOnly(2026, 9, 1);
         var contract = new CollectionContract { CustomerId = template.CustomerId, ServiceTypeId = template.ServiceTypeId, StartDate = period,
             GtsNo = marker, IvrNo = marker, CreatedDate = DateTimeOffset.UtcNow, CreatedUser = actor };
+        var secondContract = new CollectionContract { CustomerId = template.CustomerId, ServiceTypeId = template.ServiceTypeId, StartDate = period,
+            GtsNo = marker + "-selection", CreatedDate = DateTimeOffset.UtcNow, CreatedUser = actor };
         var files = new HashSet<string>(); var keys = new HashSet<string>();
         var service = new CollectionBankLoadService(db, storage);
         byte[] Workbook(string type, string note)
@@ -94,6 +99,43 @@ internal static class CollectionBankLoadCheck
                 await service.ProcessAsync(second, Convert.ToBase64String(current.RowVersion), false, actor, default);
                 if ((await service.GetAsync(second, default)).Data!.Duplicate != 1) throw new Exception("Silinmiş ödemenin banka kimliği kayboldu.");
             }
+            // A single payment must remain unassigned until the user selects one of this customer's contracts.
+            db.Add(secondContract); await db.SaveChangesAsync();
+            db.Add(new CollectionContractRatePeriod { ContractId = secondContract.Id, EffectiveFrom = period, BillingAnchor = period,
+                PaymentFrequencyId = frequency, Amount = 12.34m, CurrencyTypeId = currency, BillingBehavior = CollectionBillingBehavior.Billable, CreatedUser = actor, CreatedDate = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+            using (var wb = new XLWorkbook())
+            {
+                var ws = wb.AddWorksheet("Müşteri ödemeleri");
+                string[] h = ["RRN", "Kayıt No", "İşlem Tarihi", "İşlem Tipi", "Tutar", "Kur", "Dönüş Kodu", "ABONE NO", "Müşteri Adı", "Net Tutar", "Kur"];
+                for (var c = 0; c < h.Length; c++) ws.Cell(1, c + 1).Value = h[c];
+                var number = marker + "-manual"; keys.Add(CollectionBankLoadService.Key("GTS", number));
+                ws.Cell(2, 1).Value = number; ws.Cell(2, 2).Value = marker;
+                ws.Cell(2, 3).Value = "2026-09-30 14:46:08.319";
+                ws.Cell(2, 4).Value = "Mail Order"; ws.Cell(2, 5).Value = 12.34;
+                ws.Cell(2, 6).Value = "TL"; ws.Cell(2, 7).Value = "00";
+                ws.Cell(2, 8).Value = template.Customer.SubscriberCode![^4..]; ws.Cell(2, 9).Value = template.Customer.SubscriberCompany!;
+                ws.Cell(2, 10).Value = 999; ws.Cell(2, 11).Value = 0;
+                using var stream = new MemoryStream(); wb.SaveAs(stream);
+                var id = await Upload(stream.ToArray(), "GTS");
+                var row = (await service.RowsAsync(id, 1, 25, null, default)).Data!.Items.Single();
+                if (row.Status != "Review" || row.ContractId.HasValue || row.Source.Amount != 12.34m) throw new Exception("Birden çok sözleşme otomatik seçildi veya Net Tutar kullanıldı.");
+                var available = await service.ContractsAsync(id, row.Id, 1, 100, default);
+                if (!available.IsSuccess || !available.Data!.Items.Any(x => x.Id == secondContract.Id)) throw new Exception("Sözleşme seçenekleri bulunamadı.");
+                var version = Convert.ToBase64String((await service.GetAsync(id, default)).Data!.RowVersion);
+                if ((await service.SelectContractAsync(id, row.Id, new(version, long.MaxValue), actor, default)).IsSuccess) throw new Exception("Başka müşteriye sözleşme seçilebildi.");
+                var selection = await service.SelectContractAsync(id, row.Id, new(version, secondContract.Id), actor, default);
+                if (!selection.IsSuccess) throw new Exception(selection.Message);
+                if ((int)(await service.SelectContractAsync(id, row.Id, new(version, contract.Id), actor, default)).StatusCode != 409) throw new Exception("Eski seçim sürümü kabul edildi.");
+                row = (await service.RowsAsync(id, 1, 25, null, default)).Data!.Items.Single();
+                if (row.Status != "Ready" || row.Source.Selections?.Single().UserId != actor) throw new Exception("Seçim veya kullanıcı izi korunmadı.");
+                version = Convert.ToBase64String((await service.GetAsync(id, default)).Data!.RowVersion);
+                var applied = await service.ProcessAsync(id, version, true, actor, default);
+                if (!applied.IsSuccess) throw new Exception(applied.Message);
+                if (!await db.Set<CollectionPayment>().AnyAsync(x => x.ContractId == secondContract.Id && x.Amount == 12.34m && x.Period == period)) throw new Exception("Seçilen sözleşmeye ödeme oluşmadı.");
+                version = Convert.ToBase64String((await service.GetAsync(id, default)).Data!.RowVersion);
+                if ((await service.SelectContractAsync(id, row.Id, new(version, contract.Id), actor, default)).IsSuccess) throw new Exception("Aktarılmış satırda seçim değiştirildi.");
+            }
             if (!(await service.ListAsync(1, 25, default)).IsSuccess) throw new Exception("Liste sorgusu başarısız.");
             foreach (var file in files) if (!await storage.ExistsAsync(file)) throw new Exception("CDN kaydı bulunamadı.");
             Console.WriteLine("K08 gerçek SQL/CDN kontrolü başarılı: GTS/IVR, önizleme, başarısız/iade/eşleşmeyen ayrımı, ödeme+audit+kuyruk, tekrar/silinme/sürüm koruması.");
@@ -104,11 +146,14 @@ internal static class CollectionBankLoadCheck
             var requests = keys.Select(x => new Guid(Convert.FromHexString(x)[..16])).ToArray();
             await db.Set<CollectionPaymentOperation>().Where(x => requests.Contains(x.RequestId)).ExecuteDeleteAsync();
             await db.Set<CollectionPayment>().Where(x => x.ContractId == contract.Id && contract.Id != 0).ExecuteDeleteAsync();
+            await db.Set<CollectionPayment>().Where(x => x.ContractId == secondContract.Id && secondContract.Id != 0).ExecuteDeleteAsync();
             await db.Set<CollectionBankTransaction>().Where(x => keys.Contains(x.Key) && x.Source == "AssistFlow").ExecuteDeleteAsync();
             var loads = await db.Set<CollectionBankLoad>().Where(x => files.Contains(x.StoredFileName)).Select(x => x.Id).ToListAsync();
             await db.Set<CollectionBankLoadRow>().Where(x => loads.Contains(x.LoadId)).ExecuteDeleteAsync();
             await db.Set<CollectionBankLoad>().Where(x => loads.Contains(x.Id)).ExecuteDeleteAsync();
             await db.Set<CollectionContractRatePeriod>().Where(x => x.ContractId == contract.Id && contract.Id != 0).ExecuteDeleteAsync();
+            await db.Set<CollectionContractRatePeriod>().Where(x => x.ContractId == secondContract.Id && secondContract.Id != 0).ExecuteDeleteAsync();
+            await db.Set<CollectionContract>().Where(x => x.Id == secondContract.Id && x.GtsNo == marker + "-selection").ExecuteDeleteAsync();
             await db.Set<CollectionContract>().Where(x => x.Id == contract.Id && x.GtsNo == marker).ExecuteDeleteAsync();
             await tx.CommitAsync();
             foreach (var file in files) await storage.DeleteAsync(file);

@@ -6,3 +6,6 @@ public sealed record CollectionBankLoadItem(long Id, string Type, string FileNam
 public sealed record CollectionBankLoadRowItem(long Id, int RowNumber, CollectionBankFileRow Source,
     long? ContractId, long? CurrencyTypeId, string Status, string? Issue, long? PaymentId);
 public sealed record CollectionBankLoadApply(string RowVersion);
+public sealed record CollectionBankLoadSelect(string RowVersion, long ContractId);
+public sealed record CollectionBankContractOption(long Id, string? SubscriberCode, string? CustomerName,
+    string ServiceTypeName, DateOnly StartDate, string? GtsNo, string? IvrNo);

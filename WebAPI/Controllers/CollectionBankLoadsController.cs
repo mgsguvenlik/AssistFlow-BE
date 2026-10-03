@@ -30,6 +30,13 @@ public sealed class CollectionBankLoadsController(ICollectionBankLoadService ser
     [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
     public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm] string type, [FromForm] DateOnly period, CancellationToken ct)
     { if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Off(); var r = await service.UploadAsync(file, type, period, Actor, ct); return StatusCode((int)r.StatusCode, r); }
+    [HttpGet("{id:long:min(1)}/rows/{rowId:long:min(1)}/contracts")]
+    public async Task<IActionResult> Contracts(long id, long rowId, CancellationToken ct, int page = 1, int pageSize = 25)
+    { if (!options.Value.Enabled) return Off(); var r = await service.ContractsAsync(id, rowId, page, pageSize, ct); return StatusCode((int)r.StatusCode, r); }
+    [HttpPost("{id:long:min(1)}/rows/{rowId:long:min(1)}/contract")]
+    [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
+    public async Task<IActionResult> SelectContract(long id, long rowId, CollectionBankLoadSelect command, CancellationToken ct)
+    { if (!options.Value.Enabled || !options.Value.ContractCreateEnabled) return Off(); var r = await service.SelectContractAsync(id, rowId, command, Actor, ct); return StatusCode((int)r.StatusCode, r); }
     [HttpPost("{id:long:min(1)}/refresh")]
     [MenuAuthorize("CollectionFollowUp", MenuPermission.Edit)]
     public Task<IActionResult> Refresh(long id, CollectionBankLoadApply command, CancellationToken ct) => Process(id, command, false, ct);

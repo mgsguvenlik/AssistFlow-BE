@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Business.Interfaces;
@@ -60,6 +61,7 @@ public sealed class CollectionBankLoadService(AppDataContext db, IFileStorage st
         CollectionBankFilePreview parsed;
         try { parsed = CollectionBankFileParser.Parse(buffer.ToArray(), name, type, period); }
         catch (InvalidDataException ex) { return ResponseModel<long>.Fail(ex.Message); }
+        type = parsed.Type;
         var existing = await db.Set<CollectionBankLoad>().AsNoTracking().SingleOrDefaultAsync(x => x.Type == type && x.FileHash == parsed.FileHash && x.Period == period, ct);
         if (existing is not null) return ResponseModel<long>.Success(existing.Id, "Dosya ve dönem zaten kayıtlı; mevcut önizleme açıldı.");
         // Never upload the original workbook. Serialize only the explicitly allowed payment fields.
@@ -87,10 +89,7 @@ public sealed class CollectionBankLoadService(AppDataContext db, IFileStorage st
     private async Task Validate(CollectionBankLoad batch, CollectionBankLoadRow[] rows, CancellationToken ct)
     {
         var pending = rows.Where(x => x.Status != "Imported").ToArray();
-        var refs = pending.Select(x => Read(x).ContractReference).Distinct().ToArray();
-        var contracts = await db.Set<CollectionContract>().AsNoTracking().Where(x => !x.IsDeleted && !x.Customer.IsDeleted &&
-            (batch.Type == "GTS" ? refs.Contains(x.GtsNo!) : refs.Contains(x.IvrNo!)))
-            .Select(x => new { x.Id, Reference = batch.Type == "GTS" ? x.GtsNo : x.IvrNo }).ToListAsync(ct);
+        var contracts = await CandidateContracts(batch.Type, pending.Select(Read).ToArray(), ct);
         var ids = contracts.Select(x => x.Id).ToArray();
         var scope = await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers)
             .Where(x => ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
@@ -111,10 +110,12 @@ public sealed class CollectionBankLoadService(AppDataContext db, IFileStorage st
             if (!baseline) issues.Add("Geçmiş banka işlem kontrol listesi kurulmadı; ödeme aktarımı kapalı.");
             if (used.Contains(row.TransactionKey) || duplicateKeys.Contains(row.TransactionKey))
             { row.Status = "Duplicate"; issues.Add("Banka işlemi geçmişte veya bu dosyada mevcut; tekrar aktarılmaz."); }
-            var match = contracts.Where(x => string.Equals(x.Reference?.Trim(), source.ContractReference, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (match.Length != 1) issues.Add("GTS/IVR referansıyla tek bir sözleşme bulunamadı.");
-            else if (!scope.Contains(match[0].Id)) issues.Add("Sözleşme tahsilat kapsamı dışında.");
-            else row.ContractId = match[0].Id;
+            var match = MatchingContracts(batch.Type, source, contracts).ToArray();
+            var choice = source.SelectedContractId.HasValue ? match.SingleOrDefault(x => x.Id == source.SelectedContractId) :
+                match.Length == 1 && (source.SubscriberSuffix is null || Name(source.CustomerName) == Name(match[0].CustomerName)) ? match[0] : null;
+            if (choice is null) issues.Add(match.Length > 0 ? "Müşteri/sözleşme eşleşmesini kontrol edip sözleşme seçin." : "Müşteri bilgileriyle eşleşen sözleşme bulunamadı.");
+            else if (!scope.Contains(choice.Id)) issues.Add("Sözleşme tahsilat kapsamı dışında.");
+            else row.ContractId = choice.Id;
             var currency = currencies.Where(x => NormalizeCurrency(x.Code) == source.CurrencyCode).ToArray();
             if (currency.Length != 1) issues.Add("Para birimi eşlemesi tekil değil veya bulunamadı.");
             else row.CurrencyTypeId = currency[0].Id;
@@ -123,6 +124,76 @@ public sealed class CollectionBankLoadService(AppDataContext db, IFileStorage st
             if (row.Status == "Ready" && issues.Count > 0) row.Status = "Review";
             row.Issue = issues.Count == 0 ? null : string.Join(" ", issues);
         }
+    }
+    private static string Name(string? value) => string.Concat((value ?? "").ToUpper(CultureInfo.GetCultureInfo("tr-TR")).Where(char.IsLetterOrDigit));
+    private static bool Reference(string? value, string reference) => !string.IsNullOrWhiteSpace(reference) && string.Equals(value?.Trim(), reference.Trim(), StringComparison.OrdinalIgnoreCase);
+    private async Task<List<CollectionBankContractOption>> CandidateContracts(string type, CollectionBankFileRow[] rows, CancellationToken ct)
+    {
+        var refs = rows.Select(x => x.ContractReference).Distinct().ToArray();
+        var suffixes = rows.Where(x => x.SubscriberSuffix is not null).Select(x => x.SubscriberSuffix!).Distinct().ToArray();
+        return await db.Set<CollectionContract>().AsNoTracking().Where(x => !x.IsDeleted && !x.Customer.IsDeleted &&
+            (type == "GTS" ? refs.Contains(x.GtsNo!) : refs.Contains(x.IvrNo!)) ||
+            !x.IsDeleted && !x.Customer.IsDeleted && suffixes.Length > 0 &&
+            (refs.Contains(x.IvrNo!) || refs.Contains(x.GtsNo!) || x.Customer.SubscriberCode != null && x.Customer.SubscriberCode.Length >= 4 &&
+                suffixes.Contains(x.Customer.SubscriberCode.Substring(x.Customer.SubscriberCode.Length - 4))))
+            .OrderBy(x => x.Id).Select(x => new CollectionBankContractOption(x.Id, x.Customer.SubscriberCode,
+                x.Customer.SubscriberCompany, x.ServiceType.Name, x.StartDate, x.GtsNo, x.IvrNo)).ToListAsync(ct);
+    }
+    private static IEnumerable<CollectionBankContractOption> MatchingContracts(string type, CollectionBankFileRow source, IEnumerable<CollectionBankContractOption> contracts)
+    {
+        if (source.SubscriberSuffix is null)
+            return contracts.Where(x => Reference(type == "GTS" ? x.GtsNo : x.IvrNo, source.ContractReference));
+        var name = Name(source.CustomerName);
+        // Prefix names are suggestions only, never automatic matches. Suffix alone never authorizes a payment.
+        return contracts.Where(x => x.SubscriberCode?.Trim().EndsWith(source.SubscriberSuffix, StringComparison.Ordinal) == true &&
+            name.Length > 0 && (Name(x.CustomerName) == name || name.Length >= 6 && Name(x.CustomerName).StartsWith(name, StringComparison.Ordinal)));
+    }
+
+    public async Task<ResponseModel<PagedResult<CollectionBankContractOption>>> ContractsAsync(long id, long rowId, int page, int size, CancellationToken ct)
+    {
+        if (!Page(page, size)) return ResponseModel<PagedResult<CollectionBankContractOption>>.Fail("Geçersiz sayfa bilgisi.");
+        var row = await db.Set<CollectionBankLoadRow>().AsNoTracking().Include(x => x.Load).SingleOrDefaultAsync(x => x.Id == rowId && x.LoadId == id, ct);
+        if (row is null) return ResponseModel<PagedResult<CollectionBankContractOption>>.Fail("Yükleme satırı bulunamadı.", StatusCode.NotFound);
+        var source = Read(row);
+        var contracts = MatchingContracts(row.Load.Type, source, await CandidateContracts(row.Load.Type, [source], ct)).ToArray();
+        var ids = contracts.Select(x => x.Id).ToArray();
+        var scope = await CollectionCustomerScopeQuery.Contracts(db.Set<CollectionContract>(), db.Customers).Where(x => ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct);
+        var available = contracts.Where(x => scope.Contains(x.Id)).ToArray();
+        return ResponseModel<PagedResult<CollectionBankContractOption>>.Success(new(available.Skip((page - 1) * size).Take(size).ToArray(), available.Length, page, size));
+    }
+
+    public async Task<ResponseModel<int>> SelectContractAsync(long id, long rowId, CollectionBankLoadSelect command, long actor, CancellationToken ct)
+    {
+        if (command.ContractId <= 0 || !await Actor(actor, ct)) return ResponseModel<int>.Fail("Geçerli kullanıcı ve sözleşme seçilmelidir.");
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var batch = await db.Set<CollectionBankLoad>().Include(x => x.Rows).SingleOrDefaultAsync(x => x.Id == id, ct);
+            var row = batch?.Rows.SingleOrDefault(x => x.Id == rowId);
+            if (batch is null || row is null) return ResponseModel<int>.Fail("Yükleme satırı bulunamadı.", StatusCode.NotFound);
+            if (Convert.ToBase64String(batch.RowVersion) != command.RowVersion) return ResponseModel<int>.Fail("Önizleme değişmiş; güncel bilgileri yükleyin.", StatusCode.Conflict);
+            var source = Read(row);
+            if (row.PaymentId.HasValue || row.Status is "Imported" or "Duplicate" or "BankFailed" || source.Status != "Candidate")
+                return ResponseModel<int>.Fail("Aktarılmış, mükerrer veya geçersiz banka satırına sözleşme seçilemez.", StatusCode.Conflict);
+            var candidates = await CandidateContracts(batch.Type, [source], ct);
+            if (!MatchingContracts(batch.Type, source, candidates).Any(x => x.Id == command.ContractId))
+                return ResponseModel<int>.Fail("Seçilen sözleşme satırın müşteri bilgileriyle eşleşmiyor.");
+            var original = row.SourceJson;
+            row.SourceJson = JsonSerializer.Serialize(source with { SelectedContractId = command.ContractId,
+                Selections = [.. source.Selections ?? [], new(command.ContractId, actor, DateTimeOffset.UtcNow)] });
+            await Validate(batch, [row], ct);
+            if (row.ContractId != command.ContractId || row.Status != "Ready")
+            {
+                row.SourceJson = original;
+                return ResponseModel<int>.Fail(row.Issue ?? "Seçilen sözleşme ödeme aktarımına uygun değil.");
+            }
+            batch.ReviewedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+            return ResponseModel<int>.Success(1, "Sözleşme seçimi kaydedildi. Henüz ödeme oluşturulmadı.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        { return ResponseModel<int>.Fail("Sözleşme seçimi doğrulanamadı. Önizlemeyi yenileyin.", (StatusCode)503); }
+        finally { db.ChangeTracker.Clear(); }
     }
     private static string NormalizeCurrency(string code) => code.Trim().ToUpperInvariant() is "TL" or "YTL" or "TRL" ? "TRY" : code.Trim().ToUpperInvariant();
     private static string Snapshot(CollectionBankLoadRow row) => JsonSerializer.Serialize(new { row.Status, row.Issue, row.ContractId, row.CurrencyTypeId });
