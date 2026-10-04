@@ -45,6 +45,13 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+        [HttpGet("list")]
+        [MenuAuthorize(MenuPermission.View)]
+        public async Task<IActionResult> GetFilteredPaged([FromQuery] WorkFlowSlaSettingQueryParams q)
+        {
+            return ToActionResult(await _slaService.GetFilteredPagedAsync(q));
+        }
+
         [HttpGet("by-customer-type")]
         [MenuAuthorize(MenuPermission.View)]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
