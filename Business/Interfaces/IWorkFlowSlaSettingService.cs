@@ -12,6 +12,8 @@ namespace Business.Interfaces
         /// </summary>
         Task<ResponseModel<WorkFlowSlaSetting?>> GetSlaSettingAsync(WorkFlowCustomerType customerType, WorkFlowPriority priority);
 
+        Task<ResponseModel<PagedResult<WorkFlowSlaSettingGetDto>>> GetFilteredPagedAsync(WorkFlowSlaSettingQueryParams q);
+
         Task<ResponseModel<List<WorkFlowSlaSettingGetDto>>> GetByCustomerTypeAsync( WorkFlowCustomerType customerType);
     }
 }

@@ -130,6 +130,41 @@ namespace Business.Services
         }
 
         // ===== GetPagedAsync Override (Enum String Dönüşümü) =====
+        public async Task<ResponseModel<PagedResult<WorkFlowSlaSettingGetDto>>> GetFilteredPagedAsync(WorkFlowSlaSettingQueryParams q)
+        {
+            var query = _repo.GetQueryable<WorkFlowSlaSetting>().AsNoTracking().Where(x => !x.IsDeleted);
+            if (q.CustomerType.HasValue) query = query.Where(x => x.CustomerType == q.CustomerType.Value);
+            if (q.Priority.HasValue) query = query.Where(x => x.Priority == q.Priority.Value);
+            if (q.IsActive.HasValue) query = query.Where(x => x.IsActive == q.IsActive.Value);
+            if (q.HasNotificationEmails.HasValue)
+                query = q.HasNotificationEmails.Value
+                    ? query.Where(x => x.NotificationEmails != null && x.NotificationEmails.Trim() != "")
+                    : query.Where(x => x.NotificationEmails == null || x.NotificationEmails.Trim() == "");
+            if (!string.IsNullOrWhiteSpace(q.Search))
+            {
+                var search = q.Search.Trim();
+                query = query.Where(x => (x.Description != null && x.Description.Contains(search))
+                    || (x.NotificationEmails != null && x.NotificationEmails.Contains(search)));
+            }
+            var total = await query.CountAsync();
+            Expression<Func<WorkFlowSlaSetting, object>> sort = q.Sort?.ToLowerInvariant() switch
+            {
+                "customertype" or "customertypename" => x => x.CustomerType,
+                "priority" or "priorityname" => x => x.Priority,
+                "sladurationhours" => x => x.SlaDurationHours,
+                "notificationbeforehours" => x => x.NotificationBeforeHours,
+                "isactive" => x => x.IsActive,
+                _ => x => x.Id
+            };
+            var ordered = q.Desc ? query.OrderByDescending(sort) : query.OrderBy(sort);
+            var page = Math.Max(1, q.Page);
+            var pageSize = Math.Clamp(q.PageSize, 1, 100);
+            var items = await ordered.ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize)
+                .ProjectToType<WorkFlowSlaSettingGetDto>(_config).ToListAsync();
+            foreach (var item in items) SetDisplayNames(item);
+            return ResponseModel<PagedResult<WorkFlowSlaSettingGetDto>>.Success(new(items, total, page, pageSize));
+        }
+
         public override async Task<ResponseModel<PagedResult<WorkFlowSlaSettingGetDto>>> GetPagedAsync(QueryParams q)
         {
             var result = await base.GetPagedAsync(q);
