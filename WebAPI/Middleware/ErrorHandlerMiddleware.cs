@@ -20,6 +20,29 @@ namespace WebAPI.Middleware
 
         public async Task Invoke(HttpContext context)
         {
+            // Sheet deltas/files and SignalR stream without logging cell data or tokens.
+            if (context.Request.Path.StartsWithSegments("/api/Sheets") ||
+                context.Request.Path.StartsWithSegments("/api/sheets-hub"))
+            {
+                try
+                {
+                    await _next(context);
+                    _logger.LogInformation("Sheets {Method} {Path}: {Status}", context.Request.Method,
+                        context.Request.Path, context.Response.StatusCode);
+                }
+                catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Sheets request canceled by client: {Method} {Path}",
+                        context.Request.Method, context.Request.Path);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Sheets request failed: {Path}", context.Request.Path);
+                    if (context.Response.HasStarted) context.Abort();
+                    else await HandleExceptionAsync(context, ex);
+                }
+                return;
+            }
             var originalBodyStream = context.Response.Body;
 
             using var responseBody = new MemoryStream();
