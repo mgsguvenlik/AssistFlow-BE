@@ -168,6 +168,7 @@ namespace Data.Concrete.EfCore.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            SheetsConfiguration.Configure(modelBuilder);
             #region YKB
 
             modelBuilder.Entity<YkbServicesRequestProduct>()

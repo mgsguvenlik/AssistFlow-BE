@@ -128,6 +128,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<IReportExporter, PdfReportExporter>();
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
+            services.AddScoped<Business.Interfaces.Sheets.ISheetsService, Business.Services.Sheets.SheetsService>();
             services.AddHostedService<MailOutboxDispatcher>();
             services.AddHostedService<SlaNotificationDispatcher>();
             services.AddHostedService<ManitouStagingSyncBackgroundService>();
