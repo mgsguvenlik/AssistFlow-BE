@@ -213,7 +213,7 @@ builder.Services.Add(new ServiceDescriptor(
                 typeof(IRepository),
                 serviceProvider =>
                 {
-                    var dbContext = ActivatorUtilities.CreateInstance<AppDataContext>(serviceProvider);
+                    var dbContext = serviceProvider.GetRequiredService<AppDataContext>();
                     return new Repository(dbContext);
                 }, ServiceLifetime.Scoped));
 
@@ -252,6 +252,15 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.HttpContext.Request.Path.StartsWithSegments("/api/sheets-hub"))
+                    context.Token = context.Request.Query["access_token"];
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -266,6 +275,8 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
+builder.Services.AddDataSeeding(typeof(SheetsMenuSeed));
 
 // HttpContext
 builder.Services.AddHttpContextAccessor();
@@ -312,5 +323,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<WebAPI.Hubs.SheetsHub>("/api/sheets-hub", options => options.CloseOnAuthenticationExpiration = true);
 
 await app.RunAsync();
