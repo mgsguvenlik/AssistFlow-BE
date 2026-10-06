@@ -1,4 +1,5 @@
 using Business.Interfaces;
+using Business.Services.Crm.Collections;
 using Core.Common;
 using Core.Settings.Concrete;
 using Microsoft.AspNetCore.Authorization;
@@ -7,8 +8,6 @@ using Microsoft.Extensions.Options;
 using Model.Dtos.Crm.Collections;
 using WebAPI.Authorization;
 using System.Security.Claims;
-using System.Globalization;
-using System.Text;
 
 namespace WebAPI.Controllers;
 
@@ -83,51 +82,16 @@ public sealed class CollectionTrackingController(IOptions<CollectionReadOptions>
         var result = service.GetExportRows(query);
         if (!result.IsSuccess || result.Data is null)
             return StatusCode((int)result.StatusCode, result);
-        await using var enumerator = result.Data.GetAsyncEnumerator(cancellationToken);
-        bool hasRow;
         try
         {
-            // Validate SQL translation before committing CSV response headers.
-            hasRow = await enumerator.MoveNextAsync();
+            var stream = await CollectionTrackingExcelExporter.CreateAsync(result.Data, cancellationToken);
+            var periodLabel = query.PeriodFrom is { } from ? $"{from:yyyy-MM}_{query.Period:yyyy-MM}" : $"{query.Period:yyyy-MM}";
+            return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"tahsilat-takip-{periodLabel}.xlsx");
         }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or Microsoft.Data.SqlClient.SqlException)
         {
             return StatusCode(503, ResponseModel.Fail("Dışa aktarım sorgusu tamamlanamadı. Lütfen tekrar deneyin.", (Core.Enums.StatusCode)503));
         }
-        Response.ContentType = "text/csv; charset=utf-8";
-        var periodLabel = query.PeriodFrom is { } from ? $"{from:yyyy-MM}_{query.Period:yyyy-MM}" : $"{query.Period:yyyy-MM}";
-        Response.Headers["Content-Disposition"] = $"attachment; filename=tahsilat-takip-{periodLabel}.csv";
-        await using var writer = new StreamWriter(Response.Body, new UTF8Encoding(true), 16 * 1024, leaveOpen: true);
-        await writer.WriteLineAsync("Grup,Abone No,Müşteri,Servis Tipi,Dönem,Vade,Para Birimi,Borç,Ödeme,Kalan,Kayıt Türü".AsMemory(), cancellationToken);
-        if (hasRow) await WriteRow(enumerator.Current);
-        while (await enumerator.MoveNextAsync()) await WriteRow(enumerator.Current);
-        await writer.FlushAsync(cancellationToken);
-        return new EmptyResult();
-
-        Task WriteRow(CollectionTrackingItem row)
-        {
-            var fields = new[]
-            {
-                row.CustomerGroupName, row.SubscriberCode, row.CustomerName, row.ServiceTypeName,
-                row.Period.ToString("yyyy-MM", CultureInfo.InvariantCulture),
-                row.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), row.CurrencyCode,
-                row.AccruedAmount.ToString(CultureInfo.InvariantCulture),
-                row.PaymentAmount.ToString(CultureInfo.InvariantCulture),
-                row.RemainingAmount.ToString(CultureInfo.InvariantCulture),
-                row.IsGroup ? $"{row.ContractCount} sözleşme" : row.HasAccrual ? "Borç dönemi" : "Yalnız ödeme"
-            };
-            return writer.WriteLineAsync(string.Join(',', fields.Select(EscapeCsv)).AsMemory(), cancellationToken);
-        }
-    }
-
-    private static string EscapeCsv(string? value)
-    {
-        value ??= string.Empty;
-        var trimmed = value.TrimStart();
-        if (value.Length > 0 && "\t\r\n".Contains(value[0])
-            || trimmed.Length > 0 && "=+-@".Contains(trimmed[0])
-            && !decimal.TryParse(trimmed, NumberStyles.Number, CultureInfo.InvariantCulture, out _))
-            value = "'" + value;
-        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 }

@@ -6,6 +6,34 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 7 Ekim — Tahsilat Takibi gerçek Excel dışa aktarımı
+
+- Excel sonunda tüm aktarılan kayıtların para birimi bazlı dönem borcu, tahsil edilen ve net kalan toplamları yer alır. Toplamlar dışa aktarılan satırlardan tek geçişte biriktirilir; farklı para birimleri birleştirilmez, çok sheet varsa bütün kayıtları kapsar. Özet tutarlar mavi/yeşil/turuncu ve sayısal biçimdedir; liste AutoFilter aralığının dışında tutulur. OpenXML şeması ve iki para birimli örnek toplamlar DB kullanılmadan doğrulandı.
+- CSV yerine `.xlsx` üretilir; mevcut export endpoint'i, yetkiler, filtreler, sıralama ve tüm filtrelenmiş kayıtların kapsamı korunur. Mevcut OpenXML bağımlılığıyla satırlar akış halinde geçici dosyaya yazılır; indirme sonunda dosya otomatik silinir. Excel satır sınırı aşılırsa yeni sheet'e devam edilir.
+- Abone numaraları/metinler metin hücresinde (baştaki sıfırlar ve formül güvenliği korunarak), borç/ödeme/kalan sayısal iki ondalık biçimde tutulur. Başlıklar sabitlenir ve Excel filtreleri eklenir. Frontend ikonlu Excel’e aktar butonu `.xlsx` indirir.
+- Doğrulama: Backend ve frontend build başarılı; ilgili frontend ESLint kontrolü temiz. DB kullanmadan tek seferlik örnek veriyle OpenXML şema, baştaki sıfırlar, formül olarak yorumlanmayan metin ve sayısal tutar hücreleri doğrulandı. Çalışan backend'in yeni kodla yeniden başlatılması ve tarayıcıdan gerçek filtreli indirme kabul kontrolü bekleniyor. DB değişikliği yok.
+
+## 6 Ekim — Tahsilat Takibi varsayılan ay ve otomatik listeleme
+
+- Durum: Geliştirme tamamlandı; ilgili dosyanın ESLint kontrolü ve frontend üretim build'i başarılı. Tarayıcıda ilk açılış/geri dönüş kabul kontrolü henüz yapılmadı.
+- İlk açılışta Bitiş / tek dönem kullanıcının yerel tarihindeki güncel ayla doldurulur; aynı ayın sözleşme bazlı tüm kayıtları ve para birimi toplamları mevcut endpoint'lerden otomatik yüklenir. Başlangıç dönemi boş kalır; varsayılan sorgu 25 kayıt, abone sıralamasıyla açılır. Önceki kayıtlı filtre/sorgu varsa korunur; detaydan dönüşte güncel ay ile üzerine yazılmaz. Backend/DB/borç hesaplamaları değiştirilmez.
+
+## 6 Ekim — Tahsilat Takibi para birimi toplam kartları
+
+- Durum: Frontend/UI geliştirmesi tamamlandı; ilgili dosyalarda ESLint ve üretim build'i başarılı. Tarayıcıda görsel kabul kontrolü henüz yapılmadı.
+- Tablo altındaki tüm filtrelenmiş kayıtların toplamı, para birimi başına responsive kartlarla gösterilir. Solda para birimi simgesi/adı; sağda ikonlu mavi dönem borcu, yeşil tahsil edilen ve turuncu net kalan tutarları bulunur. Küçük ekranlarda alanlar alt alta gelir.
+- Yüzdeler her para biriminin kendi dönem borcuna göre hesaplanır; borç sıfırsa tüm rozetlerde “—” gösterilir. İnce tahsilat ilerleme çubuğu görsel olarak %0–100 aralığına sınırlandırılır; gerçek tutar ve yüzde rozetleri sınırlandırılmaz. Mevcut toplam endpoint'i, filtreler, sayfalama ve finansal hesaplamalar değiştirilmez; yalnız frontend sunumu düzenlenir.
+
+## 6 Ekim — Tahsilat listelerinde son filtre ve sorguyu koruma
+
+- Durum: Frontend geliştirmesi tamamlandı. Üretim build'i ve değişen dosyaların ESLint kontrolü başarılı; TypeScript kontrolünde Tahsilat dosyalarında hata yok (proje genelindeki mevcut hatalar devam ediyor). Tarayıcıda geri dönüş kabul kontrolü henüz yapılmadı.
+- Takip, ödeme/sözleşme raporu, toplu zam, SMS, fatura ve grup durum geçmişinde filtreler ve son uygulanan sorgu mevcut Zustand yaklaşımıyla yalnız bellekte tutulur. Detaydan geri dönüldüğünde liste aynı sorgu/sayfa/sayfa boyutu/sıralamayla mevcut SWR üzerinden yeniden yüklenir. Sözleşmeler listesi mevcut store'unu korur; banka/fatura yükleme geçmişinin sayfası da hatırlanır.
+- Müşteriye/sözleşmeye özel alt listeler ayrı anahtarla tutulur; genel listeyle karışmaz. Çıkışta/kullanıcı değişiminde hatırlanan filtreler temizlenir. Browser storage'a müşteri/finansal sonuç yazılmaz. Ödeme/zam satır seçimleri, onaylar ve yükleme dosyaları saklanmaz; backend/API/DB değişmez.
+
+## 6 Ekim — Sözleşme ve müşteri detayında geri dönüş
+
+- Sözleşme ve müşteri detayındaki Geri düğmeleri sabit sözleşme listesi yerine React Router geçmişindeki bir önceki sayfaya döner. Liste → sözleşme → müşteri akışında müşteri → sözleşme → liste sırası korunur; sorgu parametreleri de geçmişle geri gelir. Yeni sekmede/doğrudan açılışta uygulama geçmişi yoksa sözleşme listesine replace ile dönülür. Yalnız frontend navigasyonu değişir; API/DB/iş kuralları değişmez.
+
 ## 3 Ekim — Toplu Zam SMS kısayolu
 
 - `/crm/collections/rate-changes` ekranındaki SMS takip bağlantısı Tahsilat Takibi kart standardına uygun mavi mesaj ikonu, yön oku ve tamamı tıklanabilir kart şeklinde düzenlendi. Mobilde tam genişlik, geniş ekranda kompakt genişlik kullanılır; mevcut SMS route'u, yetkiler ve zam işlemleri korunur. Yalnız frontend/UI değişikliğidir.
