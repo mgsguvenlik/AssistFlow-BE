@@ -38,6 +38,7 @@ namespace Business.DependencyResolvers.Autofac
         public void Load(IServiceCollection services)
         {
             services.AddScoped(typeof(IAuthService), typeof(AuthService));
+            services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
             services.AddScoped(typeof(IBrandService), typeof(BrandService));
             services.AddScoped(typeof(ICityService), typeof(CityService));
             services.AddScoped(typeof(ICurrencyTypeService), typeof(CurrencyTypeService));

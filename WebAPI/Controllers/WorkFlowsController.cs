@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Business.Interfaces;
 using Core.Common;
 using Core.Enums;
 using Microsoft.AspNetCore.Authorization;
@@ -159,6 +160,26 @@ namespace WebAPI.Controllers
         public async Task<IActionResult> GetTechnicalServiceByRequestNo([FromQuery] string requestNo)
         {
             var result = await _workFlowService.GetTechnicalServiceByRequestNoAsync(requestNo);
+            return Ok(result);
+        }
+
+        [HttpPost("pricing/technical-service-images")]
+        [MenuAuthorize("ServiceRequestPricing", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddPricingTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
+            return Ok(result);
+        }
+
+        [HttpPost("final-approval/technical-service-images")]
+        [MenuAuthorize("ServiceRequestFinalApproval", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddFinalApprovalTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
             return Ok(result);
         }
 
