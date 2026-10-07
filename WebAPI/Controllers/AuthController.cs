@@ -22,6 +22,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("Login")]
+    [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto loginRequest, CancellationToken cancellationToken)
     {
         var resp = await _auth.LoginAsync(loginRequest, cancellationToken);
@@ -37,6 +38,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("ResetPasswordRequest")]
+    [AllowAnonymous]
     public async Task<IActionResult> ResetPasswordRequest([FromBody] ResetPasswordRequestDto resetPasswordRequest, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(resetPasswordRequest.Email))
@@ -48,6 +50,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("ChangePassword")]
+    [AllowAnonymous]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(changePasswordDto.RecoveryCode) ||
@@ -63,6 +66,18 @@ public class AuthController : ControllerBase
 
         var result = await _userService.ChangePasswordAsync(changePasswordDto.RecoveryCode, changePasswordDto.NewPassword, cancellationToken);
         return Ok(result);
+    }
+
+    [Authorize]
+    [HttpGet("password-status")]
+    public IActionResult PasswordStatus() => Ok(new { requiresPasswordChange = false });
+
+    [AllowAnonymous]
+    [HttpPost("complete-required-password-change")]
+    public async Task<IActionResult> CompleteRequiredPasswordChange([FromBody] Model.Dtos.Auth.RequiredPasswordChangeDto dto, CancellationToken ct)
+    {
+        var result = await _userService.CompleteRequiredPasswordChangeAsync(dto, ct);
+        return StatusCode((int)result.StatusCode, result);
     }
 
 }

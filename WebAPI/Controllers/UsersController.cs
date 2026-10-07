@@ -216,5 +216,14 @@ namespace WebAPI.Controllers
                 _ => StatusCode(StatusCodes.Status500InternalServerError, result)
             };
         }
+
+        [HttpPost("{id:long}/request-password-change")]
+        [AdminRoleAuthorize]
+        [MenuAuthorize(new[] { "UserList", "UserDetail" }, MenuPermission.Edit)]
+        public async Task<IActionResult> RequestPasswordChange(long id, CancellationToken ct)
+        {
+            var result = await _userService.RequestPasswordChangeAsync(id, ct);
+            return StatusCode((int)result.StatusCode, result);
+        }
     }
 }
