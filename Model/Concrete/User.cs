@@ -51,6 +51,11 @@ namespace Model.Concrete
         ///     
         /// </summary>
         public bool IsActive { get; set; } = true;
+        [ConcurrencyCheck]
+        public bool MustChangePassword { get; set; }
+        public DateTimeOffset? PasswordChangedAt { get; set; }
+        [ConcurrencyCheck]
+        public int PasswordVersion { get; set; }
         public long? TenantId { get; set; }
         public Tenant? Tenant { get; set; }
 

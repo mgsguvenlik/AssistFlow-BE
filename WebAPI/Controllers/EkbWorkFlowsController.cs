@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Business.Interfaces;
 using Business.Interfaces.Ekb;
 using Business.Services.Ekb;
 using Core.Common;
@@ -199,6 +200,26 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+
+        [HttpPost("pricing/technical-service-images")]
+        [MenuAuthorize("EkbServiceRequestPricing", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddPricingTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
+            return Ok(result);
+        }
+
+        [HttpPost("final-approval/technical-service-images")]
+        [MenuAuthorize("EkbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddFinalApprovalTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
+            return Ok(result);
+        }
 
         [HttpPost("delete-technical-service/image/{id}")]
         [MenuAuthorize("EkbServiceRequestFinalApproval", MenuPermission.Edit)]
