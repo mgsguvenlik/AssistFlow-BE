@@ -315,6 +315,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 // Sıra önemli:
 //app.UseSession();
+app.UseMiddleware<SheetsHubDisconnectMiddleware>();
 app.UseRouting();
 
 app.UseCors("CorsPolicy");
