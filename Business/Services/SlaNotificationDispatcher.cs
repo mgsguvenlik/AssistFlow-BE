@@ -1,5 +1,6 @@
 ﻿using Business.Interfaces;
 using Business.UnitOfWork;
+using Business.Utilities;
 using Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -305,8 +306,9 @@ namespace Business.Services
             DateTimeOffset now,
             CancellationToken stoppingToken)
         {
-            // Subject belirleme
-            var subject = $"SLA Uyarısı: {requestNo} - {slaSetting.Priority} Öncelik";
+            // Use the stable base subject to avoid resending after a subscriber name changes.
+            var baseSubject = $"SLA Uyarısı: {requestNo} - {slaSetting.Priority} Öncelik";
+            var subjectPrefix = baseSubject + " - ";
 
             // Aynı RequestNo ve Subject ile daha önce mail gönderilmiş mi kontrol et
             var existingMail = await uow.Repository
@@ -314,7 +316,7 @@ namespace Business.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
                     x.RequestNo == requestNo
-                    && x.Subject == subject,
+                    && (x.Subject == baseSubject || x.Subject.StartsWith(subjectPrefix)),
                     stoppingToken);
 
             if (existingMail != null)
@@ -324,6 +326,26 @@ namespace Business.Services
                     requestNo);
                 return;
             }
+
+            // Select from the request table belonging to this tenant; do not match other flows.
+            IQueryable<string?> subscriberNames = slaSetting.CustomerType switch
+            {
+                WorkFlowCustomerType.Individual => uow.Repository.GetQueryable<ServicesRequest>()
+                    .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                    .Select(x => x.Customer != null ? x.Customer.SubscriberCompany : null),
+                WorkFlowCustomerType.YKB => uow.Repository.GetQueryable<YkbServicesRequest>()
+                    .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                    .Select(x => x.Customer != null ? x.Customer.SubscriberCompany : null),
+                WorkFlowCustomerType.EKB => uow.Repository.GetQueryable<EkbServicesRequest>()
+                    .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                    .Select(x => x.Customer != null ? x.Customer.SubscriberCompany : null),
+                WorkFlowCustomerType.QNB => uow.Repository.GetQueryable<QnbServicesRequest>()
+                    .Where(x => !x.IsDeleted && x.RequestNo == requestNo)
+                    .Select(x => x.Customer != null ? x.Customer.SubscriberCompany : null),
+                _ => throw new ArgumentOutOfRangeException(nameof(slaSetting.CustomerType))
+            };
+            var subscriberName = await subscriberNames.AsNoTracking().FirstOrDefaultAsync(stoppingToken);
+            var subject = ServiceNotificationSubject.WithSubscriberName(baseSubject, subscriberName);
 
             // SLA bitiş saati
             var slaDeadline = createdDate.AddHours(slaSetting.SlaDurationHours);

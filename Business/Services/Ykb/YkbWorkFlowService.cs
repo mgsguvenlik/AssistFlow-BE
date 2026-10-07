@@ -480,12 +480,18 @@ namespace Business.Services.Ykb
                 #endregion
 
                 #region Bilgilendirme Maili
+                var subscriberName = await _uow.Repository.GetQueryable<Customer>()
+                    .AsNoTracking()
+                    .Where(x => x.Id == request.CustomerId)
+                    .Select(x => x.SubscriberCompany)
+                    .FirstOrDefaultAsync();
                 await PushTransitionMailsAsync(
                     wf: wf,
                     fromCode: "SR",
                     toCode: "WH",
                     requestNo: dto.RequestNo,
-                    customerName: request.Customer?.ContactName1
+                    customerName: request.Customer?.ContactName1,
+                    subscriberName: subscriberName
                 );
                 #endregion
 
@@ -704,7 +710,8 @@ namespace Business.Services.Ykb
                 await PushTransitionMailsAsync(
                     wf, fromCode: "WH", toCode: "TS",
                     requestNo: dto.RequestNo,
-                    customerName: request.Customer?.ContactName1
+                    customerName: request.Customer?.ContactName1,
+                    subscriberName: request.Customer?.SubscriberCompany
                 );
                 #endregion
 
@@ -871,7 +878,8 @@ namespace Business.Services.Ykb
                 await PushTransitionMailsAsync(
                     wf, fromCode: "SR", toCode: "TS",
                     requestNo: dto.RequestNo,
-                    customerName: request.Customer?.ContactName1
+                    customerName: request.Customer?.ContactName1,
+                    subscriberName: request.Customer?.SubscriberCompany
                 );
                 #endregion
 
@@ -2146,7 +2154,9 @@ namespace Business.Services.Ykb
 
             var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
             var baseUrl = appSettings?.Value.AppUrl?.TrimEnd('/');
-            var subject = $"[Lokasyon Onayı] RequestNo: {dto.RequestNo} – {request.Customer?.ContactName1}";
+            var subject = ServiceNotificationSubject.WithSubscriberName(
+                $"[Lokasyon Onayı] RequestNo: {dto.RequestNo} – {request.Customer?.ContactName1}",
+                request.Customer?.SubscriberCompany);
             var distanceInfo = distanceKm.HasValue ? $"{Math.Round(distanceKm.Value, 2)} km" : "Hesaplanamadı";
 
             // 4) Link parçaları (sadece varsa üret)
@@ -3360,7 +3370,8 @@ namespace Business.Services.Ykb
             await PushTransitionMailsAsync(
                  wf, fromCode: currentStep.Code!, toCode: targetStep.Code!,
                  requestNo: requestNo,
-                 customerName: servicesRequest.Customer?.ContactName1
+                 customerName: servicesRequest.Customer?.ContactName1,
+                 subscriberName: servicesRequest.Customer?.SubscriberCompany
             );
 
             ///Değişiklikleri Kaydet
@@ -8864,7 +8875,7 @@ namespace Business.Services.Ykb
         {
             return wf?.ApproverTechnician?.Email;
         }
-        private async Task PushTransitionMailsAsync(YkbWorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName)
+        private async Task PushTransitionMailsAsync(YkbWorkFlow wf, string fromCode, string toCode, string requestNo, string? customerName, string? subscriberName)
         {
             var me = await _currentUser.GetAsync();
             var meId = me?.Id ?? 0;
@@ -8873,7 +8884,7 @@ namespace Business.Services.Ykb
             var techMail = GetTechnicianEmail(wf);
             if (!string.IsNullOrWhiteSpace(techMail) && (toCode == "TS"))
             {
-                var (subject, html) = BuildToTechnician(requestNo, fromCode, toCode, customerName);
+                var (subject, html) = BuildToTechnician(requestNo, fromCode, toCode, customerName, subscriberName);
                 await _mailPush.EnqueueAsync(new MailOutbox
                 {
                     RequestNo = requestNo,
@@ -8892,7 +8903,7 @@ namespace Business.Services.Ykb
                 var whMails = await ResolveWarehouseEmailsAsync();
                 if (whMails.Count > 0)
                 {
-                    var (subject, html) = BuildToWarehouse(requestNo, fromCode, toCode, customerName);
+                    var (subject, html) = BuildToWarehouse(requestNo, fromCode, toCode, customerName, subscriberName);
                     await _mailPush.EnqueueAsync(new MailOutbox
                     {
                         RequestNo = requestNo,
@@ -8906,9 +8917,10 @@ namespace Business.Services.Ykb
                 }
             }
         }
-        private static (string subject, string html) BuildToTechnician(string requestNo, string fromCode, string toCode, string? customerName)
+        private static (string subject, string html) BuildToTechnician(string requestNo, string fromCode, string toCode, string? customerName, string? subscriberName)
         {
-            var subject = $"[{requestNo}] Akış güncellendi: {fromCode} → {toCode}";
+            var subject = ServiceNotificationSubject.WithSubscriberName(
+                $"[{requestNo}] Akış güncellendi: {fromCode} → {toCode}", subscriberName);
             var html = $@"
                 <div style='font-family:Arial'>
                     <h3>İş Akışı Güncellemesi</h3>
@@ -8919,9 +8931,10 @@ namespace Business.Services.Ykb
                 </div>";
             return (subject, html);
         }
-        private static (string subject, string html) BuildToWarehouse(string requestNo, string fromCode, string toCode, string? customerName)
+        private static (string subject, string html) BuildToWarehouse(string requestNo, string fromCode, string toCode, string? customerName, string? subscriberName)
         {
-            var subject = $"[{requestNo}] Depo bilgilendirmesi: {fromCode} → {toCode}";
+            var subject = ServiceNotificationSubject.WithSubscriberName(
+                $"[{requestNo}] Depo bilgilendirmesi: {fromCode} → {toCode}", subscriberName);
             var html = $@"
                  <div style='font-family:Arial'>
                      <h3>Depo Talep Bildirimi</h3>
@@ -9851,7 +9864,8 @@ namespace Business.Services.Ykb
                         customer.SubscriberCompany ?? customer.ContactName1 ?? "-",
                         dto.RequestNo,
                         receivedZones,
-                        missingZones);
+                        missingZones,
+                        customer.SubscriberCompany);
                 }
 
 
@@ -10199,7 +10213,7 @@ namespace Business.Services.Ykb
                     StatusCode.Error);
             }
         }
-        private async Task SendMissingZoneWarningMailAsync(string name, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones)
+        private async Task SendMissingZoneWarningMailAsync(string name, string customerName, string requestNo, List<string> receivedZones, List<string> missingZones, string? subscriberName)
         {
             var me = await _currentUser.GetAsync();
 
@@ -10234,7 +10248,8 @@ namespace Business.Services.Ykb
                 messageDetail = $"hiçbir bölgeden alarm almadı. Sistemde beklenen eksik alarm bölgesi de bulunmamaktadır.";
             }
 
-            var subject = $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}";
+            var subject = ServiceNotificationSubject.WithSubscriberName(
+                $"Eksik alarm bölgesi ile çalışma bitirildi - {requestNo}", subscriberName);
 
             // Ana gövde ile dinamik oluşturduğumuz detayı birleştiriyoruz.
             var body = $"{name}, {customerName} müşterisinde {requestNo} talebinde yaptığı çalışmada {messageDetail}";
