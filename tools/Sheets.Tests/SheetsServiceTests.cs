@@ -10,6 +10,7 @@ using DocumentFormat.OpenXml.Validation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using System.Text.Json;
 using Model.Concrete;
 using Model.Concrete.Sheets;
 using Model.Dtos.Auth;
@@ -75,6 +76,20 @@ internal sealed class SheetsServiceTests(string connection)
             Check.That((await service.AccessAsync(bookId, default)).Count == 2, "Visibility grants");
             var listed = await service.ListAsync(new() { OwnerName = "User 0", Search = "Large", OwnedOnly = true, PageSize = 1 }, default);
             Check.That(listed.Items.Single().Id == bookId && listed.TotalCount == 1, "Server-side owner, name, ownership and paging filters");
+        }
+        await using (var db = Db())
+        {
+            var activities = await Service(db, owner).ActivitiesAsync(bookId, new(), default);
+            Check.That(activities.Items.Count >= 3, "Persisted creation and sharing logs are returned");
+            Check.That(activities.Items.All(x => x.OccurredAtUtc.Kind == DateTimeKind.Utc),
+                "SQL activity timestamps retain their UTC kind in the API projection");
+            var activity = activities.Items[0];
+            var stored = await db.Database.SqlQuery<DateTime>(
+                $"SELECT [OccurredAtUtc] AS [Value] FROM [sheets].[Activities] WHERE [Id] = {activity.Id}").SingleAsync();
+            Check.That(stored.Ticks == activity.OccurredAtUtc.Ticks, "Reading UTC timestamps does not shift stored clock values");
+            using var json = JsonDocument.Parse(JsonSerializer.Serialize(activity, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            Check.That(json.RootElement.GetProperty("occurredAtUtc").GetString()!.EndsWith("Z"),
+                "Activity timestamps include the UTC suffix in JSON");
         }
         await using (var db = Db())
         {
@@ -253,7 +268,7 @@ internal sealed class SheetsServiceTests(string connection)
             }
             finally { File.Delete(path); }
         }
-        return 45;
+        return 46;
     }
 
     private async Task Setup()
