@@ -1,4 +1,5 @@
-﻿using Core.Common;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Core.Common;
 using Core.Enums;
 using Microsoft.AspNetCore.Http;
 using Model.Concrete.Ekb;
@@ -68,6 +69,7 @@ namespace Business.Interfaces.Ekb
 
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<EkbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default);
         Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // Müşteri Onayı 

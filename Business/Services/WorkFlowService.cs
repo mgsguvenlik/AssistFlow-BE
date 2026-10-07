@@ -3738,6 +3738,36 @@ namespace Business.Services
             return ResponseModel<TechnicalServiceGetDto>.Success(dto);
         }
 
+        public Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(
+            TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default)
+        {
+            Task<long?> FindTechnicalService(CancellationToken ct) => _ctx.Set<TechnicalService>()
+                .Where(x => x.RequestNo == dto.RequestNo && !x.IsDeleted &&
+                    _ctx.Set<WorkFlow>().Any(w => w.RequestNo == dto.RequestNo && !w.IsDeleted))
+                .Select(x => (long?)x.Id).FirstOrDefaultAsync(ct);
+
+            if (dto.Type == TechnicalServiceImageType.Service)
+                return TechnicalServiceImageUploader.UploadAsync(
+                    _ctx, _fileStorage, dto, FindTechnicalService,
+                    id => (TechnicalServiceImage image) => image.TechnicalServiceId == id,
+                    (id, url) => new TechnicalServiceImage
+                    {
+                        TechnicalServiceId = id, Url = url, Caption = "Servis Fotoğrafları"
+                    },
+                    image => new TechnicalServiceImageGetDto { Id = image.Id, Url = image.Url, Caption = image.Caption },
+                    _logger, cancellationToken);
+
+            return TechnicalServiceImageUploader.UploadAsync(
+                _ctx, _fileStorage, dto, FindTechnicalService,
+                id => (TechnicalServiceFormImage image) => image.TechnicalServiceId == id,
+                (id, url) => new TechnicalServiceFormImage
+                {
+                    TechnicalServiceId = id, Url = url, Caption = "Form Resmi"
+                },
+                image => new TechnicalServiceImageGetDto { Id = image.Id, Url = image.Url, Caption = image.Caption },
+                _logger, cancellationToken);
+        }
+
         public async Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default)
         {
             try

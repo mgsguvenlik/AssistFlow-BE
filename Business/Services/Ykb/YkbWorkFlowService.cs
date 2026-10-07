@@ -1,3 +1,4 @@
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Business.Interfaces;
 using Business.Interfaces.Manitou;
 using Business.Interfaces.Storage;
@@ -4083,6 +4084,36 @@ namespace Business.Services.Ykb
             dto.ServiceDescription = serviceHeader?.ServiceDescription ?? string.Empty;
 
             return ResponseModel<YkbTechnicalServiceGetDto>.Success(dto);
+        }
+
+        public Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(
+            TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default)
+        {
+            Task<long?> FindTechnicalService(CancellationToken ct) => _ctx.Set<YkbTechnicalService>()
+                .Where(x => x.RequestNo == dto.RequestNo && !x.IsDeleted &&
+                    _ctx.Set<YkbWorkFlow>().Any(w => w.RequestNo == dto.RequestNo && !w.IsDeleted))
+                .Select(x => (long?)x.Id).FirstOrDefaultAsync(ct);
+
+            if (dto.Type == TechnicalServiceImageType.Service)
+                return TechnicalServiceImageUploader.UploadAsync(
+                    _ctx, _fileStorage, dto, FindTechnicalService,
+                    id => (YkbTechnicalServiceImage image) => image.YkbTechnicalServiceId == id,
+                    (id, url) => new YkbTechnicalServiceImage
+                    {
+                        YkbTechnicalServiceId = id, Url = url, Caption = "Servis Fotoğrafları"
+                    },
+                    image => new TechnicalServiceImageGetDto { Id = image.Id, Url = image.Url, Caption = image.Caption },
+                    _logger, cancellationToken);
+
+            return TechnicalServiceImageUploader.UploadAsync(
+                _ctx, _fileStorage, dto, FindTechnicalService,
+                id => (YkbTechnicalServiceFormImage image) => image.YkbTechnicalServiceId == id,
+                (id, url) => new YkbTechnicalServiceFormImage
+                {
+                    YkbTechnicalServiceId = id, Url = url, Caption = "Form Resmi"
+                },
+                image => new TechnicalServiceImageGetDto { Id = image.Id, Url = image.Url, Caption = image.Caption },
+                _logger, cancellationToken);
         }
 
         public async Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default)
