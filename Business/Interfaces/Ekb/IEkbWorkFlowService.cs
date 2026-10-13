@@ -103,6 +103,7 @@ namespace Business.Interfaces.Ekb
 
         //Muhasebe ile ilgili işlemler
         Task<ResponseModel<PagedResult<EkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(EkbAccountingReportQueryParams q);
+        Task<ResponseModel<List<AccountingReportCreatorDto>>> GetAccountingReportCreatorsAsync();
         Task<ResponseModel<EkbAccountingStatusDto>> ToggleAccountingProcessAsync(string requestNo);
 
         Task<ResponseModel<List<EkbWorkflowAttachmentGetDto>>> AddAccountingAttachmentsAsync(string requestNo, IReadOnlyCollection<IFormFile>? files, CancellationToken cancellationToken = default);

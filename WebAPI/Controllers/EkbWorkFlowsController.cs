@@ -488,6 +488,14 @@ namespace WebAPI.Controllers
 
         // ----------- Muhasebe ile ilgili işlemler ------------
 
+        [HttpGet("accounting-service-report/creators")]
+        [MenuAuthorize("EkbAccountingServiceReportList", MenuPermission.View)]
+        public async Task<IActionResult> GetAccountingReportCreators()
+        {
+            var result = await _workFlowService.GetAccountingReportCreatorsAsync();
+            return ToActionResult(result);
+        }
+
         [HttpGet("accounting-service-report")]
         [MenuAuthorize("EkbAccountingServiceReportList", MenuPermission.View)]
         public async Task<IActionResult> GetAccountingServiceReport(

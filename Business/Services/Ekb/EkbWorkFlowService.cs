@@ -11109,6 +11109,37 @@ namespace Business.Services.Ekb
             public HashSet<string> AllowedExtensions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
         }
 
+        public async Task<ResponseModel<List<AccountingReportCreatorDto>>> GetAccountingReportCreatorsAsync()
+        {
+            try
+            {
+                var approvals = _uow.Repository.GetQueryable<EkbFinalApproval>().AsNoTracking()
+                    .Where(x => !x.IsDeleted && x.Status == FinalApprovalStatus.Approved && x.CustomerApprovedAt.HasValue);
+                var creatorIds = _uow.Repository.GetQueryable<EkbWorkFlow>().AsNoTracking()
+                    .Where(x => !x.IsDeleted && x.WorkFlowStatus == WorkFlowStatus.Complated && x.CreatedUser > 0 &&
+                        approvals.Any(a => a.RequestNo == x.RequestNo))
+                    .Select(x => x.CreatedUser).Distinct();
+                // Historical creators remain selectable after deactivation/deletion.
+                // Return only report-related IDs/names/codes, not the user directory.
+                var creators = await (from id in creatorIds
+                    join user in _uow.Repository.GetQueryable<User>().AsNoTracking() on id equals user.Id into users
+                    from user in users.DefaultIfEmpty()
+                    select new AccountingReportCreatorDto
+                    {
+                        Id = id,
+                        Name = user != null && user.Name != "" ? user.Name : "Kullanıcı #" + id,
+                        Code = user != null ? user.Code : null
+                    }).OrderBy(x => x.Name).ThenBy(x => x.Id).ToListAsync();
+                return ResponseModel<List<AccountingReportCreatorDto>>.Success(creators);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetAccountingReportCreatorsAsync");
+                return ResponseModel<List<AccountingReportCreatorDto>>.Fail(
+                    "Talebi başlatan kullanıcılar alınamadı.", StatusCode.Error);
+            }
+        }
+
         public async Task<ResponseModel<PagedResult<EkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(EkbAccountingReportQueryParams q)
         {
             try
@@ -11153,6 +11184,12 @@ namespace Business.Services.Ekb
                 wfQuery = wfQuery.Where(w =>
                     finalApprovalQuery.Any(fa =>
                         fa.RequestNo == w.RequestNo));
+
+                if (q.CreatedUserId.HasValue)
+                {
+                    var createdUserId = q.CreatedUserId.Value;
+                    wfQuery = wfQuery.Where(w => w.CreatedUser == createdUserId);
+                }
 
                 // -------------------------------------------------------
                 // SEARCH
