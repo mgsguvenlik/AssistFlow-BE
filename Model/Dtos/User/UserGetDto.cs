@@ -19,6 +19,8 @@ namespace Model.Dtos.User
         public string? Email { get; set; }
 
         public bool IsActive { get; set; }
+        public bool MustChangePassword { get; set; }
+        public DateTimeOffset? PasswordChangedAt { get; set; }
         public List<RoleGetDto> Roles { get; set; } = new();
 
     }

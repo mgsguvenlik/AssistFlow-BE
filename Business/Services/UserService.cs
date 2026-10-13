@@ -1,6 +1,8 @@
 using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
+using Core.Utilities.Security;
+using Model.Dtos.Auth;
 using Core.Common;
 using Core.Enums;
 using Core.Settings.Concrete;
@@ -27,11 +29,15 @@ public class UserService
 
     private readonly IMailService _mailService;
     private readonly IPasswordHasher<User> _passwordHasher;
-    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IPasswordHasher<User> passwordHasher, IMailService mailService)
+    private readonly IPasswordPolicyService _passwordPolicy;
+    private readonly IPasswordPolicyNotifier? _passwordNotifier;
+    public UserService(IUnitOfWork uow, IMapper mapper, TypeAdapterConfig config, IPasswordHasher<User> passwordHasher, IMailService mailService, IPasswordPolicyService passwordPolicy, IPasswordPolicyNotifier? passwordNotifier = null)
         : base(uow, mapper, config)
     {
         _passwordHasher = passwordHasher;
         _mailService = mailService;
+        _passwordPolicy = passwordPolicy;
+        _passwordNotifier = passwordNotifier;
     }
     protected override long ReadKey(User entity) => entity.Id;
     protected override Expression<Func<User, bool>> KeyPredicate(long id)
@@ -47,7 +53,11 @@ public class UserService
             if (string.IsNullOrWhiteSpace(dto.Password))
                 return ResponseModel<UserGetDto>.Fail(Messages.PasswordRequired, StatusCode.BadRequest);
 
+            var policyError = PasswordPolicyRules.ValidatePassword(dto.Password);
+            if (policyError != null) return ResponseModel<UserGetDto>.Fail(policyError, StatusCode.BadRequest);
             entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.Password);
+            entity.MustChangePassword = true;
+            entity.PasswordChangedAt = DateTimeOffset.UtcNow;
 
 
 
@@ -127,6 +137,11 @@ public class UserService
             if (entity is null)
                 return ResponseModel<UserGetDto>.Fail(Messages.RecordNotFound, StatusCode.NotFound);
 
+            if (!string.IsNullOrWhiteSpace(dto.NewPassword))
+            {
+                var error = PasswordPolicyRules.ValidatePassword(dto.NewPassword);
+                if (error != null) return ResponseModel<UserGetDto>.Fail(error, StatusCode.BadRequest);
+            }
             // dto -> entity map
             MapUpdate(dto, entity);
 
@@ -231,7 +246,10 @@ public class UserService
         base.MapUpdate(dto, entity);
 
         if (!string.IsNullOrWhiteSpace(dto.NewPassword))
+        {
             entity.PasswordHash = _passwordHasher.HashPassword(entity, dto.NewPassword);
+            PasswordWasChanged(entity, byAdministrator: true);
+        }
 
         if (dto.RoleIds is not null)
         {
@@ -311,7 +329,7 @@ public class UserService
         // Find user by email and include roles
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
-            whereExpression: u => u.Email == identifier || u.Code == identifier,
+            whereExpression: u => !u.IsDeleted && (u.Email == identifier || u.Code == identifier),
             q => q.Include(u => u.UserRoles).ThenInclude(x => x.Role)
             .Include(u => u.Tenant)
         ).FirstOrDefault();
@@ -354,7 +372,7 @@ public class UserService
         var appSettings = ServiceTool.ServiceProvider.GetService<IOptionsSnapshot<AppSettings>>();
         var user = _unitOfWork.Repository.GetMultiple<User>(
             asNoTracking: false,
-            whereExpression: u => u.Email == email
+            whereExpression: u => !u.IsDeleted && u.IsActive && u.Email == email
         ).FirstOrDefault();
 
         if (user == null)
@@ -368,20 +386,7 @@ public class UserService
             };
         }
 
-        var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.Email ?? string.Empty) };
-
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appSettings.Value.Key));
-        var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: appSettings.Value.Issuer,
-            audience: appSettings.Value.Audience,
-            claims: claims,
-            expires: DateTime.Now.AddMinutes(15),
-            signingCredentials: creds
-        );
-
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenString = _passwordPolicy.CreateToken(user.Id, user.PasswordVersion, PasswordPolicyRules.ResetPurpose, out _);
 
         var mailBody = $@"
                 Merhaba {user.Name},
@@ -401,7 +406,7 @@ public class UserService
                 Data = null,
                 IsSuccess = false,
                 StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.FailedToSendResetPasswordEmail + tokenString //MZK geçici test aşamasında çözüm için 
+                Message = "Şifre yenileme e-postası gönderilemedi."
             };
         }
 
@@ -413,101 +418,69 @@ public class UserService
             Message = Messages.ResetPasswordRequestSuccess
         };
     }
-    public Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
+    public async Task<ResponseModel<UserGetDto>> ChangePasswordAsync(string token, string newPassword, CancellationToken cancellationToken = default)
     {
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-
-
-        var userIdString = (jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value);
-        var userEmail = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
-
-        if (string.IsNullOrEmpty(userIdString) || string.IsNullOrEmpty(userEmail))
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.InvalidToken
-            });
-        }
-        long userId = long.Parse(userIdString);
-        var user = _unitOfWork.Repository.GetMultiple<User>(
-        asNoTracking: true,
-        whereExpression: u => u.Id == userId && u.Email == userEmail
-        ).FirstOrDefault();
-
-
-        if (user == null)
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.NotFound,
-                Message = Messages.InvalidResetToken
-            });
-        }
-
-        if (jwtToken.ValidTo < DateTime.Now)
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.TokenExpired
-            });
-        }
-
-        if (string.IsNullOrEmpty(newPassword) || newPassword.Length < 6)
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.NewPasswordTooShort
-            });
-        }
-
-        if (user.PasswordHash == _passwordHasher.HashPassword(user, newPassword))
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.NewPasswordCannotBeSameAsOld
-            });
-        }
-
-
-        user.PasswordHash = _passwordHasher.HashPassword(user, newPassword); ;
-        _unitOfWork.Repository.Update(user);
-        var result = SaveAsync<User>(user).Result;
-
-        if (!result.IsSuccess)
-        {
-            return Task.FromResult(new ResponseModel<UserGetDto>
-            {
-                Data = null,
-                IsSuccess = false,
-                StatusCode = Core.Enums.StatusCode.Error,
-                Message = Messages.FailedToChangePassword
-            });
-        }
-
-
-        return Task.FromResult(new ResponseModel<UserGetDto>
-        {
-            Data = _mapper.Map<UserGetDto>(user),
-            IsSuccess = true,
-            StatusCode = Core.Enums.StatusCode.Ok,
-            Message = Messages.PasswordChangedSuccessfully
-        });
+        var identity = _passwordPolicy.ValidateToken(token, PasswordPolicyRules.ResetPurpose);
+        if (identity is null) return ResponseModel<UserGetDto>.Fail("Şifre yenileme bağlantısı geçersiz veya süresi dolmuş.", StatusCode.BadRequest);
+        return await CompletePasswordChangeAsync(identity, newPassword, cancellationToken);
     }
+
+    public async Task<ResponseModel<UserGetDto>> CompleteRequiredPasswordChangeAsync(RequiredPasswordChangeDto dto, CancellationToken ct = default)
+    {
+        if (dto.NewPassword != dto.NewPasswordConfirm)
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordMismatch, StatusCode.BadRequest);
+        var identity = _passwordPolicy.ValidateToken(dto.PasswordChangeToken, PasswordPolicyRules.ChangePurpose);
+        if (identity is null) return ResponseModel<UserGetDto>.Fail("Şifre değiştirme oturumunuz sona erdi. Lütfen tekrar giriş yapın.", StatusCode.Unauthorized);
+        var state = await _passwordPolicy.GetAsync(identity.UserId, ct);
+        if (state is null || !state.RequiresChange || state.Version != identity.Version)
+            return ResponseModel<UserGetDto>.Fail("Şifre değiştirme oturumu geçersiz. Lütfen tekrar giriş yapın.", StatusCode.Unauthorized);
+        return await CompletePasswordChangeAsync(identity, dto.NewPassword, ct);
+    }
+
+    private async Task<ResponseModel<UserGetDto>> CompletePasswordChangeAsync(PasswordTokenIdentity identity, string newPassword, CancellationToken ct)
+    {
+        var error = PasswordPolicyRules.ValidatePassword(newPassword);
+        if (error != null) return ResponseModel<UserGetDto>.Fail(error, StatusCode.BadRequest);
+        var user = await _repo.GetQueryable<User>().FirstOrDefaultAsync(x => x.Id == identity.UserId && !x.IsDeleted && x.IsActive, ct);
+        if (user is null || user.PasswordVersion != identity.Version)
+            return ResponseModel<UserGetDto>.Fail("Şifre değiştirme oturumu geçersiz.", StatusCode.Unauthorized);
+        if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash, newPassword) != PasswordVerificationResult.Failed)
+            return ResponseModel<UserGetDto>.Fail(Messages.NewPasswordCannotBeSameAsOld, StatusCode.BadRequest);
+        user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+        PasswordWasChanged(user, byAdministrator: false);
+        try
+        {
+            await _repo.CompleteAsync();
+            return ResponseModel<UserGetDto>.Success(_mapper.Map<UserGetDto>(user), Messages.PasswordChangedSuccessfully);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResponseModel<UserGetDto>.Fail("Şifre başka bir işlemde değiştirildi. Lütfen tekrar giriş yapın.", StatusCode.Conflict);
+        }
+    }
+
+    public async Task<ResponseModel<UserGetDto>> RequestPasswordChangeAsync(long id, CancellationToken ct = default)
+    {
+        var user = await _repo.GetQueryable<User>().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        if (user is null) return ResponseModel<UserGetDto>.Fail(Messages.UserNotFound, StatusCode.NotFound);
+        if (user.MustChangePassword) return ResponseModel<UserGetDto>.Fail("Kullanıcının şifre değişikliği zaten bekleniyor.", StatusCode.Conflict);
+        user.MustChangePassword = true;
+        try { await _repo.CompleteAsync(); }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResponseModel<UserGetDto>.Fail("Şifre değişikliği talebi başka bir işlemde güncellendi.", StatusCode.Conflict);
+        }
+        if (_passwordNotifier != null) await _passwordNotifier.NotifyAsync(user.Id, ct);
+        return ResponseModel<UserGetDto>.Success(_mapper.Map<UserGetDto>(user), "Şifre değiştirme talebi oluşturuldu.");
+    }
+
+    private static void PasswordWasChanged(User user, bool byAdministrator)
+    {
+        user.PasswordChangedAt = DateTimeOffset.UtcNow;
+        user.MustChangePassword = byAdministrator;
+        user.PasswordVersion++;
+    }
+
     public async Task<ResponseModel<UserGetDto>> ChangePasswordWithOldAsync(
     long userId,
     string oldPassword,
@@ -555,6 +528,7 @@ public class UserService
         {
             // 4) Hashle ve kaydet
             user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            PasswordWasChanged(user, byAdministrator: false);
 
             _unitOfWork.Repository.Update(user);
             await _unitOfWork.Repository.CompleteAsync();
@@ -585,15 +559,7 @@ public class UserService
     /// Opsiyonel: Basit parola politikası (uzunluk, rakam, harf vb.)
     /// İstersen kaldırabilir ya da şirket politikasına göre geliştirebilirsin.
     /// </summary>
-    private static string? ValidatePasswordStrength(string password)
-    {
-        if (password.Length < 6) return "Şifre en az 6 karakter olmalıdır.";
-        if (!password.Any(char.IsDigit)) return "Şifre en az bir rakam içermelidir.";
-        if (!password.Any(char.IsLower)) return "Şifre en az bir küçük harf içermelidir.";
-        if (!password.Any(char.IsUpper)) return "Şifre en az bir büyük harf içermelidir.";
-        return null;
-    }
-
+    private static string? ValidatePasswordStrength(string password) => PasswordPolicyRules.ValidatePassword(password);
 
     public async Task<ResponseModel<List<UserGetDto>>> GetUserByRoleAsync(long roleId)
     {
@@ -680,6 +646,7 @@ public class UserService
         try
         {
             user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            PasswordWasChanged(user, byAdministrator: true);
 
             _unitOfWork.Repository.Update(user);
             await _unitOfWork.Repository.CompleteAsync();

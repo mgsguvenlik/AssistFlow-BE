@@ -1,4 +1,5 @@
-﻿using Business.Interfaces;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Business.Interfaces;
 using Business.Interfaces.Ykb;
 using Business.Services.Ykb;
 using Core.Common;
@@ -199,6 +200,26 @@ namespace WebAPI.Controllers
             return Ok(result);
         }
 
+
+        [HttpPost("pricing/technical-service-images")]
+        [MenuAuthorize("YkbServiceRequestPricing", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddPricingTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
+            return Ok(result);
+        }
+
+        [HttpPost("final-approval/technical-service-images")]
+        [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
+        [RequestSizeLimit(60 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
+        public async Task<IActionResult> AddFinalApprovalTechnicalServiceImages([FromForm] TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken)
+        {
+            var result = await _workFlowService.UploadTechnicalServiceImagesAsync(dto, cancellationToken);
+            return Ok(result);
+        }
 
         [HttpPost("delete-technical-service/image/{id}")]
         [MenuAuthorize("YkbServiceRequestFinalApproval", MenuPermission.Edit)]
@@ -466,6 +487,14 @@ namespace WebAPI.Controllers
 
 
         // ----------- Muhasebe ile ilgili işlemler ------------
+
+        [HttpGet("accounting-service-report/creators")]
+        [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.View)]
+        public async Task<IActionResult> GetAccountingReportCreators()
+        {
+            var result = await _workFlowService.GetAccountingReportCreatorsAsync();
+            return ToActionResult(result);
+        }
 
         [HttpGet("accounting-service-report")]
         [MenuAuthorize("YkbAccountingServiceReportList", MenuPermission.View)]

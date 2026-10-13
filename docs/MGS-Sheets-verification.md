@@ -111,3 +111,21 @@ Yerel mock fixture doğrulaması:
 - Yalnızca görüntüleme modunda Ctrl+C çalıştı; Ctrl+V/S/Z hücreyi veya kaydı değiştirmedi.
 - Frontend production build, Sheets/fixture ESLint, Prettier ve `tools/tsconfig.json` TypeScript kontrolü geçti. Geçmiş yardımcısı üzerinde sekiz saf senaryo grubu geçti. Proje genelindeki diğer modül hataları önceki bölümde belirtilmiştir.
 - Görsel yerel mock fixture'dan alınmıştır: [Klavye kısayolları ve geçmiş araçları](MGS-Sheets-keyboard-preview.jpg).
+
+## SignalR bağlantısını POST ile kapatma
+
+2026-10-07: Kullanıcının canlıdaki `DELETE /api/sheets-hub?id=...` isteği için bildirdiği CORS hatası ve POST kullanılması isteği üzerine yalnızca MGS Tablolar bağlantı kapatma akışı değiştirildi.
+
+`SheetsHubHttpClient`, SignalR'ın Long Polling kapatma çağrısını ağda `POST /api/sheets-hub/disconnect?id=...` olarak gönderir. Aynı hub'ın origin/path eşleşmesi aranır; müzakere, mesaj gönderme, okuma ve diğer adreslerdeki istekler değiştirilmez. Bağlantı kimliği, Bearer başlığı, çerez/credentials, zaman aşımı ve iptal sinyali korunur. WebSocket bağlantısının protokolü değişmez.
+
+`SheetsHubDisconnectMiddleware`, yalnızca bu POST adresini sunucunun içinde mevcut SignalR kapatma akışına yönlendirir. Routing öncesinde uygulanır; mevcut CORS ve `[Authorize]` kontrolleri çalışmaya devam eder. İşlem sonunda veya hatada orijinal HTTP metodu/adresi geri yüklenir. Ağda DELETE gönderilmez; bağlantının sunucuda zaman aşımını beklemeden temizlenmesi korunur. CORS origin listesi genişletilmedi; migration gerekmez.
+
+Doğrulama:
+
+- İstemci yardımcı kontrolünde URL/query, Authorization, credentials, timeout ve abortSignal korunması; diğer origin/path/metotların değişmemesi; orijinal isteğin değiştirilmemesi ve çerez aktarımı geçti.
+- Kurulu SignalR istemcisiyle zorlanmış Long Polling başlangıcı, JSON handshake, mesaj, normal kapanış ve başlangıç sırasında mesaj gönderme hatası senaryoları geçti. Alttaki HTTP istemcisine her kapatmada bir POST ulaştı; hiçbir DELETE ulaşmadı. Kontroller gerçek veritabanı veya canlı bağlantı kullanmadan örnek HTTP istemcisiyle çalıştırıldı.
+- Frontend production build, değişen dosyalarda ESLint, modül TypeScript ve Prettier kontrolleri geçti.
+- Backend Release derlemesi 0 hatayla tamamlandı. Veritabanı kullanılmadan 22 senaryo grubu geçti. Gerçek localhost SignalR/Long Polling JSON handshake ve JWT ile mesaj çağrısından sonra POST kapatma kabul edildi; bekleyen okuma sonlandı, `OnDisconnected` çalıştı ve bağlantı kaldırıldı. Tekrar kapatma/okuma 404, eksik kimlik 400, oturumsuz kapatma 401 döndü. POST preflight 204, izin verilen origin/credentials başlıkları, izin verilmeyen origin'in reddi ve hata durumunda method/path geri yüklenmesi doğrulandı.
+- Canlı API'ye oturum/veri içermeyen `OPTIONS /api/sheets-hub/disconnect` isteğinde POST preflight sonucu 204 oldu. `Access-Control-Allow-Origin: https://flowassist.mgs.com.tr`, credentials, authorization başlığı ve POST metodu doğru döndü. Canlıda mevcut bir bağlantıya kapatma isteği gönderilmedi.
+
+Yayın sırası: Önce backend yeni POST uyumluluğuyla, ardından frontend yeni HTTP istemcisiyle yayınlanmalıdır. Backend eski SignalR istemcileriyle uyumlu kalır; yalnız frontend yayınlanırsa yeni kapatma adresi henüz bulunmayabilir. Bu doğrulama kaynak kod ve yerel testleri kapsar; canlı uygulama sürümleri bu çalışma sırasında yayınlanmadı.

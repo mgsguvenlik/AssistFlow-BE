@@ -67,6 +67,7 @@ namespace Business.DependencyResolvers.Autofac
             services.AddScoped<ICollectionDefinitionReadService, CollectionDefinitionReadService>();
             services.AddOptions<CollectionReadOptions>().BindConfiguration(CollectionReadOptions.SectionName);
             services.AddScoped(typeof(IAuthService), typeof(AuthService));
+            services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
             services.AddScoped(typeof(IBrandService), typeof(BrandService));
             services.AddScoped(typeof(ICityService), typeof(CityService));
             services.AddScoped(typeof(ICurrencyTypeService), typeof(CurrencyTypeService));

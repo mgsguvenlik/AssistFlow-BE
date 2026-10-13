@@ -1,3 +1,4 @@
+using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
 using Core.Common;
 using Core.Enums;
 using Model.Dtos.WorkFlowDtos;
@@ -33,6 +34,7 @@ namespace Business.Interfaces.Qnb
         Task<ResponseModel<QnbTechnicalServiceGetDto>> StartService(QnbStartTechnicalServiceDto dto);
         Task<ResponseModel<QnbTechnicalServiceGetDto>> FinishService(QnbFinishTechnicalServiceDto dto);
         Task<ResponseModel<QnbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default);
         Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // -------------------- Pricing --------------------

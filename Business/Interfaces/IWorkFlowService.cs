@@ -1,4 +1,5 @@
-﻿using Core.Common;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Core.Common;
 using Core.Enums;
 using Model.Dtos.WorkFlowDtos;
 using Model.Dtos.WorkFlowDtos.FinalApproval;
@@ -62,6 +63,7 @@ namespace Business.Interfaces
 
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<TechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default);
         Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // Report 

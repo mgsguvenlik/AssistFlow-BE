@@ -6,6 +6,11 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 13 Ekim — Dev geliştirmelerini Tahsilat branchlerine birleştirme
+
+- GitHub güncel `origin/dev` uçları backend `157bf93`, frontend `11827ad` olarak alındı; iki temiz `tahsilat-module` çalışma ağacına merge edildi. Dev branchleri değiştirilmedi. Birleştirme çakışmasız; Tahsilat'a özgü frontend/backend dosyaları önceki sürümleriyle aynı kaldı. Ortak DataTable'da dev kontrollü sıralama desteği ve Tahsilat satır seçim koşulları; Autofac kayıtları ve migration snapshot'ında iki geliştirme birlikte korundu.
+- Backend build: 0 hata, 811 uyarı; frontend üretim build başarılı. Ortak frontend/Tahsilat entegrasyonu hedefli ESLint: 0 hata, mevcut DataTable hook bağımlılığı uyarısı. Gelen password policy migration'ı yalnız kaynak olarak alındı; herhangi DB migration/seed uygulanmadı. Push ve deployment yapılmadı; tarayıcı kullanıcı kabulü bu kontrolün kapsamında değil.
+
 ## 7 Ekim — Tahsilat Takibi gerçek Excel dışa aktarımı
 
 - Excel sonunda tüm aktarılan kayıtların para birimi bazlı dönem borcu, tahsil edilen ve net kalan toplamları yer alır. Toplamlar dışa aktarılan satırlardan tek geçişte biriktirilir; farklı para birimleri birleştirilmez, çok sheet varsa bütün kayıtları kapsar. Özet tutarlar mavi/yeşil/turuncu ve sayısal biçimdedir; liste AutoFilter aralığının dışında tutulur. OpenXML şeması ve iki para birimli örnek toplamlar DB kullanılmadan doğrulandı.

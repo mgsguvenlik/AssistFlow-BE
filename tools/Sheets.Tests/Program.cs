@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 var count = SheetSnapshotTests.Run();
 Console.WriteLine("PASS snapshot limits and stable coordinate mappings");
+count += await SheetTransportTests.Run();
 if (args.Contains("--sql"))
 {
     // This runner can only create/delete its own uniquely named LocalDB test database.

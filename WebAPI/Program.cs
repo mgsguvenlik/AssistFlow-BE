@@ -1,6 +1,8 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Business.DependencyResolvers.Autofac;
+using Business.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Business.Interfaces.Storage;
 using Business.Services.Storage;
 using Business.UnitOfWork;
@@ -167,6 +169,7 @@ builder.Services.AddDataSeeding(
 builder.Services.AddDataSeeding(
     typeof(ConfigSeed)   // buraya diğer seed tiplerini de ekleyebilirsin
 );
+builder.Services.AddDataSeeding(typeof(PasswordPolicySeed));
 builder.Services.AddDataSeeding(
     typeof(WorkFlowStepSeed)   // buraya diğer seed tiplerini de ekleyebilirsin
 );
@@ -256,8 +259,16 @@ builder.Services
         {
             OnMessageReceived = context =>
             {
-                if (context.HttpContext.Request.Path.StartsWithSegments("/api/sheets-hub"))
+                if (context.HttpContext.Request.Path.StartsWithSegments("/api/sheets-hub") ||
+                    context.HttpContext.Request.Path.StartsWithSegments("/api/password-policy-hub"))
                     context.Token = context.Request.Query["access_token"];
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                var purpose = context.Principal?.FindFirst(Core.Utilities.Security.PasswordPolicyRules.PurposeClaim)?.Value;
+                if (purpose != null && purpose != Core.Utilities.Security.PasswordPolicyRules.AccessPurpose)
+                    context.Fail("This token cannot be used to access the application.");
                 return Task.CompletedTask;
             }
         };
@@ -275,7 +286,8 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options => options.AddFilter<WebAPI.Hubs.PasswordPolicyHubFilter>());
+builder.Services.AddScoped<IPasswordPolicyNotifier, WebAPI.Hubs.PasswordPolicyNotifier>();
 builder.Services.AddDataSeeding(typeof(SheetsMenuSeed));
 
 // HttpContext
@@ -315,14 +327,17 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 // Sıra önemli:
 //app.UseSession();
+app.UseMiddleware<SheetsHubDisconnectMiddleware>();
 app.UseRouting();
 
 app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
+app.UseMiddleware<WebAPI.Middleware.PasswordPolicyMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<WebAPI.Hubs.SheetsHub>("/api/sheets-hub", options => options.CloseOnAuthenticationExpiration = true);
+app.MapHub<WebAPI.Hubs.PasswordPolicyHub>("/api/password-policy-hub", options => options.CloseOnAuthenticationExpiration = true);
 
 await app.RunAsync();

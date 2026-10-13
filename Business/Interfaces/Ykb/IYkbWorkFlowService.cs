@@ -1,4 +1,5 @@
-﻿using Core.Common;
+﻿using Model.Dtos.WorkFlowDtos.TechnicalServiceImage;
+using Core.Common;
 using Core.Enums;
 using Microsoft.AspNetCore.Http;
 using Model.Concrete.Ykb;
@@ -68,6 +69,7 @@ namespace Business.Interfaces.Ykb
 
         //Teknik Servis ile ilgili işlemler eklenecek
         Task<ResponseModel<YkbTechnicalServiceGetDto>> GetTechnicalServiceByRequestNoAsync(string requestNo);
+        Task<ResponseModel<List<TechnicalServiceImageGetDto>>> UploadTechnicalServiceImagesAsync(TechnicalServiceImageUploadDto dto, CancellationToken cancellationToken = default);
         Task<ResponseModel> DeleteTechnicalServiceImageAsync(long id, TechnicalServiceImageType type, CancellationToken cancellationToken = default);
 
         // Müşteri Onayı 
@@ -101,6 +103,7 @@ namespace Business.Interfaces.Ykb
 
         //Muhasebe ile ilgili işlemler
         Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q);
+        Task<ResponseModel<List<AccountingReportCreatorDto>>> GetAccountingReportCreatorsAsync();
         Task<ResponseModel<YkbAccountingStatusDto>> ToggleAccountingProcessAsync(string requestNo);
 
         Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachmentsAsync(string requestNo, IReadOnlyCollection<IFormFile>? files, CancellationToken cancellationToken = default);

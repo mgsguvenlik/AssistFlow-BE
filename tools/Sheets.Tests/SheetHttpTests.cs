@@ -86,6 +86,13 @@ internal static class SheetHttpTests
             Check.That((await client.GetAsync("/api/Sheets/" + workbookId + "/export")).StatusCode == HttpStatusCode.Forbidden, "HTTP protected export");
             Check.That((await client.PostAsJsonAsync("/api/Sheets/" + workbookId + "/save", new { baseRevisionId = Guid.NewGuid() })).StatusCode == HttpStatusCode.Forbidden, "HTTP protected save");
 
+            using var activitiesResponse = await client.GetAsync($"/api/Sheets/{workbookId}/activities");
+            activitiesResponse.EnsureSuccessStatusCode();
+            using var activitiesJson = JsonDocument.Parse(await activitiesResponse.Content.ReadAsStringAsync());
+            var activities = activitiesJson.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToArray();
+            Check.That(activities.Length > 0 && activities.All(x => x.GetProperty("occurredAtUtc").GetString()!.EndsWith("Z")),
+                "HTTP activity timestamps retain the UTC suffix after SQL storage");
+
             async Task<ClientWebSocket> Connect(long user)
             {
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(user));

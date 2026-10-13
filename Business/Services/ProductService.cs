@@ -1,6 +1,7 @@
 ﻿using Business.Interfaces;
 using Business.Services.Base;
 using Business.UnitOfWork;
+using Business.Utilities;
 using Core.Common;
 using Core.Enums;
 using Mapster;
@@ -38,6 +39,35 @@ namespace Business.Services
                          .Include(p => p.Model)
                          .Include(p => p.CurrencyType)
                          .Include(p => p.ProductType));
+
+        private IQueryable<Product> SearchProducts(IQueryable<Product> query, string? search, long[]? effectivePriceMatches = null, bool includeInternalIdentifiers = false)
+            => ProductCatalogSearch.Apply(query, _repo.GetQueryable<SystemType>(), search, effectivePriceMatches, includeInternalIdentifiers);
+
+        private static IQueryable<Product> SortProducts(IQueryable<Product> query, QueryParams q)
+        {
+            var prop = typeof(Product).GetProperty(q.Sort ?? "",
+                System.Reflection.BindingFlags.IgnoreCase |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.Instance);
+            if (prop == null) return query.OrderByDescending(x => x.Id);
+            var parameter = Expression.Parameter(typeof(Product), "x");
+            var lambda = Expression.Lambda(Expression.Property(parameter, prop), parameter);
+            var expression = Expression.Call(typeof(Queryable), q.Desc ? "OrderByDescending" : "OrderBy",
+                new[] { typeof(Product), prop.PropertyType }, query.Expression, Expression.Quote(lambda));
+            return query.Provider.CreateQuery<Product>(expression);
+        }
+
+        public override async Task<ResponseModel<PagedResult<ProductGetDto>>> GetPagedAsync(QueryParams q)
+        {
+            var query = _repo.GetQueryable<Product>();
+            var include = IncludeExpression();
+            if (include != null) query = include(query);
+            query = SortProducts(SearchProducts(ApplyTenantFilterIfNeeded(query), q.Search, includeInternalIdentifiers: true), q);
+            var total = await query.CountAsync();
+            var items = await query.AsNoTracking().Skip((q.Page - 1) * q.PageSize).Take(q.PageSize)
+                .ProjectToType<ProductGetDto>(_config).ToListAsync();
+            return ResponseModel<PagedResult<ProductGetDto>>.Success(new(items, total, q.Page, q.PageSize));
+        }
 
         public async Task<ResponseModel<List<ProductEffectivePriceDto>>> GetProductsByCustomerIdAsync(long customerId)
         {
@@ -144,6 +174,7 @@ namespace Business.Services
                 {
                     ProductId = product.Id,
                     ProductCode = product.ProductCode,
+                    SystemType = product.SystemType,
                     Description = product.Description,
                     BasePrice = product.Price,
                     BaseCurrency = product.PriceCurrency,
@@ -236,6 +267,7 @@ namespace Business.Services
             {
                 ProductId = product.Id,
                 ProductCode = product.ProductCode,
+                SystemType = product.SystemType,
                 Description = product.Description,
                 BasePrice = product.Price,
                 BaseCurrency = product.PriceCurrency,
@@ -333,6 +365,7 @@ namespace Business.Services
                 {
                     ProductId = product.Id,
                     ProductCode = product.ProductCode,
+                    SystemType = product.SystemType,
                     Description = product.Description,
                     BasePrice = product.Price,
                     BaseCurrency = product.PriceCurrency,
@@ -364,6 +397,7 @@ namespace Business.Services
                 {
                     ProductId = p.Id,
                     ProductCode = p.ProductCode,
+                    SystemType = p.SystemType,
                     Description = p.Description,
                     BasePrice = p.Price,
                     BaseCurrency = p.PriceCurrency,
@@ -423,46 +457,13 @@ namespace Business.Services
                 query = query.Where(p => tenantProductIds.Contains(p.Id));
             }
 
-            // 🔍 Search
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var search = q.Search.Trim();
-                query = query.Where(x =>
-                    (x.ProductCode != null && x.ProductCode.Contains(search)) ||
-                    (x.Description != null && x.Description.Contains(search)) ||
-                    (x.OracleProductCode != null && x.OracleProductCode.Contains(search))
-                );
-            }
-
-            // 🔢 Sıralama
-            if (!string.IsNullOrWhiteSpace(q.Sort))
-            {
-                var prop = typeof(Product).GetProperty(q.Sort,
-                    System.Reflection.BindingFlags.IgnoreCase |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-
-                if (prop != null)
-                {
-                    var parameter = Expression.Parameter(typeof(Product), "x");
-                    var property = Expression.Property(parameter, prop);
-                    var lambda = Expression.Lambda(property, parameter);
-
-                    string methodName = q.Desc ? "OrderByDescending" : "OrderBy";
-                    var resultExp = Expression.Call(
-                        typeof(Queryable),
-                        methodName,
-                        new Type[] { typeof(Product), prop.PropertyType },
-                        query.Expression,
-                        Expression.Quote(lambda));
-
-                    query = query.Provider.CreateQuery<Product>(resultExp);
-                }
-            }
-            else
-            {
-                query = query.OrderByDescending(x => x.Id);
-            }
+            var priceOverrides = (customer.CustomerGroup?.GroupProductPrices ?? new List<CustomerGroupProductPrice>())
+                .Select(x => (x.ProductId, x.Price, Currency: x.CurrencyCode))
+                .Concat(customer.CustomerProductPrices.Select(x => (x.ProductId, x.Price, Currency: x.CurrencyCode)))
+                .Concat((customer.Tenant?.TenantProductPrices ?? new List<TenantProductPrice>())
+                    .Select(x => (x.ProductId, x.Price, Currency: x.CurrencyCode)));
+            var priceMatches = ProductCatalogSearch.EffectivePriceMatches(priceOverrides, q.Search);
+            query = SortProducts(SearchProducts(query, q.Search, priceMatches), q);
 
             // 📄 Sayfalama
             var totalCount = await query.CountAsync();
@@ -515,6 +516,7 @@ namespace Business.Services
                 {
                     ProductId = product.Id,
                     ProductCode = product.ProductCode,
+                    SystemType = product.SystemType,
                     Description = product.Description,
                     BasePrice = product.Price,
                     BaseCurrency = product.PriceCurrency,
@@ -547,68 +549,7 @@ namespace Business.Services
             // Satın Alma ekranında sadece Ürün tipi.
             query = query.Where(x => !x.IsDeleted && x.ProductTypeId == 1);
 
-            // Server-side search.
-            if (!string.IsNullOrWhiteSpace(q.Search))
-            {
-                var search = q.Search.Trim();
-
-                query = query.Where(x =>
-                    (x.ProductCode != null &&
-                     x.ProductCode.Contains(search)) ||
-
-                    (x.Description != null &&
-                     x.Description.Contains(search)) ||
-
-                    (x.OracleProductCode != null &&
-                     x.OracleProductCode.Contains(search)) ||
-
-                    (x.Brand != null &&
-                     x.Brand.Name != null &&
-                     x.Brand.Name.Contains(search)) ||
-
-                    (x.Model != null &&
-                     x.Model.Name != null &&
-                     x.Model.Name.Contains(search)));
-            }
-
-            // Sıralama
-            if (!string.IsNullOrWhiteSpace(q.Sort))
-            {
-                var prop = typeof(Product).GetProperty(
-                    q.Sort,
-                    System.Reflection.BindingFlags.IgnoreCase |
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-
-                if (prop != null)
-                {
-                    var parameter =
-                        Expression.Parameter(typeof(Product), "x");
-
-                    var property =
-                        Expression.Property(parameter, prop);
-
-                    var lambda =
-                        Expression.Lambda(property, parameter);
-
-                    var methodName =
-                        q.Desc ? "OrderByDescending" : "OrderBy";
-
-                    var resultExp = Expression.Call(
-                        typeof(Queryable),
-                        methodName,
-                        new[] { typeof(Product), prop.PropertyType },
-                        query.Expression,
-                        Expression.Quote(lambda));
-
-                    query =
-                        query.Provider.CreateQuery<Product>(resultExp);
-                }
-            }
-            else
-            {
-                query = query.OrderByDescending(x => x.Id);
-            }
+            query = SortProducts(SearchProducts(query, q.Search), q);
 
             var totalCount =
                 await query.CountAsync(cancellationToken);

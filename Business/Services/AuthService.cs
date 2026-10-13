@@ -2,6 +2,7 @@ using Business.Interfaces;
 using Core.Common;
 using Core.Settings.Concrete;
 using Core.Utilities.Constants;
+using Core.Utilities.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -19,17 +20,19 @@ public class AuthService : IAuthService
     private readonly IOptionsSnapshot<AppSettings> _appSettings;
 
     private readonly IMenuService _menuService;
+    private readonly IPasswordPolicyService _passwordPolicy;
     public AuthService(
         IHttpContextAccessor http,
         IUserService userService,
         IOptionsSnapshot<AppSettings> appSettings
 ,
-        IMenuService menuService)
+        IMenuService menuService, IPasswordPolicyService passwordPolicy)
     {
         _http = http;
         _userService = userService;
         _appSettings = appSettings;
         _menuService = menuService;
+        _passwordPolicy = passwordPolicy;
     }
     public async Task<ResponseModel<AuthResponseDto>> LoginAsync(LoginRequestDto loginRequest, CancellationToken ct = default)
     {
@@ -39,6 +42,18 @@ public class AuthService : IAuthService
             return ResponseModel<AuthResponseDto>.Fail(Messages.Unauthorized, Core.Enums.StatusCode.Unauthorized);
 
         var user = result.Data;
+        var policy = await _passwordPolicy.GetAsync(user.Id, ct);
+        if (policy is null)
+            return ResponseModel<AuthResponseDto>.Fail(Messages.Unauthorized, Core.Enums.StatusCode.Unauthorized);
+        if (policy.RequiresChange)
+        {
+            var challenge = _passwordPolicy.CreateToken(user.Id, policy.Version, PasswordPolicyRules.ChangePurpose, out var challengeExpires);
+            return ResponseModel<AuthResponseDto>.Success(new AuthResponseDto
+            {
+                User = user, RequiresPasswordChange = true, PasswordChangeToken = challenge,
+                PasswordChangeTokenExpires = challengeExpires, PasswordChangeReason = policy.Reason
+            });
+        }
 
         // 2) Menüleri çek (user.Id ile)
         var menus = await _menuService.GetByUserIdAsync(user.Id);
@@ -60,6 +75,8 @@ public class AuthService : IAuthService
                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
+               new Claim(PasswordPolicyRules.VersionClaim, policy.Version.ToString()),
+               new Claim(PasswordPolicyRules.PurposeClaim, PasswordPolicyRules.AccessPurpose),
                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
            };
 
@@ -89,7 +106,7 @@ public class AuthService : IAuthService
 
                 var roleCode = role?.Code;
                 if (!string.IsNullOrWhiteSpace(roleCode) &&
-                    !roleCode.Equals(roleName, StringComparison.OrdinalIgnoreCase))
+                    !roleCode.Equals(roleName, StringComparison.Ordinal))
                 {
                     claims.Add(new Claim(ClaimTypes.Role, roleCode));
                 }

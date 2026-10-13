@@ -40,6 +40,9 @@ public static class SheetsConfiguration
         var activity = model.Entity<SheetActivity>();
         activity.ToTable("Activities", "sheets");
         activity.HasKey(x => x.Id);
+        // SQL datetime2 does not preserve DateTime.Kind; stored activity times are UTC.
+        activity.Property(x => x.OccurredAtUtc)
+            .HasConversion(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc));
         activity.Property(x => x.Action).HasMaxLength(40);
         activity.Property(x => x.DetailJson).HasColumnType("nvarchar(max)");
         activity.HasIndex(x => new { x.WorkbookId, x.OccurredAtUtc });
