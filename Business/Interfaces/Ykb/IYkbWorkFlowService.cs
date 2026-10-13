@@ -103,6 +103,7 @@ namespace Business.Interfaces.Ykb
 
         //Muhasebe ile ilgili işlemler
         Task<ResponseModel<PagedResult<YkbAccountingServiceReportDto>>> GetAccountingServiceReportAsync(YkbAccountingReportQueryParams q);
+        Task<ResponseModel<List<AccountingReportCreatorDto>>> GetAccountingReportCreatorsAsync();
         Task<ResponseModel<YkbAccountingStatusDto>> ToggleAccountingProcessAsync(string requestNo);
 
         Task<ResponseModel<List<YkbWorkflowAttachmentGetDto>>> AddAccountingAttachmentsAsync(string requestNo, IReadOnlyCollection<IFormFile>? files, CancellationToken cancellationToken = default);
