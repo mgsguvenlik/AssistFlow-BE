@@ -103,6 +103,9 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
         public List<long>? WorkOrderTypeIds { get; set; }
         public long? ServiceTypeId { get; set; }
 
+        /// <summary>İş akışını başlatan kullanıcı (WorkFlow.CreatedUser).</summary>
+        public long? CreatedUserId { get; set; }
+
         public void Normalize(int maxPageSize = 200)
         {
             if (Page <= 0)
@@ -115,6 +118,7 @@ namespace Model.Dtos.WorkFlowDtos.YkbDtos.YkbAccounting
                 PageSize = maxPageSize;
 
             Search = Search?.Trim();
+            if (CreatedUserId <= 0) CreatedUserId = null;
         }
     }
     public class YkbAccountingServiceTypeDto
