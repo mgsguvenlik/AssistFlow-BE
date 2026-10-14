@@ -170,6 +170,7 @@ builder.Services.AddDataSeeding(
     typeof(ConfigSeed)   // buraya diğer seed tiplerini de ekleyebilirsin
 );
 builder.Services.AddDataSeeding(typeof(PasswordPolicySeed));
+builder.Services.AddDataSeeding(typeof(TenantDashboardSeed));
 builder.Services.AddDataSeeding(
     typeof(WorkFlowStepSeed)   // buraya diğer seed tiplerini de ekleyebilirsin
 );

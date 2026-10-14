@@ -13,7 +13,7 @@ using Model.Dtos.Dashboard;
 
 namespace Business.Services
 {
-    public class WorkFlowDashboardService : IWorkFlowDashboardService
+    public partial class WorkFlowDashboardService : IWorkFlowDashboardService
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<WorkFlowDashboardService> _logger;

@@ -5,6 +5,7 @@ namespace Business.Interfaces
 {
     public interface IWorkFlowDashboardService
     {
+        Task<ResponseModel<OperationDashboardDto>> GetOperationsAsync(string? tenantCode = null, DateOnly? from = null, DateOnly? to = null);
         /// <summary>
         /// Ana KPI metriklerini getirir
         /// </summary>
