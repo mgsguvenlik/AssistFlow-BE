@@ -30,7 +30,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Dashboard KPI verileri</returns>
         [HttpGet("kpi")]
-        [MenuAuthorize("Dashboard", MenuPermission.View)]
+        [MenuAuthorize(DashboardMenuKeys.Service, MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetKpi()
@@ -162,7 +162,7 @@ namespace WebAPI.Controllers
         /// </summary>
         /// <returns>Tam dashboard verileri</returns>
         [HttpGet("full")]
-        [MenuAuthorize("Dashboard", MenuPermission.View)]
+        [MenuAuthorize(DashboardMenuKeys.Service, MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetFullDashboard()
@@ -222,7 +222,7 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("ykb/kpi")]
-        [MenuAuthorize("Dashboard", MenuPermission.View)]
+        [MenuAuthorize(DashboardMenuKeys.Ykb, MenuPermission.View)]
         public async Task<IActionResult> GetYkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
         {
             var result = await _dashboardService.GetYkbKpiAsync(from, to);
@@ -230,11 +230,28 @@ namespace WebAPI.Controllers
         }
 
         [HttpGet("ekb/kpi")]
-        [MenuAuthorize(new[] { "Dashboard", "EkbDashboard" }, MenuPermission.View)]
+        [MenuAuthorize(DashboardMenuKeys.Ekb, MenuPermission.View)]
         public async Task<IActionResult> GetEkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
         {
             var result = await _dashboardService.GetEkbKpiAsync(from, to);
             return Ok(result);
+        }
+
+        [HttpGet("operations")]
+        [AdminRoleAuthorize]
+        [MenuAuthorize(new[] { DashboardMenuKeys.Service, DashboardMenuKeys.Ykb, DashboardMenuKeys.Ekb, DashboardMenuKeys.Qnb }, MenuPermission.View)]
+        public async Task<IActionResult> GetOperations([FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null)
+        {
+            var result = await _dashboardService.GetOperationsAsync(from: from, to: to);
+            return StatusCode((int)result.StatusCode, result);
+        }
+
+        [HttpGet("operations/{tenantCode}")]
+        [MenuAuthorize(new[] { DashboardMenuKeys.Service, DashboardMenuKeys.Ykb, DashboardMenuKeys.Ekb, DashboardMenuKeys.Qnb }, MenuPermission.View)]
+        public async Task<IActionResult> GetTenantOperations(string tenantCode, [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null)
+        {
+            var result = await _dashboardService.GetOperationsAsync(tenantCode, from, to);
+            return StatusCode((int)result.StatusCode, result);
         }
 
         [HttpGet("technical-service-status-counts")]
