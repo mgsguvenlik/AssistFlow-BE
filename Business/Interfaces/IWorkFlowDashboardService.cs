@@ -5,10 +5,12 @@ namespace Business.Interfaces
 {
     public interface IWorkFlowDashboardService
     {
+        Task<ResponseModel<OperationDashboardDto>> GetOperationsAsync(string? tenantCode = null, DateOnly? from = null, DateOnly? to = null, long[]? serviceTypeIds = null);
+        Task<ResponseModel<List<DashboardServiceTypeOptionDto>>> GetServiceTypeOptionsAsync();
         /// <summary>
         /// Ana KPI metriklerini getirir
         /// </summary>
-        Task<ResponseModel<DashboardKpiDto>> GetKpiAsync();
+        Task<ResponseModel<DashboardKpiDto>> GetKpiAsync(long[]? serviceTypeIds = null);
 
         /// <summary>
         /// Teknisyen performans istatistiklerini getirir
@@ -23,7 +25,7 @@ namespace Business.Interfaces
         /// <summary>
         /// Ürün kullanım istatistiklerini getirir
         /// </summary>
-        Task<ResponseModel<ProductStatisticsDto>> GetProductStatisticsAsync();
+        Task<ResponseModel<ProductStatisticsDto>> GetProductStatisticsAsync(long[]? serviceTypeIds = null);
 
         /// <summary>
         /// Zaman bazlı trend analizini getirir
@@ -38,17 +40,17 @@ namespace Business.Interfaces
         /// <summary>
         /// Finansal dashboard verilerini getirir
         /// </summary>
-        Task<ResponseModel<FinancialDashboardDto>> GetFinancialDashboardAsync();
+        Task<ResponseModel<FinancialDashboardDto>> GetFinancialDashboardAsync(long[]? serviceTypeIds = null);
 
         /// <summary>
         /// Kritik uyarıları getirir
         /// </summary>
-        Task<ResponseModel<CriticalAlertsDto>> GetCriticalAlertsAsync();
+        Task<ResponseModel<CriticalAlertsDto>> GetCriticalAlertsAsync(long[]? serviceTypeIds = null);
 
         /// <summary>
         /// Coğrafi dağılım istatistiklerini getirir
         /// </summary>
-        Task<ResponseModel<GeographicDistributionDto>> GetGeographicDistributionAsync();
+        Task<ResponseModel<GeographicDistributionDto>> GetGeographicDistributionAsync(long[]? serviceTypeIds = null);
 
         /// <summary>
         /// YKB 
@@ -56,8 +58,8 @@ namespace Business.Interfaces
         /// <param name="from"></param>
         /// <param name="to"></param>
         /// <returns></returns>
-        Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null);
-        Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null);
+        Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, long[]? serviceTypeIds = null);
+        Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, long[]? serviceTypeIds = null);
 
         /// <summary>
         /// 

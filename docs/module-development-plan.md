@@ -6,6 +6,11 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 15 Ekim — Güncel Dev dashboard geliştirmelerini birleştirme
+
+- Güncel `origin/dev`: backend `24b2616`, frontend `7a2073d`. İki repository temiz `tahsilat-module` çalışma ağacında birleştirildi; dev branchleri değiştirilmedi. Backend çakışmasız. Frontend `src/helpers/functions.ts` menü yetkisi çakışması, dev çoklu yetki/case-insensitive karşılaştırması ve Tahsilat ağ/zaman aşımı mesajları birlikte korunarak çözüldü. Tahsilat'a özgü frontend/backend dosyaları önceki branch sürümleriyle aynı kaldı.
+- Backend build 0 hata / 811 uyarı; frontend üretim build başarılı; gelen dashboard testlerinin 11'i başarılı. Hedefli frontend lint, değişmeyen `AuthProvider.tsx` importları ve `functions.ts` mevcut any/kullanılmayan değişken satırlarında 12 sorun bildiriyor; merge dışı refactoring yapılmadı. DB migration/seed, push ve deployment yapılmadı; tarayıcı kullanıcı kabulü bu kontrolün kapsamında değil.
+
 ## 13 Ekim — Dev geliştirmelerini Tahsilat branchlerine birleştirme
 
 - GitHub güncel `origin/dev` uçları backend `157bf93`, frontend `11827ad` olarak alındı; iki temiz `tahsilat-module` çalışma ağacına merge edildi. Dev branchleri değiştirilmedi. Birleştirme çakışmasız; Tahsilat'a özgü frontend/backend dosyaları önceki sürümleriyle aynı kaldı. Ortak DataTable'da dev kontrollü sıralama desteği ve Tahsilat satır seçim koşulları; Autofac kayıtları ve migration snapshot'ında iki geliştirme birlikte korundu.
