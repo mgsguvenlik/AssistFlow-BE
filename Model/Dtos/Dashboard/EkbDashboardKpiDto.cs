@@ -8,6 +8,8 @@ namespace Model.Dtos.Dashboard
 {
     public class EkbDashboardKpiDto
     {
+        public List<StageServiceTypeCountDto> ServiceTypeDistribution { get; set; } = new();
+
         public int TotalWorkFlows { get; set; }
         public int CompletedWorkFlows { get; set; }
         public int NotCompletedWorkFlows { get; set; }

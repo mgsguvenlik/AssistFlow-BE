@@ -29,7 +29,7 @@ namespace Business.Services
             _currentUser = currentUser;
         }
 
-        public async Task<ResponseModel<DashboardKpiDto>> GetKpiAsync()
+        public async Task<ResponseModel<DashboardKpiDto>> GetKpiAsync(long[]? serviceTypeIds = null)
         {
             try
             {
@@ -37,8 +37,7 @@ namespace Business.Services
                 var todayStart = now.Date;
                 var monthStart = new DateTime(now.Year, now.Month, 1);
 
-                var workFlows = await _uow.Repository
-                    .GetQueryable<WorkFlow>()
+                var workFlows = await FilterDashboardRows(_uow.Repository.GetQueryable<WorkFlow>(), "individual", serviceTypeIds)
                     .Include(x => x.CurrentStep)
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted)
@@ -144,8 +143,7 @@ namespace Business.Services
                 }
 
                 // Teknik Servis Ortalama Süresi
-                var techServices = await _uow.Repository
-                    .GetQueryable<TechnicalService>()
+                var techServices = await FilterDashboardRows(_uow.Repository.GetQueryable<TechnicalService>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.StartTime.HasValue && x.EndTime.HasValue)
                     .ToListAsync();
@@ -159,6 +157,8 @@ namespace Business.Services
                     dto.AverageTechnicalServiceTimeHours = Math.Round(avgTechHours, 2);
                 }
 
+                dto.ServiceTypeDistribution = await GetStageServiceTypeCountsAsync(
+                    "individual", FilterDashboardRows(OperationRows("individual"), "individual", serviceTypeIds), pendingOnly: true);
                 return ResponseModel<DashboardKpiDto>.Success(dto);
             }
             catch (Exception ex)
@@ -374,18 +374,16 @@ namespace Business.Services
             }
         }
 
-        public async Task<ResponseModel<ProductStatisticsDto>> GetProductStatisticsAsync()
+        public async Task<ResponseModel<ProductStatisticsDto>> GetProductStatisticsAsync(long[]? serviceTypeIds = null)
         {
             try
             {
-                var products = await _uow.Repository
-                    .GetQueryable<ServicesRequestProduct>()
+                var products = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequestProduct>(), "individual", serviceTypeIds)
                     .Include(x => x.Product)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var warehouses = await _uow.Repository
-                    .GetQueryable<Warehouse>()
+                var warehouses = await FilterDashboardRows(_uow.Repository.GetQueryable<Warehouse>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -696,7 +694,7 @@ namespace Business.Services
             }
         }
 
-        public async Task<ResponseModel<FinancialDashboardDto>> GetFinancialDashboardAsync()
+        public async Task<ResponseModel<FinancialDashboardDto>> GetFinancialDashboardAsync(long[]? serviceTypeIds = null)
         {
             try
             {
@@ -705,24 +703,20 @@ namespace Business.Services
                 var weekStart = now.Date.AddDays(-(int)now.DayOfWeek);
                 var monthStart = new DateTime(now.Year, now.Month, 1);
 
-                var products = await _uow.Repository
-                    .GetQueryable<ServicesRequestProduct>()
+                var products = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequestProduct>(), "individual", serviceTypeIds)
                     .Include(x => x.Product)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var servicesRequests = await _uow.Repository
-                    .GetQueryable<ServicesRequest>()
+                var servicesRequests = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequest>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var pricings = await _uow.Repository
-                    .GetQueryable<Pricing>()
+                var pricings = await FilterDashboardRows(_uow.Repository.GetQueryable<Pricing>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var finalApprovals = await _uow.Repository
-                    .GetQueryable<FinalApproval>()
+                var finalApprovals = await FilterDashboardRows(_uow.Repository.GetQueryable<FinalApproval>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -839,55 +833,48 @@ namespace Business.Services
             }
         }
 
-        public async Task<ResponseModel<CriticalAlertsDto>> GetCriticalAlertsAsync()
+        public async Task<ResponseModel<CriticalAlertsDto>> GetCriticalAlertsAsync(long[]? serviceTypeIds = null)
         {
             try
             {
                 var now = DateTime.Now;
 
-                var workFlows = await _uow.Repository
-                    .GetQueryable<WorkFlow>()
+                var workFlows = await FilterDashboardRows(_uow.Repository.GetQueryable<WorkFlow>(), "individual", serviceTypeIds)
                     .Include(x => x.CurrentStep)
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted && x.WorkFlowStatus == WorkFlowStatus.Pending)
                     .ToListAsync();
 
-                var servicesRequests = await _uow.Repository
-                    .GetQueryable<ServicesRequest>()
+                var servicesRequests = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequest>(), "individual", serviceTypeIds)
                     .Include(x => x.Customer)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var reviewLogs = await _uow.Repository
-                    .GetQueryable<WorkFlowReviewLog>()
+                var reviewLogs = await FilterDashboardRows(_uow.Repository.GetQueryable<WorkFlowReviewLog>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.CreatedDate >= now.AddDays(-7))
                     .OrderByDescending(x => x.CreatedDate)
                     .Take(50)
                     .ToListAsync();
 
-                var activationLogs = await _uow.Repository
-                    .GetQueryable<WorkFlowActivityRecord>()
+                var activationLogs = await FilterDashboardRows(_uow.Repository.GetQueryable<WorkFlowActivityRecord>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.ActionType == WorkFlowActionType.LocationCheckFailed)
                     .Where(x => x.OccurredAtUtc >= now.AddDays(-7))
                     .Take(50)
                     .ToListAsync();
 
-                var finalApprovals = await _uow.Repository
-                    .GetQueryable<FinalApproval>()
+                var finalApprovals = await FilterDashboardRows(_uow.Repository.GetQueryable<FinalApproval>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.Status == FinalApprovalStatus.Pending)
                     .ToListAsync();
 
-                var pricings = await _uow.Repository
-                    .GetQueryable<Pricing>()
+                var pricings = await FilterDashboardRows(_uow.Repository.GetQueryable<Pricing>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.Status == PricingStatus.Pending)
                     .ToListAsync();
 
-                var warehouses = await _uow.Repository
-                    .GetQueryable<Warehouse>()
+                var warehouses = await FilterDashboardRows(_uow.Repository.GetQueryable<Warehouse>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => x.WarehouseStatus == WarehouseStatus.Pending)
                     .ToListAsync();
@@ -979,25 +966,22 @@ namespace Business.Services
             }
         }
 
-        public async Task<ResponseModel<GeographicDistributionDto>> GetGeographicDistributionAsync()
+        public async Task<ResponseModel<GeographicDistributionDto>> GetGeographicDistributionAsync(long[]? serviceTypeIds = null)
         {
             try
             {
-                var servicesRequests = await _uow.Repository
-                    .GetQueryable<ServicesRequest>()
+                var servicesRequests = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequest>(), "individual", serviceTypeIds)
                     .Include(x => x.Customer)
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted)
                     .ToListAsync();
 
-                var workFlows = await _uow.Repository
-                    .GetQueryable<WorkFlow>()
+                var workFlows = await FilterDashboardRows(_uow.Repository.GetQueryable<WorkFlow>(), "individual", serviceTypeIds)
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted)
                     .ToListAsync();
 
-                var products = await _uow.Repository
-                    .GetQueryable<ServicesRequestProduct>()
+                var products = await FilterDashboardRows(_uow.Repository.GetQueryable<ServicesRequestProduct>(), "individual", serviceTypeIds)
                     .Include(x => x.Product)
                     .AsNoTracking()
                     .ToListAsync();
@@ -1154,7 +1138,7 @@ namespace Business.Services
         #endregion
 
         #region Ykb
-        public async Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null)
+        public async Task<ResponseModel<YkbDashboardKpiDto>> GetYkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, long[]? serviceTypeIds = null)
         {
             try
             {
@@ -1162,6 +1146,8 @@ namespace Business.Services
                     .GetQueryable<YkbWorkFlow>()
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted);
+
+                query = FilterDashboardRows(query, "ykb", serviceTypeIds);
 
                 if (from.HasValue)
                 {
@@ -1222,6 +1208,12 @@ namespace Business.Services
                     .FirstOrDefaultAsync();
 
                 dto ??= new YkbDashboardKpiDto();
+                dto.ServiceTypeDistribution = await GetStageServiceTypeCountsAsync("ykb",
+                    query.Select(w => new OperationRow
+                    {
+                        RequestNo = w.RequestNo, CreatedDate = w.CreatedDate,
+                        Status = w.WorkFlowStatus, StepCode = w.CurrentStep == null ? null : w.CurrentStep.Code
+                    }), pendingOnly: false);
                 return ResponseModel<YkbDashboardKpiDto>.Success(dto);
             }
             catch (Exception ex)
@@ -1307,7 +1299,7 @@ namespace Business.Services
 
         #endregion
         #region Ekb
-        public async Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null)
+        public async Task<ResponseModel<EkbDashboardKpiDto>> GetEkbKpiAsync(DateTimeOffset? from = null, DateTimeOffset? to = null, long[]? serviceTypeIds = null)
         {
             try
             {
@@ -1315,6 +1307,8 @@ namespace Business.Services
                     .GetQueryable<EkbWorkFlow>()
                     .AsNoTracking()
                     .Where(x => !x.IsDeleted);
+
+                query = FilterDashboardRows(query, "ekb", serviceTypeIds);
 
                 if (from.HasValue)
                 {
@@ -1375,6 +1369,12 @@ namespace Business.Services
                     .FirstOrDefaultAsync();
 
                 dto ??= new EkbDashboardKpiDto();
+                dto.ServiceTypeDistribution = await GetStageServiceTypeCountsAsync("ekb",
+                    query.Select(w => new OperationRow
+                    {
+                        RequestNo = w.RequestNo, CreatedDate = w.CreatedDate,
+                        Status = w.WorkFlowStatus, StepCode = w.CurrentStep == null ? null : w.CurrentStep.Code
+                    }), pendingOnly: false);
                 return ResponseModel<EkbDashboardKpiDto>.Success(dto);
             }
             catch (Exception ex)

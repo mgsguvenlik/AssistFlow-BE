@@ -8,6 +8,8 @@ namespace Model.Dtos.Dashboard
 {
     public class DashboardKpiDto
     {
+        public List<StageServiceTypeCountDto> ServiceTypeDistribution { get; set; } = new();
+
         // Genel İstatistikler
         public int TotalActiveWorkFlows { get; set; }
         public int TotalCompletedWorkFlows { get; set; }

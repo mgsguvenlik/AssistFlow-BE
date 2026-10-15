@@ -33,9 +33,9 @@ namespace WebAPI.Controllers
         [MenuAuthorize(DashboardMenuKeys.Service, MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<DashboardKpiDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetKpi()
+        public async Task<IActionResult> GetKpi([FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetKpiAsync();
+            var result = await _dashboardService.GetKpiAsync(serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
@@ -80,9 +80,9 @@ namespace WebAPI.Controllers
         [MenuAuthorize("ProductStatistics", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<ProductStatisticsDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<ProductStatisticsDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetProductStatistics()
+        public async Task<IActionResult> GetProductStatistics([FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetProductStatisticsAsync();
+            var result = await _dashboardService.GetProductStatisticsAsync(serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
@@ -123,9 +123,9 @@ namespace WebAPI.Controllers
         [MenuAuthorize("FinancialReport", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FinancialDashboardDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<FinancialDashboardDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetFinancialDashboard()
+        public async Task<IActionResult> GetFinancialDashboard([FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetFinancialDashboardAsync();
+            var result = await _dashboardService.GetFinancialDashboardAsync(serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
@@ -137,9 +137,9 @@ namespace WebAPI.Controllers
         [MenuAuthorize("CriticalAlerts", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<CriticalAlertsDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<CriticalAlertsDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetCriticalAlerts()
+        public async Task<IActionResult> GetCriticalAlerts([FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetCriticalAlertsAsync();
+            var result = await _dashboardService.GetCriticalAlertsAsync(serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
@@ -151,9 +151,9 @@ namespace WebAPI.Controllers
         [MenuAuthorize("GeographicalDistribution", MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<GeographicDistributionDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<GeographicDistributionDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetGeographicDistribution()
+        public async Task<IActionResult> GetGeographicDistribution([FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetGeographicDistributionAsync();
+            var result = await _dashboardService.GetGeographicDistributionAsync(serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
@@ -165,28 +165,28 @@ namespace WebAPI.Controllers
         [MenuAuthorize(DashboardMenuKeys.Service, MenuPermission.View)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ResponseModel<FullDashboardDto>), StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> GetFullDashboard()
+        public async Task<IActionResult> GetFullDashboard([FromQuery] long[]? serviceTypeIds = null)
         {
             try
             {
                 // These operations share a scoped DbContext and must run sequentially.
-                var kpi = await _dashboardService.GetKpiAsync();
+                var kpi = await _dashboardService.GetKpiAsync(serviceTypeIds);
                 if (!kpi.IsSuccess)
                     return DashboardFailure(kpi);
 
-                var financial = await _dashboardService.GetFinancialDashboardAsync();
+                var financial = await _dashboardService.GetFinancialDashboardAsync(serviceTypeIds);
                 if (!financial.IsSuccess)
                     return DashboardFailure(financial);
 
-                var alerts = await _dashboardService.GetCriticalAlertsAsync();
+                var alerts = await _dashboardService.GetCriticalAlertsAsync(serviceTypeIds);
                 if (!alerts.IsSuccess)
                     return DashboardFailure(alerts);
 
-                var geo = await _dashboardService.GetGeographicDistributionAsync();
+                var geo = await _dashboardService.GetGeographicDistributionAsync(serviceTypeIds);
                 if (!geo.IsSuccess)
                     return DashboardFailure(geo);
 
-                var product = await _dashboardService.GetProductStatisticsAsync();
+                var product = await _dashboardService.GetProductStatisticsAsync(serviceTypeIds);
                 if (!product.IsSuccess)
                     return DashboardFailure(product);
 
@@ -223,34 +223,42 @@ namespace WebAPI.Controllers
 
         [HttpGet("ykb/kpi")]
         [MenuAuthorize(DashboardMenuKeys.Ykb, MenuPermission.View)]
-        public async Task<IActionResult> GetYkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
+        public async Task<IActionResult> GetYkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null, [FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetYkbKpiAsync(from, to);
+            var result = await _dashboardService.GetYkbKpiAsync(from, to, serviceTypeIds);
             return Ok(result);
         }
 
         [HttpGet("ekb/kpi")]
         [MenuAuthorize(DashboardMenuKeys.Ekb, MenuPermission.View)]
-        public async Task<IActionResult> GetEkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null)
+        public async Task<IActionResult> GetEkbKpi([FromQuery] DateTimeOffset? from = null, [FromQuery] DateTimeOffset? to = null, [FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetEkbKpiAsync(from, to);
+            var result = await _dashboardService.GetEkbKpiAsync(from, to, serviceTypeIds);
             return Ok(result);
+        }
+
+        [HttpGet("service-types")]
+        [MenuAuthorize(new[] { DashboardMenuKeys.Service, DashboardMenuKeys.Ykb, DashboardMenuKeys.Ekb, DashboardMenuKeys.Qnb }, MenuPermission.View)]
+        public async Task<IActionResult> GetServiceTypes()
+        {
+            var result = await _dashboardService.GetServiceTypeOptionsAsync();
+            return StatusCode((int)result.StatusCode, result);
         }
 
         [HttpGet("operations")]
         [AdminRoleAuthorize]
         [MenuAuthorize(new[] { DashboardMenuKeys.Service, DashboardMenuKeys.Ykb, DashboardMenuKeys.Ekb, DashboardMenuKeys.Qnb }, MenuPermission.View)]
-        public async Task<IActionResult> GetOperations([FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null)
+        public async Task<IActionResult> GetOperations([FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null, [FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetOperationsAsync(from: from, to: to);
+            var result = await _dashboardService.GetOperationsAsync(from: from, to: to, serviceTypeIds: serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
         [HttpGet("operations/{tenantCode}")]
         [MenuAuthorize(new[] { DashboardMenuKeys.Service, DashboardMenuKeys.Ykb, DashboardMenuKeys.Ekb, DashboardMenuKeys.Qnb }, MenuPermission.View)]
-        public async Task<IActionResult> GetTenantOperations(string tenantCode, [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null)
+        public async Task<IActionResult> GetTenantOperations(string tenantCode, [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null, [FromQuery] long[]? serviceTypeIds = null)
         {
-            var result = await _dashboardService.GetOperationsAsync(tenantCode, from, to);
+            var result = await _dashboardService.GetOperationsAsync(tenantCode, from, to, serviceTypeIds);
             return StatusCode((int)result.StatusCode, result);
         }
 
