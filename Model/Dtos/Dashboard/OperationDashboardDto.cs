@@ -10,6 +10,8 @@ public static class DashboardMenuKeys
 
 public sealed class OperationDashboardKpiDto
 {
+    public List<StageServiceTypeCountDto> ServiceTypeDistribution { get; set; } = new();
+
     public int TotalWorkFlows { get; set; }
     public int CompletedWorkFlows { get; set; }
     public int PendingWorkFlows { get; set; }
