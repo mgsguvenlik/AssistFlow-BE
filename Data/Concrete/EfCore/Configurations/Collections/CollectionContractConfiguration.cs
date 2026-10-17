@@ -1,0 +1,43 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Model.Concrete.Collections;
+
+namespace Data.Concrete.EfCore.Configurations.Collections;
+
+/// <summary>Collection contract mapping; shared tables are references only.</summary>
+public sealed class CollectionContractConfiguration : IEntityTypeConfiguration<CollectionContract>
+{
+    public void Configure(EntityTypeBuilder<CollectionContract> builder)
+    {
+        builder.ToTable("Contract", "collection", table =>
+        {
+            table.HasCheckConstraint("CK_Contract_DateRange", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
+            table.HasCheckConstraint("CK_Contract_CreationRequest", "([CreationRequestId] IS NULL AND [CreationPayloadHash] IS NULL) OR ([CreationRequestId] IS NOT NULL AND [CreationPayloadHash] IS NOT NULL AND DATALENGTH([CreationPayloadHash]) = 32)");
+        });
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedOnAdd();
+        builder.Property(x => x.CreationPayloadHash).HasColumnType("varbinary(32)");
+        builder.HasIndex(x => x.CreationRequestId).IsUnique().HasFilter("[CreationRequestId] IS NOT NULL")
+            .HasDatabaseName("UX_Contract_CreationRequestId");
+        builder.Property(x => x.StartDate).HasColumnType("date");
+        builder.Property(x => x.EndDate).HasColumnType("date");
+        builder.HasOne(x => x.SubscriptionStatus).WithMany().HasForeignKey(x => x.SubscriptionStatusId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.ContractStatus).WithMany().HasForeignKey(x => x.ContractStatusId).OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.NoAction);
+        builder.Property(x => x.GtsNo).HasMaxLength(50);
+        builder.Property(x => x.IvrNo).HasMaxLength(50);
+        builder.HasIndex(x => x.GtsNo).HasFilter("[GtsNo] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("IX_Contract_GtsNo_Active");
+        builder.HasIndex(x => x.IvrNo).HasFilter("[IvrNo] IS NOT NULL AND [IsDeleted] = 0")
+            .HasDatabaseName("IX_Contract_IvrNo_Active");
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasOne(x => x.ServiceType).WithMany().HasForeignKey(x => x.ServiceTypeId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.HasIndex(x => new { x.CustomerId, x.IsDeleted, x.Id })
+            .IsDescending(false, false, true).HasDatabaseName("IX_Contract_Customer_Deleted_Id");
+        builder.HasIndex(x => new { x.ServiceTypeId, x.IsDeleted, x.Id })
+            .IsDescending(false, false, true).HasDatabaseName("IX_Contract_ServiceType_Deleted_Id");
+    }
+}

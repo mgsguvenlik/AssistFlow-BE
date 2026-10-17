@@ -9,6 +9,7 @@ using MapsterMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using Model.Concrete;
+using Model.Concrete.Collections;
 using Model.Dtos.Customer;
 using System.Linq.Expressions;
 using System.Text.Json;
@@ -421,6 +422,14 @@ namespace Business.Services
                 .GroupBy(g => g.Code)
                 .ToDictionary(g => g.Key, g => g.First());
 
+            // Mevcut kayıtlara dokunmadan, yalnız yeni ve onaylı grup müşterilerini doğru tiple oluştur.
+            var groupTypeCodes = CollectionCustomerClassification.GroupTypeCodes;
+            var groupTypeIds = await _unitOfWork.Repository.GetQueryable<CustomerType>()
+                .Where(x => groupTypeCodes.Contains(x.Code)).Select(x => x.Id).ToListAsync();
+            if (customerGroups.Any(x => CollectionCustomerClassification.Classify(x.Code) == CollectionCustomerClass.Group)
+                && groupTypeIds.Count != 1)
+                return ResponseModel<int>.Fail("Tekil Grup Müşteri tipi bulunamadı. Müşteri aktarımı yapılmadı.");
+
             var now = DateTime.Now;
             var insertedCount = 0;
 
@@ -477,7 +486,8 @@ namespace Business.Services
                     InstallationDate = null,
 
                     CustomerGroupId = group?.Id,
-                    CustomerTypeId = 4,
+                    CustomerTypeId = CollectionCustomerClassification.Classify(group?.Code) == CollectionCustomerClass.Group
+                        ? groupTypeIds.Single() : 4,
 
                     CreatedDate = now,
                     UpdatedDate = null,

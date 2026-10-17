@@ -1,0 +1,578 @@
+{
+  "Version": 1,
+  "ReviewDate": "2026-10-17",
+  "Repository": "AssistFlow-BE",
+  "Branch": "tahsilat-module",
+  "BaseCommit": "e75a76122543cdeafc07d66699d3b4d6cc4376dd",
+  "StageAllowed": true,
+  "CommitAllowed": true,
+  "PushAllowed": false,
+  "LiveChangesAllowed": false,
+  "ExcludedTrackedFiles": [
+    "WebAPI/appsettings.Development.json"
+  ],
+  "ManifestSelf": "docs/releases/collections-2026-10-17/git-commit-scope.files.json",
+  "ManifestSelfCommitGroup": 3,
+  "Files": [
+    {
+      "Path": ".gitignore",
+      "CommitGroup": 3,
+      "Sha256": "AD4BC71DFD437C263BB0FCFCA4902B3B9C7B33CBCF38D03C4A39A263A6E1E603"
+    },
+    {
+      "Path": "Business/DependencyResolvers/Autofac/AutofacBusinessModule.cs",
+      "CommitGroup": 1,
+      "Sha256": "056EB11CF1D2DC27F8910FBBD52AE473B384BD08A67BB9CAE1B39BF24546C97A"
+    },
+    {
+      "Path": "Business/Services/ManitouStagingSyncBackgroundService.cs",
+      "CommitGroup": 1,
+      "Sha256": "70ABECD4E8A77111768A94933497C2CE40687B89221C9B15000076CB30BC0012"
+    },
+    {
+      "Path": "Business/Services/RehearsalManagedWorker.cs",
+      "CommitGroup": 1,
+      "Sha256": "A405354B52C6D29E8F7B5A76761BDBF7B7738F48920EEC0CFF7432777DD5396A"
+    },
+    {
+      "Path": "Core/Settings/Concrete/StartupExecutionOptions.cs",
+      "CommitGroup": 1,
+      "Sha256": "55ED01E4A6B962C77DF444BE070284E770287CC08AAA940EF59CA3E709E462AF"
+    },
+    {
+      "Path": "Data/Seeding/Infrastructure/SeedingExtensions.cs",
+      "CommitGroup": 1,
+      "Sha256": "F41208BF4F3DA95EB06E6833314AEFE08BE9F552EDA76C0B1B8F1AC486993012"
+    },
+    {
+      "Path": "docs/collection-production-transition.md",
+      "CommitGroup": 3,
+      "Sha256": "D1A6B9B93F16E5A79E7D017312AB78E10C2E0188F4CE2A4F28CBD65FBD0C4176"
+    },
+    {
+      "Path": "docs/module-development-plan.md",
+      "CommitGroup": 3,
+      "Sha256": "790E6E0BE2E0E88779617133FFB3F8EFEB3D1E23614E8EBD0D039F38B4F8AC7A"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/00-preflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "AD753C165980CF4FE65182C9EC0BCA58946AAC9AC5290185D76D995EC37179F0"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/01-legacy-preflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "4935D32726D71393F60F6440936C24A385360E48CDA563B55F8122D8375FB36A"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/30-definition-seed.sql",
+      "CommitGroup": 3,
+      "Sha256": "E1D1949374AB2CB0E7D74574E5DE274E360F510CF490FFDA7B17FE29436DC361"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/40-menu-sms-seed.sql",
+      "CommitGroup": 3,
+      "Sha256": "78CDCA9FF88BCCF684E625FD678CE3198A3F22B0D22743EFE766B67E19A613A3"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/41-shared-reference-plan.sql",
+      "CommitGroup": 3,
+      "Sha256": "1B1D0CCD07F644886F02E3FD10BEB5711266FD6E46A3E993FF120FFC40D77581"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/50-postflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "9CDF71A76C0C22203DEA104A1C7F62F2ABAD71AC95EC95D32B6D43A72C197D33"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/audit-rehearsal-report.md",
+      "CommitGroup": 3,
+      "Sha256": "A4510191E37D6BA561D331D836D6A282B66C056561F6BEFB7DC7978E6F23B076"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/data-preparation-report.md",
+      "CommitGroup": 3,
+      "Sha256": "48AEDC8DF3F9DE0BB0B46B214FA5D8C4571C7CCF324DB01E4BC661945E5B27BA"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/decision-reconciliation-report.md",
+      "CommitGroup": 3,
+      "Sha256": "9F01B6E4B27B6CC8EC809B51A5776EA82C54CD639ED2301AC88972B3424A263F"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/payment-reconciliation-report.md",
+      "CommitGroup": 3,
+      "Sha256": "D9EC86B22A24C961864084F57C2CD5E77898E1E8136E384EEF66DB56360AA9F2"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/README.md",
+      "CommitGroup": 3,
+      "Sha256": "04CD4EBF0FADBB989394D85A175B3FD763CF43F8CBD13582F87CC3A017DCF897"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/rehearsal/00-isolation-preflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "F4769FC96CCA88BC7A1BA93D3EACFABDEE736F18DB952B978B783392BFE2379E"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/rehearsal/data-transfer-2026-10-17.md",
+      "CommitGroup": 3,
+      "Sha256": "233255059FD1B14E787C621BF58A39FFF1C11835355099C42CEC500434E30866"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/rehearsal/execution-2026-10-17.md",
+      "CommitGroup": 3,
+      "Sha256": "26DFF62443C9F22763A50FCB3BAFC98D037A1B721315ADDAB2F9DB1027615872"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/rehearsal/README.md",
+      "CommitGroup": 3,
+      "Sha256": "9093D77C595C49D21E703F6DF63310A072A448C17694D4FF5A3E58F7C7A949EB"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/rehearsal/target-selection-2026-10-17.md",
+      "CommitGroup": 3,
+      "Sha256": "A2CFA6370D1174F4CB15FE5949A95A0398C0AA5CCC714889925D27C71FE690CB"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/relation-reconciliation-report.md",
+      "CommitGroup": 3,
+      "Sha256": "A8AAF72E46C19C6D62336239CF81972B322E89B216D82DE48FC689334DF8D5F5"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/01-20260910150310_AddCollectionFoundation.sql",
+      "CommitGroup": 3,
+      "Sha256": "714F0BBC1131BA95574CA77BD27EB4375FEFEF57F2F88DD0501E1D3BD62F7D39"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/02-20260912184617_AddCollectionOriginalAnchorDay.sql",
+      "CommitGroup": 3,
+      "Sha256": "E987C9FABCF34638CBC3CE308A7C0E6F3F4F54B2427F246D5DF89C6B636A972F"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/03-20260913081707_AddCollectionContractCreationRequest.sql",
+      "CommitGroup": 3,
+      "Sha256": "5DBAF387CEDA6A9B6D72F9B72E369C848BEABF41BF25BC5A5F166C438534A155"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/04-20260915180434_AddCollectionMigrationStaging.sql",
+      "CommitGroup": 3,
+      "Sha256": "EA09DC22D20CB686F477ACE1F26298F6AF53AAB3AD5E2F7AA64250B5E77D98DE"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/05-20260916195834_AddCollectionMigrationCustomerTypeMap.sql",
+      "CommitGroup": 3,
+      "Sha256": "CB744CE3D0FFDF78B48FE847744141ED3D77D3753E1DECFE70C7D361C2F77770"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/06-20260916202500_AddCollectionContractAttachment.sql",
+      "CommitGroup": 3,
+      "Sha256": "CD32A7D15F0990405B3EDB06117E073B10DE9D1D4B3B9C4C88E805216F211A2B"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/07-20260927123000_AddCollectionTrackingIndexes.sql",
+      "CommitGroup": 3,
+      "Sha256": "81862997C5BCBA9F9F5A4911BF3021D7E8817A7446685CE3B06D23FA808D06BF"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/08-20260927160000_AddCollectionGroupParent.sql",
+      "CommitGroup": 3,
+      "Sha256": "76C08E693BA91FE499F7432753837C179C5ADCC0C49C60D8525389FE7AAD77DD"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/09-20260927180000_AddCollectionCustomerNotes.sql",
+      "CommitGroup": 3,
+      "Sha256": "CA23D6828B465E1E8A7DB73138E6485344239C70ACCFE69A2883E7E3DE162AA1"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/10-20260927190000_AddCollectionGroupFollowUpSource.sql",
+      "CommitGroup": 3,
+      "Sha256": "708C53A4559C5A0C1B5B92350AF0C869E05E8A26DA8BEA02DF9A2A9CF022DFCA"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/11-20260929080736_AddCollectionInvoices.sql",
+      "CommitGroup": 3,
+      "Sha256": "ED17CD4FDFEDE148C478054EFEB67F88ACD88A68AA5C89A79431657DE9E42ADB"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/12-20260929084242_AddCollectionInvoiceOperations.sql",
+      "CommitGroup": 3,
+      "Sha256": "B5EAFE9A25BDCB9D6EF46DB6CEC0DEF44EE96E077C72F444A72E06DAF5B818E4"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/13-20260929100739_AddCollectionInvoiceLoads.sql",
+      "CommitGroup": 3,
+      "Sha256": "9619FADF818FA9A57240DA813BC72146AC7EB0E8961D12BD86EE9386F92B2B83"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/14-20260929101445_AddCollectionInvoiceLoadRowAudit.sql",
+      "CommitGroup": 3,
+      "Sha256": "3813E5D6164624C71155B06EFAC95512D81887B97533BC3C1EC57DEF9E964ABD"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/15-20260929111421_AddCollectionBankLoads.sql",
+      "CommitGroup": 3,
+      "Sha256": "DAAB8B2BFED29161964F5DE9CFF367BA7DB92A0EE8BE853B5D306D25B9BAD983"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/16-20260929112405_AddCollectionBankReferenceIndexes.sql",
+      "CommitGroup": 3,
+      "Sha256": "3112A3D38815F47312C141752CE421923EA2302E2501740F2775E987DB192F79"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/17-20260929130125_AddCollectionContractCorrections.sql",
+      "CommitGroup": 3,
+      "Sha256": "72428AD7775E05279BEFE84FB5E3CDE683A50B6ADD71A103A646F1FC7EF3FF3D"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/18-20260930194336_AddCollectionCustomerAttachments.sql",
+      "CommitGroup": 3,
+      "Sha256": "340185FD288212AF76E1433029DD936220D80C83F027CE0E49BA94C6A0E47195"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/19-20260930200005_AddCollectionCustomerFileActions.sql",
+      "CommitGroup": 3,
+      "Sha256": "4DECFE955CDD89EA8ED60FCF6B911BA44E98847463A94EA215928B3D1BA2D3F8"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/20-20260930230000_EnableCollectionRequestedPaymentMethods.sql",
+      "CommitGroup": 3,
+      "Sha256": "DB7050D2C9D4AE19A23CF8C3EF90638765EA43297B7B4756363F68A45BCF820D"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/21-20261002210728_AddCollectionSmsNotifications.sql",
+      "CommitGroup": 3,
+      "Sha256": "7B141F3F2853AF69692250893A2FD24F3A3C6D1540E44ADED9EC98740697CB75"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-15/schema/manifest.json",
+      "CommitGroup": 3,
+      "Sha256": "B2C2118368438157CCAC94070407A84C2FA9F8F2492EFC4FB2B06459EE6F6C80"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/cdn-adapter-rehearsal.md",
+      "CommitGroup": 3,
+      "Sha256": "2D1C69AB283D2E32E3433459FFF993E827B569BD7D5F61B7A8905EBB150B952E"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/cdn-approval.template.json",
+      "CommitGroup": 3,
+      "Sha256": "4048AF42094B0ABFF2F836FA4831E9F040E778084A076F12658DE7C95538FD2F"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/cdn-live-readonly.md",
+      "CommitGroup": 3,
+      "Sha256": "2A10E470D953F8540391AACE50699CF90F7D77705F8BAAF5BC23464DA7050130"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/cdn-transfer-and-access.md",
+      "CommitGroup": 3,
+      "Sha256": "A82F0E67B86FE096A674E487D8E698DDF55BCB4450A83A2F5B010A291E9B0445"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/cutover-runbook.md",
+      "CommitGroup": 3,
+      "Sha256": "5538B57A386BC643082D1D45381EBFCEDC13F610C0A09B2214403B8D3BDBCCF7"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/execution-handoff.md",
+      "CommitGroup": 3,
+      "Sha256": "E9E5A4228083DB3BFB5CA0AE8732F5AA9F1AECB4850A5E83BF08EE715B1551B4"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/git-commit-scope.md",
+      "CommitGroup": 3,
+      "Sha256": "DC1596A17B275CBDF6634384F75BE63F3A37475BDC57795AC476AC4E30F7EADB"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/governance-approval.template.json",
+      "CommitGroup": 3,
+      "Sha256": "420868E1E01B8536EF32FD4827550295A01F38E6C1A0A0D3F55998AC7974B709"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/handoff-delivery.md",
+      "CommitGroup": 3,
+      "Sha256": "84536C7D6DB65094721AB11710F4C6A1B44B953C9BC6ED8CD5DEED790E1E307C"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/hosting-and-refresh.md",
+      "CommitGroup": 3,
+      "Sha256": "0E55C052F4D58F28332EF50B72562D08C369D60F112AB62843C825F36776D462"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/job-backup-preflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "A7C1ECE1F2BB2DDDB7DBDC23111165C18BB8B618F7B526390E7E4E478B1F92AE"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/job-maintenance-and-recovery.md",
+      "CommitGroup": 3,
+      "Sha256": "29E5B619326EA17280854C392AECC5D9B6B5815D2F7C4D1B9B6D5C249CB2B06D"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/maintenance-approval.template.json",
+      "CommitGroup": 3,
+      "Sha256": "9CEE8EB89C266392AE5BF44F4B110D6299D81E80D446AAAECB5B756A8EE7951D"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/operator-and-shared-approvals.md",
+      "CommitGroup": 3,
+      "Sha256": "69D1DD534A7984B4CC33FD8CA1DBEAE33A479EB4F0732EEBD376CD85EFA66394"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/operator-role-preflight.sql",
+      "CommitGroup": 3,
+      "Sha256": "6EC5A6991B73BC3BFA361DD9C195DFF1BF5BE6065A4380888CF29BA8F175D3A8"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/production-adapter-rehearsal.md",
+      "CommitGroup": 3,
+      "Sha256": "5854902854F4C2B4168800980F515B266704275DED008451C3BB39434A7A436A"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/production-adapter.md",
+      "CommitGroup": 3,
+      "Sha256": "184F4BE886A495781F1DAC13A594DDAC3A407D45594314EBF325D19ED863A73F"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/README.md",
+      "CommitGroup": 3,
+      "Sha256": "93CE49D79AF0BCF94DA71637B92410AB1701DE195DCCBFD5088C505DA738D568"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/startup-isolation.example.json",
+      "CommitGroup": 3,
+      "Sha256": "FA06C3359B60CEC3626234961CD75F0D92CA7D846694FE914410713995DF62B7"
+    },
+    {
+      "Path": "docs/releases/collections-2026-10-17/startup-isolation.md",
+      "CommitGroup": 3,
+      "Sha256": "94ED35EE5234E8D18BFE7CD287B7A4E3334DFDAC0895293DE8DC8B05770E57F1"
+    },
+    {
+      "Path": "tools/Collections.CdnReadOnly/Collections.CdnReadOnly.csproj",
+      "CommitGroup": 2,
+      "Sha256": "66D48B8A80A5E8AA4A9255D64B69A7E5048EEC5B58DF537F719CE1BAFC99E36E"
+    },
+    {
+      "Path": "tools/Collections.CdnReadOnly/Program.cs",
+      "CommitGroup": 2,
+      "Sha256": "4AB15337895FDE1A9AC0D09EC8AE26C90EDDBDD20E0128A1B849398B6DDF6307"
+    },
+    {
+      "Path": "tools/Collections.CdnReadOnly/README.md",
+      "CommitGroup": 2,
+      "Sha256": "85BEBBF069BC6CD40B098CAD3533F7E2A16FBAC808E2EED74F4D5D9DF343F765"
+    },
+    {
+      "Path": "tools/Collections.Files/Collections.Files.csproj",
+      "CommitGroup": 2,
+      "Sha256": "E6CAAA28088D3FD329F6A52FB3A0E8EA8AF88E0BD03DE0D35171897CE0BE41CF"
+    },
+    {
+      "Path": "tools/Collections.Files/FileAdapter.cs",
+      "CommitGroup": 2,
+      "Sha256": "37AE0697F5C5F89BB89779FFDB96ED845C28113690F90DE8D5937EB8192B695D"
+    },
+    {
+      "Path": "tools/Collections.Files/FileRehearsal.cs",
+      "CommitGroup": 2,
+      "Sha256": "70EEB71BA31654FA7DCACADE1C35B48C719FC78394D23209FC0F51EB74728662"
+    },
+    {
+      "Path": "tools/Collections.Files/FileTransport.cs",
+      "CommitGroup": 2,
+      "Sha256": "201646E4A4236A503E946B708C4AED897D87A584C4A6BFF1A7BDC527BF0E4140"
+    },
+    {
+      "Path": "tools/Collections.Files/Program.cs",
+      "CommitGroup": 2,
+      "Sha256": "B8AD7488379FD744981B313C69EFD4FCF2AD8EBBB870C31C4A2DEE39CBADC111"
+    },
+    {
+      "Path": "tools/Collections.Files/README.md",
+      "CommitGroup": 2,
+      "Sha256": "C5F61E36CFEE89ECCB9802D75BC6D9CE856AFEA7CA945A000EB76B4104D7808A"
+    },
+    {
+      "Path": "tools/Collections.Import/CollectionPaymentCurrencyComparison.cs",
+      "CommitGroup": 2,
+      "Sha256": "5A271F7C969DE6628AC79DA374640C74596F9397D64450FAF8CAE494878F5D68"
+    },
+    {
+      "Path": "tools/Collections.Production/Collections.Production.csproj",
+      "CommitGroup": 2,
+      "Sha256": "911B9192DB3B1466367FFECE74722581C74472CFED3B370CF1204E5A42539DAE"
+    },
+    {
+      "Path": "tools/Collections.Production/ProductionTransfer.cs",
+      "CommitGroup": 2,
+      "Sha256": "F8118E6E59FCEB7DC968FF171FD18509C6899C885456830464EC665C09E72936"
+    },
+    {
+      "Path": "tools/Collections.Production/Program.cs",
+      "CommitGroup": 2,
+      "Sha256": "EDC751B456BF57770916625BB078E7AF0190983F1F2C31AEC922ADF1FB2E4F5E"
+    },
+    {
+      "Path": "tools/Collections.Production/README.md",
+      "CommitGroup": 2,
+      "Sha256": "47A56911333271A51FE4EA0EDAFFE3B289D7824D2290D5B47C9DE5B3180CD1EC"
+    },
+    {
+      "Path": "tools/Collections.Rehearsal/Collections.Rehearsal.csproj",
+      "CommitGroup": 2,
+      "Sha256": "E1ABB77820867D37FB8152D5901CEDED4B8B29C4624A448A782D01CD13F12A46"
+    },
+    {
+      "Path": "tools/Collections.Rehearsal/Program.cs",
+      "CommitGroup": 2,
+      "Sha256": "1ABAA7A134D41D7EA5D9AD5582EF9F7929B9D75315957D1190711700A014B5F6"
+    },
+    {
+      "Path": "tools/Collections.Rehearsal/README.md",
+      "CommitGroup": 2,
+      "Sha256": "2DCE1678FC7D5B0DDA2080DB8FA960ED3318161D3471E2A5A1A0AA6464B94C03"
+    },
+    {
+      "Path": "tools/Collections.Rehearsal/RehearsalTransfer.cs",
+      "CommitGroup": 2,
+      "Sha256": "482E0CCEF5EDED366BE7DE43366A97610EDE1A736A7953B21653C6836FC2D9E4"
+    },
+    {
+      "Path": "tools/Collections.Release/Collections.Release.csproj",
+      "CommitGroup": 2,
+      "Sha256": "2255C24CFD61F5EBFA51B393DFB15AB5FF8C9529842D65CC6715339A6BAC63EB"
+    },
+    {
+      "Path": "tools/Collections.Release/CustomerDecisionReplay.cs",
+      "CommitGroup": 2,
+      "Sha256": "57AB3476A91EF48CBA33DA8445A064357AE2DE2C7FFF8B8F68541BBF4245AB79"
+    },
+    {
+      "Path": "tools/Collections.Release/CutoverBundle.cs",
+      "CommitGroup": 2,
+      "Sha256": "08A1B43D8E2AB76807D02460A91C0488957DE83BA08CDB6B8A69670EF203DB5F"
+    },
+    {
+      "Path": "tools/Collections.Release/LiveFinancialPreview.cs",
+      "CommitGroup": 2,
+      "Sha256": "064FB4E168F640803312F7DA43B9347C2DABBEBAADF82919C6AC07EFB04F6B72"
+    },
+    {
+      "Path": "tools/Collections.Release/LivePaymentReconciliation.cs",
+      "CommitGroup": 2,
+      "Sha256": "A6952DE581F2DAF1ABAF5270E34C8C3B58778F94E7156CF1563345E1BECE14E9"
+    },
+    {
+      "Path": "tools/Collections.Release/LiveRelationReconciliation.cs",
+      "CommitGroup": 2,
+      "Sha256": "5706217271C4BF662CEEC4E99D8EAC631A3562B27E726BFFE4B6939ACD047476"
+    },
+    {
+      "Path": "tools/Collections.Release/LiveTransferPreview.cs",
+      "CommitGroup": 2,
+      "Sha256": "BC52F0F5632A596759D8F996A81C78BB3FF900161029AEC6E2CDCFCC3195347B"
+    },
+    {
+      "Path": "tools/Collections.Release/ProductionDataPackage.cs",
+      "CommitGroup": 2,
+      "Sha256": "976E114AE38FA35A3810EBD0F81834C14569383FF4DB90098DF0CA1610E2774F"
+    },
+    {
+      "Path": "tools/Collections.Release/Program.cs",
+      "CommitGroup": 2,
+      "Sha256": "8B272F5895571CECEA37D40F8F7EECE69C678DC65D0C691396DB449313F070EA"
+    },
+    {
+      "Path": "tools/Collections.Release/README.md",
+      "CommitGroup": 2,
+      "Sha256": "F59620A27D6F0DCF2D7E9C174BE9E68C9354D97B16D86A427156392CFF160DC9"
+    },
+    {
+      "Path": "tools/Collections.Release/RehearsalPreparation.cs",
+      "CommitGroup": 2,
+      "Sha256": "D4ADD98CF6DA9261DDD395D2AFDE9763ABDFBA2E8ABA87EB1C1A221EB9587395"
+    },
+    {
+      "Path": "tools/Collections.Transfer/CollectionTransferCore.cs",
+      "CommitGroup": 2,
+      "Sha256": "039E32052A2C85B6651DA74AC1C17B40D834C0C7761A0AE62933F741C52D9AE4"
+    },
+    {
+      "Path": "tools/Invoke-CollectionHostingRehearsal.ps1",
+      "CommitGroup": 2,
+      "Sha256": "2CEB88AE1D55D3418FBCFFA24B54AD637459903F09B9E821EA2E9CC392D0A20C"
+    },
+    {
+      "Path": "tools/Invoke-CollectionRehearsalSchema.ps1",
+      "CommitGroup": 2,
+      "Sha256": "EE974EECEBD432E37F0A4CE42958CB01783CBAE9581C494462BB3CF857740E3D"
+    },
+    {
+      "Path": "tools/Prepare-CollectionCdnHandoff.ps1",
+      "CommitGroup": 2,
+      "Sha256": "1E023936DAB4A8DC0CAB38B188398344E614206FE7B83F17A9805A702FEDFF1B"
+    },
+    {
+      "Path": "tools/Prepare-CollectionCutoverHandoff.ps1",
+      "CommitGroup": 2,
+      "Sha256": "E6F9DF4F1D85511F77954A179ABD29C273293457749561A7E14D1F279D8E07C6"
+    },
+    {
+      "Path": "tools/Prepare-CollectionRehearsalSchema.ps1",
+      "CommitGroup": 2,
+      "Sha256": "9A18CA1144F805961AE4D0AFE79B57FCED0CA966B0A2A1DED6C7A0067AE8431F"
+    },
+    {
+      "Path": "tools/Read-CollectionCdnInventory.ps1",
+      "CommitGroup": 2,
+      "Sha256": "AE3D016EE93D6D1286B84CA34919BC39CF08DE8D5D02F81B6E158D096008FE24"
+    },
+    {
+      "Path": "tools/Read-CollectionCdnRuntimeRedirect.ps1",
+      "CommitGroup": 2,
+      "Sha256": "46EEA048449CA5DED1F1C4D904071142768823FF394CE1A7FBBB9F4C955844AD"
+    },
+    {
+      "Path": "tools/Read-CollectionProductionPreflight.ps1",
+      "CommitGroup": 2,
+      "Sha256": "D0DB7D20BEA4E572935815BFBB65EAB43BCFB70FDC8AEA883DC1FB72269F38E0"
+    },
+    {
+      "Path": "tools/Read-CollectionRehearsalTarget.ps1",
+      "CommitGroup": 2,
+      "Sha256": "4E95158900F52790CF63D60D26D7A3A8C85AED0B21B1A1D32DD67BA5DFE7891C"
+    },
+    {
+      "Path": "tools/Restore-CollectionRehearsal.ps1",
+      "CommitGroup": 2,
+      "Sha256": "7104A7C27DE4C20FC71A04F72211BF37E6679266DFDF8B32613B5EA141349CFF"
+    },
+    {
+      "Path": "tools/StartupIsolation.Checks/Program.cs",
+      "CommitGroup": 1,
+      "Sha256": "17B643ED9597E128A82C80135D646140E8EA089142B84BDDF6E64ABEDF48CB51"
+    },
+    {
+      "Path": "tools/StartupIsolation.Checks/README.md",
+      "CommitGroup": 1,
+      "Sha256": "1049490991E6AA6AC49220E4DBA070DC1EFC5F414CCC748ABDEEB461D856E1EB"
+    },
+    {
+      "Path": "tools/StartupIsolation.Checks/StartupIsolation.Checks.csproj",
+      "CommitGroup": 1,
+      "Sha256": "7B2A110A54BD3930E58EDAAD86D8D172FF6D0917E96504F7A9BD8C6BF7C3E067"
+    },
+    {
+      "Path": "tools/Test-CollectionCdnPreparation.ps1",
+      "CommitGroup": 2,
+      "Sha256": "7A1AB337C2BEE76C7396215F492FE960DF260C735AE0C3FC1C3B6FF8C22D96BB"
+    },
+    {
+      "Path": "WebAPI/Middleware/ApplyMigrations.cs",
+      "CommitGroup": 1,
+      "Sha256": "082318F2B7A368383E0B58E88EFAF6D55C1C3A8BEB70BFE58CCD8C24243C8DD9"
+    }
+  ]
+}

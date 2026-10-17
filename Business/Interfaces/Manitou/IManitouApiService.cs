@@ -62,5 +62,10 @@ namespace Business.Interfaces.Manitou
             string accessToken,
             ManitouOffTestRequest request,
             CancellationToken cancellationToken = default);
+
+
+        Task<List<ManitouContactResult>> GetCustomersWithoutGroupAsync(
+                    string token,
+                    CancellationToken cancellationToken = default);
     }
 }

@@ -352,3 +352,14 @@ healthchecksdb
 /WebAPI/wwwroot/uploads/
 
 /WebAPI/UploadsStorage/
+/.tools/
+/tools/Collections.Import/snapshots/
+/tools/Collections.Snapshot/snapshots/
+
+# Reviewed collection release source/scripts, not binary release artifacts.
+!/docs/releases/
+/docs/releases/*
+!/docs/releases/collections-2026-10-15/
+!/docs/releases/collections-2026-10-15/**
+!/docs/releases/collections-2026-10-17/
+!/docs/releases/collections-2026-10-17/**

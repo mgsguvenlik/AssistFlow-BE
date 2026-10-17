@@ -381,6 +381,36 @@ namespace Business.Services.Manitou
                 accessToken,
                 cancellationToken);
         }
+
+        public async Task<List<ManitouContactResult>> GetCustomersWithoutGroupAsync(string accessToken, CancellationToken cancellationToken = default)
+        {
+            var requestBody = new List<ManitouSearchRequestItem>
+                {
+                    new()
+                    {
+                        ContactType = 1,
+                        Display = 180,
+                        FieldNo = 4,
+                        Table = 26,
+                        Value = null
+                    }
+                };
+
+            var url =
+                $"api/contactsearch/1/search" +
+                $"?maxRows={_appSettings.ManitouCustomerMaxRows}" +
+                $"&includeCancelled=false";
+
+            var response = await SendAsync<ManitouSearchResponse>(
+                HttpMethod.Post,
+                url,
+                requestBody,
+                accessToken,
+                cancellationToken);
+
+            return response?.Results ?? new List<ManitouContactResult>();
+        }
+
     }
 
     public sealed class ManitouApiException : Exception

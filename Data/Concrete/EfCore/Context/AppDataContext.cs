@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Data.Concrete.EfCore.Configurations;
+using Data.Concrete.EfCore.Configurations.Collections;
 using Model.Concrete;
 using Model.Concrete.Crm;
 using Model.Concrete.Helpdesk;
@@ -1449,6 +1450,40 @@ namespace Data.Concrete.EfCore.Context
                 entity.Property(x => x.MessageId).HasMaxLength(998);
                 entity.Property(x => x.InReplyTo).HasMaxLength(998);
             });
+            modelBuilder.ApplyConfiguration(new CollectionCustomerNoteConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionSmsNotificationConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionSmsAttemptConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionCustomerAttachmentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoicePaymentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceOperationConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceAccountConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceLoadConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankLoadConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractCorrectionConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankLoadRowConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankTransactionConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionBankBaselineConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionInvoiceLoadRowConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionGroupParentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractAttachmentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentFrequencyConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractRatePeriodConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentMethodConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionSubscriptionStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionGroupStatusConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionContractPeriodFollowUpConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionPaymentOperationConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationBatchConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationSourceRowConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationContractStageConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationRatePeriodStageConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationReferenceMapConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationIssueConfiguration());
+            modelBuilder.ApplyConfiguration(new CollectionMigrationMapConfiguration());
         }
     }
 }
