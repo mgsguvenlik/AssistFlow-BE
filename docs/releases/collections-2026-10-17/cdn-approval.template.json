@@ -1,0 +1,75 @@
+{
+  "Version": "collection-cdn-review-v1",
+  "Status": "PENDING_HUMAN_APPROVAL_NOT_EXECUTABLE",
+  "ProductionApplyApproved": false,
+  "ReviewedHandoffManifestHash": "6BC34709D364D02DCD72F05F682A7C1D805690A88D8971375A98B313F2C55ABC",
+  "ReviewedBundleHash": "8253BCA52AED33271A445FE6B46EBEF7A86E3F5220C48239B54E7B6F12AFD673",
+  "ExpectedEvidenceHashes": {
+    "file-summary.json": "E7A8CB7A07ABBC1846CDFF2352419548EF283C383175B0F2EDE9A0018CED4816",
+    "physical-file-verification.json": "CA4FF01DBCBF29A6B04368D73BBB1D9AF5575A69C89CC33C392A4B08ACB21ECE",
+    "contract-file-plan.ndjson": "C04C9073A8FF127EC4D097A504A336BB8409AB21E57208C16AC8CA77C4585808",
+    "activity-file-plan.json": "88D9D8B95B0ACB463C98C3A949E18258FD428F4D03FF39F3088F261868039867"
+  },
+  "ExpectedBaseline": {
+    "ContractPlanRows": 9517,
+    "ContractRelationshipsPendingCdn": 1818,
+    "DistinctContractPaths": 1100,
+    "DistinctContractContentHashes": 1079,
+    "ActivityFilesPendingCdn": 3,
+    "ActivityFilesHeld": 12,
+    "MissingContractFiles": 69,
+    "EmptyContractFiles": 19
+  },
+  "Target": {
+    "Server": "sql2022",
+    "Database": "AssistFlow",
+    "R2Endpoint": null,
+    "BucketName": null,
+    "KeyPrefix": null,
+    "PublicBaseUrl": null,
+    "ConfigurationFingerprint": null,
+    "SafeCredentialReference": null,
+    "ProductionNamespaceVerified": false,
+    "PublicLinkExposureAccepted": false,
+    "OwnerApprovalReference": null
+  },
+  "Source": {
+    "FinalSourceAndOwnerMappingEvidenceHash": null,
+    "ArchiveAndLocalBytesReverified": false,
+    "MalwareScanEvidencePath": null,
+    "MalwareScanAccepted": false,
+    "MissingFilesAcceptedWithoutDeletingContracts": false
+  },
+  "Execution": {
+    "ProductionFileAdapterPreparedAndRehearsed": false,
+    "AdapterCodeAndPlanHash": null,
+    "SameFinancialBatchAcceptanceEvidenceHash": null,
+    "FinancialReplayCompletedBeforeAttachments": false,
+    "MaintenanceAndBackupApprovalReference": null,
+    "OperatorUserCode": null,
+    "OperatorApprovalReference": null,
+    "PilotApproved": false,
+    "PilotMaxRelationships": null,
+    "PilotEvidenceHash": null,
+    "FullTransferApproved": false,
+    "MaxConcurrency": null,
+    "ReadTimeoutSeconds": null,
+    "RetryLimit": null,
+    "ResumeApproved": false,
+    "RemoveObjectsApproved": false,
+    "EnableOtherWritesForFileTransfer": false
+  },
+  "JournalRequiredFields": ["AtUtc", "RunId", "PlanHash", "BatchId", "EntityKind", "SourceIdOrPathHash", "SourceRowHash", "LegacyOwnerId", "RetainedLegacyOwnerId", "TargetCustomerId", "TargetContractId", "TargetRowVersion", "ArchiveHash", "ContentHash", "SizeBytes", "ContentType", "OriginalName", "StoredFileName", "NamespaceFingerprint", "ObjectExistedBefore", "State", "AttachmentId", "AuthenticatedReadbackHash", "PublicReadbackHash", "HttpStatus", "ErrorCategory", "ActorApprovalReference"],
+  "AccessAcceptance": {
+    "AllObjectAuthenticatedReadbacksVerified": false,
+    "AllPublicUrlsVerified": false,
+    "ApiViewAndEditPermissionsVerified": false,
+    "UnauthenticatedApiDenied": false,
+    "CrossOwnerRemovalDeniedInRehearsal": false,
+    "UiContractAndCustomerFileTabsVerified": false,
+    "RemovedMetadataNotReactivated": false,
+    "AcceptedBy": null,
+    "ApprovalReference": null
+  },
+  "Note": "Review checklist only; not an importer authorization. No credentials, upload, live DB write, provider configuration change or deletion is authorized. Test import tools remain test-only."
+}

@@ -12,6 +12,8 @@ using Business.Interfaces.Ykb;
 using Business.Interfaces.Ekb;
 using Business.Services;
 using Business.Services.Crm;
+using Business.Services.Crm.Collections;
+using Core.Settings.Concrete;
 using Business.Services.Helpdesk;
 using Business.Services.Manitou;
 using Business.Services.PeriodicReports;
@@ -26,6 +28,8 @@ using Core.Utilities.IoC;
 using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.MailOutbox;
@@ -37,6 +41,39 @@ namespace Business.DependencyResolvers.Autofac
     {
         public void Load(IServiceCollection services)
         {
+            services.AddOptions<StartupExecutionOptions>()
+                .BindConfiguration(StartupExecutionOptions.SectionName,
+                    options => options.ErrorOnUnknownConfiguration = true)
+                .Validate<IHostEnvironment, IConfiguration>(RehearsalStartupGuard.IsAllowed,
+                    "İzole prova yalnız CollectionRehearsal ortamı ve sabit prova DB/uygulama adıyla; migration, seed, Manitou ve Tahsilat kapalı, SMS simülasyonu açıkken kullanılabilir.")
+                .ValidateOnStart();
+            services.AddOptions<SmsServiceOptions>().BindConfiguration(SmsServiceOptions.SectionName);
+            services.AddScoped<Data.Seeding.Abstractions.IDataSeed, Data.Seeding.Seeds.CollectionSmsConfigurationSeed>();
+            services.AddHttpClient<ISmsSender, Business.Services.Sms.TelsamSmsService>(client =>
+                client.Timeout = TimeSpan.FromSeconds(20))
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            services.AddScoped<ICollectionContractReadService, CollectionContractReadService>();
+            services.AddScoped<ICollectionContractAttachmentService, CollectionContractAttachmentService>();
+            services.AddScoped<ICollectionContractCreateService, CollectionContractCreateService>();
+            services.AddScoped<ICollectionSubscriptionService, CollectionSubscriptionService>();
+            services.AddScoped<ICollectionRateChangeService, CollectionRateChangeService>();
+            services.AddScoped<CollectionSmsService>();
+            services.AddHostedService<CollectionSmsDispatcher>();
+            services.AddScoped<ICollectionContractUpdateService, CollectionContractUpdateService>();
+            services.AddScoped<ICollectionPaymentService, CollectionPaymentService>();
+            services.AddScoped<ICollectionTrackingService, CollectionTrackingService>();
+            services.AddScoped<ICollectionGroupContextService, CollectionGroupContextService>();
+            services.AddScoped<ICollectionCustomerService, CollectionCustomerService>();
+            services.AddScoped<ICollectionInvoiceService, CollectionInvoiceService>();
+            services.AddScoped<ICollectionInvoiceCommandService, CollectionInvoiceCommandService>();
+            services.AddScoped<ICollectionInvoiceLoadService, CollectionInvoiceLoadService>();
+            services.AddScoped<ICollectionBankLoadService, CollectionBankLoadService>();
+            services.AddScoped<ICollectionContractCorrectionService, CollectionContractCorrectionService>();
+            services.AddScoped<ICollectionPaymentReportService, CollectionPaymentReportService>();
+            services.AddScoped<ICollectionContractReportService, CollectionContractReportService>();
+            services.AddScoped<ICollectionGroupFollowUpService, CollectionGroupFollowUpService>();
+            services.AddScoped<ICollectionDefinitionReadService, CollectionDefinitionReadService>();
+            services.AddOptions<CollectionReadOptions>().BindConfiguration(CollectionReadOptions.SectionName);
             services.AddScoped(typeof(IAuthService), typeof(AuthService));
             services.AddScoped<IPasswordPolicyService, PasswordPolicyService>();
             services.AddScoped(typeof(IBrandService), typeof(BrandService));
@@ -101,11 +138,11 @@ namespace Business.DependencyResolvers.Autofac
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddScoped<Business.Interfaces.Sheets.ISheetsService, Business.Services.Sheets.SheetsService>();
-            services.AddHostedService<MailOutboxDispatcher>();
-            services.AddHostedService<SlaNotificationDispatcher>();
+            services.AddHostedService<RehearsalManagedWorker<MailOutboxDispatcher>>();
+            services.AddHostedService<RehearsalManagedWorker<SlaNotificationDispatcher>>();
             services.AddHostedService<ManitouStagingSyncBackgroundService>();
-            services.AddHostedService<PeriodicReportScheduler>();
-            services.AddHostedService<HelpdeskBackgroundWorker>();
+            services.AddHostedService<RehearsalManagedWorker<PeriodicReportScheduler>>();
+            services.AddHostedService<RehearsalManagedWorker<HelpdeskBackgroundWorker>>();
 
 
             // ASP.NET Core Identity hasher kaydı
