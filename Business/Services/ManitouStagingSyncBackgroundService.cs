@@ -1,6 +1,5 @@
 ﻿using Business.Interfaces.Manitou;
 using Core.Settings.Concrete;
-using Core.Utilities.IoC;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,25 +15,29 @@ namespace Business.Services
         private readonly ILogger<ManitouStagingSyncBackgroundService> _log;
         private readonly AppSettings _appSettings;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly StartupExecutionOptions _startupExecution;
 
         public ManitouStagingSyncBackgroundService(
             IServiceScopeFactory serviceScopeFactory,
-            ILogger<ManitouStagingSyncBackgroundService> log)
+            ILogger<ManitouStagingSyncBackgroundService> log,
+            IOptions<AppSettings> appSettings,
+            IOptions<StartupExecutionOptions> startupExecution)
         {
             _serviceScopeFactory = serviceScopeFactory;
             _log = log;
 
-            var appSettings = ServiceTool.ServiceProvider
-                .GetService<IOptionsSnapshot<AppSettings>>();
-
-            if (appSettings == null)
-                throw new InvalidOperationException("AppSettings servisinden okunamadı.");
-
             _appSettings = appSettings.Value;
+            _startupExecution = startupExecution.Value;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (!_startupExecution.ManitouSyncEnabled)
+            {
+                _log.LogWarning("Manitou otomatik senkronizasyonu açılış ayarıyla kapalı; API çağrısı ve veritabanı işlemi yapılmayacak. Açmak için ayarı değiştirip uygulamayı yeniden başlatın.");
+                return;
+            }
+
             var runEveryMinutes = _appSettings.ManitouRunEveryMinutes <= 0 ? 60 : _appSettings.ManitouRunEveryMinutes;
 
             var delay = TimeSpan.FromMinutes(runEveryMinutes);

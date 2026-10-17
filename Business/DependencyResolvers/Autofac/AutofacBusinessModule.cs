@@ -28,6 +28,8 @@ using Core.Utilities.IoC;
 using Core.Utilities.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Model.Dtos.CustomerSystem;
 using Model.Dtos.CustomerSystemAssignment;
 using Model.Dtos.MailOutbox;
@@ -39,6 +41,12 @@ namespace Business.DependencyResolvers.Autofac
     {
         public void Load(IServiceCollection services)
         {
+            services.AddOptions<StartupExecutionOptions>()
+                .BindConfiguration(StartupExecutionOptions.SectionName,
+                    options => options.ErrorOnUnknownConfiguration = true)
+                .Validate<IHostEnvironment, IConfiguration>(RehearsalStartupGuard.IsAllowed,
+                    "İzole prova yalnız CollectionRehearsal ortamı ve sabit prova DB/uygulama adıyla; migration, seed, Manitou ve Tahsilat kapalı, SMS simülasyonu açıkken kullanılabilir.")
+                .ValidateOnStart();
             services.AddOptions<SmsServiceOptions>().BindConfiguration(SmsServiceOptions.SectionName);
             services.AddScoped<Data.Seeding.Abstractions.IDataSeed, Data.Seeding.Seeds.CollectionSmsConfigurationSeed>();
             services.AddHttpClient<ISmsSender, Business.Services.Sms.TelsamSmsService>(client =>
@@ -130,11 +138,11 @@ namespace Business.DependencyResolvers.Autofac
 
             services.AddScoped<ICurrentUser, CurrentUser>(); 
             services.AddScoped<Business.Interfaces.Sheets.ISheetsService, Business.Services.Sheets.SheetsService>();
-            services.AddHostedService<MailOutboxDispatcher>();
-            services.AddHostedService<SlaNotificationDispatcher>();
+            services.AddHostedService<RehearsalManagedWorker<MailOutboxDispatcher>>();
+            services.AddHostedService<RehearsalManagedWorker<SlaNotificationDispatcher>>();
             services.AddHostedService<ManitouStagingSyncBackgroundService>();
-            services.AddHostedService<PeriodicReportScheduler>();
-            services.AddHostedService<HelpdeskBackgroundWorker>();
+            services.AddHostedService<RehearsalManagedWorker<PeriodicReportScheduler>>();
+            services.AddHostedService<RehearsalManagedWorker<HelpdeskBackgroundWorker>>();
 
 
             // ASP.NET Core Identity hasher kaydı
