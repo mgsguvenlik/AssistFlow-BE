@@ -1,0 +1,501 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Data.Concrete.EfCore.Context;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Model.Concrete.Collections;
+
+// Ödeme komutları kendi kesitini doğrular; transfer-payments yalnız plan hash'iyle yazar.
+if (args.Length == 2 && args[0] == "sms-workflow-check")
+{
+    await CollectionSmsWorkflowCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length == 2 && args[0] == "sms-setup")
+{
+    await CollectionSmsSetup.RunAsync(args[1]);
+    return;
+}
+if (args.Length == 1 && args[0] == "sms-service-check")
+{
+    await CollectionSmsServiceCheck.RunAsync();
+    return;
+}
+if (args.Length == 1 && args[0] == "bank-example-check")
+{
+    var bytes = Convert.FromBase64String((await Console.In.ReadToEndAsync()).Trim());
+    var preview = Business.Services.Crm.Collections.CollectionBankFileParser.Parse(bytes, "example.xlsx", "IVR", new(2026, 9, 1));
+    if (preview.Type != "GTS" || preview.Rows.Count != 6 || preview.Rows.Sum(x => x.Amount) != 12100m ||
+        preview.Rows.Any(x => x.Status != "Candidate" || x.CurrencyCode != "TRY" || x.PaymentDate?.Date != new DateTime(2026, 9, 30) ||
+            x.SubscriberSuffix?.Length != 4 || string.IsNullOrWhiteSpace(x.CustomerName)))
+        throw new InvalidOperationException("Örnek ödeme Excel'inin alan/tutar/tarih kontrolü başarısız.");
+    var clean = JsonSerializer.Serialize(preview);
+    if (clean.Contains("****") || clean.Contains("Net Tutar") || clean.Contains("Kart"))
+        throw new InvalidOperationException("Örnek dosyada kart/ek alan dışlama kontrolü başarısız.");
+    Console.WriteLine("Örnek Excel kontrolü başarılı: 6 aday satır, Tutar toplamı 12.100 TRY, 30.09.2026, GTS RRN kimliği, dört haneli abone/metin/tarih ve kart dışlama. Ödeme/DB/CDN yazılmadı.");
+    return;
+}
+if (args.Length == 2 && args[0] == "profile-bulk-rate-filters")
+{
+    using var cfg = JsonDocument.Parse(await File.ReadAllTextAsync(args[1]), new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+    var cs = new SqlConnectionStringBuilder(cfg.RootElement.GetProperty("AppSettings").GetProperty("MSSQLConnectionString").GetString());
+    if (cs.DataSource != "192.168.1.8" || cs.InitialCatalog != "AssistFlowTest") throw new InvalidOperationException("Yalnız test okuma kontrolü yapılabilir.");
+    await using var filterDb = new AppDataContext(new DbContextOptionsBuilder<AppDataContext>().UseSqlServer(cs.ConnectionString).Options);
+    var service = new Business.Services.Crm.Collections.CollectionContractReportService(new Business.UnitOfWork.UnitOfWork(new Data.Concrete.Repository(filterDb)));
+    var baseline = await service.GetPageAsync(new Model.Dtos.Crm.Collections.CollectionContractReportQuery { EligibleOnly = true, PageSize = 100 });
+    if (!baseline.IsSuccess) throw new InvalidOperationException(baseline.Message);
+    var sample = baseline.Data!.Items.First(x => x.Amount > 0 && x.PaymentFrequencyId.HasValue);
+    var serviceId = await filterDb.Set<CollectionContract>().Where(x => x.Id == sample.ContractId).Select(x => x.ServiceTypeId).SingleAsync();
+    var filtered = await service.GetPageAsync(new Model.Dtos.Crm.Collections.CollectionContractReportQuery { EligibleOnly = true, PageSize = 100,
+        AnniversaryMonth = sample.StartDate.Month, StartYear = sample.StartDate.Year, ServiceTypeId = serviceId,
+        PaymentFrequencyId = sample.PaymentFrequencyId, Amount = sample.Amount });
+    if (!filtered.IsSuccess || filtered.Data!.TotalCount == 0 || filtered.Data.Items.Any(x => x.StartDate.Month != sample.StartDate.Month || x.StartDate.Year != sample.StartDate.Year
+        || x.Amount != sample.Amount || x.PaymentFrequencyId != sample.PaymentFrequencyId || x.ServiceTypeName != sample.ServiceTypeName))
+        throw new InvalidOperationException("Birleşik zam filtrelerinin SQL kontrolü başarısız.");
+    Console.WriteLine($"Salt-okunur SQL kontrolü başarılı: ay/yıl/servis/ödeme dönemi/tutar birleşik filtre sonucu {filtered.Data.TotalCount} kayıt.");
+    return;
+}
+if (args.Length is 2 or 3 && args[0] == "copy-live-customers")
+{
+    await CustomerTestCopy.RunAsync(args[1], args.Length == 3 ? args[2] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "activity-transfer")
+{
+    await CollectionActivityTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length == 3 && args[0] == "activity-preview")
+{
+    await CollectionActivityPreview.RunAsync(args[1], args[2]);
+    return;
+}
+if (args.Length is 2 or 3 && args[0] == "k09-check")
+{
+    if (args.Length == 3 && args[2] != "--install") throw new InvalidOperationException("Geçersiz K09 seçeneği.");
+    await CollectionK09Check.RunAsync(args[1], args.Length == 3);
+    return;
+}
+if (args.Length == 2 && args[0] == "bank-load-check")
+{
+    await CollectionBankLoadCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length is 2 or 3 && args[0] == "bank-setup")
+{
+    await CollectionBankSetup.RunAsync(args[1], args.Length == 3 ? args[2] : null);
+    return;
+}
+if (args.Length == 1 && args[0] == "bank-file-check")
+{
+    CollectionBankFileCheck.Run();
+    return;
+}
+if (args.Length == 2 && args[0] == "invoice-load-check")
+{
+    await CollectionInvoiceLoadCheck.RunAsync(args[1]);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "invoice-accounts")
+{
+    await CollectionInvoiceAccountSetup.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length == 1 && args[0] == "invoice-file-check")
+{
+    CollectionInvoiceFileCheck.Run();
+    return;
+}
+if (args.Length == 4 && args[0] == "invoice-transfer")
+{
+    await CollectionInvoicePreview.RunAsync(args[1], args[2], args[3]);
+    return;
+}
+if (args.Length == 3 && args[0] == "invoice-preview")
+{
+    await CollectionInvoicePreview.RunAsync(args[1], args[2]);
+    return;
+}
+if (args.Length == 3 && args[0] == "invoice-setup")
+{
+    await CollectionInvoiceSetup.RunAsync(args[1], args[2]);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "group-history")
+{
+    await CollectionGroupHistoryTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "customer-notes")
+{
+    await CollectionCustomerNoteTransfer.RunAsync(args[1], args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "group-parents")
+{
+    await CollectionGroupParentTransfer.RunAsync(args[1], args[2], args.Length == 4 && args[3] != "--install" ? args[3] : null,
+        args.Length == 4 && args[3] == "--install");
+    return;
+}
+if (args.Length > 0 && args[0] == "transfer-payments")
+{
+    if (args.Length is not (7 or 8) || !long.TryParse(args[3], out var batchId))
+        throw new InvalidOperationException("Kullanım: transfer-payments <kesit> <Development JSON> <sözleşme batch> <manifest SHA-256> <legacy kanıt JSON> <kanıt SHA-256> [uygulanacak plan SHA-256]. Hash yoksa yalnız önizleme yapılır.");
+    await CollectionPaymentTransfer.RunAsync(args[1], args[2], batchId, args[4], args[5], args[6], args.Length == 8 ? args[7] : null);
+    return;
+}
+if (args.Length > 0 && args[0] == "compare-payment-currency")
+{
+    if (args.Length != 4)
+        throw new InvalidOperationException("Kullanım: compare-payment-currency <ön inceleme rapor klasörü> <legacy kanıt JSON yolu> <kanıt SHA-256>.");
+    await CollectionPaymentCurrencyComparison.RunAsync(args[1], args[2], args[3]);
+    return;
+}
+if (args.Length > 0 && args[0] == "review-payments")
+{
+    if (args.Length != 5 || !long.TryParse(args[3], out var paymentBatchId))
+        throw new InvalidOperationException("Kullanım: review-payments <ödeme kesiti klasörü> <Development JSON yolu> <sözleşme batch kimliği> <manifest SHA-256>.");
+    await CollectionPaymentReviewer.RunAsync(args[1], args[2], paymentBatchId, args[4]);
+    return;
+}
+if (args.Length is 3 or 5 && args[0] == "transfer-attachments")
+{
+    await CollectionAttachmentTransfer.RunAsync(args[1], args[2], args.Length == 5 ? args[3] : null,
+        args.Length == 5 ? int.Parse(args[4]) : 0);
+    return;
+}
+var scopeReview = args.Length is 3 or 4 && args[0] == "review-customer-scope";
+if (args.Length is 4 or 5 && args[0] == "review-item-five-batch" && long.TryParse(args[1], out var itemFiveBatchId))
+{
+    await CollectionItemFiveDecision.RunAsync(itemFiveBatchId, args[2], args[3], args.Length == 5 ? args[4] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "remove-obsolete-item-four-batch" && long.TryParse(args[1], out var removalBatchId))
+{
+    await CollectionObsoleteContractRemoval.RunAsync(removalBatchId, args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args.Length is 3 or 4 && args[0] is "review-customer-duplicates-batch" or "review-customer-names-batch" && long.TryParse(args[1], out var duplicateBatchId))
+{
+    await CollectionCustomerDuplicateReviewer.RunAsync(duplicateBatchId, args[2], args.Length == 4 ? args[3] : null,
+        byName: args[0] == "review-customer-names-batch");
+    return;
+}
+if (args.Length is 3 or 4 && args[0] is "transfer-item-two-batch" or "transfer-frozen-batch" or "transfer-item-four-batch" or "transfer-item-five-batch" && long.TryParse(args[1], out var transferBatchId))
+{
+    await CollectionStoredBatchTransfer.RunAsync(transferBatchId, args[2], args.Length == 4 ? args[3] : null,
+        frozenOnly: args[0] == "transfer-frozen-batch", itemFourOnly: args[0] == "transfer-item-four-batch", itemFiveOnly: args[0] == "transfer-item-five-batch");
+    return;
+}
+if (args.Length is 3 or 4 && args[0] == "review-customer-scope-batch" && long.TryParse(args[1], out var scopeBatchId))
+{
+    await CollectionCustomerScopeReviewer.RunStoredBatchAsync(scopeBatchId, args[2], args.Length == 4 ? args[3] : null);
+    return;
+}
+
+// Only immutable, pre-exported NDJSON files are accepted. The source database is never opened here.
+var isApply = args.Length == 4 && args[0] is "apply" or "exclude-yok" or "include-unknown" or "exclude-unidentified";
+if (!scopeReview && !isApply && (args.Length is not (2 or 3) || args[0] is not ("inspect" or "profile" or "stage" or "validate" or "summary" or "prepare-references" or "plan" or "reconcile" or "classify" or "customer-exceptions" or "rate-exceptions" or "attachment-inventory" or "decision-exceptions" or "include-unknown" or "exclude-unidentified")
+    || (args[0] is not ("inspect" or "profile") && args.Length != 3)))
+{
+    if (args.Length == 3 && args[0] == "map")
+    {
+        await CollectionReferenceMapImporter.RunAsync(args[1], args[2]);
+        return;
+    }
+    throw new InvalidOperationException("Kullanım: inspect/profile <kesit klasörü>, stage/validate/summary/prepare-references/plan/classify/customer-exceptions/rate-exceptions/attachment-inventory/decision-exceptions/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu>, apply/exclude-yok/include-unknown/exclude-unidentified <kesit klasörü> <Development JSON yolu> <plan SHA-256>, review-customer-scope <kesit klasörü> <Development JSON yolu> [plan SHA-256], review-customer-scope-batch <batchId> <Development JSON yolu> [plan SHA-256] veya map <eşleme JSON yolu> <Development JSON yolu>.");
+}
+
+var directory = Path.GetFullPath(args[1]);
+if (!Directory.Exists(directory)) throw new InvalidOperationException("Kesit klasörü bulunamadı.");
+var manifestPath = Path.Combine(directory, "manifest.json");
+if (!File.Exists(manifestPath)) throw new InvalidOperationException("Kesit manifest dosyası bulunamadı.");
+using var manifestDocument = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath));
+var manifest = manifestDocument.RootElement;
+if (manifest.TryGetProperty("exportKind", out var exportKind) && exportKind.GetString() == "payment-review")
+    throw new InvalidOperationException("Ödeme inceleme kesiti sözleşme aktarım komutuyla işlenemez. Ödeme doğrulama ve mutabakat adımı gereklidir.");
+var sourceSystem = Required(manifest, "sourceSystem", 50);
+var snapshotKey = Required(manifest, "snapshotKey", 200);
+var ruleVersion = Required(manifest, "ruleVersion", 50);
+var normalizationVersion = Required(manifest, "normalizationVersion", 50);
+var customers = await InspectFileAsync(Path.Combine(directory, "customers.ndjson"), "Customer", "CustomerID");
+var contracts = await InspectFileAsync(Path.Combine(directory, "contracts.ndjson"), "Contract", "ContractID");
+var histories = await InspectFileAsync(Path.Combine(directory, "contract-history.ndjson"), "ContractHistory", "ContractHistoryID");
+if (customers.Count == 0 || contracts.Count == 0 || histories.Count == 0)
+    throw new InvalidOperationException("Müşteri, sözleşme ve tarihçe kesit dosyaları boş olamaz.");
+var manifestValue = JsonSerializer.Serialize(new object[] { "collection-snapshot-v1", sourceSystem,
+    snapshotKey, ruleVersion, normalizationVersion, customers.Count, Convert.ToHexString(customers.Hash),
+    contracts.Count, Convert.ToHexString(contracts.Hash), histories.Count, Convert.ToHexString(histories.Hash) });
+var manifestHash = SHA256.HashData(Encoding.UTF8.GetBytes(manifestValue));
+Console.WriteLine($"Kesit doğrulandı: {customers.Count} müşteri, {contracts.Count} sözleşme, {histories.Count} tarihçe; SHA-256 manifest {Convert.ToHexString(manifestHash)}.");
+if (args[0] == "inspect") return;
+if (scopeReview)
+{
+    await CollectionCustomerScopeReviewer.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2],
+        args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args[0] == "profile")
+{
+    await CollectionSnapshotProfiler.RunAsync(customers.Path, contracts.Path, histories.Path);
+    return;
+}
+if (args[0] == "validate")
+{
+    await CollectionStageValidator.RunAsync(sourceSystem, snapshotKey, manifestHash,
+        customers.Count, contracts.Count, histories.Count, args[2]);
+    return;
+}
+if (args[0] == "summary")
+{
+    await CollectionStageSummary.RunAsync(sourceSystem, snapshotKey, args[2]);
+    return;
+}
+if (args[0] == "prepare-references")
+{
+    await CollectionSharedReferencePreparer.RunAsync(sourceSystem, snapshotKey, args[2]);
+    return;
+}
+if (args[0] == "plan")
+{
+    await CollectionMigrationPlanner.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2]);
+    return;
+}
+if (args[0] == "apply")
+{
+    await CollectionMigrationApplier.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], args[3]);
+    return;
+}
+if (args[0] == "reconcile")
+{
+    await CollectionMigrationReconciler.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2]);
+    return;
+}
+if (args[0] == "classify")
+{
+    await CollectionMigrationExceptionClassifier.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], null);
+    return;
+}
+if (args[0] == "exclude-yok")
+{
+    await CollectionMigrationExceptionClassifier.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], args[3]);
+    return;
+}
+if (args[0] == "include-unknown")
+{
+    await CollectionUnknownContractIncluder.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2],
+        args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args[0] == "exclude-unidentified")
+{
+    await CollectionUnidentifiedCustomerExcluder.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2],
+        args.Length == 4 ? args[3] : null);
+    return;
+}
+if (args[0] == "customer-exceptions")
+{
+    await CollectionCustomerExceptionReport.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], directory);
+    return;
+}
+if (args[0] == "rate-exceptions")
+{
+    await CollectionRateExceptionReport.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], directory);
+    return;
+}
+if (args[0] == "attachment-inventory")
+{
+    await CollectionAttachmentInventory.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], directory);
+    return;
+}
+if (args[0] == "decision-exceptions")
+{
+    await CollectionDecisionExceptionReport.RunAsync(sourceSystem, snapshotKey, manifestHash, args[2], directory);
+    return;
+}
+
+using var settings = JsonDocument.Parse(await File.ReadAllTextAsync(args[2]), new JsonDocumentOptions
+{
+    AllowTrailingCommas = true,
+    CommentHandling = JsonCommentHandling.Skip
+});
+var connection = new SqlConnectionStringBuilder(settings.RootElement.GetProperty("AppSettings")
+    .GetProperty("MSSQLConnectionString").GetString());
+if (connection.DataSource != "192.168.1.8" || connection.InitialCatalog != "AssistFlowTest")
+    throw new InvalidOperationException("Bu ilk staging komutu yalnız AssistFlowTest üzerinde çalışır.");
+var options = new DbContextOptionsBuilder<AppDataContext>()
+    .UseSqlServer(connection.ConnectionString, sql => sql.EnableRetryOnFailure()).Options;
+await using var db = new AppDataContext(options);
+if (db.Model.FindEntityType(typeof(CollectionMigrationBatch)) is null)
+    throw new InvalidOperationException("Aktarım staging modeli etkin değil.");
+
+var batch = await db.Set<CollectionMigrationBatch>().SingleOrDefaultAsync(x =>
+    x.SourceSystem == sourceSystem && x.SnapshotKey == snapshotKey);
+if (batch is not null && (!batch.ManifestHash.SequenceEqual(manifestHash)
+    || batch.RuleVersion != ruleVersion || batch.NormalizationVersion != normalizationVersion))
+    throw new InvalidOperationException("Aynı kesit anahtarı farklı içerik veya kuralla zaten kayıtlı; yeni kesit anahtarı gerekir.");
+if (batch is not null && batch.Status != CollectionMigrationBatchStatus.Staged)
+    throw new InvalidOperationException("İşlenmiş kesit yeniden staging'e alınamaz.");
+if (batch is null)
+{
+    batch = new CollectionMigrationBatch
+    {
+        SourceSystem = sourceSystem, SnapshotKey = snapshotKey, ManifestHash = manifestHash,
+        RuleVersion = ruleVersion, NormalizationVersion = normalizationVersion,
+        Status = CollectionMigrationBatchStatus.Staged, CreatedDate = DateTimeOffset.UtcNow,
+        CreatedUser = 0 // Offline importer; not a CRM user action.
+    };
+    db.Set<CollectionMigrationBatch>().Add(batch);
+    await db.SaveChangesAsync();
+}
+
+var added = 0;
+foreach (var input in new[] { customers, contracts, histories })
+{
+    await using (var hashStream = File.OpenRead(input.Path))
+    {
+        var currentHash = await SHA256.HashDataAsync(hashStream);
+        if (!currentHash.SequenceEqual(input.Hash))
+            throw new InvalidOperationException($"{input.EntityCode} dosyası incelemeden sonra değişmiş; staging durduruldu.");
+    }
+    var existing = await db.Set<CollectionMigrationSourceRow>().AsNoTracking()
+        .Where(x => x.BatchId == batch.Id && x.EntityCode == input.EntityCode)
+        .Select(x => new { x.SourceId, x.PayloadHash }).ToDictionaryAsync(x => x.SourceId, x => x.PayloadHash);
+    await using var stream = File.OpenRead(input.Path);
+    using var reader = new StreamReader(stream, new UTF8Encoding(false, true));
+    string? line;
+    while ((line = await reader.ReadLineAsync()) is not null)
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+        using var document = JsonDocument.Parse(line);
+        var sourceId = RequiredIdentity(document.RootElement, input.IdProperty);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(line));
+        if (existing.TryGetValue(sourceId, out var previous))
+        {
+            if (!previous.SequenceEqual(hash))
+                throw new InvalidOperationException($"Önceden alınmış {input.EntityCode} satırı değişmiş; mevcut ham satır ezilmedi.");
+            continue;
+        }
+        var parentId = input.EntityCode == "ContractHistory"
+            ? OptionalIdentity(document.RootElement, "ContractID") : null;
+        var sourceRow = new CollectionMigrationSourceRow
+        {
+            BatchId = batch.Id, EntityCode = input.EntityCode, SourceId = sourceId,
+            SourceParentId = parentId, Payload = line, PayloadHash = hash, StagedDate = DateTimeOffset.UtcNow
+        };
+        db.Set<CollectionMigrationSourceRow>().Add(sourceRow);
+        if (input.EntityCode == "Contract")
+        {
+            db.Set<CollectionMigrationContractStage>().Add(new CollectionMigrationContractStage
+            {
+                SourceRow = sourceRow,
+                SourceCustomerId = OptionalIdentity(document.RootElement, "CustomerID"),
+                SourceServiceTypeId = OptionalIdentity(document.RootElement, "ServiceTypeID"),
+                SourceContractStatusId = OptionalIdentity(document.RootElement, "ContractStatusID"),
+                SourceSubscriptionStatusId = OptionalIdentity(document.RootElement, "SubscriptionStatusID"),
+                SourcePaymentMethodId = OptionalIdentity(document.RootElement, "PaymentMethodID"),
+                AttachmentName = OptionalText(document.RootElement, "FileAttachmentName", 255),
+                AttachmentPath = OptionalText(document.RootElement, "FileAttachmentPath", 1000),
+                Status = CollectionMigrationRowStatus.Pending
+            });
+        }
+        else if (input.EntityCode == "ContractHistory")
+        {
+            db.Set<CollectionMigrationRatePeriodStage>().Add(new CollectionMigrationRatePeriodStage
+            {
+                SourceRow = sourceRow, SourceContractId = parentId,
+                SourceCustomerId = OptionalIdentity(document.RootElement, "CustomerID"),
+                SourceCurrencyId = OptionalIdentity(document.RootElement, "CurrencyID"),
+                SourcePaymentTypeId = OptionalIdentity(document.RootElement, "PaymentTypeID"),
+                Status = CollectionMigrationRowStatus.Pending
+            });
+        }
+        added++;
+        if (added % 500 == 0) await FlushAsync();
+    }
+    await FlushAsync();
+}
+var stagedContracts = await db.Set<CollectionMigrationSourceRow>().AsNoTracking()
+    .CountAsync(x => x.BatchId == batch.Id && x.EntityCode == "Contract");
+var stagedCustomers = await db.Set<CollectionMigrationSourceRow>().AsNoTracking()
+    .CountAsync(x => x.BatchId == batch.Id && x.EntityCode == "Customer");
+var stagedHistories = await db.Set<CollectionMigrationSourceRow>().AsNoTracking()
+    .CountAsync(x => x.BatchId == batch.Id && x.EntityCode == "ContractHistory");
+if (stagedCustomers != customers.Count || stagedContracts != contracts.Count || stagedHistories != histories.Count)
+    throw new InvalidOperationException("Staging satır sayısı kesit manifestiyle uyuşmuyor; aktarım başlamadı.");
+Console.WriteLine($"Staging tamamlandı: {added} yeni ham satır. Yükleme/finansal kayıt oluşturulmadı.");
+
+async Task FlushAsync()
+{
+    if (!db.ChangeTracker.HasChanges()) return;
+    await db.SaveChangesAsync();
+    db.ChangeTracker.Clear();
+}
+
+static string Required(JsonElement value, string property, int maxLength)
+{
+    if (!value.TryGetProperty(property, out var item) || item.ValueKind != JsonValueKind.String)
+        throw new InvalidOperationException($"Manifest {property} alanı eksik.");
+    var text = item.GetString();
+    if (string.IsNullOrWhiteSpace(text) || text.Length > maxLength)
+        throw new InvalidOperationException($"Manifest {property} alanı geçersiz.");
+    return text;
+}
+
+static string RequiredIdentity(JsonElement value, string property)
+{
+    var identity = OptionalIdentity(value, property);
+    return string.IsNullOrWhiteSpace(identity)
+        ? throw new InvalidOperationException($"Kaynak {property} kimliği eksik.")
+        : identity;
+}
+
+static string? OptionalIdentity(JsonElement value, string property)
+{
+    if (!value.TryGetProperty(property, out var item) || item.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        return null;
+    var text = item.ValueKind switch
+    {
+        JsonValueKind.String => item.GetString(),
+        JsonValueKind.Number => item.GetRawText(),
+        _ => throw new InvalidOperationException($"Kaynak {property} kimlik türü geçersiz.")
+    };
+    if (text is null || text.Length > 100) throw new InvalidOperationException($"Kaynak {property} kimliği çok uzun.");
+    return text;
+}
+
+static string? OptionalText(JsonElement value, string property, int maxLength)
+{
+    if (!value.TryGetProperty(property, out var item) || item.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        return null;
+    if (item.ValueKind != JsonValueKind.String)
+        throw new InvalidOperationException($"Kaynak {property} alanının metin olması gerekir.");
+    var text = item.GetString();
+    return text?.Length <= maxLength ? text : null; // Ham değer MigrationSourceRow.Payload içinde korunur.
+}
+
+static async Task<InspectedFile> InspectFileAsync(string path, string entityCode, string idProperty)
+{
+    if (!File.Exists(path)) throw new InvalidOperationException($"{entityCode} kesit dosyası bulunamadı.");
+    await using var stream = File.OpenRead(path);
+    var fileHash = await SHA256.HashDataAsync(stream);
+    stream.Position = 0;
+    using var reader = new StreamReader(stream, new UTF8Encoding(false, true));
+    var ids = new HashSet<string>(StringComparer.Ordinal);
+    string? line;
+    var count = 0;
+    while ((line = await reader.ReadLineAsync()) is not null)
+    {
+        if (string.IsNullOrWhiteSpace(line)) continue;
+        using var document = JsonDocument.Parse(line);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException($"{entityCode} satırı JSON nesnesi değil.");
+        var id = RequiredIdentity(document.RootElement, idProperty);
+        if (!ids.Add(id)) throw new InvalidOperationException($"{entityCode} kesitinde tekrar eden kaynak kimliği var.");
+        count++;
+    }
+    return new(path, entityCode, idProperty, count, fileHash);
+}
+
+internal sealed record InspectedFile(string Path, string EntityCode, string IdProperty, int Count, byte[] Hash);
