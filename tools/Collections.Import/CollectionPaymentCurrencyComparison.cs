@@ -8,7 +8,7 @@ using Business.Services.Crm.Collections.Calculation;
 internal static class CollectionPaymentCurrencyComparison
 {
     // Tanımlar değişirse eski SQL davranışını sessizce taklit etme: yeniden kod incelemesi gerekir.
-    private static readonly Dictionary<string, string> DefinitionHashes = new()
+    internal static readonly IReadOnlyDictionary<string, string> DefinitionHashes = new Dictionary<string, string>()
     {
         ["Core.vContract"] = "1E1A43394410B1A33979E94B39777B0EAEB9F6F077633700AD44C5139CF96E54",
         ["Core.vContractHistory"] = "6AED7E0BE88A8DB3A2EC65A8257C0EAAB125A464312D76B48B2833C5EA9B5A58",
@@ -73,6 +73,100 @@ internal static class CollectionPaymentCurrencyComparison
         }
         var customers = sourceRows["customers.ndjson"];
         var histories = sourceRows["contract-history.ndjson"].Values.ToLookup(x => Id(x, "ContractID"));
+        var resolve = CreateResolver(customers, histories, currencies, paymentTypes, maps, openEnd);
+
+        // Büyük ödeme raporu akışla okunur; hash doğrulamasından sona kadar başka yazara kapalıdır.
+        await using var input = new FileStream(Path.Combine(reviewDirectory, "payments.ndjson"), FileMode.Open, FileAccess.Read, FileShare.Read);
+        Require(Convert.ToHexString(await SHA256.HashDataAsync(input)) == Text(summary, "PaymentReportHash"), "Ön inceleme satır raporu hash'i uyuşmuyor.");
+        input.Position = 0;
+        var outputDirectory = Path.Combine(reviewDirectory, $"currency-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outputDirectory);
+        var counts = new SortedDictionary<string, long>();
+        var priorCounts = new SortedDictionary<string, long>();
+        var totals = new SortedDictionary<int, (long Count, decimal Amount)>();
+        long read = 0, compared = 0, candidatesCount = 0, newlyCleared = 0;
+        await using (var writer = new StreamWriter(Path.Combine(outputDirectory, "comparison.ndjson"), false, new UTF8Encoding(false)))
+        using (var reader = new StreamReader(input, new UTF8Encoding(false, true), leaveOpen: true))
+        {
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                read++;
+                using var doc = JsonDocument.Parse(line);
+                var row = doc.RootElement;
+                if (Text(row, "Scope") != "RetainedMappedContract") continue;
+                compared++;
+                var periodText = Text(row, "Period");
+                LegacyResult? legacy = null;
+                var status = "InvalidPeriod";
+                var currency = row.GetProperty("Currency");
+                if (DateOnly.TryParseExact(periodText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var period))
+                {
+                    legacy = resolve(Id(row, "SourceContractId"), period);
+                    status = legacy.InvalidHistory ? "LegacyInvalidHistory"
+                        : legacy.Result.Status != PaymentCurrencyCandidateStatus.SingleRateCurrency ? "Legacy" + legacy.Result.Status
+                        : currency.ValueKind == JsonValueKind.Null || Id(currency, "CandidateCount") != 1 || Id(currency, "ResolvedCurrencyTypeId") == 0 ? "TargetNotSingleCurrency"
+                        : Id(currency, "ResolvedCurrencyTypeId") == legacy.Result.ResolvedCurrencyTypeId ? "SingleCurrencyMatch" : "CurrencyMismatch";
+                }
+                var originalIssues = row.GetProperty("Issues").EnumerateArray().Select(x => x.GetString()!).ToArray();
+                var remainingIssues = originalIssues.Where(x => !HistoricalAmountObservations.Contains(x)).ToArray();
+                var prior = row.GetProperty("PreliminaryCandidate").GetBoolean();
+                var candidate = status == "SingleCurrencyMatch" && remainingIssues.Length == 0;
+                Increment(counts, status);
+                if (prior) Increment(priorCounts, status);
+                if (candidate)
+                {
+                    candidatesCount++;
+                    if (!prior) newlyCleared++;
+                    var id = legacy!.Result.ResolvedCurrencyTypeId!.Value;
+                    var before = totals.GetValueOrDefault(id);
+                    totals[id] = (before.Count + 1, before.Amount + row.GetProperty("Amount").GetDecimal());
+                }
+                await writer.WriteLineAsync(JsonSerializer.Serialize(new
+                {
+                    PaymentId = Id(row, "PaymentId"),
+                    SourceContractId = Id(row, "SourceContractId"),
+                    Period = periodText,
+                    Comparison = status,
+                    Legacy = legacy,
+                    PriorPreliminaryCandidate = prior,
+                    HistoricalObservations = originalIssues.Where(HistoricalAmountObservations.Contains),
+                    RemainingIssues = remainingIssues,
+                    PreliminaryCandidate = candidate,
+                    ReadyToApply = false
+                }));
+            }
+        }
+        Require(read == Id(summary, "PaymentCount") && compared == Id(summary.GetProperty("ScopeCounts"), "RetainedMappedContract"), "Karşılaştırma satır sayısı uyuşmuyor.");
+        await using var report = File.OpenRead(Path.Combine(outputDirectory, "comparison.ndjson"));
+        var result = new
+        {
+            Version = "legacy-payment-currency-v1",
+            ReferenceHash = Hash(referenceBytes),
+            SourceYear = sourceYear,
+            InputReportHash = Text(summary, "PaymentReportHash"),
+            ManifestHash = Text(summary, "ManifestHash"),
+            ComparedPayments = compared,
+            ComparisonCounts = counts,
+            PriorCandidateComparisonCounts = priorCounts,
+            PreliminaryCandidates = candidatesCount,
+            NewlyClearedHistoricalObservations = newlyCleared,
+            PreliminaryTotals = totals.Select(x => new { CurrencyTypeId = x.Key, x.Value.Count, x.Value.Amount }),
+            ReportHash = Convert.ToHexString(await SHA256.HashDataAsync(report)),
+            ReadyToApply = false,
+            RemainingGates = new[] { "Fiziksel silme / kalıcı kaynak kimliği", "Uygulama öncesi güncel kaynak, tanım, eşleme ve hedef mutabakatı", "Legacy karşılaştırma istisnaları" }
+        };
+        await File.WriteAllTextAsync(Path.Combine(outputDirectory, "summary.json"), JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine($"Legacy para birimi karşılaştırması: {compared} ödeme; ön aday {candidatesCount}. Veritabanına yazılmadı.");
+        Console.WriteLine($"Rapor: {outputDirectory}");
+        return outputDirectory;
+    }
+
+    // Shared only by offline review tools. Keeps the previously examined legacy semantics unchanged.
+    internal static Func<long, DateOnly, LegacyResult> CreateResolver(
+        Dictionary<long, JsonElement> customers, ILookup<long, JsonElement> histories,
+        Dictionary<long, string?> currencies, Dictionary<long, string?> paymentTypes,
+        Dictionary<long, int> maps, DateOnly openEnd)
+    {
         var cache = new Dictionary<(long Contract, DateOnly Period), LegacyResult>();
         LegacyResult Resolve(long contractId, DateOnly period)
         {
@@ -121,80 +215,10 @@ internal static class CollectionPaymentCurrencyComparison
             return cache[(contractId, period)] = new(PaymentCurrencyCandidateRules.Evaluate(candidates), sourceIds.ToArray(), invalid, shifted);
         }
 
-        // Büyük ödeme raporu akışla okunur; hash doğrulamasından sona kadar başka yazara kapalıdır.
-        await using var input = new FileStream(Path.Combine(reviewDirectory, "payments.ndjson"), FileMode.Open, FileAccess.Read, FileShare.Read);
-        Require(Convert.ToHexString(await SHA256.HashDataAsync(input)) == Text(summary, "PaymentReportHash"), "Ön inceleme satır raporu hash'i uyuşmuyor.");
-        input.Position = 0;
-        var outputDirectory = Path.Combine(reviewDirectory, $"currency-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(outputDirectory);
-        var counts = new SortedDictionary<string, long>();
-        var priorCounts = new SortedDictionary<string, long>();
-        var totals = new SortedDictionary<int, (long Count, decimal Amount)>();
-        long read = 0, compared = 0, candidatesCount = 0, newlyCleared = 0;
-        await using (var writer = new StreamWriter(Path.Combine(outputDirectory, "comparison.ndjson"), false, new UTF8Encoding(false)))
-        using (var reader = new StreamReader(input, new UTF8Encoding(false, true), leaveOpen: true))
-        {
-            while (await reader.ReadLineAsync() is { } line)
-            {
-                read++;
-                using var doc = JsonDocument.Parse(line);
-                var row = doc.RootElement;
-                if (Text(row, "Scope") != "RetainedMappedContract") continue;
-                compared++;
-                var periodText = Text(row, "Period");
-                LegacyResult? legacy = null;
-                var status = "InvalidPeriod";
-                var currency = row.GetProperty("Currency");
-                if (DateOnly.TryParseExact(periodText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var period))
-                {
-                    legacy = Resolve(Id(row, "SourceContractId"), period);
-                    status = legacy.InvalidHistory ? "LegacyInvalidHistory"
-                        : legacy.Result.Status != PaymentCurrencyCandidateStatus.SingleRateCurrency ? "Legacy" + legacy.Result.Status
-                        : currency.ValueKind == JsonValueKind.Null || Id(currency, "CandidateCount") != 1 || Id(currency, "ResolvedCurrencyTypeId") == 0 ? "TargetNotSingleCurrency"
-                        : Id(currency, "ResolvedCurrencyTypeId") == legacy.Result.ResolvedCurrencyTypeId ? "SingleCurrencyMatch" : "CurrencyMismatch";
-                }
-                var originalIssues = row.GetProperty("Issues").EnumerateArray().Select(x => x.GetString()!).ToArray();
-                var remainingIssues = originalIssues.Where(x => !HistoricalAmountObservations.Contains(x)).ToArray();
-                var prior = row.GetProperty("PreliminaryCandidate").GetBoolean();
-                var candidate = status == "SingleCurrencyMatch" && remainingIssues.Length == 0;
-                Increment(counts, status);
-                if (prior) Increment(priorCounts, status);
-                if (candidate)
-                {
-                    candidatesCount++;
-                    if (!prior) newlyCleared++;
-                    var id = legacy!.Result.ResolvedCurrencyTypeId!.Value;
-                    var before = totals.GetValueOrDefault(id);
-                    totals[id] = (before.Count + 1, before.Amount + row.GetProperty("Amount").GetDecimal());
-                }
-                await writer.WriteLineAsync(JsonSerializer.Serialize(new
-                {
-                    PaymentId = Id(row, "PaymentId"), SourceContractId = Id(row, "SourceContractId"), Period = periodText,
-                    Comparison = status, Legacy = legacy, PriorPreliminaryCandidate = prior,
-                    HistoricalObservations = originalIssues.Where(HistoricalAmountObservations.Contains),
-                    RemainingIssues = remainingIssues, PreliminaryCandidate = candidate, ReadyToApply = false
-                }));
-            }
-        }
-        Require(read == Id(summary, "PaymentCount") && compared == Id(summary.GetProperty("ScopeCounts"), "RetainedMappedContract"), "Karşılaştırma satır sayısı uyuşmuyor.");
-        await using var report = File.OpenRead(Path.Combine(outputDirectory, "comparison.ndjson"));
-        var result = new
-        {
-            Version = "legacy-payment-currency-v1", ReferenceHash = Hash(referenceBytes), SourceYear = sourceYear,
-            InputReportHash = Text(summary, "PaymentReportHash"), ManifestHash = Text(summary, "ManifestHash"),
-            ComparedPayments = compared, ComparisonCounts = counts, PriorCandidateComparisonCounts = priorCounts,
-            PreliminaryCandidates = candidatesCount, NewlyClearedHistoricalObservations = newlyCleared,
-            PreliminaryTotals = totals.Select(x => new { CurrencyTypeId = x.Key, x.Value.Count, x.Value.Amount }),
-            ReportHash = Convert.ToHexString(await SHA256.HashDataAsync(report)), ReadyToApply = false,
-            RemainingGates = new[] { "Fiziksel silme / kalıcı kaynak kimliği", "Uygulama öncesi güncel kaynak, tanım, eşleme ve hedef mutabakatı", "Legacy karşılaştırma istisnaları" }
-        };
-        await File.WriteAllTextAsync(Path.Combine(outputDirectory, "summary.json"), JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
-        Console.WriteLine($"Legacy para birimi karşılaştırması: {compared} ödeme; ön aday {candidatesCount}. Veritabanına yazılmadı.");
-        Console.WriteLine($"Rapor: {outputDirectory}");
-        return outputDirectory;
+        return Resolve;
     }
 
-    private sealed record LegacyResult(PaymentCurrencyCandidateResult Result, long[] SourceHistoryIds, bool InvalidHistory, bool HasPre2016History);
+    internal sealed record LegacyResult(PaymentCurrencyCandidateResult Result, long[] SourceHistoryIds, bool InvalidHistory, bool HasPre2016History);
     private static int? Interval(string? name)
     {
         foreach (var (label, months) in new[] { ("Aylık", 1), ("2 Aylık", 2), ("3 Aylık", 3), ("4 Aylık", 4), ("6 Aylık", 6), ("Yıllık", 12), ("2 Yıllık", 24), ("3 Yıllık", 36) })
