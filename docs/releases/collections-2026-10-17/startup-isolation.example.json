@@ -1,0 +1,16 @@
+{
+  "StartupExecution": {
+    "MigrationsEnabled": false,
+    "SeedsEnabled": false,
+    "ManitouSyncEnabled": false,
+    "IsolatedRehearsalMode": false
+  },
+  "CollectionRead": {
+    "Enabled": false,
+    "ContractCreateEnabled": false
+  },
+  "AppSettings": {
+    "CollectionSmsEnabled": false,
+    "SmsSimulationEnabled": true
+  }
+}

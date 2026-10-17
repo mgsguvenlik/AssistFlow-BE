@@ -1,0 +1,140 @@
+{
+  "status": "REVIEW_REQUIRED_NOT_APPROVED_FOR_EXECUTION",
+  "generatedAtUtc": "2026-10-15T19:15:00.4876221+00:00",
+  "targetDatabase": "AssistFlow",
+  "profileSha256": "B14329936232BE78FCD59D09DC4D101E8BD6CAF66E315ADA0742D99633549FB6",
+  "note": "Yaln\u0131z eksik Collection migrationlar\u0131. Seed, veri aktar\u0131m\u0131, ortak m\u00FC\u015Fteri/prosed\u00FCr/yetki de\u011Fi\u015Fiklikleri dahil de\u011Fildir. SQL istemcisi ilk hatada durmal\u0131d\u0131r.",
+  "appliedCollection": [],
+  "unknownExistingMigrations": [
+    "20251124200930_FixCustomerDuplicateColumn"
+  ],
+  "pendingNonCollection": [],
+  "files": [
+    {
+      "migrationId": "20260910150310_AddCollectionFoundation",
+      "previousMigrationId": "20260905164011_AddEkbTenantModule",
+      "file": "01-20260910150310_AddCollectionFoundation.sql",
+      "sha256": "714F0BBC1131BA95574CA77BD27EB4375FEFEF57F2F88DD0501E1D3BD62F7D39"
+    },
+    {
+      "migrationId": "20260912184617_AddCollectionOriginalAnchorDay",
+      "previousMigrationId": "20260910150310_AddCollectionFoundation",
+      "file": "02-20260912184617_AddCollectionOriginalAnchorDay.sql",
+      "sha256": "E987C9FABCF34638CBC3CE308A7C0E6F3F4F54B2427F246D5DF89C6B636A972F"
+    },
+    {
+      "migrationId": "20260913081707_AddCollectionContractCreationRequest",
+      "previousMigrationId": "20260912184617_AddCollectionOriginalAnchorDay",
+      "file": "03-20260913081707_AddCollectionContractCreationRequest.sql",
+      "sha256": "5DBAF387CEDA6A9B6D72F9B72E369C848BEABF41BF25BC5A5F166C438534A155"
+    },
+    {
+      "migrationId": "20260915180434_AddCollectionMigrationStaging",
+      "previousMigrationId": "20260913081707_AddCollectionContractCreationRequest",
+      "file": "04-20260915180434_AddCollectionMigrationStaging.sql",
+      "sha256": "EA09DC22D20CB686F477ACE1F26298F6AF53AAB3AD5E2F7AA64250B5E77D98DE"
+    },
+    {
+      "migrationId": "20260916195834_AddCollectionMigrationCustomerTypeMap",
+      "previousMigrationId": "20260915180434_AddCollectionMigrationStaging",
+      "file": "05-20260916195834_AddCollectionMigrationCustomerTypeMap.sql",
+      "sha256": "CB744CE3D0FFDF78B48FE847744141ED3D77D3753E1DECFE70C7D361C2F77770"
+    },
+    {
+      "migrationId": "20260916202500_AddCollectionContractAttachment",
+      "previousMigrationId": "20260916195834_AddCollectionMigrationCustomerTypeMap",
+      "file": "06-20260916202500_AddCollectionContractAttachment.sql",
+      "sha256": "CD32A7D15F0990405B3EDB06117E073B10DE9D1D4B3B9C4C88E805216F211A2B"
+    },
+    {
+      "migrationId": "20260927123000_AddCollectionTrackingIndexes",
+      "previousMigrationId": "20260916202500_AddCollectionContractAttachment",
+      "file": "07-20260927123000_AddCollectionTrackingIndexes.sql",
+      "sha256": "81862997C5BCBA9F9F5A4911BF3021D7E8817A7446685CE3B06D23FA808D06BF"
+    },
+    {
+      "migrationId": "20260927160000_AddCollectionGroupParent",
+      "previousMigrationId": "20260927123000_AddCollectionTrackingIndexes",
+      "file": "08-20260927160000_AddCollectionGroupParent.sql",
+      "sha256": "76C08E693BA91FE499F7432753837C179C5ADCC0C49C60D8525389FE7AAD77DD"
+    },
+    {
+      "migrationId": "20260927180000_AddCollectionCustomerNotes",
+      "previousMigrationId": "20260927160000_AddCollectionGroupParent",
+      "file": "09-20260927180000_AddCollectionCustomerNotes.sql",
+      "sha256": "CA23D6828B465E1E8A7DB73138E6485344239C70ACCFE69A2883E7E3DE162AA1"
+    },
+    {
+      "migrationId": "20260927190000_AddCollectionGroupFollowUpSource",
+      "previousMigrationId": "20260927180000_AddCollectionCustomerNotes",
+      "file": "10-20260927190000_AddCollectionGroupFollowUpSource.sql",
+      "sha256": "708C53A4559C5A0C1B5B92350AF0C869E05E8A26DA8BEA02DF9A2A9CF022DFCA"
+    },
+    {
+      "migrationId": "20260929080736_AddCollectionInvoices",
+      "previousMigrationId": "20260927190000_AddCollectionGroupFollowUpSource",
+      "file": "11-20260929080736_AddCollectionInvoices.sql",
+      "sha256": "ED17CD4FDFEDE148C478054EFEB67F88ACD88A68AA5C89A79431657DE9E42ADB"
+    },
+    {
+      "migrationId": "20260929084242_AddCollectionInvoiceOperations",
+      "previousMigrationId": "20260929080736_AddCollectionInvoices",
+      "file": "12-20260929084242_AddCollectionInvoiceOperations.sql",
+      "sha256": "B5EAFE9A25BDCB9D6EF46DB6CEC0DEF44EE96E077C72F444A72E06DAF5B818E4"
+    },
+    {
+      "migrationId": "20260929100739_AddCollectionInvoiceLoads",
+      "previousMigrationId": "20260929084242_AddCollectionInvoiceOperations",
+      "file": "13-20260929100739_AddCollectionInvoiceLoads.sql",
+      "sha256": "9619FADF818FA9A57240DA813BC72146AC7EB0E8961D12BD86EE9386F92B2B83"
+    },
+    {
+      "migrationId": "20260929101445_AddCollectionInvoiceLoadRowAudit",
+      "previousMigrationId": "20260929100739_AddCollectionInvoiceLoads",
+      "file": "14-20260929101445_AddCollectionInvoiceLoadRowAudit.sql",
+      "sha256": "3813E5D6164624C71155B06EFAC95512D81887B97533BC3C1EC57DEF9E964ABD"
+    },
+    {
+      "migrationId": "20260929111421_AddCollectionBankLoads",
+      "previousMigrationId": "20260929101445_AddCollectionInvoiceLoadRowAudit",
+      "file": "15-20260929111421_AddCollectionBankLoads.sql",
+      "sha256": "DAAB8B2BFED29161964F5DE9CFF367BA7DB92A0EE8BE853B5D306D25B9BAD983"
+    },
+    {
+      "migrationId": "20260929112405_AddCollectionBankReferenceIndexes",
+      "previousMigrationId": "20260929111421_AddCollectionBankLoads",
+      "file": "16-20260929112405_AddCollectionBankReferenceIndexes.sql",
+      "sha256": "3112A3D38815F47312C141752CE421923EA2302E2501740F2775E987DB192F79"
+    },
+    {
+      "migrationId": "20260929130125_AddCollectionContractCorrections",
+      "previousMigrationId": "20260929112405_AddCollectionBankReferenceIndexes",
+      "file": "17-20260929130125_AddCollectionContractCorrections.sql",
+      "sha256": "72428AD7775E05279BEFE84FB5E3CDE683A50B6ADD71A103A646F1FC7EF3FF3D"
+    },
+    {
+      "migrationId": "20260930194336_AddCollectionCustomerAttachments",
+      "previousMigrationId": "20260929130125_AddCollectionContractCorrections",
+      "file": "18-20260930194336_AddCollectionCustomerAttachments.sql",
+      "sha256": "340185FD288212AF76E1433029DD936220D80C83F027CE0E49BA94C6A0E47195"
+    },
+    {
+      "migrationId": "20260930200005_AddCollectionCustomerFileActions",
+      "previousMigrationId": "20260930194336_AddCollectionCustomerAttachments",
+      "file": "19-20260930200005_AddCollectionCustomerFileActions.sql",
+      "sha256": "4DECFE955CDD89EA8ED60FCF6B911BA44E98847463A94EA215928B3D1BA2D3F8"
+    },
+    {
+      "migrationId": "20260930230000_EnableCollectionRequestedPaymentMethods",
+      "previousMigrationId": "20260930200005_AddCollectionCustomerFileActions",
+      "file": "20-20260930230000_EnableCollectionRequestedPaymentMethods.sql",
+      "sha256": "DB7050D2C9D4AE19A23CF8C3EF90638765EA43297B7B4756363F68A45BCF820D"
+    },
+    {
+      "migrationId": "20261002210728_AddCollectionSmsNotifications",
+      "previousMigrationId": "20260930230000_EnableCollectionRequestedPaymentMethods",
+      "file": "21-20261002210728_AddCollectionSmsNotifications.sql",
+      "sha256": "7B141F3F2853AF69692250893A2FD24F3A3C6D1540E44ADED9EC98740697CB75"
+    }
+  ]
+}

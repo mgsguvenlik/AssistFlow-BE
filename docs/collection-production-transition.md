@@ -1,5 +1,88 @@
 # Tahsilat canlı geçiş hazırlığı
 
+**17 Ekim — canlı CDN salt-okuma tamam:** [Örnek erişim ve production API kontrolü](releases/collections-2026-10-17/cdn-live-readonly.md).
+Canlı AssistFlow'da yalnız SELECT; mevcut ortak PDF/PNG/JPEG'nin R2/public
+hash/MIME/boyutu eşit ve 200, API uploads yönlendirmeleri beklenen live prefix'e
+302. MGS bağlantısı, upload/silme/ayar/DB yazması yok. Bu sınırlı örnek kontrolü
+henüz aktarılmayan Tahsilat dosyalarının veya upload izninin kabulü değildir.
+Jenkins/IIS tam override/credential teyidi ayrı; eski mühürlü teslimler korunur.
+
+**17 Ekim — ayrı dosya adaptörü:** [Collections.Files ve izole kabul kaydı](releases/collections-2026-10-17/cdn-adapter-rehearsal.md).
+Ortak R2FileStorage değiştirilmeden ayrı CLI hazırlandı. Prova planı batch 2
+ile 1.818 sözleşme ilişkisi +3 müşteri dosyasını içeriyor; yazmalı prova yalnız
+AssistFlow_Performance_Restore ve HTTP-deny yerel nesne deposunda tamamlandı.
+1.821 receipt, tam replay 0 INSERT/0 PUT, 10 kontrol başarılı, 15 finansal/
+orijinal audit parmak izi aynı; CHECKDB temiz, 95 migration/24 Job adımı aynı.
+153 dosyalı ayrı CDN teslimi hazır; manifest hash'i paket README'sindedir.
+Eski finansal teslim değişmez; gerçek CDN/HTTP/operatör onayları ayrı kalır.
+Aşağıdaki "adaptör henüz hazırlanmadı" notları ilk hazırlık aşamasıdır.
+
+**17 Ekim — CDN hazırlığı:** [Dosya aktarımı ve erişim planı](releases/collections-2026-10-17/cdn-transfer-and-access.md)
+ve kapalı onay/journal alanları hazır. Offline araç paket hash ve adayları
+doğruladı: 1.818 sözleşme ilişkisi /1.100 farklı yol +3 müşteri dosyası.
+69 eksik/19 boş ve 12 sahibi doğrulanmamış aktivite dosyası ayrı raporlanır.
+Public URL maruziyeti ve liste API yetkisi ayrı kabul edilir. Test aktarıcıları
+değişmedi; canlı dosya adaptörü ve kesinti/tekrar provası henüz hazırlanmadı.
+Gerçek CDN/HTTP/DB bağlantısı veya yükleme yok; runtime/config/paket korunur.
+
+**17 Ekim — Job/bakım/kurtarma hazırlığı:** [Operasyon planı](releases/collections-2026-10-17/job-maintenance-and-recovery.md),
+kapalı onay şablonu ve çalıştırılmamış SELECT-only metadata ön kontrolü hazır.
+19 Job/24 adım için dört zorunlu kapalı, sekiz sahip/bağımlılık incelemesi,
+yedi mevcut altyapı işletimi sınıfı belirlendi. Önceden kapalı Job açılmaz;
+kesme/devam ayrı onaydır. Checksum'sız eski prova yedeği yeni canlı yedek/PIT
+kabulü sayılmaz. Sorumlu/pencere/RPO/RTO ve taze kurtarma kanıtı hâlâ açık.
+Bu adımda DB bağlantısı, Job, backup/restore veya deploy yapılmadı.
+
+**Operatör/ortak fark devamı:** [OP01, AU01/AU02 ve SC01–SC06 onay listesi](releases/collections-2026-10-17/operator-and-shared-approvals.md)
+hazır; gerçek Code/imzalı kararlar beklenir. Ön kontrol SQL'i yalnız yerelde
+parse edildi, DB'ye bağlanılmadı. Servis/müşteri/G/üst kart değişiklikleri aynı
+aktarıcı transaction'ında tek kez uygulanacak; rol seed parametresiyle yazma
+yetkisi açılmayacak. Runtime/kanıt/paket değişmedi, canlı işlem yapılmadı.
+
+**Güncel gerçek prova/yeni sürüm teslimi:** izole gerçek WebAPI/Kestrel host
+kabulü, yeni backend hash'leriyle tam aktarım/rollback/tekrar/dört koruma ve
+son CHECKDB tamamlandı. Aktif yeni teslim `collection-cutover-handoff-2026-10-17-02`;
+275 dosyanın hash'i doğrulandı. [Yeni kabul ve paket hash'i](releases/collections-2026-10-17/hosting-and-refresh.md).
+Canlı AssistFlow/MGS/config/Job/Jenkins değişikliği yok. Bu kabul özel prova
+ortamıdır; production/IIS override, bakım son kesiti ve insan/operasyon/CDN
+kapıları ayrıca kapanmadan canlı GO yoktur. Aşağıdaki önceki hazırlık notları tarihseldir.
+
+**Güncel backend hazırlığı:** [açılış izolasyon ayarları ve işletim sırası](releases/collections-2026-10-17/startup-isolation.md)
+hazır. İki otomatik migration yolu, genel seed ve ilk Manitou turu ayrı
+bayraklarla kapatılabilir; varsayılan davranış korunur. Build ve 13 bağlantısız
+kontrol geçti. Canlı/prova DB bağlantısı veya gerçek host başlangıcı yapılmadı.
+Yeni Core/Business/Data hash'leri nedeniyle eski yazmalı kabul yeni runtime'a
+otomatik taşınmaz; gerçek proses kabulü ve yeni paket/prova ayrı gereklidir.
+
+**17 Ekim aktarıcı devamı:** kullanıcı bağlantıları kapattıktan sonra ayrı
+production adaptörünün yazmalı provası yalnız AssistFlow_Performance_Restore
+üzerinde tamamlandı. Kesinti rollback'i, tam aktarım, sıfır-kayıtlı tekrar,
+dört koruma ve son CHECKDB başarılı; aynı kod/paket için teknik kabul hazır.
+Canlı AssistFlow/MGS'ye yazılmadı; canlı onay kapıları kapalıdır.
+[Gerçek sonuçlar ve kalan sınırlar](releases/collections-2026-10-17/production-adapter-rehearsal.md).
+
+**Prova sonrası teslim:** runtime/plan/gerçek kabul ve değişmemiş inceleme
+paketini birlikte mühürleyen offline teslim aracı hazırlandı.
+[Kalan kapılar, paket kullanımı ve adım adım bakım sırası](releases/collections-2026-10-17/execution-handoff.md).
+Plan yolları ve 30 dakikalık son kesit koşulu korunur; farklı final bundle
+için eski kabul kullanılamaz. Canlı yazma/deploy/Job yetkisi verilmedi.
+
+**17 Ekim — prova sonrası aktif teslim:** Güncel canlı kaynak/referanslar yeniden
+okundu, kararlar tekrar bağlandı ve 106 dosyalı kapalı inceleme paketi üretildi.
+[Aktif paket, kanıt/hash ve kalan teknik bağımlılıklar](releases/collections-2026-10-17/README.md),
+[Jenkins/DB/Job/CDN geçiş sırası](releases/collections-2026-10-17/cutover-runbook.md).
+Canlıya özel production importer ve onay kapıları henüz açık; paket üretimi
+uygulama yetkisi değildir. Canlı AssistFlow/MGS üzerinde yazma yapılmadı.
+
+**17 Ekim prova güncellemesi:** Kullanıcı onaylı `AssistFlow_Performance_Restore`
+restore/şema sonrası makbuz ve audit korumalı veri aktarımı yapıldı. Gerçek
+sonuçlar ve henüz production kabulü sayılmayan kapılar
+[prova raporundadır](releases/collections-2026-10-15/rehearsal/data-transfer-2026-10-17.md).
+Canlı AssistFlow/MGS değiştirilmedi. Tarihsel test ID'leri/canlı paketler
+bu prova kimlikleriyle güncellenmez.
+
+**15 Ekim güncel planı:** Jenkins sırası, canlı salt-okunur tespitleri, 21 eksik migration ve seed taslakları [yayın paketinde](releases/collections-2026-10-15/README.md). Aşağıdaki tarihlendirilmiş notlar geçmiş kanıttır; açık kalanların tamamlandığı varsayılmaz. Canlı veri kaynağı güncel MGS; test işlem verileri kopyalanmayacak. Şema/seed/veri/Job açılışı birlikte prova edilmeden production kabulü yok.
+
 Durum: hazırlık aşaması. Kullanıcının 27 Eylül 2026 talebiyle testteki tüm DB geliştirmeleri ileride AssistFlow canlı ortamına taşınabilir ve denetlenebilir olarak hazırlanacak. Bu belge canlı uygulama onayı veya tamamlanmış yayın paketi değildir.
 
 ## Ortam ve temel yaklaşım

@@ -1,0 +1,48 @@
+{
+  "Version": "collection-governance-review-v1",
+  "Status": "PENDING_HUMAN_APPROVAL_NOT_EXECUTABLE",
+  "ProductionApplyApproved": false,
+  "Target": "sql2022 / AssistFlow",
+  "Source": "MGS",
+  "ReviewedHandoffManifestHash": "6BC34709D364D02DCD72F05F682A7C1D805690A88D8971375A98B313F2C55ABC",
+  "ReviewedBundleHash": "8253BCA52AED33271A445FE6B46EBEF7A86E3F5220C48239B54E7B6F12AFD673",
+  "ReviewedLivePlanHash": "3D59FE431E232A6A401C3B7F724DD919B6DF5B5080725F823C904B37845F2AB2",
+  "Operator": {
+    "UserCode": null,
+    "ApprovalReference": null,
+    "ApprovedBy": null,
+    "ApprovedAtUtc": null,
+    "Approved": false,
+    "CreateOrModifyUsersAllowed": false,
+    "TechnicalActorZeroIsHumanOperator": false
+  },
+  "Permissions": {
+    "MenuKey": "CollectionFollowUp",
+    "Scope": "ALL_COLLECTION_CUSTOMERS_NO_TENANT_PARTITION",
+    "FirstOpening": "READ_ONLY",
+    "ReadOnlyRoleCodes": [],
+    "LaterEditRoleCodes": [],
+    "RoleChangeRows": [],
+    "RoleChangeRowRequiredFields": ["RoleCode", "Phase", "ExpectedExists", "ExpectedHasView", "ExpectedHasEdit", "DesiredHasView", "DesiredHasEdit", "ApprovalReference"],
+    "CreateRolesAllowed": false,
+    "UserRoleMembershipChangesAllowed": false,
+    "GrantSqlServerPrivilegesAllowed": false,
+    "ReadPhaseApproved": false,
+    "EditPhaseApproved": false,
+    "ApprovalReference": null
+  },
+  "SharedChanges": [
+    { "Code": "SC01", "Object": "dbo.ServiceType", "Change": "18 missing service names; reuse active existing matches", "Writer": "PRODUCTION_ADAPTER_TRANSACTION", "Approved": false },
+    { "Code": "SC02", "Object": "dbo.Customers.CustomerTypeId", "Change": "2602 pinned existing-customer proposals to GRP01; preserve BANKA, group and tenant", "Writer": "PRODUCTION_ADAPTER_TRANSACTION", "Approved": false },
+    { "Code": "SC03", "Object": "dbo.CustomerType", "Change": "Create G / Grup Üst Kartı only if absent; no change to existing definitions", "Writer": "PRODUCTION_ADAPTER_TRANSACTION", "Approved": false },
+    { "Code": "SC04", "Object": "dbo.Customers + collection.GroupParent", "Change": "56 verified parent cards, TenantId=null; remaining 18 proposals held", "Writer": "PRODUCTION_ADAPTER_TRANSACTION", "Approved": false },
+    { "Code": "SC05", "Object": "stg.sp_SyncCustomers", "Change": "Reviewed classification CASE and BANKA preservation only; do not execute procedure", "Writer": "SEPARATE_HASH_GUARDED_PROCEDURE_SCRIPT", "Approved": false },
+    { "Code": "SC06", "Object": "dbo.Menus + dbo.Configurations", "Change": "Missing CollectionFollowUp menu and CollectionRateChangeSmsTemplate only; retain existing text; ApprovedRoleCode stays null", "Writer": "SEPARATE_APPROVED_MENU_TEMPLATE_SEED", "Approved": false }
+  ],
+  "SharedApprovalReference": null,
+  "SharedApprovedBy": null,
+  "SharedApprovedAtUtc": null,
+  "FinalMaintenanceCaptureApproved": false,
+  "FinalCountsAndHashesRevalidated": false,
+  "Note": "Review checklist only, not an adapter approval file. Fill real identities and evidence in a new private copy; do not edit sealed packages or infer live authorization."
+}

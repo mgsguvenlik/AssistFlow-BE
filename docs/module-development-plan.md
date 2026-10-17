@@ -6,6 +6,119 @@ Bu dosya ana geliştirme görev kaydıdır. Ana agent işleri bağımlılık sı
 
 # Requirements
 
+## 17 Ekim — Güvenli Git kapsamı
+
+- Güvenli kapsam incelemesinden sonra kullanıcı üç ayrı yerel commit oluşturulmasını onayladı; push/main merge/deploy ve DB/CDN işlemi yasak kalır. FE temiz; BE açılış kodu `25ca545` (9 dosya), manuel araçlar `a53a25e` (41 dosya) olarak commit edildi. Dokümanlar ve Git korumaları üçüncü commit grubudur (63 dosya). Kullanıcıya ait Development config ve bütün özel veri/prova/secret çıktıları dışarıdadır. [Kapsam ve kontroller](releases/collections-2026-10-17/git-commit-scope.md); güncel dosya hash manifesti aynı klasördedir. Kaynaklar değiştirilmedi, mühürlü paketler korunur. GitHub'a push ve canlı uygulama sonraki açık onayı bekler.
+
+## 17 Ekim — Canlı CDN salt-okuma kontrolü
+
+- Yalnız mevcut ayar incelemesi, canlı AssistFlow SELECT ve bilinen sınırlı nesnelere HEAD/GET; MGS yazması/bağlantısı, CDN PUT/DELETE, listeleme, IAM/config değişikliği yok. Tam hosting/credential eşitliği veya PUT izni okuma başarısından çıkarılmaz. Mevcut public URL kararı değiştirilmez.
+- Ayrı readonly CLI, sabit SQL tablolarından en fazla üç küçük örnek okur; signed HTTP yalnız bilinen tam yollar/hostta GET/HEAD. Veri gövdesi diske yazılmaz. Gerçek çalışan API'nin uploads 302 davranışı ayrıca sınırlı GET ile karşılaştırılır. [Sonuç](releases/collections-2026-10-17/cdn-live-readonly.md).
+
+## 17 Ekim — Dosya adaptörü ve izole prova
+
+- Kullanıcı yalnız AssistFlow_Performance_Restore üzerinde dosya adaptörü provasını onayladı. Ayrı Collections.Files mevcut R2FileStorage'ı kullanır; prova sağlayıcısı yerel nesne deposu ve HTTP-deny handler'ıdır. Canlı AssistFlow/MGS'ye yazma, gerçek CDN'ye upload veya mevcut test aktarıcılarının kilidini kaldırma yoktur.
+- Plan/batch/audit/SubscriberCode/owner/rowversion ve içerik hash'leri bağlıdır. Attachment+kalıcı CdnFileReceipt aynı kısa transaction'dadır. Kesinti/tekrar ve finansal önce/sonra kontrolü gerçek izole hedefte yapılır; gerçek public HTTP ve UI yetki kabulü ayrı kapıdır. [Güncel kayıt](releases/collections-2026-10-17/cdn-adapter-rehearsal.md).
+
+## 17 Ekim — Canlı CDN aktarımı/erişim hazırlığı
+
+- Mevcut IFileStorage/R2 altyapısı aynen kullanılır; test-only dosya araçlarının hedef kilidi kaldırılmaz. Canlı finansal aktarıcı yalnız dosya kanıtı kaydeder; ayrı dosya adaptörü ve izole kesinti/tekrar provası gerekir. İlk finansal replay dosya ilişkileri açılmadan biter.
+- Public CDN linkleri API View yetkisiyle private değildir; listeden kaldırma URL'yi iptal etmez. Mevcut public-link kararı korunur, yeni güvenlik altyapısı kurulmaz. Final owner/config, arşiv hash/scan, authenticated ve public byte readback, API/UI ve pilot/tam aktarım ayrı kabul koşullarıdır. [Plan](releases/collections-2026-10-17/cdn-transfer-and-access.md).
+
+## 17 Ekim — Job, bakım ve kurtarma hazırlığı
+
+- Canlı AssistFlow/MGS değiştirilmeyecek. Job kesme/devam ve yedek/restore ayrı açık operasyon onaylarıdır; hazırlık bunları vermez. Tüm Job/Agent veya normal full/log yedekleri topluca kapatılmaz. Disabled olmak mevcut çalışmayı bitirmez; zorla durdurma/KILL yetkisi yoktur.
+- 19 Job/24 adım için sınıflandırma, bakım sırası, RPO/RTO/yedek zinciri kabul listesi ve aşamaya göre geri dönüş hazır. Kapalı JSON ve SELECT-only ön kontrol offline doğrulanır, DB'de çalıştırılmaz. [Güncel plan](releases/collections-2026-10-17/job-maintenance-and-recovery.md).
+
+## 17 Ekim — Canlı operatör/rol ve ortak fark onay hazırlığı
+
+- OP01 gerçek aktif tekil User.Code; AU01 salt-okuma ve AU02 sonraki yazma Role.Code listeleri ayrı onaydır. Rol üyeliği/yeni kullanıcı/SQL hesabı yetkisi bu kapsamda değiştirilmez. Aynı CollectionFollowUp Edit hakkı mevcut finansal/dosya/SMS yazmalarını kapsar; tüm rollerden gelen etkin hak değerlendirilir. Teknik audit aktörü 0 insan operatör değildir.
+- SC01 18 servis /SC02 2.602 müşteri tipi /SC03 G tanımı /SC04 56 üst kart aynı veri aktarıcı transaction'ının kapsamıdır. İnceleme 10/20 SQL'leri önce çalıştırılmaz; baseline bozulur. SC05 prosedür ayrı hash korumalı onay, SC06 menü/şablon seed rol kodu NULL; rol yetkileri ayrı matris/prova ile ele alınır. Boş/false onay şablonu ve salt-okuma ön kontrol SQL'i hazır; gerçek onay veya DB yürütme yok. [Kararlar ve sıra](releases/collections-2026-10-17/operator-and-shared-approvals.md).
+
+## 17 Ekim — Yeni sürüm gerçek host / aktarım / teslim kabulü tamamlandı
+
+- Gerçek WebAPI/Kestrel loopback hostu özel CollectionRehearsal ortamında doğrulandı. Seed/iki migration/Manitou kapalı, diğer dört worker constructor'ı prova-kilitli wrapper ile atlandı. Normal işletimde wrapper gerçek worker'ı başlatır; Production/canlı katalogda izole prova modu reddedilir. 18 bağlantısız kontrol ve gerçek HTTP 404 probe geçti; kimlikli ekran/IIS/production worker işletimi kabulü değildir.
+- Yeni -03 planlarıyla disposable hedef yeniden restore/şema hazırlandı. Batch 2: 4.439 sözleşme/17.269 tarife/139.747 ödeme+makbuz, TRY 26.684.052,43 / USD 115.320,76. Kontrollü rollback, sıfır yeni kayıtlı replay, dört geri alınan koruma ve 19 parmak izi eşitliği geçti; son CHECKDB temiz, 95 migration/34 tablo. Gerçek host ikinci kez aynı DLL'lerle doğrulandı, ön/son profiller ve Job metadata'sı aynı. Canlıya yazılmadı.
+- Aktif teslim `.tools/collection-cutover-handoff-2026-10-17-02`: 275 dosya, 468.616.497 byte; bağımsız ikinci hash kontrolü başarılı. Manifest `6BC34709D364D02DCD72F05F682A7C1D805690A88D8971375A98B313F2C55ABC`. Yeni kabul `7F0C9271BFD49F414851EF9DCD473F89E74D707D9E71EB12A4A5F5760EF0AA14`. Eski paketler/kanıtlar korunur, onay NOT_APPROVED. [Güncel sonuçlar ve kalan sınırlar](releases/collections-2026-10-17/hosting-and-refresh.md).
+
+## 17 Ekim — Gerçek prova hostu ve sürüm yenilemesi
+
+- Gerçek Program.cs/Kestrel izole loopback hostu çalıştırıldı. SQL katalog/sunucu ön kontrolü, kapalı iki migration yolu/seed/Manitou ve dört diğer worker'ın constructor etkileri özel IsolatedRehearsalMode ile engellendi. Bu mod yalnız CollectionRehearsal/prova DB/sabit uygulama adı/kapalı işlemlerle kabul edilir; Production/canlı katalogda reddedilir. Varsayılan normal işletim korunur. Gerçek host kanıtı ve 18 bağlantısız kontrol hazır; yeni hash'li finansal prova/paket sürüyor. [Güncel kabul](releases/collections-2026-10-17/hosting-and-refresh.md).
+
+## 17 Ekim — Backend açılış izolasyonu hazırlığı
+
+- StartupExecution altında MigrationsEnabled, SeedsEnabled ve ManitouSyncEnabled eklendi; varsayılan true ile mevcut davranış korunur. Geçiş override'ında üçü false olur. DI mevcut AutofacBusinessModule içinde; iki migration yolu aynı kontrolü uygular. Genel seed ve Manitou eşleme/tenant/müşteri iş kuralları değiştirilmez. Ayarlar yeniden başlatma kapsamındadır; diğer worker/Jobları kapatmaz.
+- Kod/13 offline kontrol hazır; gerçek hosting başlangıcı ve yeni sürümle paket/prova ayrıca açık. Canlı AssistFlow/MGS'ye bağlanılmayacak/değişiklik yapılmayacak. Önceki teslim/acceptance eski hash'lerin tarihsel kanıtıdır, yeni sürüm için elle güncellenmez. [Ayarlar ve kabul sınırı](releases/collections-2026-10-17/startup-isolation.md).
+
+## 17 Ekim — Yazmalı prova sonrası canlı teslim hazırlığı
+
+- Onaylı çalışma yalnız yerel paket/doküman hazırlığıdır; canlı AssistFlow/MGS değiştirilmeyecek. Mühürlü eski inceleme bundle'ı değiştirilmeden, aynı runtime/plan/kabul/CHECKDB kanıtlarıyla yeni offline teslimde korunur. Config/credential/gerçek arşivler paketlenmez; kaynak/eşleme kişisel veri dosyaları Git dışındadır.
+- Uygulama sırası ve durma kapıları [teslim belgesinde](releases/collections-2026-10-17/execution-handoff.md): final bundle hash'i değişirse yeniden prova; bakım sonrası 30 dakika kesit kapısı; ortak fark/prosedür/aktör/rol, seed/worker izolasyonu, Job, backup-PIT, CDN ve HTTP kabulü ayrı koşullar. Teslim üretimi canlı GO değildir.
+
+## 17 Ekim — Production adaptörünün yazmalı provası tamamlandı
+
+- Kullanıcı backend/prova bağlantılarını kapattı ve yalnız AssistFlow_Performance_Restore üzerinde yazmalı aktarım/geri alma/tekrar güvenliğini onayladı. Hedef mevcut 17 Ekim tam yedeğinden restore edildi; 21 migration ve iki seed uygulandı. Zorla oturum kapatma yapılmadı; canlı AssistFlow/MGS'ye yazılmadı.
+- Aynı `-02` adaptör/plan/paket ile kontrollü kesinti rollback'i, 4.439 sözleşme/17.269 tarife/139.747 ödeme ve makbuz aktarımı, sıfır-kayıtlı tekrar ve dört geri alınan koruma denemesi geçti. TRY 26.684.052,43 / USD 115.320,76; kaynak/hedef aynı. Son CHECKDB temiz; 95 migration/34 collection tablosu, Job metadata'sı aynı. Tanım/menü/SMS/rol snapshot'ları önceki doğrulanmış aynı şema baseline'ıyla aynı.
+- `WritePathVerified=true`, `ProductionAuthorizationGranted=false` teknik kabulü üretildi. Kod/bağımlılık/paket değişirse yeniden değerlendirilir. Sonraki işler canlı operatör/rol ve ortak fark onayları, BE başlangıç izolasyonu, Job/bakım/yedek-PIT, CDN/HTTP kabulü ve bakım sonrası taze kaynak/pakettir. [Güncel kanıt ve hash'ler](releases/collections-2026-10-17/production-adapter-rehearsal.md).
+
+## 17 Ekim — Önceki kod/salt-okunur hazırlık (tarihsel)
+
+- Ayrı Collections.Production adaptörü eklendi; mevcut prova aracının hedef/capture kilidi korunur. Finansal metotlar ortak compile-link çekirdeğe ayrıldı, mevcut RequestId/komut hash/snapshot/banka kimliği kuralları kullanılır. Plan, tam hedef/sürüm/migration/kaynak/bağlama hash'lerine bağlı; canlıda açık insan onayı ve aynı kod/paket için başarılı yazmalı adaptör kanıtı zorunlu. Açık oturum, kaynak drift'i, eksik makbuz/audit veya belirsiz commit güvenli durma sebebidir.
+- Kullanıcı prova DB bağlantılarını şu an kapatamıyor; restore ön kontrolü oturum görünce durdu. Oturum KILL/restore/temizlik veya başka DDL/DML yapılmadı. Mevcut veri yeni çekirdekle salt-okunur doğrulandı: 4.439 sözleşme/139.747 ödeme ve makbuz, TRY 26.684.052,43 / USD 115.320,76; 19 önce/sonra hash aynı. Bu **WritePathVerified=false** sonucudur; eski tam prova yeni adaptörün yazma kabulü sayılamaz.
+- Adaptör build 0 hata/9 uyarı; prova adaptörü 0 hata/3 uyarı. Son sürümde kapalı canlı onayı/yanlış kapsam/yanlış plan hash'i, config ve SQL açılmadan reddedildi. Aktif kod planları .tools/*adapter*-plan-2026-10-17-02. Kullanıcıya ait Development config değişmedi. Canlı AssistFlow/MGS/prova DB'sine bu tur yazılmadı. [Durum ve devam sırası](releases/collections-2026-10-17/production-adapter.md).
+
+## 17 Ekim — Prova sonrası canlı inceleme paketi hazırlandı
+
+- Güncel AssistFlow/MGS salt-okunur kesit ve müşteri kararları yeniden bağlandı. Canlı 18.888 müşteri/18.887 aktif, prova baseline'ına göre +2; MGS kaynak hash'leri prova kesitiyle aynı. 4.439 sözleşme/17.269 tarife/139.747 ödeme adayı ve tutarlar değişmedi. 18 servis/2.602 müşteri tipi/56 üst kart ve dar senkronizasyon farkı ayrı onayda; uygulanmadı.
+- `.tools/collection-cutover-review-2026-10-17-02`: 106 dosyalı hash mühürlü inceleme paketi; SHA `8253BCA52AED33271A445FE6B46EBEF7A86E3F5220C48239B54E7B6F12AFD673`. 21 migration+2 seed gerçekleşmiş prova SQL'iyle dönüşüm/hash düzeyinde aynı. Gerçek prova makbuzları, kaynak/veri planları, Job inceleme matrisi ve kapalı onaylar birlikte. Prova capture'ı reddi ve tüm dosya hash kontrolü geçti; son araç build 0 hata/0 uyarı.
+- Canlı DDL/DML/Job/CDN/Jenkins yok. Production importer henüz pakette yok; sonraki teknik bağımlılık canlıya özel adapter ve bunun provası. Operatör/rol, ortak dbo/prosedür onayı, son bakım kesiti, CDN ve operasyonel geri dönüş/kullanıcı kabulü ayrı kapılar. BE'deki Manitou worker'ı ilk turu hemen çalıştırıyor, süre 0 devre dışı bırakmıyor; kontrollü açılış yöntemi çözülmeden BE deploy yapılmaz. Mevcut ortak davranış ve kullanıcının Development config değişikliği korunur. [Aktif paket](releases/collections-2026-10-17/README.md).
+
+## 17 Ekim — Makbuz/audit korumalı veri provası tamamlandı
+
+- Yalnız `AssistFlow_Performance_Restore` hedefli ayrı `Collections.Rehearsal` aracı eklendi. Kaynak paketler hash kontrollü; canlı bağlantısı/uygulama başlangıcı yok. 4.439 sözleşme, 17.269 tarife ve 139.747 ödeme için plan sabitlendi.
+- İlk denemedeki uzun tarife açıklaması şema sınırı hatası bütünüyle rollback edildi; parmak izleri aynı. Uzun açıklamanın tamamı ham kaynak audit'inde korunur; kısa operasyon etiketi kullanılır, şema değiştirilmez.
+- Kontrollü kesinti provası geçti: sözleşme/tarife/referans ve ilk 2.000 ödeme + kalıcı makbuz + kaynak audit yazımından sonra bütün transaction geri alındı; satır parmak izleri başlangıçla aynı. Tam aktarım commit edildi: 4.439 sözleşme/17.269 tarife/139.747 ödeme ve makbuz; tutarlar TRY 26.684.052,43 / USD 115.320,76 kaynakla aynı. İkinci çalışma 0 yeni kayıt ve tüm parmak izleri aynı. Silinen/düzenlenen ödeme, bozuk kaynak audit'i ve eksik makbuz için dört geri alınmış kontrol başarılı; son durum ilk commit'le aynı. Son CHECKDB temiz, 95 migration, tanım/menü/rol ve Job metadatası korunuyor. Canlı AssistFlow/MGS'ye yazılmadı. [Ayrıntılı kanıt](releases/collections-2026-10-15/rehearsal/data-transfer-2026-10-17.md).
+
+## 17 Ekim — Onaylı restore ve şema/seed provası
+
+- Kullanıcı mevcut prova DB'sinin silinebilir olduğunu ve güncel canlı yedeğiyle üzerine restore'u açıkça onayladı. 17 Ekim AssistFlow tam yedeği HEADERONLY/FILELISTONLY/VERIFYONLY, hedef MDF/LDF çakışma ve disk alanı kontrolünden geçti. Yalnız AssistFlow_Performance_Restore restore edildi; önceki test restore içeriği değiştirildi, canlı AssistFlow/MGS'ye yazılmadı. ONLINE/MULTI_USER, CHECKDB temiz; 18.886 müşteri/74 migration baseline.
+- Production dosyaları korunarak her batch'i tam sunucu/DB kilitli 23 dosyalı prova türevi üretildi. 21 Tahsilat migrationı + 2 seed iki kez başarılı: son 95 migration/34 collection tablosu. Migration, tanım/menü/SMS şablonu, rol ve tablo sayımları ikinci çalışmada aynı; CHECKDB tekrar temiz. Rol/yetki verilmedi, Job/BE/worker/SMS/mail/CDN çalıştırılmadı. Job adım hash/etkinlik metadatası aynı.
+- Güncel MGS + gerçek restore hedefi referansları için preview-rehearsal salt-okuma komutu eklendi; hedef/ortam manifestte ayrılır. Production paketleyici prova hedefi capture'ını reddeder. Tam finansal veri apply/idempotency/rollback provası henüz tamamlanmadı; production NO-GO. [Çalışma kanıtı](releases/collections-2026-10-15/rehearsal/execution-2026-10-17.md).
+- Güncel prova kesiti tamamlandı: MGS 19.948 müşteri/9.517 sözleşme/34.588 tarihçe/243.518 ödeme/12.939 not; 794 karar ve üç değişmemiş açık onay tekrar bağlandı. Prova hedefinde 4.439 sözleşme ve legacy kanıtı sonrası 139.747 ödeme teknik aday; banka kimliği 83.543/sorun 0. Production paketinin prova referansı kabul etmediği DB'ye bağlanmadan olumsuz kontrolle doğrulandı. Henüz finansal veri importu yok; sonraki bağımlılık makbuz/audit'li tam prova apply yolu ve veri tekrar/geri dönüş kontrolleri.
+
+## 17 Ekim — Kullanıcının seçtiği prova DB'si
+
+- Hedef `AssistFlow_Performance_Restore`, mevcut sunucu/kullanıcı olarak açıkça belirlendi. Salt-okunur inceleme başarılı: 5 Ağustos AssistFlowTest restore'u, 17.537 müşteri/69 migration, collection tablosu yok. Güncel canlı eşleme paketinin hedefiyle eşdeğer değil. Etkin DB/server trigger'ı veya açık hedefli Job adımı görülmedi; 30 cross-DB bağımlılık ve beş incelenecek rapor modülü var. Bazı prosedürler canlı AssistFlow'a bağlı; çağrılmadı.
+- Kullanıcı sysadmin; ortak instance fiziksel/ağ izolasyonu sayılmaz. Tam hedef allowlist'li ayrı profil hazırlanmalı; mevcut ayrı-instance guard'ları sessizce gevşetilmez ve canlı Joblar/instance ayarları değiştirilmez. Güncel canlı yedeğini mevcut prova DB'sinin üzerine restore etmek için geri döndürülmesi zor mevcut hedef değişikliğine açık onay gerekiyor. Henüz hiçbir DB/CDN/Job yazması yok. [Hedef raporu](releases/collections-2026-10-15/rehearsal/target-selection-2026-10-17.md).
+
+## 15 Ekim — Aktör/audit ve izole prova hazırlığı
+
+- Mevcut aktarımın sistem aktörü 0 politikası korundu; gerçek kullanıcı taklidi yapılmaz. Canlıda Id=0 kullanıcı ve ilgili audit kullanıcı FK'si yok; EF model kontrolü de geçti. İnsan onaylayıcı teknik aktörden ayrıldı; onaylı canlı User.Code henüz yok, Id=1/test kimliği seçilmedi.
+- Aktif `data-package-03` ve `live-preview-04` hash'lerine bağlı 173.417 kayıt için audit planı üretildi: 4.438 sözleşme, 17.268 tarife, 139.717 ödeme, 8.277 not (2 koşullu), 1.813 fatura, 1.904 fatura ödemesi. 42 alan+ham legacy kişi etiketi korunur, ad benzerliğiyle kullanıcı eşlenmez. Açık Europe/Istanbul tarihsel UTC dönüşümünde eksik/belirsiz/geçersiz tarih 0. Ham JSON/hash/ad/tarih makbuzları yeni tam apply yolunun zorunlu girdisidir; çalışan eski test importer değiştirilmedi.
+- Salt-okunur msdb incelemesinde iki mevcut tam yedek kaydı bulundu; checksum işareti yok, dosya okunabilirliği/restore başarısı henüz doğrulanmadı. Canlıda yeni backup, restore, kullanıcı/rol veya Job değişikliği yapılmadı.
+- `.tools/collection-audit-rehearsal-2026-10-15-01` özel paket; audit politikası/row planı, model/DB FK ve yedek metadata'sı, boş izole ortam örneği ve 21 migration hash'ine bağlı prova sırası hazır. Build 0 hata/uyarı. Gerçek ayrı SQL instance, yedek/MOVE hedefleri ve operatör Code'u olmadan uygulama/prova başlamaz. Tam izole/canlı apply yolu ve restore/tekrar/geri dönüş kanıtı hâlâ açık; hazırlık tamamlanmasıyla karıştırılmaz. [Audit raporu](releases/collections-2026-10-15/audit-rehearsal-report.md), [izole prova planı](releases/collections-2026-10-15/rehearsal/README.md).
+
+## 15 Ekim — Not/grup/fatura/cari/dosya ilişki mutabakatı
+
+- İlk kesitten sonra canlıda 1 yeni müşteri/3 alan değişikliği görüldü; eski hedef eşlemesiyle ilerlenmedi. `live-preview-04 → decision-replay-03 → financial-review-06 → payment-reconciliation-02` zinciri yeniden üretildi. 4.438 sözleşme/139.717 ödeme aday kümesi değişmedi. Kaynak müşteri/cari/grup ve canlı müşteri/grup/tip/para birimi referansları salt-okunur yeniden doğrulandı.
+- İlişki teknik adayları: 8.275 not (+ üst karta bağlı 2), 26.228 grup geçmişi (+ tek temsil edilen 2 aynı tekrar), 1.813 fatura/1.904 fatura ödemesi, 2.890 cari kod. Tam ödeme geçmişi korunmadan fatura aday yapılmaz; 1.813 bakiye/sahiplik doğrulaması geçti. 74 grup üst kartında 56 oluşturma önerisi/18 inceleme; canlıda eksik G tipi ve ortak kayıt oluşturma ayrıca onay gerektirir, Kurumsal tipi değiştirilmedi. 700 mükerrer cari kod otomatik seçilmedi.
+- 1.769 fiziksel Contract dosyasının hash/boyutu yeniden doğrulandı. Aday sözleşmelerde 1.817 doğrulanmış bağlantı, 2.533 metadata yok, 69 arşivde yok, 19 boş. Aktivite 15 asıl dosyada güncel sahipliği doğrulanan onaylı eski→güncel devir 3 aday, 12 bekleyen; eski ödemelere/notlara devir izni genişletilmedi. Production CDN yazma/geri okuma veya yeni zararlı yazılım taraması yapılmadı.
+- Aktif birleşik inceleme paketi `collection-production-data-package-2026-10-15-03`; ilişki `collection-relation-reconciliation-2026-10-15-02`. Altı pakette 95 hash kontrolü, alan/sahiplik/bakiye kontrolleri ve Release build 0 hata/uyarı. Canlı/test DB ve CDN değiştirilmedi; tüm apply kapıları kapalı. Sırada aktör/audit ve üst kart/ortak tanım taslakları, izole restore/tekrar/rollback provası, production CDN ve son bakım kesiti onayı var. [Güncel rapor](releases/collections-2026-10-15/relation-reconciliation-report.md).
+
+## 15 Ekim — Ödeme ve banka kanıt mutabakatı
+
+- MGS üzerinde yalnız SELECT ile güncel para birimi/dönem/collation/yıl ve dokuz SQL nesnesi tanımı iki kez okundu. Tanım hash'leri önceki incelenmiş sürümle aynı; view/fonksiyon çalıştırılmadı. Mevcut legacy karşılaştırma resolver'ı çevrimdışı araçlar arasında paylaşıldı; finansal servis/FE davranışı değiştirilmedi.
+- 243.480 kaynak ödeme incelendi: 139.717 teknik aday, 103.763 inceleme/dışlama. Önceki 136.504 adaya, ham Free/negatif/sıfır değerleri koruyan önceki karar uyarınca 3.219 kayıt eklendi; legacy takvimle uyuşmayan 6 kayıt ayrıldı. Kaynak sözleşme/kimlik/önceki karar kapıları korunur. Aday toplamları 26.665.704,43 TRY ve 115.320,76 USD; nakit tahsilat/bakiye toplamı diye yorumlanmaz.
+- GTS 65.970 / IVR 17.573, toplam 83.543 kaynak kimliğinde boş/bilinmeyen/mükerrer kimlik yok. Tüm geçmiş kimlikler, elenen abonelik ödemelerini taşımadan tekrar korumasına adaydır. Hedefe yazılmadı; apply mevcut Key algoritmasıyla ayrıca yapılacak.
+- Aktif yerel veri inceleme paketi `collection-production-data-package-2026-10-15-02`: 4.438 sözleşme / 139.717 ödeme, banka planı ve SQL tanım kanıtı; tüm uygulama kapıları kapalı. Paket hash'leri/ödeme kimlikleri/sözleşme bağları doğrulandı. Release ve Import build'leri başarılı (Import mevcut 691 uyarı). Sonraki iş güncel not/grup/fatura/üst kart-cari/dosya mutabakatı; aktör ve izole restore/tekrar/geri dönüş provası açık. [Mutabakat raporu](releases/collections-2026-10-15/payment-reconciliation-report.md).
+
+## 15 Ekim — Önceki kararları güncel veriye bağlama ve aktarım paketi
+
+- Arşiv karar JSON'u ve 26 Eylül MGS kesiti hash ile doğrulandı; 807 karar satırının bağlı olduğu 794 karar nesnesi karşılaştırıldı. Madde 5'te açık onaylı üç literal-null tarihçenin müşteri, sözleşme ve tam 13 tarihçe kümesi aynı bulundu; yalnız bu üç davranış onayı yeniden bağlandı. Önceki dışlamalar, yanıtsız/çelişkili kararlar ve değişmiş finansal alanlar korunarak bekletildi; 435 koşullu dışlama adayı topluca elenmedi. Orijinal Excel dosyasının yeniden doğrulandığı iddia edilmez; sabit hash'li arşiv karar kanıtı kullanıldı.
+- 26 Eylül'e göre eklenenler: 28 müşteri, 7 sözleşme, 102 tarihçe ve 1.021 ödeme. Değişen/kaynakta artık gözlenmeyen kayıtlar ayrı delta dosyalarında; kaybolan kayıtlar için silme uygulanmaz.
+- Güncel aday alt küme: 4.438 sözleşme / 136.504 ödeme. 18 servis tanımı, 2.601 canlı müşteri tipi önerisi ve senkronizasyon prosedürünün dar farkı kapalı varsayılanlı SQL taslaklarıyla paketlendi. Canlı ID'ler koddan çözüldü; eski test ID'leri kullanılmadı. Ödeme RequestId'leri mevcut aktarım algoritmasıyla üretildi. Paket execution onaylı değildir; canlıda migration/seed/INSERT/UPDATE/ALTER veya Job değişikliği yapılmadı.
+- Sonraki bağımlılıklar: legacy ödeme kanıtı/banka mutabakatı, üst kart/cari/not/fatura/dosya kapsamı, aktör eşlemesi, bakım kesiti ve izole restore/idempotency/rollback provası. [Güncel karar ve paket raporu](releases/collections-2026-10-15/decision-reconciliation-report.md).
+
 ## 15 Ekim — Güncel Dev dashboard geliştirmelerini birleştirme
 
 - Güncel `origin/dev`: backend `24b2616`, frontend `7a2073d`. İki repository temiz `tahsilat-module` çalışma ağacında birleştirildi; dev branchleri değiştirilmedi. Backend çakışmasız. Frontend `src/helpers/functions.ts` menü yetkisi çakışması, dev çoklu yetki/case-insensitive karşılaştırması ve Tahsilat ağ/zaman aşımı mesajları birlikte korunarak çözüldü. Tahsilat'a özgü frontend/backend dosyaları önceki branch sürümleriyle aynı kaldı.
@@ -261,6 +374,31 @@ Kabul: her adımın kodu/kanıtı ve bekleyen sınırı ilgili raporda kayıtlı
 
 # Completed
 
+- **17 Ekim — canlı CDN salt-okuma:** Production uploads /Test-Development uploads-test ayrımı ve aynı bucket/endpoint kullanımı görüldü. Ortak altyapıda üç örneğin (PDF/PNG/JPEG) R2/public SHA-256/MIME/boyutu eşit; tümü 200. Çalışan production API aynı örneklerde doğru uploads CDN adresine 302 verdi. Yalnız SELECT/HEAD/GET; upload/delete/config/DB yazması yok. Gizli bilgiler yerine hash/varlık raporlandı, özel kanıtlar Git dışında. Gerçek Tahsilat dosyaları henüz yüklenmedi; PUT ve hosting secret eşitliği onaysızdır.
+
+- **17 Ekim — dosya adaptörü izole yazmalı kabulü tamamlandı:** Collections.Files mevcut R2FileStorage'ı HTTP-deny yerel sağlayıcıyla kullandı; yalnız AssistFlow_Performance_Restore/batch 2'de 1.818 sözleşme dosyası +3 müşteri dosyası /1.821 kalıcı receipt commit edildi. Tam replay 0 INSERT/0 PUT; üç kesinti, yanlış owner/audit, bozuk readback, 403 ve kaldırma koruması dahil 10 kontrol başarılı. 15 finansal/orijinal audit parmak izi eşit; CHECKDB temiz, 95 migration/24 Job adımı aynı. Ayrı 153 dosyalı teslim hazır; eski finansal paket değişmedi. Gerçek CDN/HTTP veya canlı DB yazması yok. [Kanıt ve hash'ler](releases/collections-2026-10-17/cdn-adapter-rehearsal.md).
+
+- **17 Ekim — CDN hazırlığı:** mevcut storage/endpoint/test aktarıcıları incelendi; kapalı onay ve journal sözleşmesi, pilot/readback/erişim/geri dönüş matrisi hazırlandı. Offline kontrol bundle+dosya hash'leri ve 1.818 sözleşme ilişkisi /1.100 yol +3 müşteri dosyası adayını doğruladı. 69 eksik/19 boş dosya ve 12 aktivite istisnası ayrıldı. Canlı DB/CDN işlemi ve runtime değişikliği yok.
+
+- **17 Ekim — operasyon hazırlığı:** Job/bakım/yedek/geri dönüş planı, 4+8+7 Job sınıfı, ayrı durdurma/devam ve gerçek sorumlu onay şablonu hazırlandı. Eski checksum'sız prova yedeği ile yeni canlı kurtarma kabulü ayrıldı; transaction rollback / belirsiz commit / ortak DB restore riskleri açıklandı. Runtime, mühürlü paket ve canlı DB değişmedi.
+
+- **17 Ekim — operatör/rol/ortak tablo-prosedür onay hazırlığı:** kişi/rol kodu ve rol başına önceki/istenen hak gereksinimleri, SC01–SC06 kapsamları, uygulayıcı/transaction sınırları, mükerrer uygulama ve seed'in geniş Edit verme riskleri, sıra/durma/geri dönüş koşulları belgelendi. Kapalı karar JSON'u ve SELECT-only ön kontrol SQL'i yerel parser ile doğrulandı. Runtime/paket/onay dosyaları değiştirilmedi, DB bağlantısı yok. [Onay listesi](releases/collections-2026-10-17/operator-and-shared-approvals.md).
+
+- **17 Ekim — gerçek host ve yeni backend'e bağlı yenilenmiş prova/teslim:** özel prova modunun ortam/katalog/kapalı ayar guard'ları, diğer worker constructor izolasyonu, gerçek Program.cs/Kestrel açılışı ve durdurulan araca ait host doğrulandı. Yeni sürümle restore+şema+rollback+full apply+replay+dört koruma+CHECKDB+teknik kabul tamam; yeni 275 dosyalı teslim mühürlendi. Canlı işlem yok. [Yeni kaynak/hash kanıtları](releases/collections-2026-10-17/hosting-and-refresh.md).
+
+- **17 Ekim — seed/migration/Manitou kontrollü açılış kodu:** StartupExecution options kaydı, iki otomatik migration girişinin ve genel seed'in kapatılması, Manitou ilk API/scope öncesi çıkış kontrolü tamamlandı. Varsayılanlar/sıkılık/dört izin kombinasyonu/kapalı ve etkin worker ilk turu için 13 bağlantısız kontrol geçti. BE solution build ilk 0 hata/811 mevcut uyarı; son artımlı tekrar 0 hata/58 uyarı (baseline iyileşmesi iddiası değil). Config/credential değişikliği, gerçek host veya SQL/API çağrısı yok. [Proses kabulü ve yeni paket gereği](releases/collections-2026-10-17/startup-isolation.md).
+
+- **17 Ekim — canlı teslim hazırlığı:** yalnız yerel dosyalardan çalışan hash kontrollü `Prepare-CollectionCutoverHandoff.ps1`, yazmalı kabul/runtime/plan/veri-şema bundle'ını bir araya getiren teslim yapısı ve sıralı bakım/geri dönüş/kabul kontrol listesi hazırlandı. Eski mühürlü paket/onaylar değiştirilmedi; canlı uygulama izni yok. [Teslim ve kalan adımlar](releases/collections-2026-10-17/execution-handoff.md).
+- **17 Ekim — teslim üretimi/doğrulaması:** `.tools/collection-cutover-handoff-2026-10-17-01` üretildi; 258 dosya/467.836.552 byte, ikinci hash okuması tam eşleşti. Manifest SHA `AAC3F982035C99167F9AEF8446F4470B374442D09F8FAB4959D3CB084B5111D5`. Yanlış hash çıktı oluşmadan reddedildi; canlı authorization NOT_APPROVED. Bu tur DB bağlantısı/şema-veri yazması/deploy yok. [Gerçek teslim kaydı](releases/collections-2026-10-17/handoff-delivery.md).
+
+- **17 Ekim — production adaptörü yazmalı kabul:** yalnız AssistFlow_Performance_Restore restore/şema, kontrollü kesinti ve tam transaction rollback, tam makbuz/audit korumalı aktarım, sıfır-kayıtlı tekrar ve dört koruma senaryosu başarılı. Son durum ilk commit'le aynı; CHECKDB temiz. Aynı kod/pakete bağlı teknik kabul oluştu; canlı yetki verilmedi. [Kanıt](releases/collections-2026-10-17/production-adapter-rehearsal.md).
+
+- **17 Ekim — canlı adaptör kodu ve salt-okunur kontrol:** ortak finansal çekirdek + ayrı production onay/plan/target/baseline/commit-outcome adaptörü, kaynak tekrar kontrolü, yazmalı prova makbuzu birleştiricisi ve kapalı canlı/prova planları hazır. Derlemeler ve üç negatif guard başarılı; mevcut veri/makbuz/audit/tutar okuma kontrolü geçti. **Yeni adaptör yazma provası tamamlanmadı**; bu madde yalnız kod ve okuma kabulüdür. [Kanıt](releases/collections-2026-10-17/production-adapter.md).
+
+- **17 Ekim — canlı inceleme paketi:** güncel canlı referanslı veri/karar/ödeme/ilişki paketleri ve şema yeniden üretildi; prova kanıtı/SQL eşdeğerliği ile hash mühürlendi. Job/approval/runbook hazır. Bu, canlı uygulama veya production executor tamamlanması değildir. [Teslim/kalan bağımlılıklar](releases/collections-2026-10-17/README.md).
+
+- **17 Ekim — hedef-kilitli veri provası:** 4.439 sözleşme, 17.269 tarife, 139.747 ödeme/makbuz ve ilişkili not/grup/fatura/cari/banka audit'i yalnız AssistFlow_Performance_Restore'a aktarıldı. Para birimi toplamları kaynakla aynı; 301.514 ham audit satırı. İkinci çalışma 0 yeni kayıt; kontrollü kesinti rollback'i ve dört makbuz/audit koruma senaryosu geçti, tüm satır hash'leri korundu. Son CHECKDB temiz. Build 0 hata. Gerçek CDN/uygulama/production geçişi bu kabulün dışında. [Kanıt](releases/collections-2026-10-15/rehearsal/data-transfer-2026-10-17.md).
+
 - **2–3 Ekim / zam SMS:** ortak servis, güvenli ortam ayarları, Configuration şablon seed'i, kalıcı SMS kuyruğu/deneme modeli, zam transaction bağlantısı, arka plan gönderici, GET/POST yetkili endpointler ve sözleşme SMS tabı tamamlandı. AssistFlowTest migration/seed ve geçici kayıtlarla uçtan uca simülasyon kontrolü başarılı. HTTP/tarayıcı kabulü için backend restartı beklenir; canlı gönderim açık değildir.
 
 - **K03 uygulaması:** Testte collection.GroupParent migrationı, eksik G müşteri tipi ve 56 net üst kart/ilişkisi uygulandı. Son önizleme 0 yeni/56 uygulanmış/18 inceleme; mevcut müşteri değişikliği 0, finansal sayımlar aynı. Üst kart ve üyeler ayrıldı; kurumsal/cari bağlam GET API, Autofac kaydı ve Tahsilat sözleşme detay sekmesi tamamlandı. BE/FE build, hedefli lint ve servis/veri mutabakatı geçti. Üst kartların eski sözleşmelerinin aktarımı ve 18 istisna ayrıca açık. [K03 sonuçları](collection-k03-customer-context-2026-09-27.md).
@@ -458,6 +596,30 @@ Kod varlığı ile entegrasyon/kabul tamamlanması farklıdır:
 - P08 yenileme dilimi: FE Sorgula/table göstergesi isValidating kullanıyor; yenileme sırasında tekrar submit engelleniyor. Dosyaya özel ESLint başarılı; tarayıcı kabulü henüz yok.
 
 # In Progress
+
+- **CDN son canlı kapıları:** sınırlı gerçek okuma/runtime public-prefix kabulü tamam. Jenkins/IIS tam etkin config/credential referansı, onaylı malware taraması/operatör/bakım/yedek/finansal replay, açık pilot ve tam migration readback/API/menu/browser kabulü beklenir. Sırf üç ortak dosya açıldı diye live upload onayı verilmez; collection dosya tabloları canlıda henüz yok.
+
+- **Dosya fazı canlı kabulü:** izole adapter/prova/teslim tamamlandı. Production namespace/credential/scan/public exposure, gerçek operatör/bakım/yedek ve finansal replay kanıtlarıyla final canlı plan/onayı, pilot/tam upload, gerçek CDN readback ve API/UI yetki kabulü beklenir. Izole kabul bunları açmaz.
+
+- **CDN istisnaları:** 69 eksik/19 boş dosya sözleşmeyi sildirmez; 2206 → 87400 dosyaları dahil sahibi doğrulanamayan 12 aktivite dosyası otomatik alınmaz. Bu kayıtlar yeni kanıt/onay olmadan aday kapsamına eklenmez. Canlı upload yetkisi yok.
+
+- **Canlı operasyon onayları bekleniyor:** gerçek sorumlular/operatör, bakım penceresi, RPO/RTO, güncel tam adım/Job kararları, seçilen yedeğin izole restore/CHECKDB ve log/fork zinciri kanıtı. Hazırlık dokümanı tamamlandı; fiilî bakım, yedekleme, Job kesme/devam veya geri dönüş uygulanmadı.
+
+**Güncel onay bekleyen bilgiler:** gerçek operatör User.Code, ilk okuma/sonraki yazma Role.Code ve tüm etkilenen üyeliklerin etkin hakları, her SC01–SC06 için yetkili kişi/dış kayıt/tarih kararı. Listeler hazır; henüz gerçek kişi/rol/onay değerleri yok, kod/kimlik tahmin edilmeyecek. Yeni onay olmadan canlı rol/prosedür/ortak tablo yazması yapılmaz.
+
+**Güncel sıra:** gerçek izole host kontrolü ve yeni backend'e bağlı paket/prova yenilemesi tamamlandı. Aşağıdaki bu kabulü hâlâ bekleyen önceki notlar tarihseldir. Sırada canlı operatör/rol/ortak dbo-prosedür onayları, production hosting override ve diğer worker işletimi/Job-bakım-yedek-PIT, CDN/HTTP kabulü ve bakım sonrası yeni son kesit vardır. Bu turun izni canlı yazma/deploy/Job açma-kapama değildir; kapılar NO-GO.
+
+- **17 Ekim — yeni açılış kodunun operasyonel kabulü:** StartupExecution bayrakları ve bağlantısız kontrol tamam. Sırada diğer worker'ların mevcut sınırlarını koruyarak gerçek hosting override/seed/Manitou izolasyonunun dış çağrıları kapalı izole süreçte doğrulanması; ardından güncel backend bağımlılık hash'leriyle yeni adapter/plan/paket ve gerekli yazmalı prova. Eski mühürlü teslim bozulmadı; yeni runtime için execution yetkisi yok. Canlı bağlantısı/config/deploy/Job değişikliği yapılmadı.
+
+- **17 Ekim güncel öncelik — canlı uygulama kapıları:** adaptörün yazmalı provası tamamlandı. Canlı onay kapıları hâlâ kapalı: operatör/rol ve ortak dbo/prosedür fark onayları, BE ilk worker/seed izolasyonu, Job/bakım/yedek-PIT, gerçek CDN/HTTP kabulü ve bakım sonrası son kesit/paket. Bu hazırlık canlı yazma veya deploy yetkisi değildir.
+
+- **17 Ekim sonraki bağımlılık:** güvenlik-kilitli veri uygulayıcı ve adapter provası hazır; teknik kabul canlı yürütme kaydına açıkça bağlanacak. Aktif inceleme paketi cutover-review-2026-10-17-02 tarihsel olarak mühürlüdür; son kesit ve gerçek onaylar olmadan production'da uygulanmaz.
+
+- **17 Ekim — production kapıları:** Restore/şema ve makbuz/audit korumalı veri provası tamamlandı; aşağıdaki 15 Ekim “prova bekleniyor” ifadeleri tarihsel durumdur. Şimdi son bakım kesiti/canlı hedef referansları, canlıya özel apply paketi, insan operatör/rol ve ortak veri/prosedür onayları, gerçek CDN, uygulama başlangıcı/HTTP/ekran kabulü ve operasyonel geri dönüş adımları ayrı tamamlanacak. Canlıda uygulama yetkisi henüz yok; NO-GO korunur.
+
+- **15 Ekim — güncel MGS/canlı müşteri önizlemesi:** Kullanıcının salt-okuma/henüz uygulamama talebine göre MGS ve AssistFlow'dan sabit SELECT'lerle Git dışına 22 veri dosyası alındı. İki tur hash/sayım aynı, ancak Joblar çalıştığından transactional/final kesit değil. Kaynak 19.944 müşteri / 9.515 sözleşme / 34.586 tarife / 243.480 ödeme / 12.934 not / 55.597 grup geçmişi; 83.543 banka kimliğinde boş/mükerrer 0. Kimlik önizlemesi 3.538 mevcut uyumlu + 2.601 grup tipi önerisi; öneriler canlı ID ve önceki alan/hash değerleriyle kaydedildi, UPDATE yok. 18 eksik servis tipi adayı. Muhafazakâr finansal önizleme 4.435 referans onayı bekleyen sözleşme ve 136.479 legacy kanıtı bekleyen ödeme adayı; kalanlar dışlama/inceleme, önceki müşteri kararları geçersiz kılınmadı. Canlıya yazılabilir import değildir: önceki 5/6/7 kanıtları/delta, G/A/cari/dosya bağları, legacy ödeme mutabakatı ve final kesit/prova açık. Araç build 0 hata/uyarı; paket hash ve sınıf toplamları doğrulandı. [Önizleme raporu](releases/collections-2026-10-15/data-preparation-report.md).
+
+- **15 Ekim — Jenkins canlı geçiş hazırlığı:** Kullanıcı FE/BE'yi ayrı job'larla main üzerinden yayınlayacak; bakım aralığı mümkün. Kaynak güncel MGS'dir; test işlem verisi canlıya kopyalanmayacak. AssistFlow salt-okunur profilinde collection tabloları yok, 21 eksik Tahsilat migrationı; MGS Sheets/PasswordPolicy zaten kurulu, repository dışı eski migration korunuyor. 18.883 aktif müşteride boş/mükerrer normalize abone no yok; GRP01 mevcut. Kaynak Tahsilat/SIMS/grup mail Jobları hâlâ etkin. 21 EF SQL'i + hash manifesti, kapalı varsayılanlı tanım/menü/SMS seed taslakları, ortak referans önizlemesi, postflight ve Jenkins/geri dönüş runbook'u hazırlandı. Çevrimdışı üretici build/hash kontrolü başarılı; **canlıya yazılmadı**. Henüz tamamlanmayanlar: canlıya özel veri apply/eşleme/sınıflandırma-prosedür farkı, güncel tutarlı kesit ve delta, restore/idempotency/rollback provası, rol/audit kullanıcısı, K10/K11 kapsam ve son kabul. [Aktif yayın planı](releases/collections-2026-10-15/README.md). Paket henüz execution onaylı değil.
 
 - **Zam SMS / kabul:** geliştirmeler ve genel SMS Takibi tamamlandı; son backend koduyla HTTP/ekran kabul kontrolü kaldı. Test/dev simülasyonu açık; gerçek müşteri gönderimi kapalıdır.
 
